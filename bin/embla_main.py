@@ -39,8 +39,15 @@ def main(argv):
   makeCommand = "make -j " + str(options.jobs)
   print makeCommand
   makeResult = os.system(makeCommand)
-  return makeResult
+  if makeResult:
+    return makeResult
+
+  checkCommand = makeCommand + " check"
+  print checkCommand
+  checkResult = os.system(checkCommand)
   
+  return checkResult
+
 if __name__ == "__main__":
   sys.exit(main(sys.argv))
   
