@@ -1,1 +1,1 @@
-EXTRA_DIST = em-manual.xml
+EXTRA_DIST = nl-manual.xml
