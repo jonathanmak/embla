@@ -39,25 +39,16 @@
 #include "pub_tool_libcprint.h"
 #include "pub_tool_libcassert.h"
 #include "pub_tool_tooliface.h"
-#include "libvex_guest_offsets.h"
 #include "pub_tool_options.h"
+#include "pub_tool_mallocfree.h"
+
+#include "libvex_guest_offsets.h"
 
 static unsigned int translations = 0;
-static unsigned int executions = 0;
-static unsigned int exits_found = 0;
-static unsigned int call_ret_found = 0;
-
-typedef 
-   enum {
-     DIC_Call,
-     DIC_Ret,
-     DIC_Other
-   } 
-   DInstrClass;
 
 typedef
    struct _StackFrame {
-     Addr32 pc,sp;
+     Addr32 sp,call_addr,ret_addr;
      unsigned int seq;
      struct _StackFrame *parent;
    }
@@ -65,12 +56,11 @@ typedef
 
 StackFrame * current_stack_frame = NULL;
 
-Char buf[512];
-int first_sp = 0;
+static Char buf[512];
+static int first_sp = 0;
 
-int trace_file_fd;
+static int trace_file_fd;
 
-DInstrClass last_imark_class = DIC_Other;
 
 static void em_post_clo_init(void)
 {
@@ -93,215 +83,87 @@ static void em_post_clo_init(void)
 
 }
 
-static DInstrClass decodeGuestInstr(Addr32 addr)
-{
-    UChar *ip = (UChar *) addr;
-
-    // Skip prefixes
-    switch( *ip ) {
-        case 0xf0: // LOCK prefix
-        case 0xf2: // rep prefix
-        case 0xf3: // rep prefix
-            ip++;
-            break;
-        default:
-            break;
-    }
-    switch( *ip ) {
-        case 0x67: // Address size override
-            ip++;
-            break;
-        default:   // Not a prefix
-            break;
-    }
-    switch( *ip ) {
-        case 0x66: // Operand size override
-            ip++;
-            break;
-        default:
-            break;
-    }
-    switch( *ip ) {
-        case 0x2e: // CS segment override
-        case 0x36: // SS segment override
-        case 0x3e: // DS segment override
-        case 0x26: // ES segment override
-        case 0x64: // FS segment override
-        case 0x65: // GS segment override
-            ip++;
-            break;
-        default:
-            break;
-    }
-
-    // Now look at the opcode
-    switch( *ip ) {
-        case 0xe8: // A pc relative CALL
-            return DIC_Call;
-        case 0xff: // Depends on the Mod/RM byte
-            ip++;
-            if( (((*ip)>>3)&7) == 2 ) {
-                return DIC_Call;
-            }
-            break;
-        case 0xc2:
-        case 0xc3:
-            return DIC_Ret;
-    }
-    return DIC_Other;
-}
-
-static VG_REGPARM(2)
-void recordCall(int sp, int ra) 
+static VG_REGPARM(3)
+void recordCall(int sp, int ca, int ra) 
 {
     StackFrame * newFrame = (StackFrame *) VG_(calloc)(1,sizeof(StackFrame));
 
-    newFrame->parent = current_stack_frame;
-    newFrame->sp = sp;
-    newFrame->pc = ra;
-    newFrame->seq = 0;
+    newFrame->parent    = current_stack_frame;
+    newFrame->sp        = sp;
+    newFrame->call_addr = ca;
+    newFrame->ret_addr  = ra;
+    newFrame->seq       = 0;
 
     current_stack_frame = newFrame;
 
 }
 
-static VG_REGPARM(0)
-void recordRet(void) 
+static VG_REGPARM(2)
+void recordRet(int sp, int pc) 
 {
+   // Should check that we are really returning to the next stack frame
+   // and in that case make it the current stack frame
+   // It should NOT deallocate the current stack frame, though
     
 
 }
 
 
 
+// instrumentExit is called when we find and Exit in the block AND for the
+// implicit Exit at the end of each block
 
-
-
-
-
-
-
-char *hexdigits = "0123456789abcdef";
-
-static VG_REGPARM(3)
-void recordCallOrReturn(int sp, int pc, int len)
+static void instrumentExit(IRBB *bbOut, IRJumpKind jk, Addr32 pc, Int len)
 {
-    HChar *str;
-    unsigned char *spc = (unsigned char *) pc;
-    int i;
-    DInstrClass ic = decodeGuestInstr((Addr32) pc);
+    switch( jk ) {
 
-    if( first_sp == 0 ) {
-       first_sp = sp;
+      case Ijk_Call: 
+          {
+             HChar *hname = "recordCall";
+             void  *haddr = &recordCall;
+             IRTemp tmp_sp = newIRTemp(bbOut->tyenv, Ity_I32);
+             IRExpr *exp_sp = IRExpr_Tmp( tmp_sp );
+             IRExpr *exp_ca = IRExpr_Const( IRConst_U32( pc ) );
+             IRExpr *exp_ra = IRExpr_Const( IRConst_U32( pc+len ) );
+             IRExpr *exp_get_sp = IRExpr_Get( OFFSET_x86_ESP, Ity_I32 );
+             IRExpr **args = mkIRExprVec_3( exp_sp, exp_ca, exp_ra );
+             IRDirty *dy = unsafeIRDirty_0_N( 3, hname, haddr, args );
+             
+             addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_sp, exp_get_sp ) );
+             addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
+          }
+          break;
+
+      case Ijk_Ret:
+          {
+             HChar *hname = "recordRet";
+             void  *haddr = &recordRet;
+             IRTemp tmp_sp = newIRTemp(bbOut->tyenv, Ity_I32);
+             IRExpr *exp_sp = IRExpr_Tmp( tmp_sp );
+             IRExpr *exp_pc = IRExpr_Const( IRConst_U32( pc ) );
+             IRExpr *exp_get_sp = IRExpr_Get( OFFSET_x86_ESP, Ity_I32 );
+             IRExpr **args = mkIRExprVec_2( exp_sp, exp_pc );
+             IRDirty *dy = unsafeIRDirty_0_N( 2, hname, haddr, args );
+             
+             addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_sp, exp_get_sp ) );
+             addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
+          }
+          break;
+
+      default: 
+          // Do nothing
+          break;
     }
-
-    if( ic == DIC_Call ) {
-       str = (HChar *) "%u %d Call";
-    } else if( ic == DIC_Ret ) {
-       str = (HChar *) "%u %d Ret";
-    } else {
-       str = (HChar *) "%u %d -";
-    }
-
-    VG_(sprintf)(buf, str, pc, first_sp - sp);
-    VG_(write)(trace_file_fd, (void*)buf, VG_(strlen)(buf));
-
-    for( i=0; i<len; i++ ) {
-       buf[0]=' ';
-       buf[1]=hexdigits[(*spc)>>4];
-       buf[2]=hexdigits[(*spc)&15];
-       buf[3]=0;
-       VG_(write)(trace_file_fd, (void*)buf, VG_(strlen)(buf));
-       spc++;
-    }
-    VG_(sprintf)(buf, "\n");
-    VG_(write)(trace_file_fd, (void*)buf, VG_(strlen)(buf));
-
-}
-
-
-static VG_REGPARM(3)
-void recordExit(IRJumpKind jk, DInstrClass ic, int pc)
-{
-    HChar *str;
-
-    if( ic == DIC_Call ) {
-       str = (HChar *) "%u DIC_Call ";
-    } else if( ic == DIC_Ret ) {
-       str = (HChar *) "%u DIC_Ret  ";
-    } else {
-       str = (HChar *) "%u DIC_Other";
-    }
-
-    VG_(sprintf)(buf, str, pc);
-    VG_(write)(trace_file_fd, (void*)buf, VG_(strlen)(buf));
-
-    if( jk == Ijk_Call ) {
-       str = (HChar *) " Ijk_Call\n";
-    } else if( jk == Ijk_Ret ) {
-       str = (HChar *) " Ijk_Ret\n";
-    } else {
-       str = (HChar *) " Ijk_Other\n";
-    }
-
-    VG_(sprintf)(buf, str, pc);
-    VG_(write)(trace_file_fd, (void*)buf, VG_(strlen)(buf));
-
-}
-
-static VG_REGPARM(0)
-void recordEntry()
-{
-    VG_(sprintf)(buf, "Block entered\n");
-    VG_(write)(trace_file_fd, (void*)buf, VG_(strlen)(buf));
-}
-
-
-static void instrumentCallOrReturn(IRBB *bbOut, DInstrClass jt, Addr32 pc, Int len)
-{
-    IRTemp sp_val = newIRTemp(bbOut->tyenv, Ity_I32);
-    HChar *hname = "recordCallOrReturn";
-    void  *haddr = &recordCallOrReturn;
-    IRExpr **args = mkIRExprVec_3( IRExpr_Tmp(sp_val),
-                                   IRExpr_Const( IRConst_U32( pc ) ),
-                                   IRExpr_Const( IRConst_U32( len ) ) );
-    IRDirty *dy = unsafeIRDirty_0_N( 3, hname, haddr, args );
-    IRExpr  *get_sp = IRExpr_Get( OFFSET_x86_ESP, Ity_I32 );
-
-    addStmtToIRBB( bbOut, IRStmt_Tmp( sp_val, get_sp ) );
-    addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
-}
-
-static void instrumentExit(IRBB *bbOut, IRJumpKind jk, Addr32 pc)
-{
-    HChar *hname = "recordExit";
-    void  *haddr = &recordExit;
-    DInstrClass ic = decodeGuestInstr( pc );
-    IRExpr **args = mkIRExprVec_3( IRExpr_Const( IRConst_U32( jk ) ),
-                                   IRExpr_Const( IRConst_U32( ic ) ),
-                                   IRExpr_Const( IRConst_U32( pc ) ) );
-    IRDirty *dy = unsafeIRDirty_0_N( 3, hname, haddr, args );
-
-    addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
-}
-
-static void instrumentBBentry(IRBB *bbOut)
-{
-    IRDirty *dy = unsafeIRDirty_0_N( 0, "recordEntry", &recordEntry, mkIRExprVec_0() );
-    addStmtToIRBB( bbOut, IRStmt_Dirty( dy ) );
 }
 
 static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout, 
                            IRType gWordTy, IRType hWordTy)
 {
     IRBB      *bbOut;
-    IRTemp    t1,t2;
-    IRExpr    *the_addr, *one;
     int       bbIn_idx;
     IRStmt    *stIn;
     Addr32    guestIAddr = 0;
     Int       guestILen  = 0;
-    DInstrClass  ic;
 
     translations++;
 
@@ -310,44 +172,14 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
     bbOut->next     = dopyIRExpr(bbIn->next);          // d:o
     bbOut->jumpkind = bbIn->jumpkind;
 
-    t1 = newIRTemp(bbOut->tyenv, Ity_I32);
-    t2 = newIRTemp(bbOut->tyenv, Ity_I32);
-
-    the_addr = IRExpr_Const( IRConst_U32( (UInt) &executions ) );
-    one      = IRExpr_Const( IRConst_U32( 1 ) );
-
-/*
-    addStmtToIRBB( bbOut, IRStmt_Tmp(t1, IRExpr_Load(Iend_LE, Ity_I32, the_addr)) );
-    addStmtToIRBB( bbOut, IRStmt_Tmp(t2, IRExpr_Binop(Iop_Add32, IRExpr_Tmp(t1), one)) );
-    addStmtToIRBB( bbOut, IRStmt_Store(Iend_LE, the_addr, IRExpr_Tmp(t2)) );
-*/
-
-    // instrumentBBentry( bbOut );
-
     for( bbIn_idx = 0; bbIn_idx < bbIn->stmts_used; bbIn_idx++ ) {
        stIn = bbIn->stmts[bbIn_idx];
        
        switch( stIn->tag ) {
 
          case Ist_IMark: 
-             guestIAddr = (Addr32) stIn->Ist.IMark.addr;
-             guestILen  = stIn->Ist.IMark.len;
-             ic = decodeGuestInstr(guestIAddr);
-             last_imark_class = ic;
-             if(1 || ic != DIC_Other ) {
-                 instrumentCallOrReturn( bbOut, ic, guestIAddr, guestILen );
-             }
-             break;
-
-         /* Here we look at all jumps, even if they are due to a repeat, but
-            then they should not have kind Call or Ret.
-         */
          case Ist_Exit:
-             if( stIn->Ist.Exit.jk == Ijk_Call || stIn->Ist.Exit.jk == Ijk_Ret ) {
-               // instrumentExit( bbOut, stIn->Ist.Exit.jk, guestIAddr );
-               ic = decodeGuestInstr(guestIAddr);
-               instrumentCallOrReturn( bbOut, ic, guestIAddr, guestILen );
-             }
+             instrumentExit( bbOut, stIn->Ist.Exit.jk, guestIAddr, guestILen );
              break;
 
          case Ist_NoOp:
@@ -355,8 +187,12 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
          case Ist_Put:
          case Ist_PutI:
          case Ist_Tmp:
+             // This is an assignment to a temp, so it should be instrumented
+             // if the rhs is a Load
          case Ist_Store:
+             // This is a store instruction, so it should be instrumented
          case Ist_Dirty:
+             // This should maybe be instrumented
          case Ist_MFence:
              break;
 
@@ -364,23 +200,12 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
        addStmtToIRBB( bbOut, stIn );
     }
 
-    
-    if( bbIn->jumpkind == Ijk_Call || bbIn->jumpkind == Ijk_Ret ) {
-      // instrumentExit( bbOut, bbIn->jumpkind, guestIAddr );
-      ic = decodeGuestInstr(guestIAddr);
-      instrumentCallOrReturn( bbOut, ic, guestIAddr, guestILen );
-    }
-    
-
+    instrumentExit( bbOut, bbIn->jumpkind, guestIAddr, guestILen );
     return bbOut;
 }
 
 static void em_fini(Int exitcode)
 {
-
-   VG_(sprintf)(buf, "Exits: %d, Calls and returns: %d\n", exits_found, call_ret_found);
-   
-   // VG_(write)(trace_file_fd, (void*)buf, VG_(strlen)(buf));
 
    VG_(close)(trace_file_fd);
 
