@@ -1,0 +1,16 @@
+<?xml version="1.0"?> <!-- -*- sgml -*- -->
+<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
+  "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
+
+<chapter id="em-manual" xreflabel="Embla">
+
+<title>Embla: a Dependency Profiler</title>
+<subtitle>A tool for finding parallelism</subtitle>
+
+<para>Embla is a dependency profiler that helps you find independent,
+or nearly independent, parts of your code. These are thus possible to
+parallelize.</para>
+
+</chapter>
+
+

@@ -509,6 +509,9 @@ AC_OUTPUT(
    none/tests/ppc32/Makefile
    none/tests/x86/Makefile
    none/docs/Makefile
+   embla/Makefile
+   embla/tests/Makefile
+   embla/docs/Makefile
 ) 
 
 cat<<EOF
