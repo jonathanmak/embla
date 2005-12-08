@@ -41,6 +41,7 @@
 #include "pub_tool_tooliface.h"
 #include "pub_tool_options.h"
 #include "pub_tool_mallocfree.h"
+#include "pub_tool_libcassert.h"
 
 #include "libvex_guest_offsets.h"
 
@@ -99,12 +100,13 @@ void recordCall(int sp, int ca, int ra)
 }
 
 static VG_REGPARM(2)
-void recordRet(int sp, int pc) 
+void recordRet(int sp, int target) 
 {
    // Should check that we are really returning to the next stack frame
    // and in that case make it the current stack frame
    // It should NOT deallocate the current stack frame, though
-    
+   
+   
 
 }
 
@@ -113,7 +115,7 @@ void recordRet(int sp, int pc)
 // instrumentExit is called when we find and Exit in the block AND for the
 // implicit Exit at the end of each block
 
-static void instrumentExit(IRBB *bbOut, IRJumpKind jk, Addr32 pc, Int len)
+static void instrumentExit(IRBB *bbOut, IRJumpKind jk, Addr32 pc, Int len, IRExpr *tgt)
 {
     switch( jk ) {
 
@@ -135,10 +137,14 @@ static void instrumentExit(IRBB *bbOut, IRJumpKind jk, Addr32 pc, Int len)
           break;
 
       case Ijk_Ret:
-          {
+          {  
+             if( tgt==NULL ) {
+                VG_(tool_panic)("Ret not at end of BB!");
+             }
              HChar *hname = "recordRet";
              void  *haddr = &recordRet;
              IRTemp tmp_sp = newIRTemp(bbOut->tyenv, Ity_I32);
+             IRTemp tmp_pc = newIRTemp(bbOut->tyenv, Ity_I32);
              IRExpr *exp_sp = IRExpr_Tmp( tmp_sp );
              IRExpr *exp_pc = IRExpr_Const( IRConst_U32( pc ) );
              IRExpr *exp_get_sp = IRExpr_Get( OFFSET_x86_ESP, Ity_I32 );
@@ -146,6 +152,7 @@ static void instrumentExit(IRBB *bbOut, IRJumpKind jk, Addr32 pc, Int len)
              IRDirty *dy = unsafeIRDirty_0_N( 2, hname, haddr, args );
              
              addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_sp, exp_get_sp ) );
+             addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_pc, tgt ) );
              addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
           }
           break;
@@ -178,8 +185,9 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
        switch( stIn->tag ) {
 
          case Ist_IMark: 
-         case Ist_Exit:
-             instrumentExit( bbOut, stIn->Ist.Exit.jk, guestIAddr, guestILen );
+         case Ist_Exit: // Should do something about the return here
+	     instrumentExit( bbOut, stIn->Ist.Exit.jk, guestIAddr, guestILen, 
+                             NULL );
              break;
 
          case Ist_NoOp:
@@ -200,7 +208,7 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
        addStmtToIRBB( bbOut, stIn );
     }
 
-    instrumentExit( bbOut, bbIn->jumpkind, guestIAddr, guestILen );
+    instrumentExit( bbOut, bbIn->jumpkind, guestIAddr, guestILen, bbIn->next );
     return bbOut;
 }
 
