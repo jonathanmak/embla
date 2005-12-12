@@ -56,7 +56,9 @@ typedef
    }
    StackFrame;
 
-static StackFrame * current_stack_frame = NULL;
+static StackFrame first_stack_frame = {(unsigned int) -1, 0, 0, 0, NULL};
+
+static StackFrame * current_stack_frame = &first_stack_frame;
 
 static Char buf[512];
 static int first_sp = 0;
@@ -98,6 +100,10 @@ void recordCall(int sp, int ca, int ra)
 
     current_stack_frame = newFrame;
 
+    // some sprintf debugging ...
+    VG_(sprintf)(buf, "Call %u %u %u\n", sp, ca, ra);
+    VG_(write)(trace_file_fd, (void*)buf, VG_(strlen)(buf));
+
 }
 
 static VG_REGPARM(2)
@@ -107,9 +113,67 @@ void recordRet(int sp, int target)
    // and in that case make it the current stack frame
    // It should NOT deallocate the current stack frame, though
    
-   
+   StackFrame   *current = current_stack_frame;
+   unsigned int stack_sp;
+   unsigned int stack_ra;
+   StackFrame    *parent;
+   int           unwind=0;
+
+   // some sprintf debugging ...
+   VG_(sprintf)(buf, "Return ");
+   VG_(write)(trace_file_fd, (void*)buf, VG_(strlen)(buf));
+
+   if( current == NULL ) return;
+
+   parent = current->parent;
+
+   // the sp in the StackFrame struct is the sp *after* pushing the 
+   // return address; hence adding 4 bytes should yield the sp 
+   // after the return has popped
+
+   while( parent != NULL && parent->sp+4 < sp ) {
+     // we need to unwind the stack
+     current=parent;
+     parent=parent->parent;
+     unwind++;
+   }
+   // we have found the right stack frame
+   stack_sp = current->sp;
+   stack_ra = current->ret_addr;
+
+   // some sprintf debugging ...
+   VG_(sprintf)(buf, "%d ", unwind);
+   VG_(write)(trace_file_fd, (void*)buf, VG_(strlen)(buf));
+
+   if( current->sp+4 > sp ) {
+     // this return does not correspond to the appropriate call
+     // do nothing
+     // some sprintf debugging ...
+     VG_(sprintf)(buf, "to same ");
+     VG_(write)(trace_file_fd, (void*)buf, VG_(strlen)(buf));
+
+     current_stack_frame=current;
+   } else {
+     // we have returned and possibly popped a few more words off of the stack
+     if( current->ret_addr != target ) {
+       // we're not returning to the scene of the crime, sorry, call
+       
+       // some sprintf debugging ...
+       VG_(sprintf)(buf, "but funny ");
+       VG_(write)(trace_file_fd, (void*)buf, VG_(strlen)(buf));
+       
+     }
+     // we will not need this retrun address any more
+     current_stack_frame=parent;
+   }
+
+   // some sprintf debugging ...
+   VG_(sprintf)(buf, "\n");
+   VG_(write)(trace_file_fd, (void*)buf, VG_(strlen)(buf));
+
 
 }
+
 
 // untility function for emitting code to increment a global variable
 
@@ -136,8 +200,6 @@ static void emitIncrementGlobal(IRBB *bbOut, void *addr, unsigned int amount)
 static void instrumentExit(IRBB *bbOut, IRJumpKind jk, Addr32 pc, Int len, IRExpr *tgt,
                            unsigned int loc_instr)
 {
-    emitIncrementGlobal( bbOut, &instructions, loc_instr );
-
     switch( jk ) {
 
       case Ijk_Call: 
@@ -207,7 +269,11 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
        switch( stIn->tag ) {
 
          case Ist_IMark: 
-	     loc_instr++;
+             guestIAddr = (Addr32) stIn->Ist.IMark.addr;
+             guestILen  = stIn->Ist.IMark.len;
+             loc_instr++;
+             emitIncrementGlobal( bbOut, &instructions, loc_instr );
+             loc_instr = 0;
              break;
          case Ist_Exit: 
 	     instrumentExit( bbOut, stIn->Ist.Exit.jk, guestIAddr, guestILen, 
