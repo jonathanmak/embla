@@ -111,6 +111,23 @@ void recordRet(int sp, int target)
 
 }
 
+// untility function for emitting code to increment a global variable
+
+static void emitIncrementGlobal(IRBB *bbOut, void *addr, unsigned int amount)
+{
+    IRTemp tmp_instrs_old = newIRTemp( bbOut->tyenv, Ity_I32 );
+    IRTemp tmp_instrs_new = newIRTemp( bbOut->tyenv, Ity_I32 );
+    IRExpr *exp_instrs_new = IRExpr_Tmp( tmp_instrs_new );
+
+    IRExpr *exp_instr_addr = IRExpr_Const( IRConst_U32( (UInt) addr ) );
+    IRExpr *exp_instrs = IRExpr_Load( Iend_LE, Ity_I32, exp_instr_addr );
+    IRExpr *exp_amount = IRExpr_Const( IRConst_U32( amount ) );
+    IRExpr *exp_add = IRExpr_Binop( Iop_Add32, IRExpr_Tmp( tmp_instrs_old ), exp_amount );
+
+    addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_instrs_old, exp_instrs ) );
+    addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_instrs_new, exp_add ) );
+    addStmtToIRBB( bbOut, IRStmt_Store( Iend_LE, exp_instr_addr, exp_instrs_new ) );
+}
 
 
 // instrumentExit is called when we find and Exit in the block AND for the
@@ -119,18 +136,7 @@ void recordRet(int sp, int target)
 static void instrumentExit(IRBB *bbOut, IRJumpKind jk, Addr32 pc, Int len, IRExpr *tgt,
                            unsigned int loc_instr)
 {
-    IRTemp tmp_instrs_old = newIRTemp( bbOut->tyenv, Ity_I32 );
-    IRTemp tmp_instrs_new = newIRTemp( bbOut->tyenv, Ity_I32 );
-    IRExpr *exp_instrs_new = IRExpr_Tmp( tmp_instrs_new );
-
-    IRExpr *exp_instr_addr = IRExpr_Const( IRConst_U32( (UInt) &instructions ) );
-    IRExpr *exp_instrs = IRExpr_Load( Iend_LE, Ity_I32, exp_instr_addr );
-    IRExpr *exp_loc = IRExpr_Const( IRConst_U32( loc_instr ) );
-    IRExpr *exp_add = IRExpr_Binop( Iop_Add32, IRExpr_Tmp( tmp_instrs_old ), exp_loc );
-
-    addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_instrs_old, exp_instrs ) );
-    addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_instrs_new, exp_add ) );
-    addStmtToIRBB( bbOut, IRStmt_Store( Iend_LE, exp_instr_addr, exp_instrs_new ) );
+    emitIncrementGlobal( bbOut, &instructions, loc_instr );
 
     switch( jk ) {
 
@@ -161,7 +167,7 @@ static void instrumentExit(IRBB *bbOut, IRJumpKind jk, Addr32 pc, Int len, IRExp
              IRTemp tmp_sp = newIRTemp(bbOut->tyenv, Ity_I32);
              IRTemp tmp_pc = newIRTemp(bbOut->tyenv, Ity_I32);
              IRExpr *exp_sp = IRExpr_Tmp( tmp_sp );
-             IRExpr *exp_pc = IRExpr_Const( IRConst_U32( pc ) );
+             IRExpr *exp_pc = IRExpr_Tmp( tmp_pc );
              IRExpr *exp_get_sp = IRExpr_Get( OFFSET_x86_ESP, Ity_I32 );
              IRExpr **args = mkIRExprVec_2( exp_sp, exp_pc );
              IRDirty *dy = unsafeIRDirty_0_N( 2, hname, haddr, args );
