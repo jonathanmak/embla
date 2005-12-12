@@ -5,7 +5,7 @@ AM_CFLAGS_PIC = -fpic -fno-omit-frame-pointer
 
 AM_CPPFLAGS_X86_LINUX = $(add_includes_x86_linux)
 AM_CFLAGS_X86_LINUX = $(WERROR) @FLAG_M32@ @PREFERRED_STACK_BOUNDARY@ $(AM_CFLAGS_BASE)
-AM_CCASFLAGS_X86_LINUX = $(add_includes_x86_linux) @FLAG_M32@ -g
+AM_CCASFLAGS_X86_LINUX = $(add_includes_x86_linux) $(DEFAULT_INCLUDES) @FLAG_M32@ -g
 
 AM_CPPFLAGS_AMD64_LINUX = $(add_includes_amd64_linux)
 AM_CFLAGS_AMD64_LINUX = $(WERROR) -m64 -fomit-frame-pointer @PREFERRED_STACK_BOUNDARY@ $(AM_CFLAGS_BASE)
