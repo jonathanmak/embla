@@ -46,6 +46,7 @@
 #include "libvex_guest_offsets.h"
 
 static unsigned int translations = 0;
+static unsigned int instructions = 0;
 
 typedef
    struct _StackFrame {
@@ -55,7 +56,7 @@ typedef
    }
    StackFrame;
 
-StackFrame * current_stack_frame = NULL;
+static StackFrame * current_stack_frame = NULL;
 
 static Char buf[512];
 static int first_sp = 0;
@@ -93,7 +94,7 @@ void recordCall(int sp, int ca, int ra)
     newFrame->sp        = sp;
     newFrame->call_addr = ca;
     newFrame->ret_addr  = ra;
-    newFrame->seq       = 0;
+    newFrame->seq       = instructions;
 
     current_stack_frame = newFrame;
 
@@ -115,8 +116,22 @@ void recordRet(int sp, int target)
 // instrumentExit is called when we find and Exit in the block AND for the
 // implicit Exit at the end of each block
 
-static void instrumentExit(IRBB *bbOut, IRJumpKind jk, Addr32 pc, Int len, IRExpr *tgt)
+static void instrumentExit(IRBB *bbOut, IRJumpKind jk, Addr32 pc, Int len, IRExpr *tgt,
+                           unsigned int loc_instr)
 {
+    IRTemp tmp_instrs_old = newIRTemp( bbOut->tyenv, Ity_I32 );
+    IRTemp tmp_instrs_new = newIRTemp( bbOut->tyenv, Ity_I32 );
+    IRExpr *exp_instrs_new = IRExpr_Tmp( tmp_instrs_new );
+
+    IRExpr *exp_instr_addr = IRExpr_Const( IRConst_U32( (UInt) &instructions ) );
+    IRExpr *exp_instrs = IRExpr_Load( Iend_LE, Ity_I32, exp_instr_addr );
+    IRExpr *exp_loc = IRExpr_Const( IRConst_U32( loc_instr ) );
+    IRExpr *exp_add = IRExpr_Binop( Iop_Add32, IRExpr_Tmp( tmp_instrs_old ), exp_loc );
+
+    addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_instrs_old, exp_instrs ) );
+    addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_instrs_new, exp_add ) );
+    addStmtToIRBB( bbOut, IRStmt_Store( Iend_LE, exp_instr_addr, exp_instrs_new ) );
+
     switch( jk ) {
 
       case Ijk_Call: 
@@ -171,6 +186,7 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
     IRStmt    *stIn;
     Addr32    guestIAddr = 0;
     Int       guestILen  = 0;
+    unsigned int loc_instr = 0;
 
     translations++;
 
@@ -185,30 +201,42 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
        switch( stIn->tag ) {
 
          case Ist_IMark: 
-         case Ist_Exit: // Should do something about the return here
+	     loc_instr++;
+             break;
+         case Ist_Exit: 
 	     instrumentExit( bbOut, stIn->Ist.Exit.jk, guestIAddr, guestILen, 
-                             NULL );
+                             NULL, loc_instr );
              break;
 
          case Ist_NoOp:
+             break;
          case Ist_AbiHint:
-         case Ist_Put:
+             break;
+         case Ist_Put: 
+             break;
          case Ist_PutI:
+             break;
          case Ist_Tmp:
              // This is an assignment to a temp, so it should be instrumented
              // if the rhs is a Load
+             break;
          case Ist_Store:
              // This is a store instruction, so it should be instrumented
+             break;
          case Ist_Dirty:
              // This should maybe be instrumented
+             break;
          case Ist_MFence:
+             break;
+         default:
+             VG_(tool_panic)("Unknown statement type!");
              break;
 
        }
        addStmtToIRBB( bbOut, stIn );
     }
 
-    instrumentExit( bbOut, bbIn->jumpkind, guestIAddr, guestILen, bbIn->next );
+    instrumentExit( bbOut, bbIn->jumpkind, guestIAddr, guestILen, bbIn->next, loc_instr );
     return bbOut;
 }
 
