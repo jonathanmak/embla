@@ -1,0 +1,4 @@
+43  * * * * ${HOME}/cron/run_cron.py hourly
+12 03 * * * ${HOME}/cron/run_cron.py daily
+32 05 * * 7 ${HOME}/cron/run_cron.py weekly
+17 02 4 * * ${HOME}/cron/run_cron.py monthly
