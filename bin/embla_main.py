@@ -28,25 +28,38 @@ def main(argv):
   
   print "cd " + srcRoot + "/valgrind"
   os.chdir(srcRoot + "/valgrind")
+  if not os.path.isfile("configure"):
+    autogenCommand = "./autogen.sh"
+    print autogenCommand
+    autogenResult = os.system(autogenCommand)
+    if autogenResult:
+      return 1
+  print "cd " + buildRoot
+  os.chdir(buildRoot)
+  if not os.path.isdir("valgrind"):
+    print "mkdir valgrind"
+    os.mkdir("valgrind")
+  os.chdir("valgrind")
+  print "cd " + os.getcwd()
   if not os.path.isfile("Makefile"):
     configureCommand = srcRoot + "/valgrind/configure --prefix=" + \
                        installRoot
     print configureCommand
     configureResult = os.system(configureCommand)
     if configureResult:
-      return configureResult
+      return 1
 
   makeCommand = "make -j " + str(options.jobs)
   print makeCommand
   makeResult = os.system(makeCommand)
   if makeResult:
-    return makeResult
+    return 1
 
   checkCommand = makeCommand + " check"
   print checkCommand
   checkResult = os.system(checkCommand)
   
-  return checkResult
+  return checkResult != 0
 
 if __name__ == "__main__":
   sys.exit(main(sys.argv))
