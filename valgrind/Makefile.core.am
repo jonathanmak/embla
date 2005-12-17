@@ -1,4 +1,5 @@
 add_includes_x86_linux = -I$(top_srcdir)/coregrind \
+		-I$(top_builddir) \
 		-I$(top_srcdir) \
 		-I$(top_srcdir)/coregrind/x86 \
 		-I$(top_srcdir)/coregrind/linux \
@@ -11,6 +12,7 @@ add_includes_x86_linux = -I$(top_srcdir)/coregrind \
 		-DVGP_x86_linux=1
 
 add_includes_amd64_linux = -I$(top_srcdir)/coregrind \
+		-I$(top_builddir) \
 		-I$(top_srcdir) \
 		-I$(top_srcdir)/coregrind/amd64 \
 		-I$(top_srcdir)/coregrind/linux \
@@ -23,6 +25,7 @@ add_includes_amd64_linux = -I$(top_srcdir)/coregrind \
 		-DVGP_amd64_linux=1
 
 add_includes_ppc32_linux = -I$(top_srcdir)/coregrind \
+		-I$(top_builddir) \
 		-I$(top_srcdir) \
 		-I$(top_srcdir)/coregrind/ppc32 \
 		-I$(top_srcdir)/coregrind/linux \

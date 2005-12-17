@@ -22,8 +22,7 @@ def main(argv):
   srcRoot = os.path.realpath(os.path.abspath(os.path.join(
     os.path.dirname(argv[0]), "..")))
   # XXX: Building under srcdir seems to be required for valgrind.
-  buildRoot = srcRoot 
-  # buildRoot = os.path.realpath(os.getcwd())
+  buildRoot = os.path.realpath(os.getcwd())
   installRoot = os.path.realpath("install_dir")
   
   print "cd " + srcRoot + "/valgrind"
@@ -43,7 +42,7 @@ def main(argv):
   print "cd " + os.getcwd()
   if not os.path.isfile("Makefile"):
     configureCommand = srcRoot + "/valgrind/configure --prefix=" + \
-                       installRoot
+                       installRoot + " --enable-maintainer-mode"
     print configureCommand
     configureResult = os.system(configureCommand)
     if configureResult:
