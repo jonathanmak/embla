@@ -34,6 +34,7 @@
 */
 
 #include "pub_tool_basics.h"
+#include "pub_tool_debuginfo.h"
 #include "pub_tool_libcfile.h"
 #include "pub_tool_libcbase.h"
 #include "pub_tool_libcprint.h"
@@ -44,6 +45,22 @@
 #include "pub_tool_libcassert.h"
 
 #include "libvex_guest_offsets.h"
+
+// smallest prime >= a million
+#define  RESULT_ENTRIES   1000003  
+#define  FILE_LEN         256
+#define  FN_LEN           128
+
+#define  BITS_PER_REF      2
+#define  BITS_PER_FRAG    12
+#define  BITS_PER_ADDRESS 32
+#define  REFS_PER_FRAG    (1 << (BITS_PER_FRAG-BITS_PER_REF))
+#define  FRAGS_IN_MAP     (1 << (BITS_PER_ADDRESS-BITS_PER_FRAG))
+#define  FRAG_MASK        ((1 << BITS_PER_FRAG) - 1)
+
+#define  GET_FRAG_PTR(m,a)   m[a>>BITS_PER_FRAG]
+#define  GET_REF_ADDR(fp,a)  ( &( fp->refs[(a&FRAG_MASK) >> BITS_PER_REF] ) )
+
 
 static unsigned int translations = 0;
 static unsigned int instructions = 0;
@@ -57,13 +74,133 @@ typedef
    StackFrame;
 
 static StackFrame first_stack_frame = {(unsigned int) -1, 0, 0, 0, NULL};
-
 static StackFrame * current_stack_frame = &first_stack_frame;
+
+typedef
+   struct {
+     Addr32      i_addr;
+     StackFrame *context;
+   }
+   Event;
+
+typedef
+   struct {
+     Event lastRef;
+     Event lastWrite;
+   }
+   RefInfo;
+
+typedef
+   struct {
+     RefInfo refs[REFS_PER_FRAG];
+   }
+   MapFragment;
+
+static MapFragment **map;
 
 static Char buf[512];
 static int first_sp = 0;
 
 static int trace_file_fd;
+
+typedef
+   struct _RTEntry {
+     char *title;
+     UInt n_raw, n_war, n_waw;
+     struct _RTEntry *next;
+   }
+   RTEntry;
+
+static RTEntry **result_table;
+
+static UInt hash(Char *s) 
+{
+   const int hash_const = 257;
+   int hash_value = 0;
+   while( *s != 0 ) {
+      hash_value = (hash_const*hash_value + *s) % RESULT_ENTRIES;
+      s++;
+   }
+   return hash_value;
+}
+
+static void getDebugInfo(Addr32 addr, Char file[FILE_LEN], Char fn[FN_LEN], UInt *line)
+{
+   Bool found_file_line = VG_(get_filename_linenum)(
+                              addr,
+                              file, FILE_LEN,
+                              NULL, 0, NULL,
+                              line
+                          );
+   Bool found_fn = VG_(get_fnname)(addr, fn, FN_LEN);
+
+   if( !found_file_line ) {
+      VG_(strcpy)( file, "???" );
+      *line = 0;
+   }
+   if( !found_fn ) {
+      VG_(strcpy)( fn, "???" );
+   }
+}
+
+static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr, 
+                               StackFrame *old_ctx,  Addr32 old_addr)
+{
+   UInt old_time = old_ctx->seq;
+   StackFrame *nca = curr_ctx,
+              *tmp = old_ctx;
+   Addr32     h_addr=old_addr, 
+              t_addr=curr_addr;
+   Char       h_file[FILE_LEN], h_fn[FN_LEN];
+   Int        h_line;
+   Char       t_file[FILE_LEN], t_fn[FN_LEN];
+   Int        t_line;
+   UInt       hash_value;
+   RTEntry    *rp;
+
+
+   // Find nearest common ancestor of the new ref and the old ref in the call tree
+   // t_addr will be the tail address of the dependency, which is either
+   //   the address of the instruction making old reference, if the old ref was in nca, or
+   //   the address of the call site in the nca
+   while( old_time < nca->seq ) {
+        t_addr = nca->call_addr;
+        nca = nca->parent;
+   }
+
+   // Find the head address of the dependency
+   while( tmp != nca ) {
+        h_addr = tmp->call_addr;
+        tmp = tmp->parent;
+   }
+
+   // Translate the addresses into line and file numbers
+
+   getDebugInfo( h_addr, h_file, h_fn, &h_line );
+   getDebugInfo( t_addr, t_file, t_fn, &t_line );
+
+   // Construct the hash key
+
+   VG_(sprintf)( buf, "%s %s %d %d", h_file, h_fn, t_line, h_line );
+   hash_value = hash( buf );
+
+   // Walk the hash chain
+
+   for( rp = result_table[hash_value]; 
+        rp != NULL && VG_(strcmp)( buf, rp->title ) != 0;
+       rp = rp->next );
+   if( rp==NULL ) {
+       rp = (RTEntry *) VG_(calloc)( 1, sizeof(RTEntry) );
+       rp->next = result_table[hash_value];
+       result_table[hash_value] = rp;
+       rp->title = (Char *) VG_(calloc)( VG_(strlen)( buf )+1, sizeof(Char) );
+       VG_(strcpy)( rp->title, buf );
+   }
+
+   return rp;
+}
+   
+
 
 
 static void em_post_clo_init(void)
@@ -84,6 +221,40 @@ static void em_post_clo_init(void)
    VG_(clo_vex_control).iropt_unroll_thresh = 0;
    VG_(clo_vex_control).guest_chase_thresh = 0;
 
+   map = (MapFragment **) VG_(calloc)(FRAGS_IN_MAP, sizeof(MapFragment*));
+   result_table = (RTEntry **) VG_(calloc)(RESULT_ENTRIES, sizeof(RTEntry *));
+
+}
+
+static VG_REGPARM(2)
+void recordRead(Addr32 pc, Addr32 addr)
+{
+    MapFragment *frag = GET_FRAG_PTR(map,addr);
+    RefInfo     *refp;
+    StackFrame  *nca = current_stack_frame;
+    // unsigned int ref_time;
+    RTEntry     *res_entry;
+
+    if( frag==NULL ) {
+        frag = (MapFragment *) VG_(calloc)(1, sizeof(MapFragment));
+        GET_FRAG_PTR(map,addr) = frag;
+        if( frag==NULL ) {
+            VG_(tool_panic)("Out of memory!");
+        }
+    }
+    
+    refp = GET_REF_ADDR(frag,addr);
+    refp->lastRef.i_addr = pc;
+    refp->lastRef.context = nca;
+
+    
+    res_entry = getResultEntry( current_stack_frame,
+                                pc, 
+                                refp->lastWrite.context, 
+                                refp->lastWrite.i_addr );
+    
+
+    // to be continued!
 
 }
 
@@ -196,9 +367,6 @@ static void instrumentExit(IRBB *bbOut, IRJumpKind jk, Addr32 pc, Int len, IRExp
 
       case Ijk_Ret:
           {  
-             if( tgt==NULL ) {
-                VG_(tool_panic)("Ret not at end of BB!");
-             }
              HChar *hname = "recordRet";
              void  *haddr = &recordRet;
              IRTemp tmp_sp = newIRTemp(bbOut->tyenv, Ity_I32);
@@ -209,6 +377,10 @@ static void instrumentExit(IRBB *bbOut, IRJumpKind jk, Addr32 pc, Int len, IRExp
              IRExpr **args = mkIRExprVec_2( exp_sp, exp_pc );
              IRDirty *dy = unsafeIRDirty_0_N( 2, hname, haddr, args );
              
+             if( tgt==NULL ) {
+                VG_(tool_panic)("Ret not at end of BB!");
+             }
+
              addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_sp, exp_get_sp ) );
              addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_pc, tgt ) );
              addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
