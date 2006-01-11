@@ -1,2 +1,2 @@
 #! /bin/sh
-sort --stable -k 1,2 -k3,3n -k3,3 -k4,4n -k4,4 $*
+sort --stable -k 1,2 -k 4,4n -k 4,4 -k 5,5n -k 5,5 -k 3,3 $*

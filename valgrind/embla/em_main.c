@@ -73,7 +73,7 @@ static struct {
 static unsigned int translations = 0;
 static unsigned int instructions = 0;
 
-static Addr32 shadow_sp, lowest_shadow_sp=0xffffffff;
+static Addr32 shadow_sp, lowest_shadow_sp=0xffffffff, highest_shadow_sp=0;
 
 static Char dbuf[512];
 
@@ -170,7 +170,7 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
    Char       h_file[FILE_LEN], h_fn[FN_LEN];
    Int        h_line;
    Char       t_file[FILE_LEN], t_fn[FN_LEN];
-   Char       *h_inf, *t_inf;
+   Char       *h_inf, *t_inf, *d_inf;
    Int        t_line;
    UInt       hash_value;
    RTEntry    *rp;
@@ -198,20 +198,28 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
    getDebugInfo( t_addr, t_file, t_fn, &t_line );
 
    // Check if this is a false dependency due to stack aliasing (pop then push)
+   // or if it is in the stack or if it is something else
 
    if( opt.elim_stack_alias && ref_addr+4 <= h_sp && ref_addr+4 <= t_sp 
        && ref_addr >= lowest_shadow_sp ) {
        // False aliasing due to stack pop then push 
-       h_inf = "a";
-       t_inf = "a";
+       d_inf = "f";
+   } else if( ref_addr >= lowest_shadow_sp && ref_addr <= highest_shadow_sp ) {
+       d_inf = "s";
    } else {
-       h_inf = old_ctx==nca ? "" : "i";
-       t_inf = curr_ctx==nca ? "" : "i";
+       d_inf = "o";
    }
+
+   // Check whether any of the references where made during a call from the 
+   // nca activation record
+
+   h_inf = old_ctx==nca ? "" : "c";
+   t_inf = curr_ctx==nca ? "" : "c";
 
    // Construct the hash key
 
-   VG_(sprintf)( buf, "%s %s %d%s %d%s", h_file, h_fn, t_line, t_inf, h_line, h_inf );
+   VG_(sprintf)( buf, "%s %s %s %d%s %d%s", 
+                      h_file, h_fn, d_inf, t_line, t_inf, h_line, h_inf );
    hash_value = hash( buf );
 
    // Walk the hash chain
@@ -293,6 +301,9 @@ static void adjust_shadow_sp(Addr32 sp)
     shadow_sp = sp;
     if( lowest_shadow_sp > sp ) {
         lowest_shadow_sp = sp;
+    }
+    if( highest_shadow_sp < sp ) {
+        highest_shadow_sp = sp;
     }
 }
 
