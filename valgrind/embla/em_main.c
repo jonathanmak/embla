@@ -29,7 +29,7 @@
 
 /* 
    Things that should be changed include, but are not limited to, the following:
-   - There is an assumption throughout that we run code for a 32 bit machine.
+   - There is an assumption throughout that we run code for a LE 32 bit machine.
 
 */
 
@@ -61,9 +61,16 @@
 #define  GET_FRAG_PTR(m,a)   m[a>>BITS_PER_FRAG]
 #define  GET_REF_ADDR(fp,a)  ( &( fp->refs[(a&FRAG_MASK) >> BITS_PER_REF] ) )
 
+#define  BONK(s) VG_(write)( 2, s, VG_(strlen)( s ) )
+#define  DPRINT1(s,x)     { VG_(sprintf)( dbuf, s, x );       BONK( dbuf ); }
+#define  DPRINT2(s,x,y)   { VG_(sprintf)( dbuf, s, x, y );    BONK( dbuf ); }
+#define  DPRINT1(s,x,y,z) { VG_(sprintf)( dbuf, s, x, y, z ); BONK( dbuf ); }
+
 
 static unsigned int translations = 0;
 static unsigned int instructions = 0;
+
+Char dbuf[512];
 
 typedef
    struct _StackFrame {
@@ -83,9 +90,10 @@ typedef
    }
    Event;
 
+// If the last reference was a write, lastRead.context is NULL
 typedef
    struct {
-     Event lastRef;
+     Event lastRead;
      Event lastWrite;
    }
    RefInfo;
@@ -158,7 +166,6 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
    UInt       hash_value;
    RTEntry    *rp;
 
-
    // Find nearest common ancestor of the new ref and the old ref in the call tree
    // t_addr will be the tail address of the dependency, which is either
    //   the address of the instruction making old reference, if the old ref was in nca, or
@@ -188,12 +195,19 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
 
    for( rp = result_table[hash_value]; 
         rp != NULL && VG_(strcmp)( buf, rp->title ) != 0;
-       rp = rp->next );
+       rp = rp->next )
+      ;
    if( rp==NULL ) {
        rp = (RTEntry *) VG_(calloc)( 1, sizeof(RTEntry) );
+       if( rp==NULL ) {
+           VG_(tool_panic)( "Out of memory" );
+       }
        rp->next = result_table[hash_value];
        result_table[hash_value] = rp;
        rp->title = (Char *) VG_(calloc)( VG_(strlen)( buf )+1, sizeof(Char) );
+       if( rp->title==NULL ) {
+           VG_(tool_panic)( "Out of memory" );
+       }
        VG_(strcpy)( rp->title, buf );
    }
 
@@ -224,44 +238,98 @@ static void em_post_clo_init(void)
    map = (MapFragment **) VG_(calloc)(FRAGS_IN_MAP, sizeof(MapFragment*));
    result_table = (RTEntry **) VG_(calloc)(RESULT_ENTRIES, sizeof(RTEntry *));
 
+   if( map==NULL || result_table==NULL ) {
+       VG_(tool_panic)("Out of memory!");
+   }
+
 }
 
-static VG_REGPARM(2)
-void recordRead(Addr32 pc, Addr32 addr)
+static RefInfo* getRefInfo(Addr32 addr)
 {
     MapFragment *frag = GET_FRAG_PTR(map,addr);
-    RefInfo     *refp;
-    StackFrame  *nca = current_stack_frame;
-    // unsigned int ref_time;
-    RTEntry     *res_entry;
+    int          i;
 
     if( frag==NULL ) {
         frag = (MapFragment *) VG_(calloc)(1, sizeof(MapFragment));
-        GET_FRAG_PTR(map,addr) = frag;
         if( frag==NULL ) {
             VG_(tool_panic)("Out of memory!");
         }
+        GET_FRAG_PTR(map,addr) = frag;
+        for(i=0; i<REFS_PER_FRAG; i++) {
+            frag->refs[i].lastWrite.context = &first_stack_frame;
+        }
     }
-    
-    refp = GET_REF_ADDR(frag,addr);
-    refp->lastRef.i_addr = pc;
-    refp->lastRef.context = nca;
 
-    
+    return GET_REF_ADDR(frag,addr);
+}
+
+static VG_REGPARM(2)
+void recordLoad(Addr32 pc, Addr32 addr)
+{
+    RefInfo     *refp;
+    RTEntry     *res_entry;
+
+    refp = getRefInfo( addr );
+
     res_entry = getResultEntry( current_stack_frame,
                                 pc, 
                                 refp->lastWrite.context, 
                                 refp->lastWrite.i_addr );
     
+    res_entry->n_raw++;
 
-    // to be continued!
+    // DPRINT2("RAW: %s %u\n", res_entry->title, pc);
+
+    refp->lastRead.i_addr = pc;
+    refp->lastRead.context = current_stack_frame;
+
+}
+
+static VG_REGPARM(2)
+void recordStore(Addr32 pc, Addr32 addr)
+{
+    RefInfo     *refp=getRefInfo( addr );
+    RTEntry     *res_entry;
+
+    // is it a WAR or a WAW?
+    if( refp->lastRead.context == NULL ) {
+        // last reference was a write: a WAW
+        res_entry = getResultEntry( current_stack_frame,
+                                    pc, 
+                                    refp->lastWrite.context, 
+                                    refp->lastWrite.i_addr );
+        res_entry->n_waw++;
+
+        // DPRINT2("WAW: %s %u\n", res_entry->title, pc);
+    } else {
+        // last reference was a read: a WAR
+        res_entry = getResultEntry( current_stack_frame,
+                                    pc, 
+                                    refp->lastRead.context, 
+                                    refp->lastRead.i_addr );
+        res_entry->n_war++;
+        // DPRINT2("WAR: %s %u\n", res_entry->title, pc);
+    }
+
+    // last reference is now a store
+    refp->lastRead.context = NULL;
+
+    refp->lastWrite.i_addr = pc;
+    refp->lastWrite.context = current_stack_frame;
 
 }
 
 static VG_REGPARM(3)
 void recordCall(int sp, int ca, int ra) 
 {
+    if( first_sp==0 ) {
+       first_sp = sp;
+    }
+
     StackFrame * newFrame = (StackFrame *) VG_(calloc)(1,sizeof(StackFrame));
+    if( newFrame==NULL ) {
+        VG_(tool_panic)("Out of memory!");
+    }
 
     newFrame->parent    = current_stack_frame;
     newFrame->sp        = sp;
@@ -285,6 +353,10 @@ void recordRet(int sp, int target)
    unsigned int stack_ra;
    StackFrame    *parent;
    int           unwind=0;
+
+   if( first_sp==0 ) {
+      first_sp = sp;
+   }
 
    if( current == NULL ) return;
 
@@ -318,6 +390,33 @@ void recordRet(int sp, int target)
      current_stack_frame=parent;
    }
 
+   if( current_stack_frame == NULL ) {
+     current_stack_frame = &first_stack_frame;
+   }
+
+}
+
+
+static void instrumentLoad( IRBB *bbOut, Addr32 pc, IRExpr *exp_addr )
+{
+    HChar *hname = "recordLoad";
+    void  *haddr = &recordLoad;
+    IRExpr *exp_pc = IRExpr_Const( IRConst_U32( pc ) );
+    IRExpr **args = mkIRExprVec_2( exp_pc, exp_addr );
+    IRDirty *dy = unsafeIRDirty_0_N( 2, hname, haddr, args );
+
+    addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
+}
+
+static void instrumentStore( IRBB *bbOut, Addr32 pc, IRExpr *exp_addr )
+{
+    HChar *hname = "recordStore";
+    void  *haddr = &recordStore;
+    IRExpr *exp_pc = IRExpr_Const( IRConst_U32( pc ) );
+    IRExpr **args = mkIRExprVec_2( exp_pc, exp_addr );
+    IRDirty *dy = unsafeIRDirty_0_N( 2, hname, haddr, args );
+
+    addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
 }
 
 
@@ -438,12 +537,16 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
          case Ist_Tmp:
              // This is an assignment to a temp, so it should be instrumented
              // if the rhs is a Load
+             if( stIn->Ist.Tmp.data->tag == Iex_Load ) {
+                 instrumentLoad( bbOut, guestIAddr, stIn->Ist.Tmp.data->Iex.Load.addr );
+             }
              break;
          case Ist_Store:
              // This is a store instruction, so it should be instrumented
+             instrumentStore( bbOut, guestIAddr, stIn->Ist.Store.addr );
              break;
          case Ist_Dirty:
-             // This should maybe be instrumented
+             // This should maybe be instrumented, but we'll leave it for later
              break;
          case Ist_MFence:
              break;
@@ -459,10 +562,25 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
     return bbOut;
 }
 
+static void printResultTable(int fd)
+{
+   int      i;
+   RTEntry *entry;
+
+   for( i=0; i<RESULT_ENTRIES; i++ ) {
+      for( entry=result_table[i]; entry != NULL; entry=entry->next ) {
+         VG_(sprintf)( buf, 
+                       "%s %d %d %d\n", 
+                       entry->title, entry->n_raw, entry->n_war, entry->n_waw );
+         VG_(write)( fd, buf, VG_(strlen)( buf ) );
+      }
+   }
+}
+
 static void em_fini(Int exitcode)
 {
-
-   VG_(close)(trace_file_fd);
+   printResultTable( trace_file_fd );
+   VG_(close)( trace_file_fd );
 
 }
 
