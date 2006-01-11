@@ -51,7 +51,7 @@
 #define  FILE_LEN         256
 #define  FN_LEN           128
 
-#define  BITS_PER_REF      2
+#define  BITS_PER_REF      0
 #define  BITS_PER_FRAG    12
 #define  BITS_PER_ADDRESS 32
 #define  REFS_PER_FRAG    (1 << (BITS_PER_FRAG-BITS_PER_REF))
@@ -64,13 +64,18 @@
 #define  BONK(s) VG_(write)( 2, s, VG_(strlen)( s ) )
 #define  DPRINT1(s,x)     { VG_(sprintf)( dbuf, s, x );       BONK( dbuf ); }
 #define  DPRINT2(s,x,y)   { VG_(sprintf)( dbuf, s, x, y );    BONK( dbuf ); }
-#define  DPRINT1(s,x,y,z) { VG_(sprintf)( dbuf, s, x, y, z ); BONK( dbuf ); }
+#define  DPRINT3(s,x,y,z) { VG_(sprintf)( dbuf, s, x, y, z ); BONK( dbuf ); }
 
+static struct {
+    int elim_stack_alias;
+} opt;
 
 static unsigned int translations = 0;
 static unsigned int instructions = 0;
 
-Char dbuf[512];
+static Addr32 shadow_sp, lowest_shadow_sp=0xffffffff;
+
+static Char dbuf[512];
 
 typedef
    struct _StackFrame {
@@ -152,16 +157,20 @@ static void getDebugInfo(Addr32 addr, Char file[FILE_LEN], Char fn[FN_LEN], UInt
 }
 
 static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr, 
-                               StackFrame *old_ctx,  Addr32 old_addr)
+                               StackFrame *old_ctx,  Addr32 old_addr,
+                               Addr32 ref_addr)
 {
    UInt old_time = old_ctx->seq;
    StackFrame *nca = curr_ctx,
               *tmp = old_ctx;
    Addr32     h_addr=old_addr, 
               t_addr=curr_addr;
+   Addr32     h_sp = 0,
+              t_sp = 0;
    Char       h_file[FILE_LEN], h_fn[FN_LEN];
    Int        h_line;
    Char       t_file[FILE_LEN], t_fn[FN_LEN];
+   Char       *h_inf, *t_inf;
    Int        t_line;
    UInt       hash_value;
    RTEntry    *rp;
@@ -172,12 +181,14 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
    //   the address of the call site in the nca
    while( old_time < nca->seq ) {
         t_addr = nca->call_addr;
+        t_sp   = nca->sp;
         nca = nca->parent;
    }
 
    // Find the head address of the dependency
    while( tmp != nca ) {
         h_addr = tmp->call_addr;
+        h_sp   = tmp->sp;
         tmp = tmp->parent;
    }
 
@@ -186,9 +197,21 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
    getDebugInfo( h_addr, h_file, h_fn, &h_line );
    getDebugInfo( t_addr, t_file, t_fn, &t_line );
 
+   // Check if this is a false dependency due to stack aliasing (pop then push)
+
+   if( opt.elim_stack_alias && ref_addr+4 <= h_sp && ref_addr+4 <= t_sp 
+       && ref_addr >= lowest_shadow_sp ) {
+       // False aliasing due to stack pop then push 
+       h_inf = "a";
+       t_inf = "a";
+   } else {
+       h_inf = old_ctx==nca ? "" : "i";
+       t_inf = curr_ctx==nca ? "" : "i";
+   }
+
    // Construct the hash key
 
-   VG_(sprintf)( buf, "%s %s %d %d", h_file, h_fn, t_line, h_line );
+   VG_(sprintf)( buf, "%s %s %d%s %d%s", h_file, h_fn, t_line, t_inf, h_line, h_inf );
    hash_value = hash( buf );
 
    // Walk the hash chain
@@ -242,6 +265,8 @@ static void em_post_clo_init(void)
        VG_(tool_panic)("Out of memory!");
    }
 
+   opt.elim_stack_alias = 1;
+
 }
 
 static RefInfo* getRefInfo(Addr32 addr)
@@ -263,18 +288,29 @@ static RefInfo* getRefInfo(Addr32 addr)
     return GET_REF_ADDR(frag,addr);
 }
 
-static VG_REGPARM(2)
-void recordLoad(Addr32 pc, Addr32 addr)
+static void adjust_shadow_sp(Addr32 sp)
+{
+    shadow_sp = sp;
+    if( lowest_shadow_sp > sp ) {
+        lowest_shadow_sp = sp;
+    }
+}
+
+static VG_REGPARM(3)
+void recordLoad(Addr32 pc, Addr32 addr, Addr32 sp)
 {
     RefInfo     *refp;
     RTEntry     *res_entry;
+
+    adjust_shadow_sp( sp );
 
     refp = getRefInfo( addr );
 
     res_entry = getResultEntry( current_stack_frame,
                                 pc, 
                                 refp->lastWrite.context, 
-                                refp->lastWrite.i_addr );
+                                refp->lastWrite.i_addr,
+                                addr );
     
     res_entry->n_raw++;
 
@@ -285,11 +321,13 @@ void recordLoad(Addr32 pc, Addr32 addr)
 
 }
 
-static VG_REGPARM(2)
-void recordStore(Addr32 pc, Addr32 addr)
+static VG_REGPARM(3)
+void recordStore(Addr32 pc, Addr32 addr, Addr32 sp)
 {
     RefInfo     *refp=getRefInfo( addr );
     RTEntry     *res_entry;
+
+    adjust_shadow_sp( sp );
 
     // is it a WAR or a WAW?
     if( refp->lastRead.context == NULL ) {
@@ -297,7 +335,8 @@ void recordStore(Addr32 pc, Addr32 addr)
         res_entry = getResultEntry( current_stack_frame,
                                     pc, 
                                     refp->lastWrite.context, 
-                                    refp->lastWrite.i_addr );
+                                    refp->lastWrite.i_addr,
+                                    addr );
         res_entry->n_waw++;
 
         // DPRINT2("WAW: %s %u\n", res_entry->title, pc);
@@ -306,7 +345,8 @@ void recordStore(Addr32 pc, Addr32 addr)
         res_entry = getResultEntry( current_stack_frame,
                                     pc, 
                                     refp->lastRead.context, 
-                                    refp->lastRead.i_addr );
+                                    refp->lastRead.i_addr,
+                                    addr );
         res_entry->n_war++;
         // DPRINT2("WAR: %s %u\n", res_entry->title, pc);
     }
@@ -401,10 +441,16 @@ static void instrumentLoad( IRBB *bbOut, Addr32 pc, IRExpr *exp_addr )
 {
     HChar *hname = "recordLoad";
     void  *haddr = &recordLoad;
-    IRExpr *exp_pc = IRExpr_Const( IRConst_U32( pc ) );
-    IRExpr **args = mkIRExprVec_2( exp_pc, exp_addr );
-    IRDirty *dy = unsafeIRDirty_0_N( 2, hname, haddr, args );
 
+    IRTemp tmp_sp = newIRTemp( bbOut->tyenv, Ity_I32 );
+    IRExpr *exp_sp = IRExpr_Tmp( tmp_sp );
+    IRExpr *exp_get_sp = IRExpr_Get( OFFSET_x86_ESP, Ity_I32 );
+
+    IRExpr *exp_pc = IRExpr_Const( IRConst_U32( pc ) );
+    IRExpr **args = mkIRExprVec_3( exp_pc, exp_addr, exp_sp );
+    IRDirty *dy = unsafeIRDirty_0_N( 3, hname, haddr, args );
+
+    addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_sp, exp_get_sp ) );
     addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
 }
 
@@ -412,10 +458,16 @@ static void instrumentStore( IRBB *bbOut, Addr32 pc, IRExpr *exp_addr )
 {
     HChar *hname = "recordStore";
     void  *haddr = &recordStore;
-    IRExpr *exp_pc = IRExpr_Const( IRConst_U32( pc ) );
-    IRExpr **args = mkIRExprVec_2( exp_pc, exp_addr );
-    IRDirty *dy = unsafeIRDirty_0_N( 2, hname, haddr, args );
 
+    IRTemp tmp_sp = newIRTemp( bbOut->tyenv, Ity_I32 );
+    IRExpr *exp_sp = IRExpr_Tmp( tmp_sp );
+    IRExpr *exp_get_sp = IRExpr_Get( OFFSET_x86_ESP, Ity_I32 );
+
+    IRExpr *exp_pc = IRExpr_Const( IRConst_U32( pc ) );
+    IRExpr **args = mkIRExprVec_3( exp_pc, exp_addr, exp_sp );
+    IRDirty *dy = unsafeIRDirty_0_N( 3, hname, haddr, args );
+
+    addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_sp, exp_get_sp ) );
     addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
 }
 
