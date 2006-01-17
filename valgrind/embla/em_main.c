@@ -30,6 +30,7 @@
 /* 
    Things that should be changed include, but are not limited to, the following:
    - There is an assumption throughout that we run code for a LE 32 bit machine.
+   - WAR conflicts are not tracked correctly.
 
 */
 
@@ -66,6 +67,14 @@
 #define  DPRINT2(s,x,y)   { VG_(sprintf)( dbuf, s, x, y );    BONK( dbuf ); }
 #define  DPRINT3(s,x,y,z) { VG_(sprintf)( dbuf, s, x, y, z ); BONK( dbuf ); }
 
+#define  CONT_LEN         1024
+#define  FULL_CONTOURS    0
+
+static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
+
+#define  SF_HIDDEN        1
+#define  SF_SEEK          2     // We SEEK to see if it's hidden
+
 static struct {
     int elim_stack_alias;
 } opt;
@@ -80,12 +89,12 @@ static Char dbuf[512];
 typedef
    struct _StackFrame {
      Addr32 sp,call_addr,ret_addr;
-     unsigned int seq;
+     unsigned int seq, flags;
      struct _StackFrame *parent;
    }
    StackFrame;
 
-static StackFrame first_stack_frame = {(unsigned int) -1, 0, 0, 0, NULL};
+static StackFrame first_stack_frame = {(unsigned int) -1, 0, 0, 0, 0, NULL};
 static StackFrame * current_stack_frame = &first_stack_frame;
 
 typedef
@@ -111,7 +120,7 @@ typedef
 
 static MapFragment **map;
 
-static Char buf[512];
+static Char buf[512+2*CONT_LEN];
 static int first_sp = 0;
 
 static int trace_file_fd;
@@ -156,17 +165,63 @@ static void getDebugInfo(Addr32 addr, Char file[FILE_LEN], Char fn[FN_LEN], UInt
    }
 }
 
+static void checkIfHidden(StackFrame *curr_ctx, Addr32 addr, Bool no_recheck)
+{
+    Char fname[FN_LEN];
+
+    if( curr_ctx == NULL || no_recheck && curr_ctx->flags & SF_SEEK ) {
+        return;
+    }
+
+    if( VG_(get_fnname)(addr, fname, FN_LEN) ) {
+        if( ! VG_(strcmp)( fname, "malloc" ) ||
+            ! VG_(strncmp)( fname, "_dl", 3 ) ||
+            ! VG_(strcmp)( fname, "calloc" ) ||
+            ! VG_(strcmp)( fname, "realloc" ) ) 
+        {
+            curr_ctx->flags |= SF_HIDDEN | SF_SEEK;
+        } else {
+            curr_ctx->flags |= SF_SEEK;
+        }
+    }
+}
+
+static int copyFnName(Char *cont, int idx, Addr32 addr, int hidden) 
+{
+
+#if FULL_CONTOURS
+   if( CONT_LEN - idx < FN_LEN ) {    // no space left
+       return idx;
+   }
+   if( idx > 0 ) {                     // not the first call; append a ','
+       cont[idx++] = ',';
+   }
+   if( hidden ) {
+      cont[idx++] = '#';
+   }
+   if( ! VG_(get_fnname)( addr, cont+idx, FN_LEN ) ) {
+        VG_(strcpy)( cont+idx, "???" );
+   }
+   return idx + VG_(strlen)( cont+idx );   // start next part *at* the NUL character
+#else
+   return idx;
+#endif
+
+}
+
+static void addNULL(Char *cont, int idx)
+{
+    cont[idx] = 0;
+}
+
 static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr, 
                                StackFrame *old_ctx,  Addr32 old_addr,
                                Addr32 ref_addr)
 {
    UInt old_time = old_ctx->seq;
-   StackFrame *nca = curr_ctx,
-              *tmp = old_ctx;
-   Addr32     h_addr=old_addr, 
-              t_addr=curr_addr;
-   Addr32     h_sp = 0,
-              t_sp = 0;
+   StackFrame *nca,*tmp;
+   Addr32     h_addr, t_addr;
+   Addr32     h_sp, t_sp;
    Char       h_file[FILE_LEN], h_fn[FN_LEN];
    Int        h_line;
    Char       t_file[FILE_LEN], t_fn[FN_LEN];
@@ -174,23 +229,48 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
    Int        t_line;
    UInt       hash_value;
    RTEntry    *rp;
+   Bool       h_hidden, t_hidden;
+   int        cont_idx;
+
+   // The tail (source) of the dependence is related to the old reference
+   // The head (sink)   of the dependence is related to the new reference
 
    // Find nearest common ancestor of the new ref and the old ref in the call tree
-   // t_addr will be the tail address of the dependency, which is either
-   //   the address of the instruction making old reference, if the old ref was in nca, or
+   // h_addr will be the head address of the dependency, which is either
+   //   the address of the instruction making new reference, if the new ref was in nca, or
    //   the address of the call site in the nca
+
+   nca = curr_ctx;
+   h_addr = curr_addr;
+   h_sp = 0;
+   h_hidden = curr_ctx->flags & SF_HIDDEN;
+
+   cont_idx = copyFnName( h_cont, 0, h_addr, h_hidden );
    while( old_time < nca->seq ) {
-        t_addr = nca->call_addr;
-        t_sp   = nca->sp;
+        h_addr    = nca->call_addr;
+        h_sp      = nca->sp;
+        h_hidden |= nca->flags & SF_HIDDEN;
+        cont_idx = copyFnName( h_cont, cont_idx, nca->call_addr, h_hidden );
         nca = nca->parent;
    }
+   addNULL( h_cont, cont_idx );
 
-   // Find the head address of the dependency
+
+   // Find the tail address of the dependency
+   tmp = old_ctx;
+   t_addr = old_addr;
+   t_sp = 0;
+   t_hidden = old_ctx->flags & SF_HIDDEN;
+
+   cont_idx = copyFnName( t_cont, 0, t_addr, t_hidden );
    while( tmp != nca ) {
-        h_addr = tmp->call_addr;
-        h_sp   = tmp->sp;
+        t_addr = tmp->call_addr;
+        t_sp   = tmp->sp;
+        t_hidden |= tmp->flags & SF_HIDDEN;
+        cont_idx = copyFnName( t_cont, cont_idx, tmp->call_addr, t_hidden );
         tmp = tmp->parent;
    }
+   addNULL( t_cont, cont_idx );
 
    // Translate the addresses into line and file numbers
 
@@ -211,15 +291,20 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
    }
 
    // Check whether any of the references where made during a call from the 
-   // nca activation record
+   // nca activation record or hidden
 
-   h_inf = old_ctx==nca ? "" : "c";
-   t_inf = curr_ctx==nca ? "" : "c";
+   h_inf = curr_ctx==nca ? "" : (h_hidden ? "h" : "c");
+   t_inf = old_ctx==nca  ? "" : (t_hidden ? "h" : "c");
 
    // Construct the hash key
 
+#if FULL_CONTOURS
+   VG_(sprintf)( buf, "%s %s %s %d%s(%s) %d%s(%s)", 
+                      h_file, h_fn, d_inf, h_line, h_inf, h_cont, t_line, t_inf, t_cont );
+#else
    VG_(sprintf)( buf, "%s %s %s %d%s %d%s", 
-                      h_file, h_fn, d_inf, t_line, t_inf, h_line, h_inf );
+                      h_file, h_fn, d_inf, h_line, h_inf, t_line, t_inf );
+#endif
    hash_value = hash( buf );
 
    // Walk the hash chain
@@ -314,6 +399,7 @@ void recordLoad(Addr32 pc, Addr32 addr, Addr32 sp)
     RTEntry     *res_entry;
 
     adjust_shadow_sp( sp );
+    checkIfHidden( current_stack_frame, pc, 1 );
 
     refp = getRefInfo( addr );
 
@@ -339,6 +425,7 @@ void recordStore(Addr32 pc, Addr32 addr, Addr32 sp)
     RTEntry     *res_entry;
 
     adjust_shadow_sp( sp );
+    checkIfHidden( current_stack_frame, pc, 1 );
 
     // is it a WAR or a WAW?
     if( refp->lastRead.context == NULL ) {
@@ -373,11 +460,13 @@ void recordStore(Addr32 pc, Addr32 addr, Addr32 sp)
 static VG_REGPARM(3)
 void recordCall(int sp, int ca, int ra) 
 {
+    StackFrame * newFrame = (StackFrame *) VG_(calloc)(1,sizeof(StackFrame));
+
+    checkIfHidden( current_stack_frame, ca, 0 );
     if( first_sp==0 ) {
        first_sp = sp;
     }
 
-    StackFrame * newFrame = (StackFrame *) VG_(calloc)(1,sizeof(StackFrame));
     if( newFrame==NULL ) {
         VG_(tool_panic)("Out of memory!");
     }
@@ -387,6 +476,7 @@ void recordCall(int sp, int ca, int ra)
     newFrame->call_addr = ca;
     newFrame->ret_addr  = ra;
     newFrame->seq       = instructions;
+    newFrame->flags     = 0;
 
     current_stack_frame = newFrame;
 
@@ -521,7 +611,7 @@ static void instrumentExit(IRBB *bbOut, IRJumpKind jk, Addr32 pc, Int len, IRExp
              IRExpr *exp_get_sp = IRExpr_Get( OFFSET_x86_ESP, Ity_I32 );
              IRExpr **args = mkIRExprVec_3( exp_sp, exp_ca, exp_ra );
              IRDirty *dy = unsafeIRDirty_0_N( 3, hname, haddr, args );
-             
+
              addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_sp, exp_get_sp ) );
              addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
           }
@@ -586,7 +676,7 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
              break;
          case Ist_Exit: 
 	     instrumentExit( bbOut, stIn->Ist.Exit.jk, guestIAddr, guestILen, 
-                             NULL, loc_instr );
+                             IRExpr_Const( stIn->Ist.Exit.dst ), loc_instr );
              break;
 
          case Ist_NoOp:
