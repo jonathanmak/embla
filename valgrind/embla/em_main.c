@@ -104,10 +104,17 @@ typedef
    }
    Event;
 
-// If the last reference was a write, lastRead.context is NULL
+typedef 
+   struct _EventList {
+     Event            ev;
+     struct _EventList *next;
+   }
+   EventList;
+
+// If the last reference was a write, lastRead.ev.context is NULL
 typedef
    struct {
-     Event lastRead;
+     EventList lastRead;
      Event lastWrite;
    }
    RefInfo;
@@ -397,6 +404,7 @@ void recordLoad(Addr32 pc, Addr32 addr, Addr32 sp)
 {
     RefInfo     *refp;
     RTEntry     *res_entry;
+    EventList   *ev_list;
 
     adjust_shadow_sp( sp );
     checkIfHidden( current_stack_frame, pc, 1 );
@@ -413,8 +421,17 @@ void recordLoad(Addr32 pc, Addr32 addr, Addr32 sp)
 
     // DPRINT2("RAW: %s %u\n", res_entry->title, pc);
 
-    refp->lastRead.i_addr = pc;
-    refp->lastRead.context = current_stack_frame;
+    if( refp->lastRead.ev.context == NULL ) { // ref before this was write
+        refp->lastRead.ev.i_addr = pc;
+        refp->lastRead.ev.context = current_stack_frame;
+        refp->lastRead.next = NULL;
+    } else {
+        ev_list = (EventList *) VG_(calloc)( 1, sizeof(EventList) );
+        ev_list->ev.i_addr = pc;
+        ev_list->ev.context = current_stack_frame;
+        ev_list->next = refp->lastRead.next;
+        refp->lastRead.next = ev_list;
+    }
 
 }
 
@@ -423,12 +440,13 @@ void recordStore(Addr32 pc, Addr32 addr, Addr32 sp)
 {
     RefInfo     *refp=getRefInfo( addr );
     RTEntry     *res_entry;
+    EventList   *ev_list, *ev_next;
 
     adjust_shadow_sp( sp );
     checkIfHidden( current_stack_frame, pc, 1 );
 
     // is it a WAR or a WAW?
-    if( refp->lastRead.context == NULL ) {
+    if( refp->lastRead.ev.context == NULL ) {        // DONE !
         // last reference was a write: a WAW
         res_entry = getResultEntry( current_stack_frame,
                                     pc, 
@@ -440,17 +458,24 @@ void recordStore(Addr32 pc, Addr32 addr, Addr32 sp)
         // DPRINT2("WAW: %s %u\n", res_entry->title, pc);
     } else {
         // last reference was a read: a WAR
-        res_entry = getResultEntry( current_stack_frame,
-                                    pc, 
-                                    refp->lastRead.context, 
-                                    refp->lastRead.i_addr,
-                                    addr );
-        res_entry->n_war++;
+        for( ev_list = &(refp->lastRead); ev_list != NULL; ev_list = ev_list->next ) {
+            res_entry = getResultEntry( current_stack_frame,
+                                        pc, 
+                                        ev_list->ev.context, 
+                                        ev_list->ev.i_addr,
+                                        addr );
+            res_entry->n_war++;
+        }
         // DPRINT2("WAR: %s %u\n", res_entry->title, pc);
     }
 
     // last reference is now a store
-    refp->lastRead.context = NULL;
+    refp->lastRead.ev.context = NULL;
+    for( ev_list = refp->lastRead.next; ev_list != NULL; ev_list = ev_next ) {
+        ev_next = ev_list->next;
+        VG_(free)( ev_list );
+    }
+    refp->lastRead.next = NULL;
 
     refp->lastWrite.i_addr = pc;
     refp->lastWrite.context = current_stack_frame;
