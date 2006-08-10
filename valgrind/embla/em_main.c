@@ -30,7 +30,6 @@
 /* 
    Things that should be changed include, but are not limited to, the following:
    - There is an assumption throughout that we run code for a LE 32 bit machine.
-   - WAR conflicts are not tracked correctly.
 
 */
 
@@ -72,8 +71,10 @@
 
 static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
 
-#define  SF_HIDDEN        1
-#define  SF_SEEK          2     // We SEEK to see if it's hidden
+#define  SF_HIDDEN        1   // The function owning the frame is HIDDEN
+#define  SF_STR_HIDDEN    2   // STRongly HIDDEN; callees inherit the property
+#define  SF_SEEN          4   // We have SEEN this stack frame
+
 
 static struct {
     int elim_stack_alias;
@@ -176,19 +177,20 @@ static void checkIfHidden(StackFrame *curr_ctx, Addr32 addr, Bool no_recheck)
 {
     Char fname[FN_LEN];
 
-    if( curr_ctx == NULL || no_recheck && curr_ctx->flags & SF_SEEK ) {
+    if( curr_ctx == NULL || no_recheck && curr_ctx->flags & SF_SEEN ) {
         return;
     }
 
     if( VG_(get_fnname)(addr, fname, FN_LEN) ) {
         if( ! VG_(strcmp)( fname, "malloc" ) ||
-            ! VG_(strncmp)( fname, "_dl", 3 ) ||
             ! VG_(strcmp)( fname, "calloc" ) ||
             ! VG_(strcmp)( fname, "realloc" ) ) 
         {
-            curr_ctx->flags |= SF_HIDDEN | SF_SEEK;
+            curr_ctx->flags |= SF_HIDDEN | SF_SEEN | SF_STR_HIDDEN;
+        } else if ( ! VG_(strncmp)( fname, "_dl", 3 ) ) {
+            curr_ctx->flags |= SF_HIDDEN | SF_SEEN;
         } else {
-            curr_ctx->flags |= SF_SEEK;
+            curr_ctx->flags |= SF_SEEN;
         }
     }
 }
@@ -256,7 +258,7 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
    while( old_time < nca->seq ) {
         h_addr    = nca->call_addr;
         h_sp      = nca->sp;
-        h_hidden |= nca->flags & SF_HIDDEN;
+        h_hidden |= nca->flags & SF_STR_HIDDEN;
         cont_idx = copyFnName( h_cont, cont_idx, nca->call_addr, h_hidden );
         nca = nca->parent;
    }
@@ -273,7 +275,7 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
    while( tmp != nca ) {
         t_addr = tmp->call_addr;
         t_sp   = tmp->sp;
-        t_hidden |= tmp->flags & SF_HIDDEN;
+        t_hidden |= tmp->flags & SF_STR_HIDDEN;
         cont_idx = copyFnName( t_cont, cont_idx, tmp->call_addr, t_hidden );
         tmp = tmp->parent;
    }
@@ -355,6 +357,7 @@ static void em_post_clo_init(void)
 
    trace_file_fd = sres.val;
 
+   /* VG_(clo_vex_control).iropt_level = 0; */
    VG_(clo_vex_control).iropt_unroll_thresh = 0;
    VG_(clo_vex_control).guest_chase_thresh = 0;
 
