@@ -1,0 +1,55 @@
+Some notes on scripts and such
+------------------------------
+
+Embla itself is invoded as 
+'valgrind --tool=embla <command>' 
+
+where 'valgrind' must be our Valgrind (which includes Embla), 
+of course. The trace goes in the file 'embla.trace'.
+
+Embla needs symbol information, loses dependencies over 
+registers, and occasionally gets confused by dynamic linking.
+Thus compile your programs with the flags "--static -O0 -g".
+Some of the scripts like the idea that if the source of the
+program is "<prog>.c" then the executable should be "<prog>".
+Hence the command line I use is:
+
+   gcc --static -g -O0 -o <prog> <prog>.c
+
+
+'sorttrace' sorts the output of Embla in a suitable order and 
+            throws away dependencies for which source info was 
+            unavailable
+
+Invoke as:
+sorttrace <tracefile>
+
+The output goes on stdout, and <tracefile> is typically 'embla.trace'.
+
+There are some AWK scripts for typesetting the output of Embla:
+
+'deplist.awk'  makes the LaTeX for the detailed dependency list
+'depgraph.awk' makes the LaTeX for the dependency graph 
+               (aka executive summary)
+
+Invoke as:
+awk -f dep(list|graph).awk <sourcefile> <tracefile>
+
+Note that for 'deplist.awk', the order of the entries in the tracefile 
+is significant; use sorttrace!
+
+The output is LaTeX code suitable to put in a 'figure' environment.
+The code requires the LaTeX 'verbdef', 'color' and 'epic' packages 
+to typeset properly.
+
+
+'embla.sh' runs Embla and produces the sorted trace, the dependency 
+list and the dependency graph.
+ 
+Invoke as:
+embla.sh <commandname>
+
+assuming that there is an executable named <commandname> which 
+takes no arguments and whose source code is "<commandname>.c".
+The files "<commandname>.trace" "<commandname>.deplist.tex" and
+"<commandname>.depgraph.tex" are produced.
