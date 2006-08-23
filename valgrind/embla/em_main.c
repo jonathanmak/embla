@@ -69,6 +69,8 @@
 #define  CONT_LEN         1024
 #define  FULL_CONTOURS    0
 
+#define N_SMARKS 1000000
+
 static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
 
 #define  SF_HIDDEN        1   // The function owning the frame is HIDDEN
@@ -80,8 +82,10 @@ static struct {
     int elim_stack_alias;
 } opt;
 
+typedef unsigned int ICount;
+
 static unsigned int translations = 0;
-static unsigned int instructions = 0;
+static ICount instructions = 0;
 
 static Addr32 shadow_sp, lowest_shadow_sp=0xffffffff, highest_shadow_sp=0;
 
@@ -101,6 +105,7 @@ static StackFrame * current_stack_frame = &first_stack_frame;
 typedef
    struct {
      Addr32      i_addr;
+     ICount      i_count;
      StackFrame *context;
    }
    Event;
@@ -131,6 +136,14 @@ static MapFragment **map;
 static Char buf[512+2*CONT_LEN];
 static int first_sp = 0;
 
+typedef struct {
+   Addr32 sp;
+   ICount instr;
+} StackMark;
+
+static StackMark smarks[N_SMARKS];
+static int topMark=0;
+
 static int trace_file_fd;
 
 typedef
@@ -152,6 +165,46 @@ static UInt hash(Char *s)
       s++;
    }
    return hash_value;
+}
+
+static VG_REGPARM(2)
+void recordSpChange(Addr32 newSp)
+{
+   int i = topMark;
+
+   // DPRINT2("Calling spchange, new sp=%u, instr=%u\n", (unsigned) newSp, instructions);
+
+   /* smarks[0].sp == (Addr32) -1 acts as sentinel */
+   while( newSp >= smarks[i].sp ) { 
+      i--;
+   }
+
+   i++;
+
+   if( i > N_SMARKS || i < 1 ) {
+      VG_(tool_panic)( "Smark overflow" );
+   }
+   smarks[i].sp = newSp;
+   smarks[i].instr = instructions;
+   topMark = i;
+}
+
+static Bool inStack( Addr32 oldAddr, ICount oldInstr )
+{
+   unsigned int i;
+   
+   /*
+   DPRINT3("Checking stack, refAddr=%u, old instr=%u, curr instr=%u ...",
+          (unsigned) oldAddr, (unsigned) oldInstr, instructions);
+   */
+   for( i=topMark; smarks[i].instr >= oldInstr; i-- ) {
+      if( smarks[i].sp > oldAddr ) {
+         /* BONK(" false\n"); */
+         return 0;
+      }
+   }
+   /* BONK(" true\n"); */
+   return 1;
 }
 
 static void getDebugInfo(Addr32 addr, Char file[FILE_LEN], Char fn[FN_LEN], UInt *line)
@@ -177,7 +230,7 @@ static void checkIfHidden(StackFrame *curr_ctx, Addr32 addr, Bool no_recheck)
 {
     Char fname[FN_LEN];
 
-    if( curr_ctx == NULL || no_recheck && curr_ctx->flags & SF_SEEN ) {
+    if( curr_ctx == NULL || ( no_recheck && curr_ctx->flags & SF_SEEN ) ) {
         return;
     }
 
@@ -224,7 +277,7 @@ static void addNULL(Char *cont, int idx)
 }
 
 static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr, 
-                               StackFrame *old_ctx,  Addr32 old_addr,
+                               StackFrame *old_ctx,  Addr32 old_addr, ICount old_instr,
                                Addr32 ref_addr)
 {
    UInt old_time = old_ctx->seq;
@@ -289,8 +342,9 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
    // Check if this is a false dependency due to stack aliasing (pop then push)
    // or if it is in the stack or if it is something else
 
-   if( opt.elim_stack_alias && ref_addr+4 <= h_sp && ref_addr+4 <= t_sp 
-       && ref_addr >= lowest_shadow_sp ) {
+   if( opt.elim_stack_alias && 
+       ref_addr >= lowest_shadow_sp && ref_addr <= highest_shadow_sp
+       && ! inStack( ref_addr, old_instr ) ) {
        // False aliasing due to stack pop then push 
        d_inf = "f";
    } else if( ref_addr >= lowest_shadow_sp && ref_addr <= highest_shadow_sp ) {
@@ -357,7 +411,7 @@ static void em_post_clo_init(void)
 
    trace_file_fd = sres.val;
 
-   /* VG_(clo_vex_control).iropt_level = 0; */
+   VG_(clo_vex_control).iropt_level = 0;
    VG_(clo_vex_control).iropt_unroll_thresh = 0;
    VG_(clo_vex_control).guest_chase_thresh = 0;
 
@@ -369,6 +423,9 @@ static void em_post_clo_init(void)
    }
 
    opt.elim_stack_alias = 1;
+
+   smarks[0].sp = (Addr32) 0xffffffff;
+   smarks[0].instr = 0;
 
 }
 
@@ -418,6 +475,7 @@ void recordLoad(Addr32 pc, Addr32 addr, Addr32 sp)
                                 pc, 
                                 refp->lastWrite.context, 
                                 refp->lastWrite.i_addr,
+                                refp->lastWrite.i_count,
                                 addr );
     
     res_entry->n_raw++;
@@ -426,11 +484,13 @@ void recordLoad(Addr32 pc, Addr32 addr, Addr32 sp)
 
     if( refp->lastRead.ev.context == NULL ) { // ref before this was write
         refp->lastRead.ev.i_addr = pc;
+        refp->lastRead.ev.i_count = instructions;
         refp->lastRead.ev.context = current_stack_frame;
         refp->lastRead.next = NULL;
     } else {
         ev_list = (EventList *) VG_(calloc)( 1, sizeof(EventList) );
         ev_list->ev.i_addr = pc;
+        ev_list->ev.i_count = instructions;
         ev_list->ev.context = current_stack_frame;
         ev_list->next = refp->lastRead.next;
         refp->lastRead.next = ev_list;
@@ -455,6 +515,7 @@ void recordStore(Addr32 pc, Addr32 addr, Addr32 sp)
                                     pc, 
                                     refp->lastWrite.context, 
                                     refp->lastWrite.i_addr,
+                                    refp->lastWrite.i_count,
                                     addr );
         res_entry->n_waw++;
 
@@ -466,6 +527,7 @@ void recordStore(Addr32 pc, Addr32 addr, Addr32 sp)
                                         pc, 
                                         ev_list->ev.context, 
                                         ev_list->ev.i_addr,
+                                        ev_list->ev.i_count,
                                         addr );
             res_entry->n_war++;
         }
@@ -481,6 +543,7 @@ void recordStore(Addr32 pc, Addr32 addr, Addr32 sp)
     refp->lastRead.next = NULL;
 
     refp->lastWrite.i_addr = pc;
+    refp->lastWrite.i_count = instructions;
     refp->lastWrite.context = current_stack_frame;
 
 }
@@ -619,6 +682,22 @@ static void emitIncrementGlobal(IRBB *bbOut, void *addr, unsigned int amount)
     addStmtToIRBB( bbOut, IRStmt_Store( Iend_LE, exp_instr_addr, exp_instrs_new ) );
 }
 
+static void emitSpChange(IRBB *bbOut)
+{
+    HChar *hname = "recordSpChange";
+    void  *haddr = &recordSpChange;
+
+    IRTemp tmp_sp = newIRTemp(bbOut->tyenv, Ity_I32);
+    IRExpr *exp_sp = IRExpr_Tmp( tmp_sp );
+    IRExpr *exp_get_sp = IRExpr_Get( OFFSET_x86_ESP, Ity_I32 );
+    IRExpr **args = mkIRExprVec_1( exp_sp );
+    IRDirty *dy = unsafeIRDirty_0_N( 1, hname, haddr, args );
+    
+    addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_sp, exp_get_sp ) );
+    addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
+}
+
+
 
 // instrumentExit is called when we find and Exit in the block AND for the
 // implicit Exit at the end of each block
@@ -696,6 +775,8 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
        switch( stIn->tag ) {
 
          case Ist_IMark: 
+             emitSpChange( bbOut );
+
              guestIAddr = (Addr32) stIn->Ist.IMark.addr;
              guestILen  = stIn->Ist.IMark.len;
              loc_instr++;

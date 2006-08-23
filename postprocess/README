@@ -51,5 +51,8 @@ embla.sh <commandname>
 
 assuming that there is an executable named <commandname> which 
 takes no arguments and whose source code is "<commandname>.c".
+The script also depends on the environment variable '$EMBLAHOME'
+which should point to the parent directory of 'postprocess' (which 
+I believe is also the root of the Embla svn-tree).
 The files "<commandname>.trace" "<commandname>.deplist.tex" and
 "<commandname>.depgraph.tex" are produced.
