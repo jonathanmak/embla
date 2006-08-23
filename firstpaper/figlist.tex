@@ -1,0 +1,54 @@
+\begin{verbatim}
+                                | #include <stdio.h>
+                                | #include <stdlib.h>
+                                | 
+                                | #define N 5
+                                | 
+                                | typedef struct _ilist {
+                                |    int val;
+                                |    struct _ilist *next;
+                                | } ilist;
+                                | 
+                                | static ilist* mklist(int n)
+                                | {
+                                |   int i;
+                                |   ilist *p = NULL;
+                                | 
+                                |   for( i=0; i<n; i++ ) {
+                                |     ilist *t = (ilist *) malloc( sizeof(ilist) );
+                                |     t->val = i;
+                                |     t->next = p;
+                                |     p = t;
+                                |   }
+                                |   return p;
+                                | }
+                                | 
+                                | static int sumlist(ilist* p)
+                                | {
+                                |    ilist *q;
+                                |    int  sum = 0;
+                                | 
+                                |    for( q=p; q!=NULL; q=q->next ) {
+                                |       sum += q->val;
+                                |    }
+                                |    return sum;
+                              F | }
+                              . | 
+                              s | 
+                              . | int main(int argc, char **argv) 
+  A   F F F                   V | {
+  c   h . c A   F   F         | |   int m,n;
+  s   o s o c   . A c   F     | |   ilist *p,*q;
+  .   h . c s   s c o   . A   | | 
+= V   V V V c   . s c   s c   | |   p = mklist( N );
+F > = > | | V   V . V   . s   | |   q = mklist( N );
+.   F   > > > = | V |   V .   | |   m = sumlist( p );
+s   .         F > > > = | V   | |   n = sumlist( q );
+c   s         .       F | |   | | 
+    c         s       . > > = | |   printf("%d\n", m);
+              c       s     F | | 
+                      c     . | |   return 0;
+                            s | | 
+                            c > | }
+\end{verbatim}
+

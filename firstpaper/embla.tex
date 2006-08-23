@@ -1,0 +1,142 @@
+\section{The Tool}
+
+Embla helps the user find dependencies in a program. Technically, a
+dependece is two references, not both reads, to overlapping memory
+locations with no interveaning write. What makes Embla special is the
+way dependencies are reported. Since the idea is to support manual,
+function call level parallelization, we are not really interested in
+knowing that a memory read on line 11754 in function {\tt foo}
+sometimes reads a value last written in line 3411 in function {\tt
+bar}. Rather, the user is concerned with a completely different
+function {\tt baz} and would like to know whether the call to {\tt
+foobar} on line 2355 can be made in parallel with the call to {\tt
+barfoo} on line 2356.
+
+
+
+\subsection{Types of dependencies}
+
+There are several different types of dependences between two
+references. These types can be characterized according to several
+dimensions. The first dimension concerns the read and write nature of
+the references:
+\begin{description}
+\item[Flow:]
+A true data dependency wher the location is first written then
+read. Also known as {\em read after write} (RAW).
+\item[Anti:]
+A dependence caused by reuse of a location that is first read and then
+written. Also known as {\em write after read} (WAR).
+\item[Output:]
+Similar to an anti dependence, but the second reference is also a
+write. Also known as {\em write after write} (WAW).
+\end{description}
+Some anti and output dependencies are due to reusing the same
+locations for (logically) distinct data items. This happens for
+instance for stack locations when arguments are passed on the stack
+(as is common on the x86, for instance). Consider the following
+example:
+\begin{verbatim}
+    foo(x);
+    bar(y);
+\end{verbatim}
+The value of {\tt x} will be pushed on the stack. Then {\tt foo} will
+be called and will read {\tt x}. When that call has returned, {\tt y}
+will be pushed on the stack on the same address as {\tt x}, creating
+an anti dependence with {\tt foo}'s read. This kind of dependence can 
+easily be removed by a
+compiler. In fact, if the call to {\tt foo} is made asynchronously, in
+another thread, it will automatically be made on a different stack and
+the dependence disappears. Register allocation is another source of
+anti and output dependencies since distinct variables are packed into
+the same register. In this case, the allocation can be changed to
+remove dependenies, a transformation known as {\em renaming}. 
+Other anti dependencies are due to updates
+to the same data structure and cannot be eliminated by renaming.
+
+Another dimension that Embla recognizes is where in memory the
+location associated with the dependency is situated. In particular, we
+want to catch the cases where anti and output dependencies are created
+by reuse of memory for new stack frames. This happens when the stack 
+shrinks and
+then grows again; the new stack frames use the same memory locations,
+but only for memory management reasons. With this in mind we have the
+following categories:
+\begin{description}
+\item[s(tack):]
+The location has been a part of the stack from the first reference to
+the second (inclusive).
+\item[f(alse):]
+The location was part of the stack when the first reference was made,
+then the stack shrunk enough that the location was not part of the
+stack and then it became part of the stack again.
+\item[o(ther):]
+The location has never been part of the stack.
+\end{description}
+
+We also categorize dependencies according to properties of the two 
+memory references making up the source and target of the dependence. 
+This is both in order to give more precise information and to flag
+additional dependencies as spurious. 
+
+A typical case in point is 
+{\tt malloc}. Each call to {\tt malloc} manipulates (updates) 
+administrative data structures like the free list. Embla will
+report these as dependencies, effectively serializing all calls to 
+{\tt malloc}, and thus in addition all calls to functions calling
+{\tt malloc}. In reality, these calls need not be serialized since
+program semantics typically does not depend on the exact addresses 
+that data are allocated. It suffices that a thread safe 
+implementation of {\tt malloc} is used.
+
+Dependency endpoints correspond to instruction execution events and
+are reported as line numbers with one of the following codes:
+\begin{description}
+\item[$\epsilon$:] 
+No code at all represents an instruction that is
+generated from the source code at the indicated line. Thus the 
+instruction is part of the function or procedure containing the 
+line.
+\item[c:]
+The instruction was executed by a function (procedure) that was 
+(transitively) invoked by a function (procedure) call at the indicated 
+line.
+\item[h:]
+Like {\bf c}, but the function containing the instruction was 
+{\em hidden}, that is, it was on a blacklist of functions which, 
+like {\tt malloc}, would not give rise to dependencies in the 
+parallelized program.
+\end{description}
+
+
+\begin{figure} 
+\small
+\input{ex1.deplist}
+\end{figure}
+
+\begin{figure} 
+\small
+\input{ex4.deplist}
+\end{figure}
+
+\begin{figure} 
+\small
+\input{ex1.depgraph}
+\end{figure}
+
+\begin{figure} 
+\small
+\input{ex4.depgraph}
+\end{figure}
+
+\begin{figure} 
+\small
+\input{ex5.deplist}
+\end{figure}
+
+\begin{figure} 
+\small
+\input{ex5.depgraph}
+\end{figure}
+
+

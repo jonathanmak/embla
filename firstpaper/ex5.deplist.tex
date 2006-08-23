@@ -1,0 +1,119 @@
+\verbdef\jkffxb$#include <stdlib.h> $
+\verbdef\jkffxc$#include <stdio.h> $
+\verbdef\jkffxd$ $
+\verbdef\jkffxe$static int nfib(int n) $
+\verbdef\jkffxf${ $
+\verbdef\jkffxg$   int result; $
+\verbdef\jkffxh$   if( n < 2 ) { $
+\verbdef\jkffxi$     result = 1; $
+\verbdef\jkffxj$   } else { $
+\verbdef\jkffxba$     int a = nfib( n-1 ); $
+\verbdef\jkffxbb$     int b = nfib( n-2 ); $
+\verbdef\jkffxbc$     result = a+b; $
+\verbdef\jkffxbd$   } $
+\verbdef\jkffxbe$   return result; $
+\verbdef\jkffxbf$} $
+\verbdef\jkffxbg$      $
+\verbdef\jkffxbh$  $
+\verbdef\jkffxbi$ $
+\verbdef\jkffxbj$int main(int argc, char **argv) $
+\verbdef\jkffxca${ $
+\verbdef\jkffxcb$   int m = nfib( 8 ); $
+\verbdef\jkffxcc$    $
+\verbdef\jkffxcd$   printf( "%d\n", m ); $
+\verbdef\jkffxce$} $
+\hrulefill
+\[
+\begin{picture}(420,240)(-36,-240)
+
+\put(0,0){\makebox(100,10)[l]{}}
+\put(0,-10){\makebox(100,10)[l]{\jkffxb}}
+\put(0,-20){\makebox(100,10)[l]{\jkffxc}}
+\put(0,-30){\makebox(100,10)[l]{\jkffxd}}
+\put(0,-40){\makebox(100,10)[l]{\jkffxe}}
+\put(0,-50){\makebox(100,10)[l]{\jkffxf}}
+{\color{black} \dottedline{3}(-33,-50)(-5,-50)}\put(0,-60){\makebox(100,10)[l]{\jkffxg}}
+{\color{black} \dottedline{3}(-33,-60)(-5,-60)}\put(0,-70){\makebox(100,10)[l]{\jkffxh}}
+{\color{black} \dottedline{3}(-33,-70)(-5,-70)}\put(0,-80){\makebox(100,10)[l]{\jkffxi}}
+{\color{black} \dottedline{3}(-33,-80)(-5,-80)}\put(0,-90){\makebox(100,10)[l]{\jkffxj}}
+{\color{black} \dottedline{3}(-33,-90)(-5,-90)}\put(0,-100){\makebox(100,10)[l]{\jkffxba}}
+{\color{black} \dottedline{3}(-33,-100)(-5,-100)}\put(0,-110){\makebox(100,10)[l]{\jkffxbb}}
+{\color{black} \dottedline{3}(-33,-110)(-5,-110)}\put(0,-120){\makebox(100,10)[l]{\jkffxbc}}
+{\color{black} \dottedline{3}(-33,-120)(-5,-120)}\put(0,-130){\makebox(100,10)[l]{\jkffxbd}}
+{\color{black} \dottedline{3}(-33,-130)(-5,-130)}\put(0,-140){\makebox(100,10)[l]{\jkffxbe}}
+{\color{black} \dottedline{3}(-33,-140)(-5,-140)}\put(0,-150){\makebox(100,10)[l]{\jkffxbf}}
+\put(0,-160){\makebox(100,10)[l]{\jkffxbg}}
+\put(0,-170){\makebox(100,10)[l]{\jkffxbh}}
+\put(0,-180){\makebox(100,10)[l]{\jkffxbi}}
+\put(0,-190){\makebox(100,10)[l]{\jkffxbj}}
+\put(0,-200){\makebox(100,10)[l]{\jkffxca}}
+{\color{black} \dottedline{3}(-33,-200)(-5,-200)}\put(0,-210){\makebox(100,10)[l]{\jkffxcb}}
+{\color{black} \dottedline{3}(-33,-210)(-5,-210)}\put(0,-220){\makebox(100,10)[l]{\jkffxcc}}
+{\color{black} \dottedline{3}(-33,-220)(-5,-220)}\put(0,-230){\makebox(100,10)[l]{\jkffxcd}}
+{\color{black} \dottedline{3}(-33,-230)(-5,-230)}\put(0,-240){\makebox(100,10)[l]{\jkffxce}}
+
+\color{red}
+\put(-6,-45){\circle*{2}}
+\put(-6,-47){\vector(0,-1){96}}
+\put(-8,-47){\linethickness{0.7pt}\line(1,0){0}}
+\put(-6,-145){\circle*{2}}
+
+\color{red}
+\put(-12,-75){\circle*{2}}
+\put(-12,-77){\vector(0,-1){56}}
+\put(-14,-77){\linethickness{0.7pt}\line(1,0){0}}
+\put(-12,-135){\circle*{2}}
+
+\color{red}
+\put(-18,-92){\circle*{2}}
+\put(-20,-94){\linethickness{0.7pt}\line(1,0){0}}
+\put(-18,-97){\circle*{2}\hspace{-2\unitlength}\circle{4}}
+
+\color{red}
+\put(-24,-95){\circle*{2}}
+\put(-24,-97){\vector(0,-1){16}}
+\put(-26,-97){\linethickness{0.7pt}\line(1,0){0}}
+\put(-24,-115){\circle*{2}}
+
+\color{red}
+\put(-18,-102){\circle*{2}}
+\put(-20,-104){\linethickness{0.7pt}\line(1,0){0}}
+\put(-18,-107){\circle*{2}\hspace{-2\unitlength}\circle{4}}
+
+\color{red}
+\put(-30,-105){\circle*{2}}
+\put(-30,-107){\vector(0,-1){6}}
+\put(-32,-107){\linethickness{0.7pt}\line(1,0){0}}
+\put(-30,-115){\circle*{2}}
+
+\color{red}
+\put(-18,-115){\circle*{2}}
+\put(-18,-117){\vector(0,-1){16}}
+\put(-20,-117){\linethickness{0.7pt}\line(1,0){0}}
+\put(-18,-135){\circle*{2}}
+
+\color{red}
+\put(-6,-195){\circle*{2}}
+\put(-6,-197){\vector(0,-1){36}}
+\put(-8,-197){\linethickness{0.7pt}\line(1,0){0}}
+\put(-6,-235){\circle*{2}}
+
+\color{red}
+\put(-12,-202){\circle*{2}}
+\put(-14,-204){\linethickness{0.7pt}\line(1,0){0}}
+\put(-12,-207){\circle*{2}\hspace{-2\unitlength}\circle{4}}
+
+\color{red}
+\put(-18,-205){\circle*{2}}
+\put(-18,-207){\vector(0,-1){16}}
+\put(-20,-207){\linethickness{0.7pt}\line(1,0){0}}
+\put(-18,-225){\circle*{2}}
+
+\color{red}
+\put(-12,-222){\circle*{2}}
+\put(-14,-224){\linethickness{0.7pt}\line(1,0){0}}
+\put(-12,-227){\circle*{2}\hspace{-2\unitlength}\circle{4}}
+
+\end{picture}
+\]
+\hrulefill

@@ -1,0 +1,66 @@
+\section{Introduction}
+
+Ubiquity of chip multithreading
+
+The need for thread parallelism
+
+A parallelisation model: asynchronous function calls
+
+
+Embla is, at least initially, aimed at supporting procedure-level 
+fork-join parallelism. To a first approximation, this means executing 
+procedure calls asynchronously. Consider the program fragment below:
+\begin{alltt}
+   foo();
+   bar();
+   baz();
+\end{alltt}
+Suppose that {\tt foo()} and {\tt bar()} are {\em independent}, ie that 
+executing {\tt bar()} before {\tt foo()} does not change the meaning of
+the program\footnote{There are many ways to formally give meaning to a
+program, although it has never been done for C.}. A sufficient condition 
+for independence
+in this case is that {\tt foo()} and {\tt bar()} do not do any I/O and
+that neither call writes to a memory location that the other call 
+accesses. In that case the call to {\tt foo()} can be asynchronously, 
+by a different thread, and in parallel with the call to {\tt bar()}.
+Suppose further that {\tt foo()} and {\tt baz()} are not independent,
+so {\tt baz()} can not be executed until the call {\tt foo()} is completed.
+We can express this as 
+\begin{alltt}
+   spawn foo();
+   bar();
+   sync;
+   baz();
+\end{alltt}
+where {\tt spawn} starts the call in parallel and {\tt sync} waits
+for all {\tt spawn}'d acivities to terminate (here we have borrowed 
+programming constructs from the Cilk programming language 
+\cite{frigo98implementation}).
+
+This style of paralleism can be implemented efficiently (as is done
+for instance in the Cilk language) and is easy to understand although
+not as powerful as general thread parallelism with arbitrary
+synchronization. In particular, as long as {\tt foo()} and {\tt bar()}
+are independent, the behavior of the parallel program is identical to
+the behavior of the sequential version. Therefore it is sufficient to
+understand (debug, verify, \ldots) the sequential program; everything
+except performance carries over to the parallel version.
+
+The price for this approach is that one must find independent
+procedure calls (program fragments, in general). Thus there must be
+such calls in the code and the programmer must be able to make sure
+that they are in fact independent. The first issue depends of course
+on the algorithms used in the program.
+
+The second issue is typically
+dealt with using static analysis tools as is done in parallelizing
+compilers. Such analysers are however very complex and must by
+necessity be conservative (since they are static, they must use
+approximations which are always safe).
+
+Embla takes a different approach by observing program execution
+directly and recording the dependencies that occur.
+
+
+

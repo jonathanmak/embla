@@ -1,0 +1,178 @@
+\verbdef\jkffxb$#include <stdio.h> $
+\verbdef\jkffxc$#include <stdlib.h> $
+\verbdef\jkffxd$ $
+\verbdef\jkffxe$#define N 5 $
+\verbdef\jkffxf$ $
+\verbdef\jkffxg$typedef struct _ilist { $
+\verbdef\jkffxh$   int val; $
+\verbdef\jkffxi$   struct _ilist *next; $
+\verbdef\jkffxj$} ilist; $
+\verbdef\jkffxba$ $
+\verbdef\jkffxbb$static ilist* mklist(int n) $
+\verbdef\jkffxbc${ $
+\verbdef\jkffxbd$  int i; $
+\verbdef\jkffxbe$  ilist *p = NULL; $
+\verbdef\jkffxbf$ $
+\verbdef\jkffxbg$  for( i=0; i<n; i++ ) { $
+\verbdef\jkffxbh$    ilist *t = (ilist *) malloc( sizeof(ilist) ); $
+\verbdef\jkffxbi$    t->val = i; $
+\verbdef\jkffxbj$    t->next = p; $
+\verbdef\jkffxca$    p = t; $
+\verbdef\jkffxcb$  } $
+\verbdef\jkffxcc$  return p; $
+\verbdef\jkffxcd$} $
+\verbdef\jkffxce$ $
+\verbdef\jkffxcf$static int sumlist(ilist* p) $
+\verbdef\jkffxcg${ $
+\verbdef\jkffxch$   ilist *q; $
+\verbdef\jkffxci$   int  sum = 0; $
+\verbdef\jkffxcj$ $
+\verbdef\jkffxda$   for( q=p; q!=NULL; q=q->next ) { $
+\verbdef\jkffxdb$      sum += q->val; $
+\verbdef\jkffxdc$   } $
+\verbdef\jkffxdd$   return sum; $
+\verbdef\jkffxde$} $
+\verbdef\jkffxdf$ $
+\verbdef\jkffxdg$ $
+\verbdef\jkffxdh$int main(int argc, char **argv)  $
+\verbdef\jkffxdi${ $
+\verbdef\jkffxdj$  int m,n; $
+\verbdef\jkffxea$  ilist *p,*q; $
+\verbdef\jkffxeb$ $
+\verbdef\jkffxec$  p = mklist( N ); $
+\verbdef\jkffxed$  q = mklist( N ); $
+\verbdef\jkffxee$  m = sumlist( p ); $
+\verbdef\jkffxef$  n = sumlist( q ); $
+\verbdef\jkffxeg$ $
+\verbdef\jkffxeh$  printf("%d\n", m+n); $
+\verbdef\jkffxei$ $
+\verbdef\jkffxej$  return 0; $
+\verbdef\jkffxfa$ $
+\verbdef\jkffxfb$} $
+\hrulefill
+\[
+\begin{picture}(420,510)(-40,-510)
+
+\put(0,-10){\makebox(100,10)[l]{\jkffxb}}
+\put(0,-20){\makebox(100,10)[l]{\jkffxc}}
+\put(0,-30){\makebox(100,10)[l]{\jkffxd}}
+\put(0,-40){\makebox(100,10)[l]{\jkffxe}}
+\put(0,-50){\makebox(100,10)[l]{\jkffxf}}
+\put(0,-60){\makebox(100,10)[l]{\jkffxg}}
+\put(0,-70){\makebox(100,10)[l]{\jkffxh}}
+\put(0,-80){\makebox(100,10)[l]{\jkffxi}}
+\put(0,-90){\makebox(100,10)[l]{\jkffxj}}
+\put(0,-100){\makebox(100,10)[l]{\jkffxba}}
+\put(0,-110){\makebox(100,10)[l]{\jkffxbb}}
+\put(0,-120){\makebox(100,10)[l]{\jkffxbc}}
+{\color{black} \dottedline{3}(-10,-115)(-0,-115)}
+\put(0,-130){\makebox(100,10)[l]{\jkffxbd}}
+\put(0,-140){\makebox(100,10)[l]{\jkffxbe}}
+{\color{black} \dottedline{3}(-10,-135)(-0,-135)}
+\put(0,-150){\makebox(100,10)[l]{\jkffxbf}}
+\put(0,-160){\makebox(100,10)[l]{\jkffxbg}}
+{\color{black} \dottedline{3}(-10,-155)(-0,-155)}
+\put(0,-170){\makebox(100,10)[l]{\jkffxbh}}
+{\color{black} \dottedline{3}(-10,-165)(-0,-165)}
+\put(0,-180){\makebox(100,10)[l]{\jkffxbi}}
+{\color{black} \dottedline{3}(-10,-175)(-0,-175)}
+\put(0,-190){\makebox(100,10)[l]{\jkffxbj}}
+{\color{black} \dottedline{3}(-10,-185)(-0,-185)}
+\put(0,-200){\makebox(100,10)[l]{\jkffxca}}
+{\color{black} \dottedline{3}(-10,-195)(-0,-195)}
+\put(0,-210){\makebox(100,10)[l]{\jkffxcb}}
+\put(0,-220){\makebox(100,10)[l]{\jkffxcc}}
+{\color{black} \dottedline{3}(-10,-215)(-0,-215)}
+\put(0,-230){\makebox(100,10)[l]{\jkffxcd}}
+{\color{black} \dottedline{3}(-10,-225)(-0,-225)}
+\put(0,-240){\makebox(100,10)[l]{\jkffxce}}
+\put(0,-250){\makebox(100,10)[l]{\jkffxcf}}
+\put(0,-260){\makebox(100,10)[l]{\jkffxcg}}
+{\color{black} \dottedline{3}(-10,-255)(-0,-255)}
+\put(0,-270){\makebox(100,10)[l]{\jkffxch}}
+\put(0,-280){\makebox(100,10)[l]{\jkffxci}}
+{\color{black} \dottedline{3}(-10,-275)(-0,-275)}
+\put(0,-290){\makebox(100,10)[l]{\jkffxcj}}
+\put(0,-300){\makebox(100,10)[l]{\jkffxda}}
+{\color{black} \dottedline{3}(-10,-295)(-0,-295)}
+\put(0,-310){\makebox(100,10)[l]{\jkffxdb}}
+{\color{black} \dottedline{3}(-10,-305)(-0,-305)}
+\put(0,-320){\makebox(100,10)[l]{\jkffxdc}}
+\put(0,-330){\makebox(100,10)[l]{\jkffxdd}}
+{\color{black} \dottedline{3}(-10,-325)(-0,-325)}
+\put(0,-340){\makebox(100,10)[l]{\jkffxde}}
+{\color{black} \dottedline{3}(-10,-335)(-0,-335)}
+\put(0,-350){\makebox(100,10)[l]{\jkffxdf}}
+\put(0,-360){\makebox(100,10)[l]{\jkffxdg}}
+\put(0,-370){\makebox(100,10)[l]{\jkffxdh}}
+\put(0,-380){\makebox(100,10)[l]{\jkffxdi}}
+{\color{black} \dottedline{3}(-10,-375)(-0,-375)}
+\put(0,-390){\makebox(100,10)[l]{\jkffxdj}}
+\put(0,-400){\makebox(100,10)[l]{\jkffxea}}
+\put(0,-410){\makebox(100,10)[l]{\jkffxeb}}
+\put(0,-420){\makebox(100,10)[l]{\jkffxec}}
+{\color{black} \dottedline{3}(-10,-415)(-0,-415)}
+\put(0,-430){\makebox(100,10)[l]{\jkffxed}}
+{\color{black} \dottedline{3}(-10,-425)(-0,-425)}
+\put(0,-440){\makebox(100,10)[l]{\jkffxee}}
+{\color{black} \dottedline{3}(-10,-435)(-0,-435)}
+\put(0,-450){\makebox(100,10)[l]{\jkffxef}}
+{\color{black} \dottedline{3}(-10,-445)(-0,-445)}
+\put(0,-460){\makebox(100,10)[l]{\jkffxeg}}
+\put(0,-470){\makebox(100,10)[l]{\jkffxeh}}
+{\color{black} \dottedline{3}(-10,-465)(-0,-465)}
+\put(0,-480){\makebox(100,10)[l]{\jkffxei}}
+\put(0,-490){\makebox(100,10)[l]{\jkffxej}}
+\put(0,-500){\makebox(100,10)[l]{\jkffxfa}}
+\put(0,-510){\makebox(100,10)[l]{\jkffxfb}}
+{\color{black} \dottedline{3}(-10,-505)(-0,-505)}
+
+\put(-20,-435){\color{black}\circle*{2}}
+\put(-40,-165){\color{black}\circle*{2}}
+\put(-10,-255){\color{black}\circle*{2}}
+\put(-30,-445){\color{black}\circle*{2}}
+\put(-20,-175){\color{black}\circle*{2}}
+\put(-30,-185){\color{black}\circle*{2}}
+\put(-30,-275){\color{black}\circle*{2}}
+\put(-20,-465){\color{black}\circle*{2}}
+\put(-10,-375){\color{black}\circle*{2}}
+\put(-40,-195){\color{black}\circle*{2}}
+\put(-10,-115){\color{black}\circle*{2}}
+\put(-20,-295){\color{black}\circle*{2}}
+\put(-40,-215){\color{black}\circle*{2}}
+\put(-30,-305){\color{black}\circle*{2}}
+\put(-30,-135){\color{black}\circle*{2}}
+\put(-10,-225){\color{black}\circle*{2}}
+\put(-30,-415){\color{black}\circle*{2}}
+\put(-10,-505){\color{black}\circle*{2}}
+\put(-30,-325){\color{black}\circle*{2}}
+\put(-30,-425){\color{black}\circle*{2}}
+\put(-20,-155){\color{black}\circle*{2}}
+\put(-10,-335){\color{black}\circle*{2}}
+\put(-10,-117){\color{red}\vector(0,-1){106}}
+\put(-30,-137){\color{red}\vector(0,-1){46}}
+\put(-19,-157){\color{red}\vector(0,-1){16}}
+\put(-37,-166){\color{red}\vector(2,-1){16}}
+\put(-38,-167){\color{red}\vector(1,-2){8}}
+\put(-39,-167){\color{red}\vector(0,-1){26}}
+\put(-21,-173){\color{green}\vector(0,1){16}}
+\put(-22,-173){\color{green}\vector(-2,1){16}}
+\put(-31,-182){\color{green}\vector(-1,2){8}}
+\put(-30,-185){\color{green}\vector(-1,-1){7}}
+\put(-41,-193){\color{green}\vector(0,1){26}}
+\put(-39,-194){\color{red}\vector(1,1){7}}
+\put(-40,-197){\color{red}\vector(0,-1){16}}
+\put(-10,-257){\color{red}\vector(0,-1){76}}
+\put(-30,-277){\color{red}\vector(0,-1){26}}
+\put(-20,-295){\color{red}\vector(-1,-1){7}}
+\put(-29,-304){\color{green}\vector(1,1){7}}
+\put(-30,-307){\color{red}\vector(0,-1){16}}
+\put(-10,-377){\color{red}\vector(0,-1){126}}
+\put(-30,-417){\color{cyan}\vector(0,-1){6}}
+\put(-29,-416){\color{red}\vector(1,-2){8}}
+\put(-30,-427){\color{red}\vector(0,-1){16}}
+\put(-20,-437){\color{red}\vector(0,-1){26}}
+\put(-29,-446){\color{red}\vector(1,-2){8}}
+\end{picture}
+\]
+\hrulefill

@@ -1,0 +1,85 @@
+\verbdef\jkffxb$#include <stdlib.h> $
+\verbdef\jkffxc$#include <stdio.h> $
+\verbdef\jkffxd$ $
+\verbdef\jkffxe$static int nfib(int n) $
+\verbdef\jkffxf${ $
+\verbdef\jkffxg$   int result; $
+\verbdef\jkffxh$   if( n < 2 ) { $
+\verbdef\jkffxi$     result = 1; $
+\verbdef\jkffxj$   } else { $
+\verbdef\jkffxba$     int a = nfib( n-1 ); $
+\verbdef\jkffxbb$     int b = nfib( n-2 ); $
+\verbdef\jkffxbc$     result = a+b; $
+\verbdef\jkffxbd$   } $
+\verbdef\jkffxbe$   return result; $
+\verbdef\jkffxbf$} $
+\verbdef\jkffxbg$      $
+\verbdef\jkffxbh$  $
+\verbdef\jkffxbi$ $
+\verbdef\jkffxbj$int main(int argc, char **argv) $
+\verbdef\jkffxca${ $
+\verbdef\jkffxcb$   int m = nfib( 8 ); $
+\verbdef\jkffxcc$    $
+\verbdef\jkffxcd$   printf( "%d\n", m ); $
+\verbdef\jkffxce$} $
+\hrulefill
+\[
+\begin{picture}(420,240)(-40,-240)
+
+\put(0,-10){\makebox(100,10)[l]{\jkffxb}}
+\put(0,-20){\makebox(100,10)[l]{\jkffxc}}
+\put(0,-30){\makebox(100,10)[l]{\jkffxd}}
+\put(0,-40){\makebox(100,10)[l]{\jkffxe}}
+\put(0,-50){\makebox(100,10)[l]{\jkffxf}}
+{\color{black} \dottedline{3}(-10,-45)(-0,-45)}
+\put(0,-60){\makebox(100,10)[l]{\jkffxg}}
+\put(0,-70){\makebox(100,10)[l]{\jkffxh}}
+\put(0,-80){\makebox(100,10)[l]{\jkffxi}}
+{\color{black} \dottedline{3}(-10,-75)(-0,-75)}
+\put(0,-90){\makebox(100,10)[l]{\jkffxj}}
+\put(0,-100){\makebox(100,10)[l]{\jkffxba}}
+{\color{black} \dottedline{3}(-10,-95)(-0,-95)}
+\put(0,-110){\makebox(100,10)[l]{\jkffxbb}}
+{\color{black} \dottedline{3}(-10,-105)(-0,-105)}
+\put(0,-120){\makebox(100,10)[l]{\jkffxbc}}
+{\color{black} \dottedline{3}(-10,-115)(-0,-115)}
+\put(0,-130){\makebox(100,10)[l]{\jkffxbd}}
+\put(0,-140){\makebox(100,10)[l]{\jkffxbe}}
+{\color{black} \dottedline{3}(-10,-135)(-0,-135)}
+\put(0,-150){\makebox(100,10)[l]{\jkffxbf}}
+{\color{black} \dottedline{3}(-10,-145)(-0,-145)}
+\put(0,-160){\makebox(100,10)[l]{\jkffxbg}}
+\put(0,-170){\makebox(100,10)[l]{\jkffxbh}}
+\put(0,-180){\makebox(100,10)[l]{\jkffxbi}}
+\put(0,-190){\makebox(100,10)[l]{\jkffxbj}}
+\put(0,-200){\makebox(100,10)[l]{\jkffxca}}
+{\color{black} \dottedline{3}(-10,-195)(-0,-195)}
+\put(0,-210){\makebox(100,10)[l]{\jkffxcb}}
+{\color{black} \dottedline{3}(-10,-205)(-0,-205)}
+\put(0,-220){\makebox(100,10)[l]{\jkffxcc}}
+\put(0,-230){\makebox(100,10)[l]{\jkffxcd}}
+{\color{black} \dottedline{3}(-10,-225)(-0,-225)}
+\put(0,-240){\makebox(100,10)[l]{\jkffxce}}
+{\color{black} \dottedline{3}(-10,-235)(-0,-235)}
+
+\put(-10,-45){\color{black}\circle*{2}}
+\put(-30,-75){\color{black}\circle*{2}}
+\put(-20,-95){\color{black}\circle*{2}}
+\put(-10,-195){\color{black}\circle*{2}}
+\put(-40,-105){\color{black}\circle*{2}}
+\put(-20,-205){\color{black}\circle*{2}}
+\put(-20,-115){\color{black}\circle*{2}}
+\put(-20,-225){\color{black}\circle*{2}}
+\put(-30,-135){\color{black}\circle*{2}}
+\put(-10,-235){\color{black}\circle*{2}}
+\put(-10,-145){\color{black}\circle*{2}}
+\put(-10,-47){\color{red}\vector(0,-1){96}}
+\put(-30,-77){\color{red}\vector(0,-1){56}}
+\put(-20,-97){\color{red}\vector(0,-1){16}}
+\put(-38,-105){\color{red}\vector(2,-1){16}}
+\put(-20,-116){\color{red}\vector(-1,-2){8}}
+\put(-10,-197){\color{red}\vector(0,-1){36}}
+\put(-20,-207){\color{red}\vector(0,-1){16}}
+\end{picture}
+\]
+\hrulefill
