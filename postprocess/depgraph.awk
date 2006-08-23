@@ -173,6 +173,27 @@ END {
             }
           }
         }
+        # Then: near a non-neighbour with a common neighbour,
+        # except under a previously placed non-neighbour
+        for( off=1; off<10; off++ ) {
+          for( nc=node-1; nc>0; nc-- ) {
+            is_close = 0;
+            for( j=node+1; j<=srcmax; j++ ) {
+              if( ( (nc,j) in edges || (j,nc) in egdes ) &&
+                  ( (node,j) in edges || (j,node) in edges ) ) {
+                is_close = 1;
+              }
+            }
+            for( a=1; a>=-1; a-=2 ) {
+              cand = sstate[nc,"cand"]+a*off;
+              if( is_close && !( cand in marks ) && !( cand in avoid ) ) {
+                xidx++;
+                sstate[node,xidx] = cand;
+                marks[cand] = xidx;
+              }
+            }
+          }
+        }
         # Then: anywhere close to zero, except under a previously placed
         # non-neighbour
         for( off = 0; off < 20; off++ ) {
@@ -362,18 +383,29 @@ END {
         }
         if( (dstL,srcL) in edges ) {
            Xtwoff = - YoffN/2;
-           Ytwoff = - XoffN/2;
+           Ytwoff =   XoffN/2;
         } else {
            Xtwoff = 0;
            Ytwoff = 0;
         }
+
+        Xstart =  depcolw*srcC - ncoff     + Xtwoff + XoffN;
+        Ystart = -depcolw*srcL + depcolw/2 + Ytwoff + YoffN;
+        Xend   =  Xstart + depcolw*Xoff - 2*XoffN;
+        Yend   =  Ystart + depcolw*Yoff - 2*YoffN;
              
-        printf "\\put(%d,%d){\\color{%s}\\vector%s{%d}}\n",
-               depcolw*srcC-ncoff+Xtwoff + XoffN, 
-               -depcolw*srcL+depcolw/2 + Ytwoff + YoffN,
+        printf "\\put(%.1f,%.1f){\\color{%s}\\vector%s{%.1f}}\n",
+               Xstart, 
+               Ystart,
                type[edges[srcL,dstL]],
                slope[dstC-srcC,srcL-dstL], 
                veclen;
+        printf "{\\color{%s}\\dashline[100]{2}(%.1f,%.1f)(%.1f,%.1f)}\n",
+               type[edges[srcL,dstL]],
+               Xstart,
+               Ystart,
+               Xend,
+               Yend;
       }
     }
   }
