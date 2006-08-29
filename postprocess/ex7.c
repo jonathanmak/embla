@@ -16,4 +16,5 @@ int main(int argc, char **argv)
    inc(q);
    printf( "%d\n", *q+n );
    q = (int*) malloc( sizeof(int) );
+   return q==NULL;
 }
