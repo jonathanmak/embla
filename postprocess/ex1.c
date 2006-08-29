@@ -11,5 +11,5 @@ int main(int argc, char **argv)
    has_ab.a = 2;
    has_ab.b = 2;
    printf("%d %d\n", has_ab.a, has_ab.b);
-
+   return 0;
 }

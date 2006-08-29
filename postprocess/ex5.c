@@ -19,6 +19,7 @@ static int nfib(int n)
 int main(int argc, char **argv)
 {
    int m = nfib( 8 );
-   
+
    printf( "%d\n", m );
+   return 0;
 }

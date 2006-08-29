@@ -21,7 +21,6 @@ def main(argv):
   
   srcRoot = os.path.realpath(os.path.abspath(os.path.join(
     os.path.dirname(argv[0]), "..")))
-  # XXX: Building under srcdir seems to be required for valgrind.
   buildRoot = os.path.realpath(os.getcwd())
   installRoot = os.path.realpath("install_dir")
   
@@ -52,6 +51,12 @@ def main(argv):
   print makeCommand
   makeResult = os.system(makeCommand)
   if makeResult:
+    return 1
+
+  installCommand = "make install"
+  print installCommand
+  installResult = os.system(installCommand)
+  if installResult:
     return 1
 
   checkCommand = makeCommand + " check"

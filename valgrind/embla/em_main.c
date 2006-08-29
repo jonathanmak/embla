@@ -402,7 +402,7 @@ static void em_post_clo_init(void)
 
    sres = VG_(open)((Char *) "embla.trace", 
                     VKI_O_CREAT | VKI_O_TRUNC | VKI_O_WRONLY,
-                    VKI_S_IRUSR | VKI_S_IWUSR);
+                    VKI_S_IRUSR | VKI_S_IWUSR | VKI_S_IRGRP);
 
    if( sres.isError ) {
       VG_(message)(Vg_UserMsg, "Trace file could not be opened");
