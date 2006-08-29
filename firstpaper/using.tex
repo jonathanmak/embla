@@ -1,0 +1,113 @@
+\section{Using Embla}
+
+\begin{figure} 
+\small
+\input{ex7.depgraph}
+\caption{Example program with dependency graph} \label{ffirstex}
+\end{figure}
+
+To get a feeling for what dependency profiling is and what Embla can do, 
+let us turn to the admittedly contrieved program in Figure~\ref{ffirstex}. 
+Here we see, from 
+left to right, line numbers, colored data dependency arrows and source 
+lines. 
+
+The presence of a data dependency arrow between a pair of lines indicates
+that Embla has found one or more data dependencies between them
+(Embla does not find control dependencies). A data dependece is a pair
+of references, not both reads, to overlapping memory
+locations with no interveaning write. For instance, in the figure, 
+there is a (red) arrow from line 13 to line 14 corresponding to
+the assignment to {\tt q} followed by its use as an argument in 
+{\tt inc(q)}.
+
+Depending on whether the two references corresponding to a dependence
+are reads or writes, data dependencies are typically divided into 
+three classes:
+\begin{description}
+\item[Flow:]
+A true data dependency where the location is first written then
+read. Also known as {\em read after write} (RAW). Shown in 
+{\color{red} red} in the figure.
+\item[Anti:]
+A dependence caused by reuse of a location that is first read and then
+written. Also known as {\em write after read} (WAR). Shown in 
+{\color{green} green} in the figure.
+\item[Output:]
+Similar to an anti dependence, but the second reference is also a
+write. Also known as {\em write after write} (WAW). Shown in 
+{\color{blue} blue} in the figure.
+\end{description}
+If there are multiple dependencies of different class between the 
+same pair of lines, the color selection is prioritized in the
+order the dependencies are presented above. That is, if there is
+some flow dependence, the arrow is red. Otherwise if there is 
+some antidependence, the arrow is green, otherwise blue. We will 
+come to the light blue arrows shortly.
+
+
+We show dependencies in different colors since there are program
+transformations that in some cases can be used to eliminate 
+dependencies. Since we are discussing an approach to tool-supported
+hand parallelisation, program transformation to remove dependencies
+is potentially useful so Embla is designed to support it.
+
+Flow dependencies are unavoidable since they represent the data flow 
+in the program, but anti and output dependencies can sometimes be 
+removed by {\em renaming}. Consider the (green) arrows from line 
+14, 16 and 17 to line 18 in the figure. These correspond to three
+reads of {\tt q} followed by an assignment to {\tt q}. Here we 
+are dealing with two different values which happen to be stored 
+in the same variable. We could easily invent a new variable, e.g. 
+{\tt r}, and replace {\tt q} by {\tt r} on line 18 and 19. This 
+transformation would remove the dependencies from line 14, 16 and
+17 to line 18. 
+
+Similarly, an output dependence like the one from line 11 to line 13
+(blue) can sometimes, and indeed in this case, be eliminated by 
+removing the first write (the initialization of {\tt q} on line 11).
+Renaming is of course also applicable to output dependencies.
+
+For each of the dependence arrows in the figure that 
+we have dicussed up to now, the endpoints have been part of the 
+code for {\tt main}
+itself. Embla also tracks references made in function calls. For
+instance, there is a (red) flow dependence from line 14 to line 16
+representing the write in the first call to {\tt inc} to the 
+{\tt malloc}'d area pointed to by {\tt q} and the subsequent read 
+of the same location by {\tt inc}. Note that these dependencies 
+are reported as pertaining to {\tt main} rather than {\tt inc},
+although the referencing instructions are part of the latter function. 
+But the importance of the dependence is that, in {\tt main}, the calls
+on line 14 and 16 can not be made in parallel.
+
+Dependencies involving {\tt malloc} are especially interesting.
+Each call to {\tt malloc} manipulates (updates) 
+administrative data structures like the free list. Embla will
+report these as dependencies, effectively serializing all calls to 
+{\tt malloc}, and thus in addition all calls to functions calling
+{\tt malloc}. In reality, these calls need not be serialized since
+program semantics typically does not depend on the exact addresses 
+that data are allocated. It suffices that a thread safe 
+implementation of {\tt malloc} is used.
+
+Embla maintains a black list of functions that behave in this way.
+In the exampples in this paper, the black list consists of the 
+{\tt malloc} family, but of course other functions can be included 
+as appropriate. 
+
+An important thing to remember when interpreting the output of Embla 
+is that although it takes the form of annotated source code, the 
+profiling is performed on the executable machine code. Thus one must
+keep the mappning of source code to machine code in mind. A case in 
+point is the (red) flow dependence between the opening brace of a 
+function and its closing brace (for instance from line 5 to line 7).
+This dependence corresponds to pushing the frame pointer onto the 
+stack as part of the function prologue and popping it in the 
+epilogue.
+
+\begin{figure} 
+\small
+\input{ex7.deplist}
+\end{figure}
+
