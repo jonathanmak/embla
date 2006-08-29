@@ -65,7 +65,7 @@ $1!="???" && ARGIND==2 && $3!="f" && (onlyF=="" || onlyF==$2) {
   if( srcLNum != dstLNum ) {
     if( edges[srcLNum,dstLNum] < depty ) {
       edges[srcLNum,dstLNum] = depty;
-      printf "%2d -> %2d\n", srcLNum, dstLNum > "/dev/stderr";
+      # printf "%2d -> %2d\n", srcLNum, dstLNum > "/dev/stderr";
     }
     social[srcLNum] = 1;
     social[dstLNum] = 1;
@@ -151,7 +151,7 @@ END {
         for( dn in component ) {
           # printf "%d ", dn > "/dev/stderr"
         }
-        printf "\n" > "/dev/stderr"
+        # printf "\n" > "/dev/stderr"
       }
 
       node = i;
@@ -287,7 +287,7 @@ END {
           delete sstate[node,"cand"];
         }
         delete sstate[node,1];
-        printf "\n" > "/dev/stderr"
+        # printf "\n" > "/dev/stderr"
         # Now try to place a node, backtracking if necessary
         # The new candidate is not yet checked
         do {
@@ -450,26 +450,22 @@ END {
 
   ncoff = 5+depcolw/2;
 
+  leftmargin = -depcolw*(maxdep+1)-25;
 
   printf "\\hrulefill\n\\[\n";
   printf "\\begin{picture}(420,%d)(%d,%d)\n\n", 
-          10*srcmax, -depcolw*(maxdep+1), -10*srcmax;
+          10*srcmax, leftmargin, -10*srcmax;
  
   for( line=1; line<=srcmax; line++ ) {
-    used = 1;
-    for( row=line; row<=line+1; row++ ) {
-      oneused = 0;
-      for( col=0; col>=-maxdep; col-- ) {
-        oneused = oneused || usedpos[line,col];
-      }
-      used = used && oneused;
-    }
+
+    printf "\\put(%d,%d){\\makebox(15,10)[r]{\\it %d:}}%%\n",
+      leftmargin, -10*line, line;
+
     printf "\\put(%d,%d){\\makebox(100,10)[l]{%s}}\n", 
            0, -10*line, src[line];
-    # if( line != srcmax && used ) {
+
     if( line in social ) {
-      printf "{\\color{black} \\dottedline{3}(%d,%d)(-0,%d)}\n", 
-        # -depcolw*(maxdep+1.5),
+      printf "{\\color{black} \\dottedline{3}(%d,%d)(0,%d)}\n", 
         -10, 
         -10*line+5, -10*line+5
     }

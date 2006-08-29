@@ -127,9 +127,11 @@ $1!="???" && ARGIND==2 && $3!="f" && (onlyF=="" || onlyF==$2) {
 }
 END {
 
+ leftmargin = -depcolw*(maxdep+1)-20;
+
  printf "\\hrulefill\n\\[\n";
  printf "\\begin{picture}(420,%d)(%d,%d)\n\n", 
-         10*srcmax, -depcolw*(maxdep+1), -10*srcmax;
+         10*srcmax, leftmargin, -10*srcmax;
  
  for( i=0; i<=srcmax; i++ ) {
    used = 1;
@@ -140,6 +142,9 @@ END {
      }
      used = used && oneused;
    }
+   printf "\\put(%d,%d){\\makebox(15,10)[r]{\\it %d:}}%%\n",
+      leftmargin, -10*i, i;
+
    printf "\\put(%d,%d){\\makebox(100,10)[l]{%s}}\n", 
           0, -10*i, src[i];
    if( i != srcmax && used ) {
