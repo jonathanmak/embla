@@ -1,0 +1,200 @@
+\verbdef\jkffxb$#include <stdlib.h> $
+\verbdef\jkffxc$#include <stdio.h> $
+\verbdef\jkffxd$ $
+\verbdef\jkffxe$static void inc(int *p) $
+\verbdef\jkffxf${ $
+\verbdef\jkffxg$   *p=*p+1; $
+\verbdef\jkffxh$} $
+\verbdef\jkffxi$ $
+\verbdef\jkffxj$int main(int argc, char **argv) $
+\verbdef\jkffxba${ $
+\verbdef\jkffxbb$   int *q=NULL,n=0; $
+\verbdef\jkffxbc$ $
+\verbdef\jkffxbd$   q = (int*) malloc( sizeof(int) ); $
+\verbdef\jkffxbe$   inc(q); $
+\verbdef\jkffxbf$   inc(&n); $
+\verbdef\jkffxbg$   inc(q); $
+\verbdef\jkffxbh$   printf( "%d\n", *q+n ); $
+\verbdef\jkffxbi$   q = (int*) malloc( sizeof(int) ); $
+\verbdef\jkffxbj$   return q==NULL; $
+\verbdef\jkffxca$} $
+\hrulefill
+\[
+\begin{picture}(420,200)(-86,-200)
+
+\put(-86,0){\makebox(15,10)[r]{\it 0:}}%
+\put(0,0){\makebox(100,10)[l]{}}
+\put(-86,-10){\makebox(15,10)[r]{\it 1:}}%
+\put(0,-10){\makebox(100,10)[l]{\jkffxb}}
+\put(-86,-20){\makebox(15,10)[r]{\it 2:}}%
+\put(0,-20){\makebox(100,10)[l]{\jkffxc}}
+\put(-86,-30){\makebox(15,10)[r]{\it 3:}}%
+\put(0,-30){\makebox(100,10)[l]{\jkffxd}}
+\put(-86,-40){\makebox(15,10)[r]{\it 4:}}%
+\put(0,-40){\makebox(100,10)[l]{\jkffxe}}
+\put(-86,-50){\makebox(15,10)[r]{\it 5:}}%
+\put(0,-50){\makebox(100,10)[l]{\jkffxf}}
+{\color{black} \dottedline{3}(-63,-50)(-5,-50)}\put(-86,-60){\makebox(15,10)[r]{\it 6:}}%
+\put(0,-60){\makebox(100,10)[l]{\jkffxg}}
+{\color{black} \dottedline{3}(-63,-60)(-5,-60)}\put(-86,-70){\makebox(15,10)[r]{\it 7:}}%
+\put(0,-70){\makebox(100,10)[l]{\jkffxh}}
+\put(-86,-80){\makebox(15,10)[r]{\it 8:}}%
+\put(0,-80){\makebox(100,10)[l]{\jkffxi}}
+\put(-86,-90){\makebox(15,10)[r]{\it 9:}}%
+\put(0,-90){\makebox(100,10)[l]{\jkffxj}}
+\put(-86,-100){\makebox(15,10)[r]{\it 10:}}%
+\put(0,-100){\makebox(100,10)[l]{\jkffxba}}
+{\color{black} \dottedline{3}(-63,-100)(-5,-100)}\put(-86,-110){\makebox(15,10)[r]{\it 11:}}%
+\put(0,-110){\makebox(100,10)[l]{\jkffxbb}}
+{\color{black} \dottedline{3}(-63,-110)(-5,-110)}\put(-86,-120){\makebox(15,10)[r]{\it 12:}}%
+\put(0,-120){\makebox(100,10)[l]{\jkffxbc}}
+{\color{black} \dottedline{3}(-63,-120)(-5,-120)}\put(-86,-130){\makebox(15,10)[r]{\it 13:}}%
+\put(0,-130){\makebox(100,10)[l]{\jkffxbd}}
+{\color{black} \dottedline{3}(-63,-130)(-5,-130)}\put(-86,-140){\makebox(15,10)[r]{\it 14:}}%
+\put(0,-140){\makebox(100,10)[l]{\jkffxbe}}
+{\color{black} \dottedline{3}(-63,-140)(-5,-140)}\put(-86,-150){\makebox(15,10)[r]{\it 15:}}%
+\put(0,-150){\makebox(100,10)[l]{\jkffxbf}}
+{\color{black} \dottedline{3}(-63,-150)(-5,-150)}\put(-86,-160){\makebox(15,10)[r]{\it 16:}}%
+\put(0,-160){\makebox(100,10)[l]{\jkffxbg}}
+{\color{black} \dottedline{3}(-63,-160)(-5,-160)}\put(-86,-170){\makebox(15,10)[r]{\it 17:}}%
+\put(0,-170){\makebox(100,10)[l]{\jkffxbh}}
+{\color{black} \dottedline{3}(-63,-170)(-5,-170)}\put(-86,-180){\makebox(15,10)[r]{\it 18:}}%
+\put(0,-180){\makebox(100,10)[l]{\jkffxbi}}
+{\color{black} \dottedline{3}(-63,-180)(-5,-180)}\put(-86,-190){\makebox(15,10)[r]{\it 19:}}%
+\put(0,-190){\makebox(100,10)[l]{\jkffxbj}}
+{\color{black} \dottedline{3}(-63,-190)(-5,-190)}\put(-86,-200){\makebox(15,10)[r]{\it 20:}}%
+\put(0,-200){\makebox(100,10)[l]{\jkffxca}}
+
+\color{red}
+\put(-6,-95){\circle*{2}}
+\put(-6,-97){\vector(0,-1){96}}
+\put(-8,-97){\linethickness{0.7pt}\line(1,0){0}}
+\put(-6,-195){\circle*{2}}
+
+\color{blue}
+\put(-12,-105){\circle*{2}}
+\put(-12,-107){\vector(0,-1){16}}
+\put(-14,-107){\linethickness{0.7pt}\line(1,0){0}}
+\put(-12,-125){\circle*{2}}
+
+\color{red}
+\put(-18,-105){\circle*{2}}
+\put(-18,-107){\vector(0,-1){36}}
+\put(-20,-107){\linethickness{0.7pt}\line(1,0){0}}
+\put(-18,-145){\circle*{2}\hspace{-2\unitlength}\circle{4}}
+
+\color{red}
+\put(-24,-122){\circle*{2}}
+\put(-26,-124){\linethickness{0.7pt}\line(1,0){0}}
+\put(-24,-127){\circle{4}}
+
+\color{red}
+\put(-30,-125){\circle*{2}}
+\put(-30,-127){\vector(0,-1){6}}
+\put(-32,-127){\linethickness{0.7pt}\line(1,0){0}}
+\put(-30,-135){\circle*{2}}
+
+\color{red}
+\put(-36,-125){\circle*{2}}
+\put(-36,-127){\vector(0,-1){26}}
+\put(-38,-127){\linethickness{0.7pt}\line(1,0){0}}
+\put(-36,-155){\circle*{2}}
+
+\color{red}
+\put(-42,-125){\circle*{2}}
+\put(-42,-127){\vector(0,-1){36}}
+\put(-44,-127){\linethickness{0.7pt}\line(1,0){0}}
+\put(-42,-165){\circle*{2}}
+
+\color{red}
+\put(-48,-125){\circle{4}}
+\put(-48,-127){\vector(0,-1){46}}
+\put(-50,-127){\linethickness{0.7pt}\line(1,0){4}}
+\put(-48,-175){\circle{4}}
+
+\color{red}
+\put(-12,-132){\circle*{2}}
+\put(-14,-134){\linethickness{0.7pt}\line(1,0){0}}
+\put(-12,-137){\circle*{2}\hspace{-2\unitlength}\circle{4}}
+
+\color{green}
+\put(-24,-135){\circle*{2}}
+\put(-24,-137){\vector(0,-1){36}}
+\put(-26,-137){\linethickness{0.7pt}\line(1,0){0}}
+\put(-24,-175){\circle*{2}}
+
+\color{red}
+\put(-54,-135){\circle*{2}\hspace{-2\unitlength}\circle{4}}
+\put(-54,-137){\vector(0,-1){16}}
+\put(-56,-137){\linethickness{0.7pt}\line(1,0){4}}
+\put(-54,-155){\circle*{2}\hspace{-2\unitlength}\circle{4}}
+
+\color{red}
+\put(-12,-142){\circle*{2}}
+\put(-14,-144){\linethickness{0.7pt}\line(1,0){0}}
+\put(-12,-147){\circle*{2}\hspace{-2\unitlength}\circle{4}}
+
+\color{red}
+\put(-30,-145){\circle*{2}\hspace{-2\unitlength}\circle{4}}
+\put(-30,-147){\vector(0,-1){16}}
+\put(-32,-147){\linethickness{0.7pt}\line(1,0){0}}
+\put(-30,-165){\circle*{2}}
+
+\color{red}
+\put(-12,-152){\circle*{2}}
+\put(-14,-154){\linethickness{0.7pt}\line(1,0){0}}
+\put(-12,-157){\circle*{2}\hspace{-2\unitlength}\circle{4}}
+
+\color{green}
+\put(-18,-155){\circle*{2}}
+\put(-18,-157){\vector(0,-1){16}}
+\put(-20,-157){\linethickness{0.7pt}\line(1,0){0}}
+\put(-18,-175){\circle*{2}}
+
+\color{red}
+\put(-60,-155){\circle*{2}\hspace{-2\unitlength}\circle{4}}
+\put(-60,-157){\vector(0,-1){6}}
+\put(-62,-157){\linethickness{0.7pt}\line(1,0){4}}
+\put(-60,-165){\circle*{2}}
+
+\color{red}
+\put(-12,-162){\circle*{2}}
+\put(-14,-164){\linethickness{0.7pt}\line(1,0){0}}
+\put(-12,-167){\circle*{2}\hspace{-2\unitlength}\circle{4}}
+
+\color{green}
+\put(-36,-165){\circle*{2}}
+\put(-36,-167){\vector(0,-1){6}}
+\put(-38,-167){\linethickness{0.7pt}\line(1,0){0}}
+\put(-36,-175){\circle*{2}}
+
+\color{red}
+\put(-12,-172){\circle*{2}}
+\put(-14,-174){\linethickness{0.7pt}\line(1,0){0}}
+\put(-12,-177){\circle{4}}
+
+\color{red}
+\put(-30,-175){\circle*{2}}
+\put(-30,-177){\vector(0,-1){6}}
+\put(-32,-177){\linethickness{0.7pt}\line(1,0){0}}
+\put(-30,-185){\circle*{2}}
+
+\color{red}
+\put(-6,-45){\circle*{2}}
+\put(-6,-47){\vector(0,-1){16}}
+\put(-8,-47){\linethickness{0.7pt}\line(1,0){0}}
+\put(-6,-65){\circle*{2}}
+
+\color{green}
+\put(-12,-52){\circle*{2}}
+\put(-14,-54){\linethickness{0.7pt}\line(1,0){4}}
+\put(-12,-57){\circle*{2}}
+
+\color{green}
+\put(-18,-52){\circle*{2}}
+\put(-20,-54){\linethickness{0.7pt}\line(1,0){0}}
+\put(-18,-57){\circle*{2}}
+
+\end{picture}
+\]
+\hrulefill
