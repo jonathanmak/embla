@@ -49,8 +49,9 @@ come to the light blue arrows shortly.
 We show dependencies in different colors since there are program
 transformations that in some cases can be used to eliminate 
 dependencies. Since we are discussing an approach to tool-supported
-hand parallelisation, program transformation to remove dependencies
-is potentially useful so Embla is designed to support it.
+hand parallelisation, program transformations to remove dependencies
+and increase parallelism are potentially useful. Hence Embla is 
+designed to support them.
 
 Flow dependencies are unavoidable since they represent the data flow 
 in the program, but anti and output dependencies can sometimes be 
@@ -73,18 +74,21 @@ we have dicussed up to now, the endpoints have been part of the
 code for {\tt main}
 itself. Embla also tracks references made in function calls. For
 instance, there is a (red) flow dependence from line 14 to line 16
-representing the write in the first call to {\tt inc} to the 
+representing the write in the first invocation of {\tt inc} to the 
 {\tt malloc}'d area pointed to by {\tt q} and the subsequent read 
-of the same location by {\tt inc}. Note that these dependencies 
+of the same location by a later invocation of {\tt inc}. 
+Note that these dependencies 
 are reported as pertaining to {\tt main} rather than {\tt inc},
 although the referencing instructions are part of the latter function. 
 But the importance of the dependence is that, in {\tt main}, the calls
 on line 14 and 16 can not be made in parallel.
 
-Dependencies involving {\tt malloc} are especially interesting.
+Dependencies between different invocations of {\tt malloc} form 
+an interesting special case.
 Each call to {\tt malloc} manipulates (updates) 
 administrative data structures like the free list. Embla will
-report these as dependencies, effectively serializing all calls to 
+report dependencies arising from these updates, 
+effectively serializing all calls to 
 {\tt malloc}, and thus in addition all calls to functions calling
 {\tt malloc}. In reality, these calls need not be serialized since
 program semantics typically does not depend on the exact addresses 
@@ -146,7 +150,8 @@ What, then, does the graph in Figure~\ref{ffirstex} tell us about
 the available parallelism in the program? It tells us that 
 the call to {\tt inc} on line 15 is independent on lines 13, 14
 and 16. Consequently, it can be parallelized, and we show the
-result in Figure~\ref{fparfirstex}.
+result in Figure~\ref{fparfirstex} where we have again used the 
+Cilk primitives {\tt spawn} and {\tt synch}.
 
 \begin{figure} 
 \small

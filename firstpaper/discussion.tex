@@ -19,7 +19,8 @@ all relevant imputs have been used, allowing a dependency to slip
 though the net. This will manifest itself as a bug in the parallel
 program, possibly in a nondeterministic manner. However, the root
 cause of the bug is the missed dependency, which is deterministic and
-which can be found by running Embla with the offending input. Thus,
+which can be found by running Embla on the sequential program 
+with the offending input. Thus,
 while Embla does not give proof of absence of dependencies (as a
 static checker would), it reduces the problem of debugging a
 multithreaded program to the problem of debugging a sequential

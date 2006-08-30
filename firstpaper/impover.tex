@@ -1,8 +1,5 @@
 \section{Overview of the Implementation of Embla}
 
-In order to understand dependency profiling with Embla, we 
-here give an overview of the implementation of Embla. 
-
 Embla is based on instrumented execution of binary code. Although
 our examples of profiling output use a high level language (C),
 the profiling itself is on instruction level, followed by 
@@ -27,3 +24,27 @@ A hash table mapping dependency signatures to counters of RAW, WAR
 and WAR dependencies. Dependency signatures identify the source and
 target of the dependency as well as other information of interest.
 \end{description}
+
+Some anti and output dependencies are due to reusing the same
+locations for (logically) distinct data items. This happens for
+instance for stack locations when arguments are passed on the stack
+(as is common on the x86, for instance). Consider the following
+example:
+\begin{verbatim}
+    foo(x);
+    bar(y);
+\end{verbatim}
+The value of {\tt x} will be pushed on the stack. Then {\tt foo} will
+be called and will read {\tt x}. When that call has returned, {\tt y}
+will be pushed on the stack on the same address as {\tt x}, creating
+an anti dependence with {\tt foo}'s read. This kind of dependence can 
+easily be removed by a
+compiler. In fact, if the call to {\tt foo} is made asynchronously, in
+another thread, it will automatically be made on a different stack and
+the dependence disappears. Register allocation is another source of
+anti and output dependencies since distinct variables are packed into
+the same register. In this case, the allocation can be changed to
+remove dependenies, a transformation known as {\em renaming}. 
+Other anti dependencies are due to updates
+to the same data structure and cannot be eliminated by renaming.
+

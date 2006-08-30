@@ -13,7 +13,18 @@ these techniques can be referred to as {\em CMT} (chip multithreading).
 
 From the point of view of the software, a CMT processor looks just
 like a traditional symmetric multiprocessor. In particular, a CMT
-program consists of multiple threads.
+program consists of multiple threads. Unfortunately, such code is much
+harder to write than single threaded code, both because there are many
+more program states to consider and because the relative execution
+speed of threads are, in general, nondeterministic.  Not only is it
+difficult to write multithreaded programs; most existing code is
+single threaded (with the exception of code for numeric computation
+and server oriented code).
+
+We think that a practical way of resolving this issue is through hand
+parallelization of sequential code. This method would both apply to
+the existing code base and to newly developed code. This paper
+presents a tool, Embla, to assist in this process.
 
 
 
@@ -52,7 +63,10 @@ programming constructs from the Cilk programming language
 This style of paralleism can be implemented efficiently (as is done
 for instance in the Cilk language) and is easy to understand although
 not as powerful as general thread parallelism with arbitrary
-synchronization. In particular, as long as {\tt foo()} and {\tt bar()}
+synchronization. In general, we can find more parallelism in a program 
+by using the latter, but in many cases, fork-join paralleism suffices 
+(especially for CMT processors which are not massively parallel).
+In particular, as long as {\tt foo()} and {\tt bar()}
 are independent, the behavior of the parallel program is identical to
 the behavior of the sequential version. Therefore it is sufficient to
 understand (debug, verify, \ldots) the sequential program; everything
