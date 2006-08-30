@@ -35,12 +35,6 @@ all: ${depgraphs} ${deplists}
 %.o: %.c
 	${CC} -O0 -g -c -o $@ $<
 
-ex1_c__main.dot: ex1.trace dep_graph_dot.py
-	./dep_graph_dot.py -vvvvvvv $<
-
-%.ps: %.dot
-	dot -Tps -o$@ $<
-
 copy-doc: all
 	for f in ${depgraphs} ${deplists} ; do \
 	  install $$f ../firstpaper || exit 1 ; \
@@ -53,5 +47,7 @@ clean:
 	rm -f ${depgraphs}
 	rm -f $(addsuffix .trace, ${examples})
 	rm -f embla.trace
+	rm -f $(addsuffix .ps, ${dotfiles})
+	rm -f $(addsuffix .dot, ${dotfiles})
 
 .SECONDARY:

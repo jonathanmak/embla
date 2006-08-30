@@ -3,6 +3,10 @@
 import optparse
 import sys
 
+arrowSize = .5
+fontName = "Courier"
+fontSize = 8
+
 class Debug:
   def __init__(self, level):
     self._level = level
@@ -60,36 +64,66 @@ def writeGraph(allDeps):
   sourceLines = sourceFile.readlines()
   sourceFile.close()
 
-  dotLines = ["digraph " + graphName + " {"]
+  dotLines = ["digraph " + graphName + " {",
+              '  fontname = "' + fontName + '";',
+              '  fontsize = ' + str(fontSize) + ';',
+              "  nodesep = .2;",
+              "  ranksep = 0;"]
+
+  nodeLabels = {}
+  for dep in deps:
+    for (end, depth) in [dep.dest, dep.src]:
+      if depth != 'h':
+        nodeLabels[end] = min(nodeLabels.get(end, 'l'), depth)
+
   dotLines.extend(["  {",
-                   "    node [shape = plaintext];",
+                   '    node [fontname = "' + fontName +
+                   '", fontsize = ' + str(fontSize) + '];'])
+  for lineNum in nodeLabels.keys():
+    dotLines.append("    end_" + str(lineNum) + ' [shape = point];')
+  dotLines.extend(["  }",
+                   ""])
+
+  for dep in deps:
+    if (dep.src[1] != 'h') and (dep.dest[1] != 'h'):
+      dotLines.append("  end_" + str(dep.src[0]) + " -> end_" +
+                      str(dep.dest[0]) + ' [arrowsize = ' + str(arrowSize) +
+                      '];')
+
+  dotLines.extend(["  subgraph {",
+                   '    node [shape = plaintext, fontname = "' + fontName +
+                   '", fontsize = ' + str(fontSize) + '];',
                    "    edge [style = invis];"])
-  for lineIndex in range(1, len(sourceLines) + 1):
+
+  # Only print the source lines for this function.
+  nodeLines = nodeLabels.keys()
+  nodeLines.sort()
+  debug(4, "Node lines: " + str(nodeLines))
+  # Include the two line before the first (usually return type and function
+  # name).
+  firstLine = max(1, nodeLines[0] - 2)
+  lastLine = nodeLines[-1]
+  sourceLineLength = 0
+  for srcLine in sourceLines[firstLine - 1: lastLine - 1]:
+    sourceLineLength = max(sourceLineLength, len(srcLine))
+
+  for lineIndex in range(firstLine, lastLine + 1):
+    sourceLine = sourceLines[lineIndex - 1].rstrip()
     dotLines.append("    line_" + str(lineIndex) + ' [label = "' +
-                    str(lineIndex + 1) + "  " +
-                    sourceLines[lineIndex - 1].rstrip().replace('"', '\\"') +
-                    '"];')
-    if lineIndex != 1:
+                    str(lineIndex) + "  " +
+                    sourceLine.replace('\\', '\\\\').replace('"', '\\"') +
+                    (" " * (sourceLineLength - len(sourceLine))) + '"];')
+    if lineIndex != firstLine:
       dotLines.append("    line_" + str(lineIndex - 1) + " -> line_" +
                       str(lineIndex) + ';')
   dotLines.extend(["  }",
                    ""])
 
-  nodes = {}
-  for dep in deps:
-    for (end, depth) in [dep.dest, dep.src]:
-      if depth != 'h':
-        nodes[end] = 1
-          
-  for lineNum in nodes.keys():
+  for lineNum in nodeLabels.keys():
     dotLines.append("  { rank = same; end_" + str(lineNum) + "; line_" +
                     str(lineNum) + "; }")
   dotLines.append("")
 
-  for dep in deps:
-    if (dep.src[1] != 'h') and (dep.dest[1] != 'h'):
-      dotLines.append("  end_" + str(dep.src[0]) + " -> end_" +
-                      str(dep.dest[0]) + ';')
   dotLines.extend(["}", ""])
     
   dotFile = file(dotFileName, "w")
