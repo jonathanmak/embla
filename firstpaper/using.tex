@@ -97,7 +97,7 @@ In the examples in this paper, the black list consists of the
 as appropriate. 
 
 We give all dependencies where both ends are in blacklisted functions 
-a {\bf \color{cyan}light blue} color, independent of whethet they are 
+a {\bf \color{cyan}light blue} color, independent of whether they are 
 flow, anti or output. This is because they will disappear when the
 program is run in parallel.
 
@@ -110,6 +110,43 @@ function and its closing brace (for instance from line 5 to line 7).
 This dependence corresponds to pushing the frame pointer onto the 
 stack as part of the function prologue and popping it in the 
 epilogue.
+
+\begin{figure}
+\small
+\hrulefill
+\begin{alltt}
+#include <stdlib.h>
+#include <stdio.h>
+
+static void inc(int *p)
+\verb+{+
+   *p=*p+1;
+\verb+}+
+
+int main(int argc, char **argv)
+\verb+{+
+   int *q=NULL,n=0;
+
+   {\color{red}spawn} inc(&n);
+   q = (int*) malloc( sizeof(int) );
+   inc(q);
+   inc(q);
+   {\color{red}synch;}
+   printf( "%d\verb+\+n", *q+n );
+   q = (int*) malloc( sizeof(int) );
+   return q==NULL;
+\verb+}+
+\end{alltt}
+\hrulefill
+\caption{The first example parallelized.}
+\label{fparfirstex}
+\end{figure}
+
+What, then, does the graph in Figure~\ref{ffirstex} tell us about
+the available parallelism in the program? It tells us that 
+the call to {\tt inc} on line 15 is independent on lines 13, 14
+and 16. Consequently, it can be parallelized, and we show the
+result in Figure~\ref{fparfirstex}.
 
 \begin{figure} 
 \small

@@ -1,10 +1,20 @@
 \section{Introduction}
 
-Ubiquity of chip multithreading
+As wire delays and thermal problems have made improvements in clock
+frequency much more difficult to realize, and increased levels of
+instruction level parallelism faces problems of design complexity and
+control dependencies, improving microprocessor performance has come to
+depend increasingly on thread level parallelism. Multicore chips, also
+known as CMPs (chip multiprocessors) pack several processor cores on a
+single die, typically with per core L1 caches but sharing the L2
+cache. Processor cores can also be multithreaded, executing
+instructions from several threads simultaneously. Collectively 
+these techniques can be referred to as {\em CMT} (chip multithreading).
 
-The need for thread parallelism
+From the point of view of the software, a CMT processor looks just
+like a traditional symmetric multiprocessor. In particular, a CMT
+program consists of multiple threads.
 
-A parallelisation model: asynchronous function calls
 
 
 Embla is, at least initially, aimed at supporting procedure-level 
@@ -22,7 +32,8 @@ program, although it has never been done for C.}. A sufficient condition
 for independence
 in this case is that {\tt foo()} and {\tt bar()} do not do any I/O and
 that neither call writes to a memory location that the other call 
-accesses. In that case the call to {\tt foo()} can be asynchronously, 
+accesses. In that case the call to {\tt foo()} can be executed
+asynchronously, 
 by a different thread, and in parallel with the call to {\tt bar()}.
 Suppose further that {\tt foo()} and {\tt baz()} are not independent,
 so {\tt baz()} can not be executed until the call {\tt foo()} is completed.
