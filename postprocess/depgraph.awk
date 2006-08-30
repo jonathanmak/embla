@@ -487,8 +487,8 @@ END {
         Yoff = srcL-dstL;
         dist = sqrt( Xoff*Xoff + Yoff*Yoff );
 
-        XoffN = 2*Xoff/dist;
-        YoffN = 2*Yoff/dist;
+        XoffN = 3*Xoff/dist;
+        YoffN = 3*Yoff/dist;
 
         XoffNA = XoffN < 0 ? - XoffN : XoffN;
         YoffNA = YoffN < 0 ? - YoffN : YoffN;
@@ -500,8 +500,8 @@ END {
           veclen = depcolw * (srcC<dstC ? dstC-srcC : srcC-dstC) - 2*XoffNA;
         }
         if( (dstL,srcL) in edges ) {
-           Xtwoff = - YoffN/2;
-           Ytwoff =   XoffN/2;
+           Xtwoff = - YoffN/3;
+           Ytwoff =   XoffN/3;
         } else {
            Xtwoff = 0;
            Ytwoff = 0;
@@ -533,10 +533,13 @@ END {
                  Xend,
                  Yend;
 
-          Xcw  = Xend - XoffN - YoffN/2;
-          Ycw  = Yend - YoffN + XoffN/2;
-          Xccw = Xend - XoffN + YoffN/2;
-          Yccw = Yend - YoffN - XoffN/2;
+          XoffArr = XoffN/3;
+          YoffArr = YoffN/3;
+
+          Xcw  = Xend - XoffN - YoffArr;
+          Ycw  = Yend - YoffN + XoffArr;
+          Xccw = Xend - XoffN + YoffArr;
+          Yccw = Yend - YoffN - XoffArr;
 
           printf "{\\color{%s}\\dashline[200]{3}(%.1f,%.1f)(%.1f,%.1f)}%%\n",
                  type[edges[srcL,dstL]],
