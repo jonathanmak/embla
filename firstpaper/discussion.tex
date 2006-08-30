@@ -1,0 +1,28 @@
+\section{Discussion}
+
+In this section we would like to discuss our approach to parallel
+programming and contrast it with two alternatives: Automatic 
+(compiler) parallelisation and explicit thread parallelism.
+
+While the information provided by Embla can be used for any hand 
+parallelization strategy, it appears to be especially suitable to
+combine with a fork-join framework. In this case, the programmer 
+simply annotates function calls that should be made asynchronously 
+and in addition determines the join points. For such programs we
+know that in the absence of dependencies petween parallel parts,
+the programs are free of both deadlocks and race conditions and are 
+furthermore deterministic (if the sequential version of the program 
+is deterministic).
+
+Of course, since Embla is a testing tool, it may be the case that not
+all relevant imputs have been used, allowing a dependency to slip
+though the net. This will manifest itself as a bug in the parallel
+program, possibly in a nondeterministic manner. However, the root
+cause of the bug is the missed dependency, which is deterministic and
+which can be found by running Embla with the offending input. Thus,
+while Embla does not give proof of absence of dependencies (as a
+static checker would), it reduces the problem of debugging a
+multithreaded program to the problem of debugging a sequential
+program. Here all of the standard testing machinery (regression 
+testing, test coverage tools, \ldots) can be used.
+
