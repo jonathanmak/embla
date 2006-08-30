@@ -28,15 +28,15 @@ three classes:
 \item[Flow:]
 A true data dependency where the location is first written then
 read. Also known as {\em read after write} (RAW). Shown in 
-{\color{red} red} in the figure.
+{\bf \color{red} red} in the figure.
 \item[Anti:]
 A dependence caused by reuse of a location that is first read and then
 written. Also known as {\em write after read} (WAR). Shown in 
-{\color{green} green} in the figure.
+{\bf \color{green} green} in the figure.
 \item[Output:]
 Similar to an anti dependence, but the second reference is also a
 write. Also known as {\em write after write} (WAW). Shown in 
-{\color{blue} blue} in the figure.
+{\bf \color{blue} blue} in the figure.
 \end{description}
 If there are multiple dependencies of different class between the 
 same pair of lines, the color selection is prioritized in the
@@ -92,9 +92,14 @@ that data are allocated. It suffices that a thread safe
 implementation of {\tt malloc} is used.
 
 Embla maintains a black list of functions that behave in this way.
-In the exampples in this paper, the black list consists of the 
+In the examples in this paper, the black list consists of the 
 {\tt malloc} family, but of course other functions can be included 
 as appropriate. 
+
+We give all dependencies where both ends are in blacklisted functions 
+a {\bf \color{cyan}light blue} color, independent of whethet they are 
+flow, anti or output. This is because they will disappear when the
+program is run in parallel.
 
 An important thing to remember when interpreting the output of Embla 
 is that although it takes the form of annotated source code, the 
