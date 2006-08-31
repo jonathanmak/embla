@@ -18,7 +18,8 @@ block of memory. Blocksize is a tradeoff between memory use and
 precision. 
 \item[The activation tree:]
 Contains a record for each stack frame allocated during execution. 
-The rightmost branch of the activation tree corresponds to the stack.
+At any given point during execution, 
+the rightmost branch of the activation tree corresponds to the stack.
 \item[The result table:]
 A hash table mapping dependency signatures to counters of RAW, WAR 
 and WAR dependencies. Dependency signatures identify the source and

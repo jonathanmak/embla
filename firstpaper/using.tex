@@ -17,14 +17,16 @@ lines.
 
 The presence of a data dependency arrow between a pair of lines indicates
 that Embla has found one or more data dependencies between them
-(Embla does not find control dependencies). A data dependece is a pair
+(Embla does not find control dependencies). A data dependence is a pair
 of references, not both reads, to overlapping memory
-locations with no interveaning write. For instance, in the figure, 
+locations with no interveaning write. We will refer to these
+references as the {\em endpoints} of the dependence.
+For instance, in the figure, 
 there is a (red) arrow from line 13 to line 14 corresponding to
-the assignment to {\tt q} followed by its use as an argument in 
-{\tt inc(q)}.
+the assignment to {\tt q} (the {\em early} endpoint) followed by its use 
+as an argument in {\tt inc(q)} (the {\em late} endpoint).
 
-Depending on whether the two references corresponding to a dependence
+Depending on whether the two endpoints of a dependence
 are reads or writes, data dependencies are typically divided into 
 three classes:
 \begin{description}
@@ -54,7 +56,8 @@ transformations that in some cases can be used to eliminate
 dependencies. Since we are discussing an approach to tool-supported
 hand parallelisation, program transformations to remove dependencies
 and increase parallelism are potentially useful. Hence Embla is 
-designed to support them.
+designed to support them by tipping the user off as to which
+dependencies might be removable.
 
 Flow dependencies are unavoidable since they represent the data flow 
 in the program, but anti and output dependencies can sometimes be 
@@ -72,7 +75,7 @@ Similarly, an output dependence like the one from line 11 to line 13
 removing the first write (the initialization of {\tt q} on line 11).
 Renaming is of course also applicable to output dependencies.
 
-For each of the dependence arrows in the figure that 
+For each of the dependency arrows in the figure that 
 we have dicussed up to now, the endpoints have been part of the 
 code for {\tt main}
 itself. Embla also tracks references made in function calls. For
@@ -82,7 +85,7 @@ representing the write in the first invocation of {\tt inc} to the
 of the same location by a later invocation of {\tt inc}. 
 Note that these dependencies 
 are reported as pertaining to {\tt main} rather than {\tt inc},
-although the referencing instructions are part of the latter function. 
+although the endpoints are part of the latter function. 
 But the importance of the dependence is that, in {\tt main}, the calls
 on line 14 and 16 can not be made in parallel.
 
@@ -103,7 +106,7 @@ In the examples in this paper, the black list consists of the
 {\tt malloc} family, but of course other functions can be included 
 as appropriate. 
 
-We give all dependencies where both ends are in blacklisted functions 
+We give all dependencies where both endpoints are in blacklisted functions 
 a {\bf \color{cyan}light blue} color, independent of whether they are 
 flow, anti or output. This is because they will disappear when the
 program is run in parallel.
@@ -169,8 +172,8 @@ The dependency graph we have discussed above is an abstracted form of
 the information provided by Embla. If the region of interest lacks
 dependencies we are done; in order to motivate the transformation
 shown in Figure~\ref{fparfirstex}, we only need the dependency
-graph. But if Embla discovers more dependencies than we had hopen, we
-might which to see if we can transform the program to eliminate them.
+graph. But if Embla discovers more dependencies than we had hoped, we
+might wish to see if we can transform the program to eliminate them.
 For that task, it is useful to have a more detailed look.
 
 Hence we now turn to Figure~\ref{ffirstexlist} where we see a
@@ -180,7 +183,7 @@ details:
 
 \paragraph*{All dependencies are shown} 
 
-Rather than giving a single arrow if there are more than one kind of
+Rather than giving a single arrow if there is more than one kind of
 dependence, every kind is shown individually. If there is both a flow
 and an anti dependence between a pair of lines, there are two arrows
 (one red and one green). There is however no example of this in the
@@ -188,15 +191,16 @@ figure.
 
 Dependency lists also show {\em self dependencies}, where the source
 and target of the dependence is on the same line. in that case, no
-arrow is shown, only two endpoint symbols. 
+arrow is shown, only the two endpoint symbols. 
 
 \paragraph*{Characterization of dependence endpoints}
 
-Each dependence corresponds to a pair of memory referencing 
-instruction executions, referred to as the {\em dependence 
-endpoints}. These instructions are not always part of the function
+% Each dependence corresponds to a pair of memory referencing 
+% instruction executions, referred to as the {\em dependence 
+% endpoints}. 
+The dependence endpoints are not always part of the function
 containing the dependence but may be part of a function called
-(indirectly) from the line indicated by the arrow. For instance, the
+(indirectly) from the line indicated by the dependency arrow. For instance, the
 endpoints of the flow dependence from line 14 to line 16 in the
 example are part of the function {\tt inc}. This observation gives
 rise to the following three kinds of endpoints:
@@ -234,10 +238,12 @@ distinguish references to the stack from other references but a more
 fine-grained characterization is certainly possible.
 \begin{description}
 \item[$\downarrow\ $]
-A {\em stack dependence} where the location has been a part of 
+An unadorned arrow represents a
+ {\em stack dependence} where the location has been a part of 
 the stack from the first reference to the second (inclusive).
 \item[$\bar{\downarrow}\ $]
-A {\em heap dependence} where the location has never been part of the stack.
+An arrow with a bar across represents a
+{\em heap dependence} where the location has never been part of the stack.
 \end{description}
 Dependencies where the data location has been part of the stack, then
 not part of the stack, then part of the stack again are filtered away

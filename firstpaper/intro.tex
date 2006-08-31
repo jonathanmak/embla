@@ -12,8 +12,9 @@ instructions from several threads simultaneously. Collectively
 these techniques can be referred to as {\em CMT} (chip multithreading).
 
 From the point of view of the software, a CMT processor looks just
-like a traditional symmetric multiprocessor. In particular, a CMT
-program consists of multiple threads. Unfortunately, such code is much
+like a traditional shared memory symmetric multiprocessor. In particular, a CMT
+program consists of multiple threads with shared state. 
+Unfortunately, such code is much
 harder to write than single threaded code, both because there are many
 more program states to consider and because the relative execution
 speed of threads are, in general, nondeterministic.  Not only is it
@@ -27,8 +28,9 @@ the existing code base and to newly developed code. This paper
 presents a tool, Embla, to assist in this process.
 
 
-
-Embla is, at least initially, aimed at supporting procedure-level 
+While the dependence information that Embla finds can be used to 
+support different models of parallelism, 
+Embla is initially aimed mainly at supporting procedure-level 
 fork-join parallelism. To a first approximation, this means executing 
 procedure calls asynchronously. Consider the program fragment below:
 \begin{alltt}
@@ -60,7 +62,7 @@ for all {\tt spawn}'d acivities to terminate (here we have borrowed
 programming constructs from the Cilk programming language 
 \cite{frigo98implementation}).
 
-This style of paralleism can be implemented efficiently (as is done
+This style of parallelism can be implemented efficiently (as is done
 for instance in the Cilk language) and is easy to understand although
 not as powerful as general thread parallelism with arbitrary
 synchronization. In general, we can find more parallelism in a program 
@@ -82,10 +84,17 @@ The second issue is typically
 dealt with using static analysis tools as is done in parallelizing
 compilers. Such analysers are however very complex and must by
 necessity be conservative (since they are static, they must use
-approximations which are always safe).
+approximations which are always safe). Good precision also comes at a
+high computational cost, especially when analysing large programs.
+Consequently, it has proved difficult to parallelize programs 
+automatically in 
+practice, and most production codes are written in an explicitly 
+parallel way.
 
 Embla takes a different approach by observing program execution
-directly and recording the dependencies that occur.
+directly and recording the dependencies that occur. This means that
+Embla in effect is a testing tool which should make it easy to 
+integrate into existing software development processes.
 
 
 
