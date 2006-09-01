@@ -33,7 +33,8 @@
 # GNU gcc
 #
 CC = gcc
-CFLAGS = -O2
+#CFLAGS = -O2
+CFLAGS = --static -g
 
 #
 # SPARCworks acc
