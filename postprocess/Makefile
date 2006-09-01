@@ -9,7 +9,7 @@ all:
 
 CC = gcc
 
-examples = ex1 ex2 ex3 ex4 ex5 # qsorter
+examples = ex1 ex2 ex3 ex4 ex5 ex7 # qsorter
 depgraphs = $(addsuffix .depgraph.tex, ${examples})
 deplists = $(addsuffix .deplist.tex, ${examples} qsorter)
 
@@ -28,6 +28,7 @@ all: ${depgraphs} ${deplists}
 	[ -f "${VALGRIND}" ] || ( echo "Set VALGRIND variable" ; exit 1 )
 	${VALGRIND} --tool=embla ./$*
 	./sorttrace embla.trace > $@
+	rm embla.trace
 
 %: %.o
 	${CC} --static -O0 -g -o $@ $^

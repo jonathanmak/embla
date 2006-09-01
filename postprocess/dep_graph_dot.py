@@ -60,10 +60,6 @@ def writeGraph(allDeps):
   dotFileName = graphName + ".dot"
   debug(2, "Creating " + dotFileName)
 
-  sourceFile = file(sourceFileName)
-  sourceLines = sourceFile.readlines()
-  sourceFile.close()
-
   dotLines = ["digraph " + graphName + " {",
               '  fontname = "' + fontName + '";',
               '  fontsize = ' + str(fontSize) + ';',
@@ -74,13 +70,15 @@ def writeGraph(allDeps):
   for dep in deps:
     for (end, depth) in [dep.dest, dep.src]:
       if depth != 'h':
-        nodeLabels[end] = min(nodeLabels.get(end, 'l'), depth)
+        nodeLabels[end] = min(nodeLabels.get(end, 'L'), depth).upper()
 
   dotLines.extend(["  {",
                    '    node [fontname = "' + fontName +
                    '", fontsize = ' + str(fontSize) + '];'])
   for lineNum in nodeLabels.keys():
-    dotLines.append("    end_" + str(lineNum) + ' [shape = point];')
+    dotLines.append("    end_" + str(lineNum) +
+                    ' [shape = plaintext, label = "' + str(lineNum) +
+                    nodeLabels[lineNum] + '"];')
   dotLines.extend(["  }",
                    ""])
 
@@ -89,40 +87,6 @@ def writeGraph(allDeps):
       dotLines.append("  end_" + str(dep.src[0]) + " -> end_" +
                       str(dep.dest[0]) + ' [arrowsize = ' + str(arrowSize) +
                       '];')
-
-  dotLines.extend(["  subgraph {",
-                   '    node [shape = plaintext, fontname = "' + fontName +
-                   '", fontsize = ' + str(fontSize) + '];',
-                   "    edge [style = invis];"])
-
-  # Only print the source lines for this function.
-  nodeLines = nodeLabels.keys()
-  nodeLines.sort()
-  debug(4, "Node lines: " + str(nodeLines))
-  # Include the two line before the first (usually return type and function
-  # name).
-  firstLine = max(1, nodeLines[0] - 2)
-  lastLine = nodeLines[-1]
-  sourceLineLength = 0
-  for srcLine in sourceLines[firstLine - 1: lastLine - 1]:
-    sourceLineLength = max(sourceLineLength, len(srcLine))
-
-  for lineIndex in range(firstLine, lastLine + 1):
-    sourceLine = sourceLines[lineIndex - 1].rstrip()
-    dotLines.append("    line_" + str(lineIndex) + ' [label = "' +
-                    str(lineIndex) + "  " +
-                    sourceLine.replace('\\', '\\\\').replace('"', '\\"') +
-                    (" " * (sourceLineLength - len(sourceLine))) + '"];')
-    if lineIndex != firstLine:
-      dotLines.append("    line_" + str(lineIndex - 1) + " -> line_" +
-                      str(lineIndex) + ';')
-  dotLines.extend(["  }",
-                   ""])
-
-  for lineNum in nodeLabels.keys():
-    dotLines.append("  { rank = same; end_" + str(lineNum) + "; line_" +
-                    str(lineNum) + "; }")
-  dotLines.append("")
 
   dotLines.extend(["}", ""])
     
