@@ -26,6 +26,55 @@ and WAR dependencies. Dependency signatures identify the source and
 target of the dependency as well as other information of interest.
 \end{description}
 
+\begin{figure*}
+\small
+\hrulefill
+\[
+\begin{picture}(500,210)(-30,0)
+% The memory table
+\put(-30,30){\framebox(40,180)[t]{\ }}
+\put(-30,100){\line(1,0){40}}
+\put(-30,110){\line(1,0){40}}
+% A block
+\put(10,110){\line(4,3){20}}
+\put(10,100){\line(4,-3){20}}
+\put(30,85){\framebox(40,40){\ }}
+\put(30,115){\line(1,0){40}}
+\put(30,115){\makebox(40,10){Last write}}
+\put(30,105){\makebox(40,10){Last reads}}
+\put(30,90){\makebox(40,10){\vdots}}
+% An event
+\put(70,105){\line(2,1){20}}
+\put(70,95){\line(2,-1){20}}
+\put(90,85){\framebox(40,30){\ }}
+\put(90,105){\line(1,0){40}}
+\put(90,95){\line(1,0){40}}
+\put(90,85){\makebox(40,10){Time}}
+\put(90,95){\makebox(40,10){Instr}}
+\put(90,105){\makebox(40,10){Context}}
+\put(130,110){\vector(2,-3){40}}
+% The activation tree
+% Level 0 (root)
+\put(270,180){\framebox(30,30)[tl]{\it 1}}
+% Level 1 (1 node)
+\put(235,130){\framebox(30,30)[tl]{\it 2}} \put(250,160){\vector(3,2){30}}
+% Level 2 (2 nodes)
+\put(190,80){\framebox(30,30)[tl]{\it 3}} \put(205,110){\vector(2,1){40}}
+\put(280,80){\framebox(30,30)[tl]{\it 6}} \put(295,110){\vector(-2,1){40}}
+% Level 3 (3 nodes)
+\put(170,30){\framebox(30,30)[tl]{\it 4}} \put(185,60){\vector(3,4){15}}
+\put(210,30){\framebox(30,30)[tl]{\it 5}} \put(225,60){\vector(-3,4){15}}
+\put(260,30){\framebox(30,30)[tl]{\it 7}} \put(275,60){\vector(3,4){15}}
+% The result table
+\put(350,30){\framebox(80,180){\ }}
+
+\end{picture}
+\]
+\hrulefill
+\caption{The main Embla data structures}
+\label{fembladata}
+\end{figure*}
+
 Some anti and output dependencies are due to reusing the same
 locations for (logically) distinct data items. This happens for
 instance for stack locations when arguments are passed on the stack
@@ -49,3 +98,4 @@ remove dependenies, a transformation known as {\em renaming}.
 Other anti dependencies are due to updates
 to the same data structure and cannot be eliminated by renaming.
 
+Embla does not trace registers; unoptimized code
