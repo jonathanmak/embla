@@ -1,0 +1,256 @@
+                          mpeg2encode / mpeg2decode
+                          =========================
+              MPEG-2 Encoder / Decoder, Version 1.1, June 1994
+
+                        MPEG Software Simulation Group
+                              (MPEG-L@netcom.com)
+
+Contents:
+1. Overview
+2. Introduction
+3. Contacting the MPEG Software Simulation Group
+4. Availability 
+5. Installation
+6. Acknowledgements
+7. History of the technical report
+
+
+1. Overview
+===========
+
+This directory contains our implementation of an ISO/IEC DIS 13818-2 codec. 
+It converts uncompressed video frames into MPEG-1 and MPEG-2 video 
+coded bitstream sequences, and vice versa.
+
+The files mpeg2enc.doc and mpeg2dec.doc in the doc/ directory contain
+further information about the codec. The doc directory also contains an
+FAQ file answering frequently asked questions about MPEG. A precompiled
+version of the programs for MSDOS (requires at least a '386) and a set
+of verification files are available separately.
+
+Subdirectories src/mpeg2enc and src/mpeg2dec contain the source code
+for the encoder and decoder, subdirectory par/ contains a couple of
+example encoder parameter files for 25 and 30 frames/sec MPEG-2 and
+MPEG-1 video.
+
+
+2. Introduction
+===============
+
+MPEG-2 Video is a generic method for compressed representation of video
+sequences using a common coding syntax defined in the document ISO/IEC
+13818 Part 2 (CD: Nov. 1993, DIS: March 1994) by the International
+Organization for Standardization (ISO) and the International
+Electrotechnical Commission (IEC), in collaboration with the
+International Telecommunications Union (ITU) as Recommendation H.262.
+The MPEG-2 concept is similar to MPEG-1, but includes extensions to
+cover a wider range of applications. The primary application targeted
+during the MPEG-2 definition process was the all-digital transmission
+of broadcast TV quality video at coded bitrates between 4 and 9
+Mbit/sec.  However, the MPEG-2 syntax has been found to be efficient
+for other applications such as those at higher bit rates and sample
+rates (e.g. HDTV). The most significant enhancement over MPEG-1 is the
+addition of syntax for efficient coding of interlaced video (e.g. 16x8
+block size motion compensation, Dual Prime, et al).  Several other more
+subtle enhancements (e.g. 10-bit DCT DC precision, non-linear
+quantization, VLC tables, improved mismatch control) are included 
+which have a noticeable improvement on coding efficiency, even for
+progressive video. Other key features of MPEG-2 are the scalable
+extensions which permit the division of a continuous video signal into
+two or more coded bit streams representing the video at different
+resolutions, picture quality (i.e. SNR), or picture rates.
+
+The MPEG Software Simulation Group is currently developing MPEG
+software with the purpose of providing aid in understanding the various
+algorithms which comprise an encoder and decoder, and giving a sample
+implementation based on advanced encoding models. The MPEG-2 software
+project is an on-going development. Since the current version of the
+encoder already employs a reasonable (and the most popular) subset of
+the MPEG-2 signal coding toolkit, and there appears to be sufficient
+public interest, we have decided to make a public release of the code.
+
+The encoder can also be used for generating good quality constant
+bitrate MPEG-1 sequences and is (to our knowledge) the first publicly
+available encoder based on the relatively sophisticated TM5 coding model.
+
+
+3. Contacting the MPEG Software Simulation Group
+================================================
+
+We welcome any project-specific questions, comments, suggestions, bug
+reports etc. They should be sent to the Internet E-mail address: 
+
+      MPEG-L@netcom.com 
+
+which automatically forwards them to the authors.
+
+
+Additionally, if you wish to be added to the general discussion 
+and annoucement list (mpeg-users@netcom.com), send mail to:  
+
+      listserv@netcom.com
+
+with the following line in the message body:
+
+      subscribe mpeg-users  [your E-mail address] 
+
+
+4. Availability
+===============
+
+The most recent version of the codec source code is available by anonymous
+ftp from:
+
+  ftp.netcom.com:/pub/cfogg/mpeg2
+
+The Internet address of ftp.netcom.com is [192.100.81.1].
+
+The directory contains the following files:
+
+  README                         this file
+  mpeg2codec_v1.1.tar.gz         codec source code and documentation
+  mpeg2codec_verify_v1.1.tar.gz  verification archive       
+  mpeg2d11.zip                   MS-DOS executable archive  
+  mpeg2w11.zip                   Win32s executable archive
+  tennis.m2v                     sample MPEG-2 video sequence (8 frames 704x576)
+  tennis.par, tennis.stat.gz     parameter file and statistics output
+                                 for tennis.m2v
+ 
+You need gunzip (GNU zip/unzip) to uncompress the .gz archives.
+
+Alternatively, the files may be retrieved by sending E-mail to:  
+
+  ftp-request@netcom.com
+
+... with the following line in the body of the message:
+
+  SEND cfogg/mpeg2/mpeg2codec_v1.1.tar.gz
+
+You can retrieve the directory listings by sending the following command
+to ftp-request@netcom.com:
+
+  DIR cfogg/mpeg2
+
+General information can be retrieved with the command:   HELP
+
+World Wide Web:
+
+A set of WWW pages describing the project and containing information
+about the latest versions and their availability will be announced soon.
+This will include a couple of sample MPEG-2 video bitstreams.
+
+
+5. Installation
+===============
+
+mpeg2decode and mpeg2encode have been compiled and tested on the following
+platforms:
+
+- SUN SPARCstation 10, SunOS 4.1.3, cc / gcc / acc
+- '386-PC, MSDOS 5.0, djgpp v1.11, gcc v2.5.7
+
+The source code should compile without major modifications on other 32 bit
+systems using both K&R and ANSI C compilers. Systems with 16 bit 'int'
+variables or segmented memory models are not supported.
+
+Please report any modifications you had to apply in order to install the
+programs on your system to the address MPEG-L@netcom.com.
+
+The encoder and decoder are kept in separate sub-directories,
+src/mpeg2dec contains the decoder, while src/mpeg2enc contains the
+encoder sources.  The following installation procedure applies to both
+the encoder and the decoder:
+
+
+Step 1: edit Makefile
+---------------------
+
+You may have to set CC to your C compiler and CFLAGS to the flags required
+by the compiler. It is sufficient to set these variables in the top directory
+Makefile. They are propagated to the individual Makefiles of the encoder
+and decoder. Any other changes have to be applied to the individual Makefiles,
+however.
+
+You can compile the decoder with or without X11 output. Please follow the
+instructions in the top-level Makefile to activate X Window System support.
+
+If you use a C compiler which doesn't understand ANSI-C function prototypes
+add -DNON_ANSI_COMPILER to CFLAGS.
+
+
+Step 2: edit src/mpeg2dec/config.h
+----------------------------------
+
+In most cases, no modification should be required. If your C library
+doesn't accept "rb" / "wb" parameters in fopen() (required to disable
+LF <-> CR/LF conversion on MSDOS systems), change the #defines RB and WB
+to "r" and "w".
+
+
+Step 3: make
+------------
+
+Type 'make' from the top directory (mpeg2). On a PC with DJGPP installed you
+have to enter 'make pc' in the individual source directories to produce
+.exe files.
+
+
+Step 4: verification
+--------------------
+
+If you have downloaded and unarchived the mpeg/verify directory, you can
+verify correct compilation of the codec by typing 'make test'. No differences
+should be reported. The only comparison which is allowed to fail is between
+test.m2v and new.m2v, caused by floating point accuracy dependencies in the
+forward DCT.
+
+
+6. Acknowledgements
+===================
+
+Authors of the current release are:
+
+Stefan Eckart    (stefan@lis.e-technik.tu-muenchen.de)
+Chad Fogg        (cfogg@netcom.com)
+Cheung Auyeung   (auyeung@mot.com)
+Sorin Papuc      (sop@compcore.com)
+
+Special thanks are due to
+
+ J. Steurer, M. Oepen, IRT (Institut fuer Rundfunktechnik, Muenchen):
+   for contributing motion estimation speed improvements (distance
+   computation short-circuit in conjunction with spiral search, cf.
+   dist1(), fullsearch())
+
+ Numerous users:
+   for providing bug reports and Makefiles
+
+
+7. History of Technical Report Project
+======================================
+
+The Technical Report, a document which primarily consists of
+a C source code program, was initiated by the MPEG committee to: 
+
+ - Provide an example of MPEG video syntax being intelligently employed 
+   to generate good quality video.
+ - A reference tool for implementors
+ - Aid in understanding the MPEG specification 
+
+MPEG would like to especially thank Dr. Stefan Eckart for his
+contributions have greatly helped the MPEG-2 Technical Report project
+start onto a successful path towards the final 13818-5 document.
+
+MPEG lends a kind acknowledgement to Arian Koster (PTT) for initiating
+the MPEG-1 technical report project in Autumn 1992, and Leonardo
+Chiariglione (Convenor of MPEG) and Didier Le Gall (Chairman of MPEG
+Video) for support throughout both projects.  Also many thanks to
+MPEG-1 project contributors Peter Au (Hughes Aircraft), Ron Burns
+(Hughes Aircraft), Stefan Eckart (Technical University of Munich), Chad
+Fogg (Cascade Design Automation / Xenon Microsystems), Tsuyoshi
+Hanamura (Waseda University), Kinya Oosa (Nippon Steel), Brian Quandt
+(Heuris Logic) and Hiroshi Watanabe (NTT).
+
+----
+End of Readme file
+

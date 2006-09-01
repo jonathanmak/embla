@@ -1,0 +1,19 @@
+CHANGES to mpeg2encode
+Updated:  July 12, 1995
+
+Verify few changes have been made between the July 4, 1994 edition
+of mpeg2encode and the July 15, 1995 edition:
+
+BUG CORRECTIONS:
+
+ - Based on feedback from Stephan Dancer and Peter Loje Hansen,
+   corrected typo in motion.c where field_estimate() for backwards
+   search was called using the forward motion vector search range.
+   Likewise, another typo is putseq() was corrected where a local copy 
+   of vertical search range was created from the horizontal search
+   range.
+
+ - Based on feedback by Michael Schuster, prevented calcSNR1 from
+   generating 'e' with value '0' since it will be used in the 
+   denominator of a division operation later.
+

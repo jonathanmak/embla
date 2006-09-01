@@ -1,0 +1,108 @@
+0. Concatenated file for output
+  -b command line argument option works for the substitute frame buffer
+     sequence, but there is no equivalent for output.
+
+[the big picture format, -g,  will be eliminated in the release edition.  
+ It's not very useful for the outside world.]
+
+ 1. Test bitstream
+    Small example bitstream (128x128 pixel dimensions) which employs all 
+    picture_structure (top field, bottom field, frame), picture_coding_type 
+    (I, P, and B), macroblock_type (forwards/backwards/interpolated, 
+    intra/non-intra, coded/not-coded, quant/no quant, etc.), and 
+    motion_type (field, frame, 16X8, dual prime) modes.
+
+ 3. Incorrect coefficient in convmat[]
+    correct entry in conversion matrix.
+    [have not been able to identify it yet]
+
+ 4. 24 bit X11 display
+    (borrow from Berkeley or find way for our code to use their interface)
+
+ 5. MPEG-2 Transport layer systems streams parsing 
+
+ 6. Document IPR issue 
+
+   provide CableLabs URL
+   how IPR relates to our disclaimer.
+
+ 7. TIFF library support (YCbCr 4:4:4, 4:2:2, and 4:2:0 pictures)
+[deferred]
+  
+ 8. Copyright extension header 
+  [done]
+
+
+ 9. slice_id corridgendum
+  [done]
+
+
+10.  IDCT rounding
+  As per IDCT corridgendum (Savatier, MPEG 95/XXX)
+  [done, but verified ?]
+
+
+11. IEEE 1180 report 
+  Provide example report of the fast IDCT and source code.
+  [this was done by Stefan a long time ago]
+  [done]
+
+12. green dots in can
+  [ appears to be a display issue, probably related to convmat[] 
+    error ]
+
+13  detailed comments
+
+  - implementation-specifc
+  - link to ISO/IEC 13818-2
+
+[done]
+
+15. structural changes to getpic()
+[done]
+
+16. frame output based on repeat_first_field and top_field_first
+[not terribly useful unless it is a static padding]
+
+17. recognize 4:2:2 profile 
+[done]
+
+18. improved Options_Processing()
+[done]
+
+19. move Dual_Prime calculation into picture_data()
+
+20. motion vector calculation to include tappable stages to test
+    whether elements fall within [low:high] range.
+
+21. Integrate verifier routines 
+
+22. Inter-layer verification routines
+    - check base and enhancement layers (e.g. SNR)
+
+23. Spatial verification
+   - considering that no base layer is available.
+
+24. SNR verification
+
+25. DP verification
+
+26. merge all global bitsteam element variables into 
+    common data structure (similar to layer_data).  This is needed
+    for the verifier (whether or not headers in SNR and DP streams
+    are identical where needed to that of the base layer).
+
+27. investigate why MS-DOS wants an extra % sign for filename patterns
+     when more than one filename pattern is used in the command line argument
+
+28. convert -t (trace) flag into levels, merge with Verbose.
+
+29. seek to a specified frame number (support for MCI-like functions)
+
+30. document the "flash" VLC table decoding method in detail. 
+    (namely how to map tables in Annex B to those in getvlc.h)
+
+31. MPEG-2 program stream compatibility
+   (a few minor bits of difference).
+
+--------
