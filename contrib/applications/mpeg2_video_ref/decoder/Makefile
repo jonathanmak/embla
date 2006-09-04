@@ -34,8 +34,8 @@ VERBOSE = -DVERBOSE
 
 # uncomment the following two lines if you want to include X11 support
 
-USE_DISP = -DDISPLAY
-LIBS = -lX11
+#USE_DISP = -DDISPLAY
+#LIBS = -lX11
 
 # uncomment the following two lines if you want to use shared memory
 # (faster display if server and client run on the same machine)
