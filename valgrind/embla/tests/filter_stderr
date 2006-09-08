@@ -5,7 +5,7 @@ dir=`dirname $0`
 $dir/../../tests/filter_stderr_basic    |
 
 # Remove "Lackey, ..." line and the following copyright line.
-sed "/^Lackey, an example Valgrind tool./ , /./ d" |
+sed "/^Embla, a dependency profiler./ , /./ d" |
 
 # Output looks like this...
 #
@@ -28,7 +28,8 @@ sed "/^Lackey, an example Valgrind tool./ , /./ d" |
 #  Exit code:     0
 #
 # ...so chop all lines between first and last (inclusive)
-sed "/^Counted [0-9]\+ calls to _dl_runtime_resolve()$/ ,   \
-     /UInstrs : x86_instrs = [0-9]\+ : [0-9]\+/             \
-     d"
+sed "/^Initalising dependency profiling, storing trace in embla\.trace$/ ,   \
+     /Dependency trace has finished, stored in embla\.trace/             \
+     d" |
 
+sed '/^ *$/d'

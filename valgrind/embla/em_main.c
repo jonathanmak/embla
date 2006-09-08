@@ -89,7 +89,7 @@ static ICount instructions = 0;
 
 static Addr32 shadow_sp, lowest_shadow_sp=0xffffffff, highest_shadow_sp=0;
 
-static Char dbuf[512];
+static Char dbuf[512] __attribute__((unused));
 
 typedef
    struct _StackFrame {
@@ -144,6 +144,7 @@ typedef struct {
 static StackMark smarks[N_SMARKS];
 static int topMark=0;
 
+const char * const trace_file_name = "embla.trace";
 static int trace_file_fd;
 
 typedef
@@ -400,7 +401,9 @@ static void em_post_clo_init(void)
 {
    SysRes sres;
 
-   sres = VG_(open)((Char *) "embla.trace", 
+   VG_(message)(Vg_UserMsg, "Initalising dependency profiling, storing trace "
+		"in %s", trace_file_name);
+   sres = VG_(open)((Char *) trace_file_name, 
                     VKI_O_CREAT | VKI_O_TRUNC | VKI_O_WRONLY,
                     VKI_S_IRUSR | VKI_S_IWUSR | VKI_S_IRGRP);
 
@@ -752,7 +755,8 @@ static void instrumentExit(IRBB *bbOut, IRJumpKind jk, Addr32 pc, Int len, IRExp
     }
 }
 
-static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout, 
+static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
+			   Addr64 orig_addr_noredir, VexGuestExtents * vge,
                            IRType gWordTy, IRType hWordTy)
 {
     IRBB      *bbOut;
@@ -843,7 +847,8 @@ static void em_fini(Int exitcode)
 {
    printResultTable( trace_file_fd );
    VG_(close)( trace_file_fd );
-
+   VG_(message)(Vg_UserMsg, "Dependency trace has finished, stored in %s",
+		trace_file_name);
 }
 
 static void em_pre_clo_init(void)
