@@ -126,7 +126,7 @@ see if a memory location has been first in, then out of, then in the
 stack again. Thus when we see a memory location (now part of the
 stack) with time stamp $t$, we want to know if the stack has been
 small enough to exclude that location at some point $t'$ such that 
-$t'>t$. 
+$t<t'$. 
 
 To this end, we maintain a {\em min stack} consisting of pairs $(t,s)$
 where $t$ is a time stamp and $s$ is a stack pointer value. Each pair
@@ -145,7 +145,7 @@ stack.
 
 Thus, when we record a dependence at address $a$ with time stamp $t$,
 we see if we can find a pair $(s,t')$ in the min stack with $a<s$ and
-$t<t'$ (a smaller stack a a later time).
+$t<t'$ (a smaller stack at a later time).
 
 We avoid spurious anti and output dependencies due to register
 allocation by not computing dependencies on registers and compiling
