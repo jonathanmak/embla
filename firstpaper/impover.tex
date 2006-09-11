@@ -1,30 +1,5 @@
 \section{Overview of the Implementation of Embla}
 
-Embla is based on instrumented execution of binary code. Although
-our examples of profiling output use a high level language (C),
-the profiling itself is on instruction level, followed by 
-mapping the information to source level using debugging information 
-in the standard way.
-
-Embla uses the Valgrind instrumentation infrastructure, so there
-is no offline code rewriting; the Embla tool behaves like an emulator
-of the hardware.
-
-There are three fundamental data structures in Embla.
-\begin{description}
-\item[The memory table:]
-Contains information about the most recent reads and writes to each
-block of memory. Blocksize is a tradeoff between memory use and 
-precision. 
-\item[The activation tree:]
-Contains a record for each stack frame allocated during execution. 
-At any given point during execution, 
-the rightmost branch of the activation tree corresponds to the stack.
-\item[The result table:]
-A hash table mapping dependency signatures to counters of RAW, WAR 
-and WAR dependencies. Dependency signatures identify the source and
-target of the dependency as well as other information of interest.
-\end{description}
 
 \begin{figure*}
 \small
@@ -35,6 +10,7 @@ target of the dependency as well as other information of interest.
 \put(-30,30){\framebox(40,180)[t]{\ }}
 \put(-30,100){\line(1,0){40}}
 \put(-30,110){\line(1,0){40}}
+\put(-30,10){\makebox(60,10){The memory table}}
 % A block
 \put(10,110){\line(4,3){20}}
 \put(10,100){\line(4,-3){20}}
@@ -44,20 +20,21 @@ target of the dependency as well as other information of interest.
 \put(30,105){\makebox(40,10){Last reads}}
 \put(30,90){\makebox(40,10){\vdots}}
 % An event
-\put(70,105){\line(2,1){20}}
-\put(70,95){\line(2,-1){20}}
-\put(90,85){\framebox(40,30){\ }}
-\put(90,105){\line(1,0){40}}
-\put(90,95){\line(1,0){40}}
-\put(90,85){\makebox(40,10){Time}}
-\put(90,95){\makebox(40,10){Instr}}
-\put(90,105){\makebox(40,10){Context}}
-\put(130,110){\vector(2,-3){40}}
+\put(70,125){\line(2,1){20}}
+\put(70,115){\line(2,-1){20}}
+\put(90,105){\framebox(40,30){\ }}
+\put(90,125){\line(1,0){40}}
+\put(90,115){\line(1,0){40}}
+\put(90,105){\makebox(40,10){Time}}
+\put(90,115){\makebox(40,10){Instr}}
+\put(90,125){\makebox(40,10){Context}}
+\put(130,130){\vector(1,-2){40}}
 % The activation tree
 % Level 0 (root)
 \put(270,180){\framebox(30,30)[tl]{\it 1}}
 % Level 1 (1 node)
 \put(235,130){\framebox(30,30)[tl]{\it 2}} \put(250,160){\vector(3,2){30}}
+\put(270,150){\makebox(50,10)[l]{\it NCA(4,7)}}
 % Level 2 (2 nodes)
 \put(190,80){\framebox(30,30)[tl]{\it 3}} \put(205,110){\vector(2,1){40}}
 \put(280,80){\framebox(30,30)[tl]{\it 6}} \put(295,110){\vector(-2,1){40}}
@@ -65,8 +42,12 @@ target of the dependency as well as other information of interest.
 \put(170,30){\framebox(30,30)[tl]{\it 4}} \put(185,60){\vector(3,4){15}}
 \put(210,30){\framebox(30,30)[tl]{\it 5}} \put(225,60){\vector(-3,4){15}}
 \put(260,30){\framebox(30,30)[tl]{\it 7}} \put(275,60){\vector(3,4){15}}
+\put(295,50){\makebox(50,10)[l]{\it Current frame}}
+% caption
+\put(170,10){\makebox(80,10){The activation tree}}
 % The result table
-\put(350,30){\framebox(80,180){\ }}
+\put(360,30){\framebox(80,180){\ }}
+\put(360,10){\makebox(80,10){The result table}}
 
 \end{picture}
 \]
@@ -74,6 +55,47 @@ target of the dependency as well as other information of interest.
 \caption{The main Embla data structures}
 \label{fembladata}
 \end{figure*}
+
+Embla is based on instrumented execution of binary code. Although
+our examples of profiling output use a high level language (C),
+the profiling itself is on instruction level, followed by 
+mapping the information to source level using debugging information 
+in the standard way.
+
+Embla uses the Valgrind instrumentation infrastructure, so there
+is no offline code rewriting; the Embla tool behaves like an emulator
+of the hardware.
+
+Figure~\ref{fembladata} shows the three fundamental data structures 
+in Embla:
+\begin{description}
+\item[The memory table:]
+Contains, for each block of memory, information about the most 
+recent write and all reads since that write. 
+Blocksize is a tradeoff between memory use and precision; the examples in 
+this paper were run with single byte blocks. 
+\item[The activation tree:]
+Contains a record for each stack frame allocated during execution. 
+At any given point during execution, 
+the rightmost branch of the activation tree corresponds to the stack.
+\item[The result table:]
+A hash table mapping dependency signatures to counters of RAW, WAR 
+and WAR dependencies. Dependency signatures identify the source and
+target of the dependency as well as other information of interest.
+\end{description}
+The figure also shows how the data structures are used when the
+profiled program does a memory read. From the memory table we find the
+activation frame that was active when the last write was made and we
+compute the {\em nearest common ancestor} (NCA) of that an the
+current frame. The flow dependence we find will be attributed to the
+function that the NCA corresponds to. 
+
+If a dependency endpoint is part of the NCA (if the NCA is the current
+frame or the frame pointed to from the memory table) it is labelled as
+direct, otherwise it is indirect. If any of the activation frames on
+the path from an endpoint to the NCA is on the black list, we have a
+weak endpoint.
+
 
 Some anti and output dependencies are due to reusing the same
 locations for (logically) distinct data items. This happens for
@@ -94,8 +116,37 @@ another thread, it will automatically be made on a different stack and
 the dependence disappears. Register allocation is another source of
 anti and output dependencies since distinct variables are packed into
 the same register. In this case, the allocation can be changed to
-remove dependenies, a transformation known as {\em renaming}. 
-Other anti dependencies are due to updates
-to the same data structure and cannot be eliminated by renaming.
+remove dependenies, a transformation known as {\em renaming}.
 
-Embla does not trace registers; unoptimized code
+We currently try to avoid these spurious dependencies in the following
+way. The memory table contains time stamps (these are simply the
+number of (emulated) instructions executed since the start). We also
+keep track of the changing stack size during execution so that we can
+see if a memory location has been first in, then out of, then in the
+stack again. Thus when we see a memory location (now part of the
+stack) with time stamp $t$, we want to know if the stack has been
+small enough to exclude that location at some point $t'$ such that 
+$t'>t$. 
+
+To this end, we maintain a {\em min stack} consisting of pairs $(t,s)$
+where $t$ is a time stamp and $s$ is a stack pointer value. Each pair
+$(t,s)$ in the min stack indicates that, at time $t$, the stack
+pointer was $s$ and at all times $t'$ the stack has been larger (since
+the x86 stack grows from high to low addresses, a small stack
+corresponds to a large stack pointer). In the min stack, both
+time stamps and stack sizes grow towards the top (that is, the stack
+pointers decrease).
+
+When the
+call stack grows, we push a new pair, consisting of the current time
+and the new stack pointer value, on top of the min stack. When the
+stack shrinks, we pop all pairs representing larger stacks off the min
+stack.
+
+Thus, when we record a dependence at address $a$ with time stamp $t$,
+we see if we can find a pair $(s,t')$ in the min stack with $a<s$ and
+$t<t'$ (a smaller stack a a later time).
+
+We avoid spurious anti and output dependencies due to register
+allocation by not computing dependencies on registers and compiling
+the traced program without optimization. 

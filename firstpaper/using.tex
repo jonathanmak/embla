@@ -252,10 +252,32 @@ and not shown, as discussed in the implementation section.
 \begin{figure} 
 \small
 \input{ex6.depgraph}
+\caption{The dependency graph of quicksort}
+\label{fquickg}
 \end{figure}
 
-\begin{figure*} 
+\begin{figure} 
 \small
 \input{ex6.deplist}
-\end{figure*}
+\caption{The dependency list of quicksort}
+\label{fquickl}
+\end{figure}
 
+\subsection{A look at quicksort}
+
+Figures~\ref{fquickg} and \ref{fquickl} give another example;
+quicksort (we have suppressed all dependencies except those in the
+function {\tt qs} itself which implements the recursion).
+This is an interesting program since it uses a recursive divide and
+conquer algorithm which gives hope for a lot of parallelism. However,
+the implementation is sequential and uses in-place update of a single
+array. The question is whether Embla can find the parallelism that
+should be buried there. 
+
+To find out, let us turn to the definition of {\tt qs} in
+figure~\ref{fquickg} where we find the two recursive calls at lines 36
+and 37. What we do not find is a data dependecy between them; hence
+Embla has found that the functions are independent. We know of no 
+static analysis that could find this independence, especially as it 
+is expressed using pointer arithmetic rather than indexing operations,
+as is representative of legacy C code.

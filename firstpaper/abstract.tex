@@ -1,24 +1,5 @@
 \begin{abstract}
 
-With the widespread use of chip multithreaded (CMT) processors, there
-is an urgent need for tools and methodologies supporting
-parallelization of existing applications. Writing explicitly threaded
-code is a challenging task, especially since such code is naturally
-nondeterministic.
-
-In this paper we present a novel tool supporting the process of
-parallelizing programs by hand. The tool, Embla, allows the user to
-profile the dependencies in a sequential program, thus finding
-opportunities for parallelization. While most tools for this problem
-rely on static analysis, Embla is a profiler that records dependencies
-as they arise during program execution. It is thus exact in contrast
-to static tool which by necessity make conservative
-approximation. Also, since the tool deals with the machine code of the
-program, it is completely language independent.
-
-\begin{comment_env}
-Suggestion for changes: 
-
 With the proliferation of multicore processors, there is an urgent need for
 tools and methodologies supporting parallelization of existing
 applications.  In this paper we present a novel tool for aiding
@@ -36,7 +17,6 @@ transform the program in a correct manner.
 
 Moreover, since the tool instruments with the machine code of the program,
 it is completely language independent. 
-\end{comment_env}
 
 \end{abstract}
 
