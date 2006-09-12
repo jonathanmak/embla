@@ -82,7 +82,15 @@ static struct {
     int elim_stack_alias;
 } opt;
 
-typedef unsigned int ICount;
+typedef unsigned long long int ICount;
+
+typedef unsigned int StatData;
+
+static StatData
+   mem_table_frags = 0,
+   stack_frames = 0,
+   read_list_elements = 0,
+   max_read_list_elements = 0;
 
 static unsigned int translations = 0;
 static ICount instructions = 0;
@@ -143,6 +151,19 @@ typedef struct {
 
 static StackMark smarks[N_SMARKS];
 static int topMark=0;
+
+static void bumpCounter(StatData *c, StatData n, StatData *min, StatData *max)
+{
+   StatData nv = *c + n;
+   *c = nv;
+
+   if( n<0 && min!=NULL && nv<*min ) {
+      *min = nv;
+   } else if( max!=NULL && nv>*max ) {
+      *max = nv;
+   }
+}
+
 
 const char * const trace_file_name = "embla.trace";
 static int trace_file_fd;
@@ -442,6 +463,7 @@ static RefInfo* getRefInfo(Addr32 addr)
         if( frag==NULL ) {
             VG_(tool_panic)("Out of memory!");
         }
+        bumpCounter( &mem_table_frags, 1, NULL, NULL );
         GET_FRAG_PTR(map,addr) = frag;
         for(i=0; i<REFS_PER_FRAG; i++) {
             frag->refs[i].lastWrite.context = &first_stack_frame;
@@ -492,6 +514,10 @@ void recordLoad(Addr32 pc, Addr32 addr, Addr32 sp)
         refp->lastRead.next = NULL;
     } else {
         ev_list = (EventList *) VG_(calloc)( 1, sizeof(EventList) );
+        if( ev_list==NULL ) {
+            VG_(tool_panic)("Out of memory!");
+        }
+        bumpCounter( &read_list_elements, 1, NULL, &max_read_list_elements );   
         ev_list->ev.i_addr = pc;
         ev_list->ev.i_count = instructions;
         ev_list->ev.context = current_stack_frame;
@@ -542,6 +568,7 @@ void recordStore(Addr32 pc, Addr32 addr, Addr32 sp)
     for( ev_list = refp->lastRead.next; ev_list != NULL; ev_list = ev_next ) {
         ev_next = ev_list->next;
         VG_(free)( ev_list );
+        bumpCounter( &read_list_elements, -1, NULL, NULL );
     }
     refp->lastRead.next = NULL;
 
@@ -556,13 +583,14 @@ void recordCall(int sp, int ca, int ra)
 {
     StackFrame * newFrame = (StackFrame *) VG_(calloc)(1,sizeof(StackFrame));
 
+    if( newFrame==NULL ) {
+        VG_(tool_panic)("Out of memory!");
+    }
+    bumpCounter( &stack_frames, 1, NULL, NULL );
+
     checkIfHidden( current_stack_frame, ca, 0 );
     if( first_sp==0 ) {
        first_sp = sp;
-    }
-
-    if( newFrame==NULL ) {
-        VG_(tool_panic)("Out of memory!");
     }
 
     newFrame->parent    = current_stack_frame;
@@ -849,6 +877,16 @@ static void em_fini(Int exitcode)
    VG_(close)( trace_file_fd );
    VG_(message)(Vg_UserMsg, "Dependency trace has finished, stored in %s",
 		trace_file_name);
+   VG_(message)(Vg_UserMsg, "Max mem frags:    %10u (%10u bytes)", 
+                            mem_table_frags, 
+                            mem_table_frags*sizeof( MapFragment ) );
+   VG_(message)(Vg_UserMsg, "Max stack frames: %10u (%10u bytes)", 
+                            stack_frames,
+                            stack_frames*sizeof( StackFrame ) );
+   VG_(message)(Vg_UserMsg, "Max read list:    %10u (%10u bytes)", 
+                            max_read_list_elements,
+                            max_read_list_elements*sizeof( EventList ) );
+   VG_(message)(Vg_UserMsg, "Instructions:    %11llu", instructions);
 }
 
 static void em_pre_clo_init(void)
