@@ -113,7 +113,7 @@ def main(argv):
       os.path.join(baseDir, latestDir),
       "Output:"
       "",
-      output]), 0)
+      buildOutput]), 0)
 
   return buildStatus
 
