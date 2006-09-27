@@ -1,0 +1,12 @@
+test1.c main s 15  7  2 0 0
+test1.c main o 10  8  1 0 0
+test1.c main o 12  9  0 0 1
+test1.c main s 10c 10  3 0 0
+test1.c main o 11  10  0 1 0
+test1.c main f 13  10c 0 1 0
+test1.c main s 13  10c 0 2 0
+test1.c main f 13c 10c 1 76 15
+test1.c main o 13c 10c 16 0 0
+test1.c main o 13  11  1 0 0
+test1.c main o 13  12  1 0 0
+test1.c main s 13c 13  4 0 0

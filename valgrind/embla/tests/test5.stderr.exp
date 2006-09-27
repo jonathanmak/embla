@@ -1,0 +1,17 @@
+test5.c main s 25  20  2 0 0
+test5.c main s 21c 21  4 0 0
+test5.c main s 23  21  1 0 0
+test5.c main f 23  21c 0 1 0
+test5.c main s 23  21c 0 3 0
+test5.c main f 23c 21c 0 16 0
+test5.c main s 23c 23  3 0 0
+test5.c nfib s 15  5  67 0 0
+test5.c nfib s 14  8  34 0 0
+test5.c nfib s 10c 10  106 0 0
+test5.c nfib s 12  10  33 0 0
+test5.c nfib f 11  10c 0 33 0
+test5.c nfib s 11  10c 0 73 0
+test5.c nfib f 11c 10c 0 240 0
+test5.c nfib s 11c 11  90 0 0
+test5.c nfib s 12  11  33 0 0
+test5.c nfib s 14  12  33 0 0

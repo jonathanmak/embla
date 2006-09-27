@@ -22,13 +22,10 @@ all: ${depgraphs} ${deplists}
 	awk -f $^ > $@
 
 # Make won't allow % among the dependencies, so make a recursive call...
-%.trace: sorttrace %.o
+%.trace: %.o
 	${MAKE} $*
-	rm -f embla.trace
 	[ -f "${VALGRIND}" ] || ( echo "Set VALGRIND variable" ; exit 1 )
-	${VALGRIND} --tool=embla ./$*
-	./sorttrace embla.trace > $@
-	rm embla.trace
+	${VALGRIND} --tool=embla --trace-file=$@ ./$*
 
 %: %.o
 	${CC} --static -O0 -g -o $@ $^
@@ -47,7 +44,6 @@ clean:
 	rm -f ${deplists}
 	rm -f ${depgraphs}
 	rm -f $(addsuffix .trace, ${examples})
-	rm -f embla.trace
 	rm -f $(addsuffix .ps, ${dotfiles})
 	rm -f $(addsuffix .dot, ${dotfiles})
 

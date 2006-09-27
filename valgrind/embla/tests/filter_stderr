@@ -4,7 +4,7 @@ dir=`dirname $0`
 
 $dir/../../tests/filter_stderr_basic    |
 
-# Remove "Lackey, ..." line and the following copyright line.
+# Remove "Embla, ..." line and the following copyright line.
 sed "/^Embla, a dependency profiler./ , /./ d" |
 
 # Output looks like this...
@@ -28,8 +28,10 @@ sed "/^Embla, a dependency profiler./ , /./ d" |
 #  Exit code:     0
 #
 # ...so chop all lines between first and last (inclusive)
-sed "/^Initalising dependency profiling, storing trace in embla\.trace$/ ,   \
-     /Dependency trace has finished, stored in embla\.trace/             \
+sed "/^Initalising dependency profiling$/ ,   \
+     /Dependency trace has finished, storing in .*$/             \
      d" |
+
+sed '/Max mem frags:.*/ , /Instructions:.*/d' |
 
 sed '/^ *$/d'

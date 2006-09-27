@@ -87,6 +87,10 @@ extern void VG_(bad_option) ( Char* opt );
    less aggressively if that is needed (callgrind needs this). */
 extern VexControl VG_(clo_vex_control);
 
+/* Set to true if --wait-for-gdb option is set to yes.  After attaching a
+   gdb, set this to zero to continue. */
+extern volatile Bool VG_(wait_for_gdb);
+
 #endif   // __PUB_TOOL_OPTIONS_H
 
 /*--------------------------------------------------------------------*/

@@ -1,1 +1,2 @@
 prog: test6
+vgopts: --trace-file=-

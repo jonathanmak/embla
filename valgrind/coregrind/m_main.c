@@ -59,6 +59,7 @@
 #include "pub_core_transtab.h"
 #include "pub_core_ume.h"
 
+volatile Bool VG_(wait_for_gdb) = 0;
 
 /*====================================================================*/
 /*=== Counters, for profiling purposes only                        ===*/
@@ -2331,6 +2332,13 @@ Int main(Int argc, HChar **argv, HChar **envp)
       iters *= 1000*1000*1000;
       for (q = 0; q < iters; q++) 
          ;
+	 
+      /* Lalle: Delay loop doesn't seem to work.  It may be optimised out.
+	 Spin on a volatile variable instead.  Set vgPlain_wait_for_gdb to
+	 0 when you have attached. */
+      VG_(wait_for_gdb) = 1;
+      while (VG_(wait_for_gdb))
+	;
    }
 
    //--------------------------------------------------------------

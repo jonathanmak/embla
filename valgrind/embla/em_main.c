@@ -50,6 +50,7 @@
 #define  RESULT_ENTRIES   1000003  
 #define  FILE_LEN         256
 #define  FN_LEN           128
+#define  BUF_SIZE         512
 
 #define  BITS_PER_REF      0
 #define  BITS_PER_FRAG    12
@@ -97,7 +98,7 @@ static ICount instructions = 0;
 
 static Addr32 shadow_sp, lowest_shadow_sp=0xffffffff, highest_shadow_sp=0;
 
-static Char dbuf[512] __attribute__((unused));
+static Char dbuf[BUF_SIZE] __attribute__((unused));
 
 typedef
    struct _StackFrame {
@@ -165,12 +166,17 @@ static void bumpCounter(StatData *c, StatData n, StatData *min, StatData *max)
 }
 
 
-const char * const trace_file_name = "embla.trace";
-static int trace_file_fd;
+const char * trace_file_name = "embla.trace";
 
 typedef
    struct _RTEntry {
-     char *title;
+     char * h_file;
+     char * h_fn;
+     char d_inf;
+     Int h_line;
+     Int t_line;
+     char h_inf;
+     char t_inf;
      UInt n_raw, n_war, n_waw;
      struct _RTEntry *next;
    }
@@ -178,7 +184,33 @@ typedef
 
 static RTEntry **result_table;
 
-static UInt hash(Char *s) 
+/***********************************************************************
+ * Implement the needs_command_line_options for Valgrind.
+ **********************************************************************/
+
+static Bool em_process_cmd_line_option(Char* arg)
+{
+  VG_STR_CLO(arg, "--trace-file", trace_file_name)
+  else
+    return False;
+  
+  tl_assert(trace_file_name);
+  tl_assert(trace_file_name[0]);
+  return True;
+}
+
+static void em_print_usage(void)
+{  
+   VG_(printf)(
+"    --trace-file=<name>       store trace data in <name> [embla.trace]\n"
+   );
+}
+
+static void em_print_debug_usage(void)
+{  
+}
+
+static UInt hash(const Char *s) 
 {
    const int hash_const = 257;
    int hash_value = 0;
@@ -298,6 +330,50 @@ static void addNULL(Char *cont, int idx)
     cont[idx] = 0;
 }
 
+static const Char * makeTitle(const RTEntry * e)
+{
+  static Char result[BUF_SIZE];
+#if FULL_CONTOURS
+   VG_(sprintf)( result, "%s %s %s %d%s(%s) %d%s(%s)", 
+		 h_file, h_fn, d_inf, h_line, h_inf, h_cont, t_line, t_inf,
+		 t_cont );
+#else						
+   tl_assert(e);
+   VG_(sprintf)( result, "%s %s %c %d%c %d%c", 
+		 e->h_file, e->h_fn, e->d_inf, e->h_line, e->h_inf, e->t_line,
+		 e->t_inf );
+#endif
+   return result;
+}
+
+static Int result_entry_compare(const RTEntry * e1, const RTEntry * e2)
+{
+  Int result;
+  
+  tl_assert(e1);
+  tl_assert(e2);
+
+  result = VG_(strcmp)(e1->h_file, e2->h_file);
+  if (result != 0)
+    return result;
+  result = VG_(strcmp)(e1->h_fn, e2->h_fn);
+  if (result != 0)
+    return result;
+
+#define tmp_compare_field(field)		\
+  if (e1-> field != e2-> field)			\
+    return e1-> field < e2-> field ? -1 : 1
+
+  tmp_compare_field(t_line);
+  tmp_compare_field(t_inf);
+  tmp_compare_field(h_line);
+  tmp_compare_field(h_inf);
+  tmp_compare_field(d_inf);
+  return 0;
+
+#undef tmp_compare_field
+}
+
 static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr, 
                                StackFrame *old_ctx,  Addr32 old_addr, ICount old_instr,
                                Addr32 ref_addr)
@@ -307,14 +383,12 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
    Addr32     h_addr, t_addr;
    Addr32     h_sp, t_sp;
    Char       h_file[FILE_LEN], h_fn[FN_LEN];
-   Int        h_line;
    Char       t_file[FILE_LEN], t_fn[FN_LEN];
-   Char       *h_inf, *t_inf, *d_inf;
-   Int        t_line;
    UInt       hash_value;
    RTEntry    *rp;
    Bool       h_hidden, t_hidden;
    int        cont_idx;
+   RTEntry    tmp_entry;
 
    // The tail (source) of the dependence is related to the old reference
    // The head (sink)   of the dependence is related to the new reference
@@ -324,6 +398,7 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
    //   the address of the instruction making new reference, if the new ref was in nca, or
    //   the address of the call site in the nca
 
+   VG_(memset)(& tmp_entry, 0, sizeof(tmp_entry));
    nca = curr_ctx;
    h_addr = curr_addr;
    h_sp = 0;
@@ -358,8 +433,21 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
 
    // Translate the addresses into line and file numbers
 
-   getDebugInfo( h_addr, h_file, h_fn, &h_line );
-   getDebugInfo( t_addr, t_file, t_fn, &t_line );
+   h_file[0] = '\0';
+   h_fn[0] = '\0';
+   getDebugInfo( h_addr, h_file, h_fn,
+		 & tmp_entry.h_line );
+
+   tmp_entry.h_file = VG_(malloc)(VG_(strlen)(h_file) + 1);
+   tl_assert(tmp_entry.h_file);
+   VG_(strcpy)(tmp_entry.h_file, h_file);
+
+   tmp_entry.h_fn = VG_(malloc)(VG_(strlen)(h_fn) + 1);
+   tl_assert(tmp_entry.h_fn);
+   VG_(strcpy)(tmp_entry.h_fn, h_fn);
+
+   getDebugInfo( t_addr, t_file, t_fn,
+		 & tmp_entry.t_line );
 
    // Check if this is a false dependency due to stack aliasing (pop then push)
    // or if it is in the stack or if it is something else
@@ -368,34 +456,27 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
        ref_addr >= lowest_shadow_sp && ref_addr <= highest_shadow_sp
        && ! inStack( ref_addr, old_instr ) ) {
        // False aliasing due to stack pop then push 
-       d_inf = "f";
+       tmp_entry.d_inf = 'f';
    } else if( ref_addr >= lowest_shadow_sp && ref_addr <= highest_shadow_sp ) {
-       d_inf = "s";
+       tmp_entry.d_inf = 's';
    } else {
-       d_inf = "o";
+       tmp_entry.d_inf = 'o';
    }
 
    // Check whether any of the references where made during a call from the 
    // nca activation record or hidden
 
-   h_inf = curr_ctx==nca ? "" : (h_hidden ? "h" : "c");
-   t_inf = old_ctx==nca  ? "" : (t_hidden ? "h" : "c");
+   tmp_entry.h_inf = curr_ctx==nca ? ' ' : (h_hidden ? 'h' : 'c');
+   tmp_entry.t_inf = old_ctx==nca  ? ' ' : (t_hidden ? 'h' : 'c');
 
    // Construct the hash key
 
-#if FULL_CONTOURS
-   VG_(sprintf)( buf, "%s %s %s %d%s(%s) %d%s(%s)", 
-                      h_file, h_fn, d_inf, h_line, h_inf, h_cont, t_line, t_inf, t_cont );
-#else
-   VG_(sprintf)( buf, "%s %s %s %d%s %d%s", 
-                      h_file, h_fn, d_inf, h_line, h_inf, t_line, t_inf );
-#endif
-   hash_value = hash( buf );
+   hash_value = hash( makeTitle(& tmp_entry) );
 
    // Walk the hash chain
 
    for( rp = result_table[hash_value]; 
-        rp != NULL && VG_(strcmp)( buf, rp->title ) != 0;
+        rp != NULL && result_entry_compare( rp, & tmp_entry ) != 0;
        rp = rp->next )
       ;
    if( rp==NULL ) {
@@ -403,13 +484,9 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
        if( rp==NULL ) {
            VG_(tool_panic)( "Out of memory" );
        }
+       * rp = tmp_entry;
        rp->next = result_table[hash_value];
        result_table[hash_value] = rp;
-       rp->title = (Char *) VG_(calloc)( VG_(strlen)( buf )+1, sizeof(Char) );
-       if( rp->title==NULL ) {
-           VG_(tool_panic)( "Out of memory" );
-       }
-       VG_(strcpy)( rp->title, buf );
    }
 
    return rp;
@@ -420,24 +497,11 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
 
 static void em_post_clo_init(void)
 {
-   SysRes sres;
-
-   VG_(message)(Vg_UserMsg, "Initalising dependency profiling, storing trace "
-		"in %s", trace_file_name);
-   sres = VG_(open)((Char *) trace_file_name, 
-                    VKI_O_CREAT | VKI_O_TRUNC | VKI_O_WRONLY,
-                    VKI_S_IRUSR | VKI_S_IWUSR | VKI_S_IRGRP);
-
-   if( sres.isError ) {
-      VG_(message)(Vg_UserMsg, "Trace file could not be opened");
-      return;
-   }
-
-   trace_file_fd = sres.val;
-
    VG_(clo_vex_control).iropt_level = 0;
    VG_(clo_vex_control).iropt_unroll_thresh = 0;
    VG_(clo_vex_control).guest_chase_thresh = 0;
+
+   VG_(message)(Vg_UserMsg, "Initalising dependency profiling");
 
    map = (MapFragment **) VG_(calloc)(FRAGS_IN_MAP, sizeof(MapFragment*));
    result_table = (RTEntry **) VG_(calloc)(RESULT_ENTRIES, sizeof(RTEntry *));
@@ -856,27 +920,66 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
     return bbOut;
 }
 
-static void printResultTable(int fd)
+static void printResultTable(const Char * traceFileName)
 {
    int      i;
    RTEntry *entry;
+   SizeT results_buf_size = 100;
+   RTEntry * result_array = VG_(malloc)(sizeof(RTEntry) * results_buf_size);
+   SizeT num_results = 0;
+   int fd = -1;
 
-   for( i=0; i<RESULT_ENTRIES; i++ ) {
-      for( entry=result_table[i]; entry != NULL; entry=entry->next ) {
-         VG_(sprintf)( buf, 
-                       "%s %d %d %d\n", 
-                       entry->title, entry->n_raw, entry->n_war, entry->n_waw );
-         VG_(write)( fd, buf, VG_(strlen)( buf ) );
-      }
+   tl_assert(result_array);
+   for( i=0; i<RESULT_ENTRIES; i++ )
+     for( entry=result_table[i]; entry != NULL; entry=entry->next )
+       if ((VG_(strcmp)(entry->h_file, "???") != 0) &&
+	   (VG_(strcmp)(entry->h_fn, "???") != 0))
+       {
+	 ++num_results;
+	 if (num_results >= results_buf_size)
+	 {
+	   results_buf_size *= 2;
+	   result_array = VG_(realloc)(result_array,
+				       sizeof(RTEntry) * results_buf_size);
+	   tl_assert(result_array);
+	 }
+	 result_array[num_results - 1] = * entry;
+       }
+
+   VG_(ssort)((void *) result_array, num_results, sizeof(RTEntry),
+	      (Int (*)(void *, void *)) result_entry_compare);
+   
+   if (VG_(strcmp)(traceFileName, "-") != 0)
+   {
+      SysRes sres;
+      sres = VG_(open)((Char *) traceFileName, 
+		       VKI_O_CREAT | VKI_O_TRUNC | VKI_O_WRONLY,
+		       VKI_S_IRUSR | VKI_S_IWUSR | VKI_S_IRGRP);
+     if( sres.isError ) {
+       VG_(message)(Vg_UserMsg, "Trace file could not be opened");
+       return;
+     }
+     fd = sres.val;
    }
+   for (i = 0; i < num_results; ++i)
+   {
+     VG_(sprintf)( buf, "%s %d %d %d\n", 
+		   makeTitle(& result_array[i]), result_array[i].n_raw,
+		   result_array[i].n_war, result_array[i].n_waw );
+     if (VG_(strcmp)(traceFileName, "-") != 0)
+       VG_(write)( fd, buf, VG_(strlen)( buf ) );
+     else
+       VG_(printf)("%s", buf);
+   }
+   if (VG_(strcmp)(traceFileName, "-") != 0)
+     VG_(close)( fd );
 }
 
 static void em_fini(Int exitcode)
 {
-   printResultTable( trace_file_fd );
-   VG_(close)( trace_file_fd );
-   VG_(message)(Vg_UserMsg, "Dependency trace has finished, stored in %s",
+   VG_(message)(Vg_UserMsg, "Dependency trace has finished, storing in %s",
 		trace_file_name);
+   printResultTable( trace_file_name );
    VG_(message)(Vg_UserMsg, "Max mem frags:    %10u (%10u bytes)", 
                             mem_table_frags, 
                             mem_table_frags*sizeof( MapFragment ) );
@@ -901,6 +1004,9 @@ static void em_pre_clo_init(void)
    VG_(basic_tool_funcs)        (em_post_clo_init,
                                  em_instrument,
                                  em_fini);
+   VG_(needs_command_line_options)(em_process_cmd_line_option,
+                                   em_print_usage,
+                                   em_print_debug_usage);
 
    /* No needs, no core events to track */
 }
