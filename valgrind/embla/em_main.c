@@ -31,6 +31,8 @@
    Things that should be changed include, but are not limited to, the following:
    - There is an assumption throughout that we run code for a LE 32 bit machine.
    - Funny things will happen if we access the same place with words and bytes
+   - spChange and adjust_shadow_sp are maybe not both needed
+   - howHidden should not be called for every load and store
 */
 
 #include "pub_tool_basics.h"
@@ -46,11 +48,15 @@
 
 #include "libvex_guest_offsets.h"
 
-// smallest prime >= a million
-#define  RESULT_ENTRIES   1000003  
-#define  FILE_LEN         256
-#define  FN_LEN           128
-#define  BUF_SIZE         512
+#define  RESULT_ENTRIES     1000003  // smallest prime >= a million
+#define  FILE_LEN               256
+#define  FN_LEN                 128
+#define  BUF_SIZE               512
+#define  II_CHUNK_SIZE      1000000
+// #define  STRING_TABLE         10007  // smallest prime >= 10000
+
+#define  RT_IDX_BITS                        3
+#define  RT_ENTRIES_PER_LINE (1<<RT_IDX_BITS)  // must be power of 2
 
 #define  BITS_PER_REF      0
 #define  BITS_PER_FRAG    12
@@ -62,13 +68,44 @@
 #define  GET_FRAG_PTR(m,a)   m[a>>BITS_PER_FRAG]
 #define  GET_REF_ADDR(fp,a)  ( &( fp->refs[(a&FRAG_MASK) >> BITS_PER_REF] ) )
 
+#ifdef DEBUG
+
 #define  BONK(s) VG_(write)( 2, s, VG_(strlen)( s ) )
 #define  DPRINT1(s,x)     { VG_(sprintf)( dbuf, s, x );       BONK( dbuf ); }
 #define  DPRINT2(s,x,y)   { VG_(sprintf)( dbuf, s, x, y );    BONK( dbuf ); }
 #define  DPRINT3(s,x,y,z) { VG_(sprintf)( dbuf, s, x, y, z ); BONK( dbuf ); }
 
-#define IFDID( c ) {if( did_gc>2 ) { c } }
+#else
+
+#define BONK(s) { }
+#define DPRINT1(s,x) { }
+#define DPRINT2(s,x,y) { }
+#define DPRINT3(s,x,y,z) { }
+
+#endif
+
+static void check(int c, Char *s)
+{
+   if( !c ) {
+     VG_(tool_panic)( s );
+   }
+}
+
+#define IFDID( c ) {if( did_gc>0 ) { c } }
 static unsigned did_gc=0;
+
+#define DF_DIRECT 0
+#define DF_INDIRECT 1
+#define DF_HIDDEN 2
+#define DF_N_EFLAGS 3
+#define DF_STACK 0
+#define DF_HEAP 1
+#define DF_FALSE 2
+#define DF_N_RFLAGS
+#define DF_MK_KEY(rf,hf,tf) (rf*DF_N_EFLAGS*DF_N_EFLAGS + hf*DF_N_EFLAGS + tf)
+#define DF_GET_RFLAG(k) (k / (DF_N_EFLAGS*DF_N_EFLAGS))
+#define DF_GET_HFLAG(k) ( (k/DF_N_EFLAGS) % DF_N_EFLAGS )
+#define DF_GET_TFLAG(k) (k%DF_N_EFLAGS)
 
 #define  CONT_LEN         1024
 #define  FULL_CONTOURS    0
@@ -84,7 +121,7 @@ static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
 #define  SF_SEEN          4   // We have SEEN this stack frame
 
 //
-// Tags with i_addr != 0
+// Tags with i_info != NULL
 //
 #define  TPT_REG                  0    // A regular node
 #define  TPT_OPEN                 1    // An open call header; corresponds to a frame
@@ -92,7 +129,7 @@ static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
 #define  TPT_REG_OR_CLOSED_LIVE   3    // Valid from phase 1-3 in compaction
 
 //
-// Tags with i_addr == 0
+// Tags with i_info == NULL
 //
 #define  TPT_RET          0   // A return header
 #define  TPT_BRIDGE       1   // Bridging a gap of dead nodes
@@ -115,6 +152,43 @@ static StatData
 static unsigned int translations = 0;
 static ICount instructions = 0;
 static unsigned millions;
+
+const char * trace_file_name = "embla.trace";
+
+typedef
+   struct _RTEntry {
+     char * h_file;
+     char * h_fn;
+     UInt code;
+     char d_inf;
+     Int h_line;
+     Int t_line;
+     char h_inf;
+     char t_inf;
+     UInt n_raw, n_war, n_waw;
+     struct _RTEntry *next;
+   }
+   RTEntry;
+
+static RTEntry mock_rtentry = {"mock", "", 0, 'o', 0, 0, 'c', 'c', 0, 0, 0, NULL};
+
+typedef struct _LineInfo {
+   RTEntry  *entries[RT_ENTRIES_PER_LINE];
+   unsigned line;
+   char    *file;
+   char    *func;
+   struct _LineInfo *next;
+} LineInfo;
+
+static LineInfo dummy_line_info = { { }, 0, "", "", NULL };
+
+typedef struct {
+   Addr32   i_addr;
+   unsigned i_len;
+   LineInfo *line;
+} InstrInfo;
+
+static InstrInfo dummy_instr_info = {1, 0, &dummy_line_info};
 
 static Addr32 shadow_sp, lowest_shadow_sp=0xffffffff, highest_shadow_sp=0;
 
@@ -194,8 +268,8 @@ static TaggedPtr mkTaggedPtr2(void *ptr, unsigned flag)
 
 typedef 
    struct {
-      Addr32    i_addr;
-      TaggedPtr link;
+      InstrInfo *i_info;
+      TaggedPtr  link;
    }
    TraceRec;
 
@@ -204,7 +278,7 @@ static TraceRec *last_trace_rec;
 
 static unsigned long int n_calls_to_newTR= 0; 
 
-static TraceRec * newTraceRec(Addr32 i_addr, TaggedPtr link)
+static TraceRec * newTraceRec(InstrInfo *i_info, TaggedPtr link)
 {
    n_calls_to_newTR++;
    if( last_trace_rec >= trace_pile + N_TRACE_RECS ) {
@@ -212,7 +286,7 @@ static TraceRec * newTraceRec(Addr32 i_addr, TaggedPtr link)
        VG_(tool_panic)( "Trace pile overflow" );
    }
    last_trace_rec++;
-   last_trace_rec->i_addr = i_addr;
+   last_trace_rec->i_info = i_info;
    last_trace_rec->link   = link;
    return last_trace_rec;
 }
@@ -228,7 +302,7 @@ static int topMark=0;
 
 typedef
    struct _StackFrame {
-     Addr32 sp,call_addr,ret_addr;
+     Addr32 sp, /* call_addr, */ ret_addr;
      unsigned int flags;
      // struct _StackFrame *parent;
      TraceRec *call_header;
@@ -238,7 +312,7 @@ typedef
 
 static StackFrame stack_base[N_STACK_FRAMES] =
        {
-         {(unsigned int) -1, 0, 0, 0, NULL, smarks} // initializing the first
+         {(unsigned int) -1, /* 0, */ 0, 0, NULL, smarks} // initializing the first
        };
 static StackFrame * current_stack_frame = stack_base;
 
@@ -252,9 +326,9 @@ static StackFrame * current_stack_frame = stack_base;
 
 */
 
-static TaggedPtr newRegularEvent(StackFrame *frame, Addr32 i_addr)
+static TaggedPtr newRegularEvent(StackFrame *frame, InstrInfo *i_info)
 {
-   TraceRec  *tr   = newTraceRec( i_addr, mkTaggedPtr2( frame->call_header, TPT_REG ) );
+   TraceRec  *tr   = newTraceRec( i_info, mkTaggedPtr2( frame->call_header, TPT_REG ) );
    unsigned  hflag = ( frame->flags & SF_HIDDEN ) != 0 ? 1 : 0;
 
    return mkTaggedPtr( tr, hflag, 0 );
@@ -330,26 +404,115 @@ static void bumpCounter(StatData *c, StatData n, StatData *min, StatData *max)
    }
 }
 
-
-const char * trace_file_name = "embla.trace";
-
-typedef
-   struct _RTEntry {
-     char * h_file;
-     char * h_fn;
-     char d_inf;
-     Int h_line;
-     Int t_line;
-     char h_inf;
-     char t_inf;
-     UInt n_raw, n_war, n_waw;
-     struct _RTEntry *next;
+static UInt hash(const Char *s) 
+{
+   const int hash_const = 257;
+   int hash_value = 0;
+   while( *s != 0 ) {
+      hash_value = (hash_const*hash_value + *s) % RESULT_ENTRIES;
+      s++;
    }
-   RTEntry;
+   return hash_value;
+}
 
-static RTEntry **result_table;
+typedef struct _StringEntry {
+   char *str;
+   struct _StringEntry *next;
+} StringEntry;
 
-static RTEntry mock_rtentry = {"mock", "", 'o', 0, 0, 'c', 'c', 0, 0, 0, NULL};
+static StringEntry *string_table[RESULT_ENTRIES];
+
+static char *intern_string( char *str )
+{
+   StringEntry * entry = string_table[ hash( str ) ];
+
+   while( entry != NULL && VG_(strcmp)( str, entry->str ) ) {
+      entry = entry->next;
+   }
+   if( entry==NULL ) {
+      entry = (StringEntry *) VG_(calloc)( 1, sizeof( StringEntry ) );
+      check( entry != NULL, "Out of memory" );
+      entry->str = (char *) VG_(calloc)( VG_(strlen)( str ) + 1, sizeof( char ) );
+      check( entry->str != NULL, "Out of memory" );
+      VG_(strcpy)( entry->str, str );
+   }
+   return entry->str;
+}
+
+static void getDebugInfo(Addr32 addr, Char file[FILE_LEN], Char fn[FN_LEN], UInt *line)
+{
+   Bool found_file_line = VG_(get_filename_linenum)(
+                              addr,
+                              file, FILE_LEN,
+                              NULL, 0, NULL,
+                              line
+                          );
+   Bool found_fn = VG_(get_fnname)(addr, fn, FN_LEN);
+
+   if( !found_file_line ) {
+      VG_(strcpy)( file, "???" );
+      *line = 0;
+   }
+   if( !found_fn ) {
+      VG_(strcpy)( fn, "???" );
+   }
+}
+
+static LineInfo *line_table[RESULT_ENTRIES];
+
+static LineInfo *mk_line_info( Addr32 i_addr )
+{
+   char file[FILE_LEN], func[FN_LEN], buffer[BUF_SIZE], *i_file;
+   unsigned line;
+   LineInfo *info,**info_p;
+
+   getDebugInfo( i_addr, file, func, &line );
+   i_file = intern_string( file );
+
+   VG_(sprintf)( buffer, "%d %s", line, file );
+   info_p = & line_table[ hash( buffer ) ];
+   info = *info_p;
+
+   // interned file
+   while( info!=NULL && ( info->line != line || info->file != i_file ) ) {
+      info = info->next;
+   }
+   if( info == NULL ) {
+      int i;
+      info = (LineInfo *) VG_(calloc)( 1, sizeof(LineInfo) );
+      for( i=0; i<RT_ENTRIES_PER_LINE; i++ ) {
+         info->entries[i] = NULL;
+      }
+      info->line = line;
+      info->file = i_file;
+      info->func = intern_string( func );
+      info->next = *info_p;
+      *info_p = info;
+   }
+   return info;
+}
+      
+static InstrInfo *ii_chunk = NULL;
+static unsigned   ii_idx = II_CHUNK_SIZE;
+
+static InstrInfo *mk_i_info(InstrInfo *curr, Addr32 i_addr, unsigned i_len)
+{
+   if( curr != NULL ) return curr;
+
+   if( ii_idx == II_CHUNK_SIZE ) {
+      ii_chunk = (InstrInfo *) VG_(calloc)( II_CHUNK_SIZE, sizeof( InstrInfo ) );
+      check( ii_chunk != NULL, "Out of memory for ii_chunk" );
+      ii_idx = 0;
+   }
+   
+   ii_chunk[ii_idx].i_addr = i_addr;
+   ii_chunk[ii_idx].i_len  = i_len;
+   ii_chunk[ii_idx].line   = mk_line_info( i_addr );
+
+   return ii_chunk + ii_idx++;
+}
+
+
 
 /***********************************************************************
  * Implement the needs_command_line_options for Valgrind.
@@ -377,16 +540,9 @@ static void em_print_debug_usage(void)
 {  
 }
 
-static UInt hash(const Char *s) 
-{
-   const int hash_const = 257;
-   int hash_value = 0;
-   while( *s != 0 ) {
-      hash_value = (hash_const*hash_value + *s) % RESULT_ENTRIES;
-      s++;
-   }
-   return hash_value;
-}
+/******************************************************
+ * Stack mark handling                                *
+ ******************************************************/
 
 static VG_REGPARM(2)
 void recordSpChange(Addr32 newSp)
@@ -422,25 +578,6 @@ static Bool inStack( Addr32 oldAddr, TraceRec *oldTR )
       }
    }
    return 1;
-}
-
-static void getDebugInfo(Addr32 addr, Char file[FILE_LEN], Char fn[FN_LEN], UInt *line)
-{
-   Bool found_file_line = VG_(get_filename_linenum)(
-                              addr,
-                              file, FILE_LEN,
-                              NULL, 0, NULL,
-                              line
-                          );
-   Bool found_fn = VG_(get_fnname)(addr, fn, FN_LEN);
-
-   if( !found_file_line ) {
-      VG_(strcpy)( file, "???" );
-      *line = 0;
-   }
-   if( !found_fn ) {
-      VG_(strcpy)( fn, "???" );
-   }
 }
 
 static int howHidden( Addr32 addr )
@@ -504,12 +641,9 @@ static void addNULL(Char *cont, int idx)
     cont[idx] = 0;
 }
 
-static void check(int c, Char *s)
-{
-   if( !c ) {
-     VG_(tool_panic)( s );
-   }
-}
+/**********************************
+ * Compaction routines            *
+ **********************************/
 
 static Event forward( Event e, int delta )
 {
@@ -540,35 +674,6 @@ static void init_read_table(void)
      nonempty[i] = -1;
    }
 }
-
-#if NAIVE_COMPACT_READS
-
-static EventList * compactReads( EventList *in_p, int delta )
-{
-   EventList *lp,*new_p=NULL,*next_p;
-
-   for( lp=in_p; lp != NULL; lp=next_p ) {
-      Event ev = forward( lp->ev, delta );
-      EventList *p;
-      int found = 0;
-      next_p = lp->next;
-      for( p=new_p; p!=NULL; p=p->next ) {
-         if( EQUAL_EVENT( p->ev, ev ) ) {
-            found = 1;
-         }
-      }
-      if( found ) {
-         deleteEvent( lp );
-      } else {
-         lp->next = new_p;
-         lp->ev = ev;
-         new_p = lp;
-      }
-   }
-   return new_p;
-}
-
-#else
 
 #define ToUnsigned( e ) ( e )
 
@@ -614,8 +719,6 @@ static EventList * compactReads( EventList *in_p, int delta )
    return new_p;
 }
 
-#endif
-
 static void compact(void)
 {
 
@@ -634,12 +737,13 @@ static void compact(void)
    // Phase 4: Relocate live trace recs. Forwards
 
    // Phase 1:
+   BONK( "  Phase 1... " );
    tp = last_trace_rec;
    ap = last_trace_rec;
    sp = current_stack_frame;
    mp = smarks+topMark;
    while( tp >= trace_pile ) {
-      if( tp->i_addr != 0 ) {
+      if( tp->i_info != NULL ) {
         switch( TP_GET_FLAGS( tp->link ) ) {
           // Regular
           case TPT_REG:
@@ -677,7 +781,7 @@ static void compact(void)
    }
    delta = ap + 1 - trace_pile;
 
-   IFDID( BONK( "Phase 1 done\nPhase 2 starting\n" ); )
+   BONK( "done\n  Phase 2 (" ); 
    
    // Phase 2:
    for( sp=stack_base; sp <= current_stack_frame; sp++ ) {
@@ -685,21 +789,23 @@ static void compact(void)
             "Wrong header pointed to by sp->call_header" );
      sp->call_header = ToTrP( sp->call_header->link ) - delta;
    }
-   IFDID( BONK( "   stack\n" ); )
+   BONK( "stack, " );
    for( mp=smarks; mp<=smarks+topMark; mp++ ) {
      int flag = TP_GET_FLAGS( mp->tr->link );
-     unsigned addr = mp->tr->i_addr;
-     if( flag!=TPT_OPEN && flag!=TPT_REG_OR_CLOSED_LIVE && (flag!=TPT_RET_LIVE || addr) ) 
+     InstrInfo *i_info = mp->tr->i_info;
+     if( flag!=TPT_OPEN && 
+         flag!=TPT_REG_OR_CLOSED_LIVE && 
+         (flag!=TPT_RET_LIVE || i_info!=NULL) ) 
      { 
         mp->tr = mp==smarks ? trace_pile : (mp-1)->tr;
-     } else if( flag==TPT_RET_LIVE && addr==0 ) {
+     } else if( flag==TPT_RET_LIVE && i_info==NULL ) {
         TraceRec * header = ToTrP( mp->tr->link );
         mp->tr = ToTrP( header->link ) - delta + 1;
      } else {
         mp->tr = ToTrP( mp->tr->link ) - delta;
      }
    }
-   IFDID( BONK( "   stack marks\n" ); )
+   BONK( "marks, " );
    for( i=0; i<FRAGS_IN_MAP; i++ ) {
      if( map[i] != NULL ) {
        for( j=0; j<REFS_PER_FRAG; j++ ) {
@@ -710,18 +816,18 @@ static void compact(void)
      }
    }
 
-   IFDID( BONK( "Phase 2\n" ); )
+   BONK( "map)\n  Phase 3... " ); 
    
    // Phase 3:
    tp = last_trace_rec;
    while( tp >= trace_pile ) {
-      if( tp->i_addr != 0 ) {
+      if( tp->i_info != NULL ) {
         switch( TP_GET_FLAGS( tp->link ) ) {
           // Dead trace recs
           case TPT_REG:
           case TPT_CLOSED:
             tp->link = mkTaggedPtr2( tp+1, TPT_BRIDGE );
-            tp->i_addr = 0;
+            tp->i_info = NULL;
             break;
 
           // Open header
@@ -746,7 +852,7 @@ static void compact(void)
         check( h_ptr < tp, "TPT_RET_LIVE pointing up in phase 3" );
         if( h_ptr+1 != tp ) {
           h_ptr[1].link = mkTaggedPtr2( tp, TPT_BRIDGE );
-          h_ptr[1].i_addr = 0;
+          h_ptr[1].i_info = NULL;
         }
         h_ptr->link = mkTaggedPtr2( NULL, TPT_CLOSED );
         tp = h_ptr;
@@ -754,7 +860,7 @@ static void compact(void)
       tp--;
    }
 
-   IFDID( BONK( "Phase 3\n" ); )
+   BONK( "done\n  Phase 4... " ); 
    
    // Phase 4:
    tp = trace_pile;
@@ -763,12 +869,12 @@ static void compact(void)
    last_closed=NULL;
    sp = stack_base;
    while( tp <= last_trace_rec ) {
-      if( tp->i_addr != 0 ) {
+      if( tp->i_info != NULL ) {
         switch( TP_GET_FLAGS( tp->link ) ) {
           // Regular trace rec
           case TPT_REG:
             ap->link = mkTaggedPtr2( last_open, TPT_REG );
-            ap->i_addr = tp->i_addr;
+            ap->i_info = tp->i_info;
             ap++;
             break;
 
@@ -777,7 +883,7 @@ static void compact(void)
             check( last_closed == NULL, "Two TPT_CLOSED with no TPT_RET" );
             last_closed = ap;
             ap->link = mkTaggedPtr2( last_open, TPT_CLOSED );
-            ap->i_addr = tp->i_addr;
+            ap->i_info = tp->i_info;
             ap++;
             break;
 
@@ -785,8 +891,8 @@ static void compact(void)
           case TPT_OPEN:
             check( last_closed == NULL, "TPT_OPEN between TPT_CLOSED and TPT_RET" );
             last_open = ap;
-            ap->link = mkTaggedPtr2( sp->call_header, TPT_OPEN );
-            ap->i_addr = tp->i_addr;
+            ap->link = mkTaggedPtr2( sp, TPT_OPEN );
+            ap->i_info = tp->i_info;
             ap++;
             sp++;
             break;
@@ -803,7 +909,7 @@ static void compact(void)
           case TPT_RET_LIVE:
             check( last_closed != NULL, "last_closed == NULL at TPT_RET_LIVE" );
             ap->link = mkTaggedPtr2( last_closed, TPT_RET );
-            ap->i_addr = 0;
+            ap->i_info = NULL;
             last_closed = NULL;
             ap++;
             tp++;
@@ -820,29 +926,83 @@ static void compact(void)
       }
    }
    last_trace_rec = ap-1;
-   IFDID( BONK( "Phase 4\n" ); )
+   BONK( "done\n" );
    
 }
 
-#define N_LEAST 1000000
+static void dump_trace_pile(void)
+{
+   TraceRec *rec;
+   char     *tag;
+   int       off,i_idx;
+
+   for( rec=trace_pile; rec <= last_trace_rec; rec++ ) {
+      if( rec->i_info != NULL ) {
+         switch( TP_GET_FLAGS( rec->link ) ) {
+            case TPT_REG:
+               tag = "REG   ";
+               off = ToTrP( rec->link ) - trace_pile;
+               break;
+            case TPT_OPEN:
+               tag = "OPEN  ";
+               off = ToStP( rec->link ) - stack_base;
+               break;
+            case TPT_CLOSED:
+               tag = "CLOSED";
+               off = ToTrP( rec->link ) - trace_pile;
+               break;
+            default:
+               tag = "FUNNY ";
+               off = ToTrP( rec->link ) - trace_pile;
+               break;
+         }
+         i_idx = rec->i_info == &dummy_instr_info ? -1 : rec->i_info - ii_chunk;
+         DPRINT3( "%s %d %d\n", tag, i_idx, off );
+      } else {
+         switch( TP_GET_FLAGS( rec->link ) ) {
+            case TPT_RET:
+               tag = "RET   ";
+               off = ToTrP( rec->link ) - trace_pile;
+               break;
+            default:
+               tag = "FUNNY ";
+               off = ToTrP( rec->link ) - trace_pile;
+               break;
+
+         }
+         DPRINT2( "%s %d\n", tag, off );
+      }
+   }
+}
+         
+
+#define N_LEAST 10000
 static unsigned n_live_last = N_LEAST, 
-                max_use = N_TRACE_RECS - 100000;
+                max_use = N_TRACE_RECS - 100000,
+                real_nll=0;
 
 static void gc(void) 
 {
    unsigned n_used = last_trace_rec - trace_pile;
 
-   if( n_used > max_use || n_used > 10 * n_live_last ) {
+   if( /* n_used-real_nll > 0 || */ n_used > max_use || n_used > 10 * n_live_last ) {
+      // dump_trace_pile( );
       did_gc++;
       DPRINT2("[ %llu  %u\n", instructions, n_used);
       compact( );
       n_live_last = last_trace_rec - trace_pile;
+      real_nll = n_live_last;
       DPRINT1("%u ]\n", n_live_last);
       if( n_live_last < N_LEAST ) {
          n_live_last = N_LEAST;
       }
+      // dump_trace_pile( );
    }
 }
+
+/*********************************
+ *  Result entry routines        *
+ *********************************/
 
 static const Char * makeTitle(const RTEntry * e)
 {
@@ -888,22 +1048,22 @@ static Int result_entry_compare(const RTEntry * e1, const RTEntry * e2)
 #undef tmp_compare_field
 }
 
-static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr, 
+/********************************
+ * Main getResultEntry routine  *
+ ********************************/
+
+static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
                                Event old_event,
                                Addr32 ref_addr)
 {
-   TraceRec *old_tr = ToTrP( old_event ),
-            *nca_tr = ToTrP( old_tr->link );
-   Addr32   h_addr, t_addr;
-   Char     h_file[FILE_LEN], h_fn[FN_LEN];
-   Char     t_file[FILE_LEN], t_fn[FN_LEN];
-   Int      h_ind, t_ind;
-   UInt     hash_value;
-   RTEntry  *rp;
-   Bool     h_hidden, t_hidden;
-   RTEntry    tmp_entry;
-
-   // IFDID( BONK("getResultEntry\n   looks for NCA\n"); );
+   TraceRec   *old_tr = ToTrP( old_event ),
+              *nca_tr = ToTrP( old_tr->link );
+   Addr32      h_addr, t_addr;
+   InstrInfo  *h_info, *t_info;
+   Int         h_ind, t_ind;
+   UInt        hash_value, h_code, t_code, r_code, code;
+   UInt        t_line;
+   RTEntry    *entry;
 
    // The tail (source) of the dependence is related to the old reference
    // The head (sink)   of the dependence is related to the new reference
@@ -914,95 +1074,86 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, Addr32 curr_addr,
    //     in nca, or
    //   the address of the call site in the nca
 
-   VG_(memset)(& tmp_entry, 0, sizeof(tmp_entry));
+   IFDID( BONK( "getResultEntry... " ); )
 
    while( TP_GET_FLAGS( nca_tr->link ) != TPT_OPEN ) { // tag 1 is open header
-       // IFDID( DPRINT3( "      nca_tr=%u, nca tag=%u, nca i_addr=%u\n", 
-       //                 nca_tr-trace_pile, 
-       //                 TP_GET_FLAGS( nca_tr->link ), nca_tr->i_addr ); );
        old_tr = nca_tr;
        nca_tr = ToTrP( nca_tr->link );
    }
    // nca_tr now points to call header for NCA
+   // old_tr now points to the relevant trace record in the NCA
 
-   // IFDID( DPRINT1("   found NCA, TR %u\n", nca_tr - trace_pile ); );
+   IFDID( DPRINT1( "nca=%u... ", nca_tr-trace_pile ); )
 
    t_ind = TP_GET_FLAGS( old_tr->link ) == TPT_CLOSED; // tag 2 is closed header
    h_ind = nca_tr != curr_ctx->call_header;
 
-   // IFDID( BONK("   found t_ind, h_ind\n" ); );
+   IFDID( BONK( "ind... " ); )
 
-   t_addr = old_tr->i_addr;
-   h_addr = h_ind ? ToStP( nca_tr->link )[1].call_header->i_addr : curr_addr;
+   t_info = old_tr->i_info;
+   IFDID( BONK( "t_info... " ); )
 
-   // IFDID( BONK("   found t_addr, h_addr\n" ); );
+   h_info = h_ind ? ToStP( nca_tr->link )[1].call_header->i_info : curr_info;
 
-   t_hidden = TP_GET_FLAG1( old_event );
-   h_hidden = curr_ctx->flags & SF_HIDDEN;
+   IFDID( BONK( "h_info... " ); )
 
-   // IFDID( BONK("   found t_hidden, h_hidden\n" ); );
+   t_addr = t_info->i_addr;
+   h_addr = h_info->i_addr;
 
-   // Now Lalle's code begins in earnest!
+   IFDID( BONK( "addr... " ); )
 
-   h_file[0] = '\0';
-   h_fn[0] = '\0';
-   getDebugInfo( h_addr, h_file, h_fn,
-		 & tmp_entry.h_line );
-   tmp_entry.h_file = VG_(malloc)(VG_(strlen)(h_file) + 1);
-   tl_assert(tmp_entry.h_file);
-   VG_(strcpy)(tmp_entry.h_file, h_file);
-
-   tmp_entry.h_fn = VG_(malloc)(VG_(strlen)(h_fn) + 1);
-   tl_assert(tmp_entry.h_fn);
-   VG_(strcpy)(tmp_entry.h_fn, h_fn);
-
-   getDebugInfo( t_addr, t_file, t_fn,
-		 & tmp_entry.t_line );
-
-   // Here is a mixture
+   t_code = TP_GET_FLAG1( old_event ) && t_ind ? DF_HIDDEN : t_ind;
+   h_code = curr_ctx->flags & SF_HIDDEN && h_ind ? DF_HIDDEN : h_ind;
 
    // Check if this is a false dependency due to stack aliasing (pop then push)
    // or if it is in the stack or if it is something else
 
-   if( opt.elim_stack_alias && 
-       ref_addr >= lowest_shadow_sp && ref_addr <= highest_shadow_sp
-       && ! inStack( ref_addr, old_tr ) ) {
-       // False aliasing due to stack pop then push 
-       tmp_entry.d_inf = 'f';
-   } else if( ref_addr >= lowest_shadow_sp && ref_addr <= highest_shadow_sp ) {
-       tmp_entry.d_inf = 's';
+   if( ref_addr >= lowest_shadow_sp && ref_addr <= highest_shadow_sp ) {
+      if( inStack( ref_addr, old_tr ) ) {
+         r_code = DF_STACK;
+      } else {
+         r_code = DF_FALSE;
+      }
    } else {
-       tmp_entry.d_inf = 'o';
+      r_code = DF_HEAP;
    }
 
-   // Check whether any of the references where made during a call from the 
-   // nca activation record or hidden
+   code = DF_MK_KEY( r_code, h_code, t_code );
 
-   tmp_entry.h_inf = !h_ind ? ' ' : (h_hidden ? 'h' : 'c');
-   tmp_entry.t_inf = !t_ind ? ' ' : (t_hidden ? 'h' : 'c');
+   // We now have all necessary info to look up the dependence
+   IFDID( BONK( "finding entry... " ); )
 
+   t_line = t_info->line->line;
+   hash_value = ( t_line + code ) & ( RT_ENTRIES_PER_LINE-1 );
+   entry = h_info->line->entries[hash_value];
 
-   hash_value = hash( makeTitle(& tmp_entry) );
+   IFDID( BONK( "chain... " ); )
 
-   // Walk the hash chain
-
-   for( rp = result_table[hash_value]; 
-        rp != NULL && result_entry_compare( rp, & tmp_entry ) != 0;
-       rp = rp->next )
-      ;
-   if( rp==NULL ) {
-       rp = (RTEntry *) VG_(calloc)( 1, sizeof(RTEntry) );
-       if( rp==NULL ) {
+   while( entry!=NULL && ( entry->t_line != t_line && entry->code != t_code ) ) {
+      entry = entry->next;
+   }
+   if( entry == NULL ) {
+       LineInfo *h_line_info = h_info->line;
+       entry = (RTEntry *) VG_(calloc)( 1, sizeof(RTEntry) );
+       if( entry==NULL ) {
            VG_(tool_panic)( "Out of memory" );
        }
-       * rp = tmp_entry;
-       rp->next = result_table[hash_value];
-       result_table[hash_value] = rp;
+       entry->h_file = h_line_info->file;
+       entry->h_fn   = h_line_info->func;
+       entry->code   = code;
+       entry->d_inf  = r_code == DF_STACK ? 's' : r_code == DF_FALSE ? 'f' : 'o';
+       entry->h_line = h_info->line->line;
+       entry->t_line = t_line;
+       entry->h_inf  = " ch"[h_code]; // maybe this is too slick
+       entry->t_inf  = " ch"[t_code];
+       entry->n_raw  = 0;
+       entry->n_war  = 0;
+       entry->n_waw  = 0;
+       entry->next = h_info->line->entries[hash_value];
+       h_info->line->entries[hash_value] = entry;
    }
-
-   // IFDID( BONK("... finished\n"); );
-
-   return rp;
+   IFDID( BONK( "done\n" ); )
+   return entry;
 
 }
    
@@ -1016,10 +1167,9 @@ static void em_post_clo_init(void)
    VG_(message)(Vg_UserMsg, "Initalising dependency profiling");
 
    map = (MapFragment **) VG_(calloc)(FRAGS_IN_MAP, sizeof(MapFragment*));
-   result_table = (RTEntry **) VG_(calloc)(RESULT_ENTRIES, sizeof(RTEntry *));
    trace_pile = (TraceRec *) VG_(calloc)( N_TRACE_RECS, sizeof( TraceRec ) );
 
-   if( map==NULL || result_table==NULL || trace_pile==NULL ) {
+   if( map==NULL || trace_pile==NULL ) {
        VG_(tool_panic)("Out of memory!");
    }
 
@@ -1028,10 +1178,10 @@ static void em_post_clo_init(void)
    smarks[0].sp = (Addr32) 0xffffffff;
    smarks[0].tr = trace_pile+1;
 
-   trace_pile[0].i_addr = 1;
+   trace_pile[0].i_info = &dummy_instr_info;
    trace_pile[0].link = mkTaggedPtr2(stack_base, TPT_OPEN);
 
-   trace_pile[1].i_addr = 1;
+   trace_pile[1].i_info = &dummy_instr_info;
    trace_pile[1].link = mkTaggedPtr2(trace_pile, TPT_REG);
 
    last_trace_rec = trace_pile+1;
@@ -1040,6 +1190,11 @@ static void em_post_clo_init(void)
    init_read_table( );
 
 }
+
+
+/***********************************
+ * Recording routines              *
+ ***********************************/
 
 static RefInfo* getRefInfo(Addr32 addr)
 {
@@ -1074,61 +1229,56 @@ static void adjust_shadow_sp(Addr32 sp)
 }
 
 static VG_REGPARM(3)
-void recordLoad(Addr32 pc, Addr32 addr, Addr32 sp)
+void recordLoad(InstrInfo *i_info, Addr32 addr, Addr32 sp)
 {
     RefInfo     *refp;
     RTEntry     *res_entry;
 
     adjust_shadow_sp( sp );
-    checkIfHidden( current_stack_frame, pc, 1 );
+    checkIfHidden( current_stack_frame, i_info->i_addr, 1 );
 
     refp = getRefInfo( addr );
 
     res_entry = getResultEntry( current_stack_frame,
-                                pc, 
+                                i_info, 
                                 refp->lastWrite, 
                                 addr );
     
     res_entry->n_raw++;
 
-    // DPRINT2("RAW: %s %u\n", res_entry->title, pc);
-
-    refp->lastRead = consEvent( newRegularEvent( current_stack_frame, pc ), 
+    refp->lastRead = consEvent( newRegularEvent( current_stack_frame, i_info ), 
                                 refp->lastRead );
 
     gc( );
 }
 
 static VG_REGPARM(3)
-void recordStore(Addr32 pc, Addr32 addr, Addr32 sp)
+void recordStore(InstrInfo *i_info, Addr32 addr, Addr32 sp)
 {
     RefInfo     *refp=getRefInfo( addr );
     RTEntry     *res_entry;
     EventList   *ev_list, *ev_next;
 
     adjust_shadow_sp( sp );
-    checkIfHidden( current_stack_frame, pc, 1 );
+    checkIfHidden( current_stack_frame, i_info->i_addr, 1 );
 
     // is it a WAR or a WAW?
     if( refp->lastRead == NULL ) {        // DONE !
         // last reference was a write: a WAW
         res_entry = getResultEntry( current_stack_frame,
-                                    pc, 
+                                    i_info, 
                                     refp->lastWrite, 
                                     addr );
         res_entry->n_waw++;
-
-        // DPRINT2("WAW: %s %u\n", res_entry->title, pc);
     } else {
         // last reference was a read: a WAR
         for( ev_list = refp->lastRead; ev_list != NULL; ev_list = ev_list->next ) {
             res_entry = getResultEntry( current_stack_frame,
-                                        pc, 
+                                        i_info, 
                                         ev_list->ev, 
                                         addr );
             res_entry->n_war++;
         }
-        // DPRINT2("WAR: %s %u\n", res_entry->title, pc);
     }
 
     // last reference is now a write
@@ -1139,17 +1289,18 @@ void recordStore(Addr32 pc, Addr32 addr, Addr32 sp)
         bumpCounter( &read_list_elements, -1, NULL, NULL );
     }
     refp->lastRead  = NULL;
-    refp->lastWrite = newRegularEvent( current_stack_frame, pc );
+    refp->lastWrite = newRegularEvent( current_stack_frame, i_info );
 
     gc( );
 
 }
 
 static VG_REGPARM(3)
-void recordCall(Addr32 sp, Addr32 ca, Addr32 ra) 
+void recordCall(Addr32 sp, InstrInfo *i_info) 
 {
     StackFrame * newFrame = current_stack_frame + 1;
-    TraceRec * newTR = newTraceRec( ca, mkTaggedPtr2( newFrame, TPT_OPEN ) );
+    Addr32 ca = i_info->i_addr, ra = ca + i_info->i_len;
+    TraceRec * newTR = newTraceRec( i_info, mkTaggedPtr2( newFrame, TPT_OPEN ) );
 
     if( newFrame==stack_base+N_STACK_FRAMES ) {
         VG_(tool_panic)("Out of memory!");
@@ -1160,11 +1311,9 @@ void recordCall(Addr32 sp, Addr32 ca, Addr32 ra)
 
     checkIfHidden( current_stack_frame, ca, 1 ); // no recheck!
 
-    // newFrame->parent      = current_stack_frame;
     newFrame->sp          = sp;
-    newFrame->call_addr   = ca;
+    // newFrame->call_addr   = ca;
     newFrame->ret_addr    = ra;
-    // newFrame->seq         = instructions;
     newFrame->flags       = 0;
     newFrame->call_header = newTR;
     newFrame->stack_mark  = smarks+topMark;
@@ -1233,38 +1382,60 @@ void recordRet(Addr32 sp, Addr32 target)
 }
 
 
-static void instrumentLoad( IRBB *bbOut, Addr32 pc, IRExpr *exp_addr )
+//
+// Utility functions for emitting assignments and dirty helper calls
+//
+
+static IRExpr* emitIRAssign(IRBB *bbOut, IRExpr *exp)
 {
-    HChar *hname = "recordLoad";
-    void  *haddr = &recordLoad;
+    IRTemp t = newIRTemp( bbOut->tyenv, Ity_I32 );
+    addStmtToIRBB( bbOut, IRStmt_Tmp( t, exp ) );
+    return IRExpr_Tmp( t );
+}
 
-    IRTemp tmp_sp = newIRTemp( bbOut->tyenv, Ity_I32 );
-    IRExpr *exp_sp = IRExpr_Tmp( tmp_sp );
-    IRExpr *exp_get_sp = IRExpr_Get( OFFSET_x86_ESP, Ity_I32 );
-
-    IRExpr *exp_pc = IRExpr_Const( IRConst_U32( pc ) );
-    IRExpr **args = mkIRExprVec_3( exp_pc, exp_addr, exp_sp );
-    IRDirty *dy = unsafeIRDirty_0_N( 3, hname, haddr, args );
-
-    addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_sp, exp_get_sp ) );
+static void emitDC_1(IRBB *bbOut, HChar *hname, void *haddr, IRExpr *exp1)
+{
+    IRExpr **args = mkIRExprVec_1( exp1 );
+    IRDirty *dy = unsafeIRDirty_0_N( 1, hname, haddr, args );
     addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
 }
 
-static void instrumentStore( IRBB *bbOut, Addr32 pc, IRExpr *exp_addr )
+static void emitDC_2(IRBB *bbOut, HChar *hname, void *haddr, IRExpr *exp1, IRExpr *exp2)
 {
-    HChar *hname = "recordStore";
-    void  *haddr = &recordStore;
-
-    IRTemp tmp_sp = newIRTemp( bbOut->tyenv, Ity_I32 );
-    IRExpr *exp_sp = IRExpr_Tmp( tmp_sp );
-    IRExpr *exp_get_sp = IRExpr_Get( OFFSET_x86_ESP, Ity_I32 );
-
-    IRExpr *exp_pc = IRExpr_Const( IRConst_U32( pc ) );
-    IRExpr **args = mkIRExprVec_3( exp_pc, exp_addr, exp_sp );
-    IRDirty *dy = unsafeIRDirty_0_N( 3, hname, haddr, args );
-
-    addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_sp, exp_get_sp ) );
+    IRExpr **args = mkIRExprVec_2( exp1, exp2 );
+    IRDirty *dy = unsafeIRDirty_0_N( 2, hname, haddr, args );
     addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
+}
+
+static void emitDC_3(IRBB *bbOut, HChar *hname, void *haddr, IRExpr *exp1, IRExpr *exp2,
+                     IRExpr *exp3)
+{
+    IRExpr **args = mkIRExprVec_3( exp1, exp2, exp3 );
+    IRDirty *dy = unsafeIRDirty_0_N( 3, hname, haddr, args );
+    addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
+}
+
+static IRExpr* const32( unsigned val )
+{
+    return IRExpr_Const( IRConst_U32( val ) );
+}
+
+//
+// Code instrumentation functions
+//
+
+static void instrumentLoad( IRBB *bbOut, InstrInfo *i_info, IRExpr *exp_addr )
+{
+    IRExpr *exp_sp = emitIRAssign( bbOut, IRExpr_Get( OFFSET_x86_ESP, Ity_I32 ) );
+    IRExpr *exp_ii = const32( (UInt) i_info );
+    emitDC_3( bbOut, "recordLoad", &recordLoad, exp_ii, exp_addr, exp_sp );
+}
+
+static void instrumentStore( IRBB *bbOut, InstrInfo *i_info, IRExpr *exp_addr )
+{
+    IRExpr *exp_sp = emitIRAssign( bbOut, IRExpr_Get( OFFSET_x86_ESP, Ity_I32 ) );
+    IRExpr *exp_ii = const32( (UInt) i_info );
+    emitDC_3( bbOut, "recordStore", &recordStore, exp_ii, exp_addr, exp_sp );
 }
 
 
@@ -1306,7 +1477,7 @@ static void emitSpChange(IRBB *bbOut)
 // instrumentExit is called when we find and Exit in the block AND for the
 // implicit Exit at the end of each block
 
-static void instrumentExit(IRBB *bbOut, IRJumpKind jk, Addr32 pc, Int len, IRExpr *tgt,
+static void instrumentExit(IRBB *bbOut, IRJumpKind jk, InstrInfo *i_info, IRExpr *tgt,
                            unsigned int loc_instr)
 {
     switch( jk ) {
@@ -1315,16 +1486,8 @@ static void instrumentExit(IRBB *bbOut, IRJumpKind jk, Addr32 pc, Int len, IRExp
           {
              HChar *hname = "recordCall";
              void  *haddr = &recordCall;
-             IRTemp tmp_sp = newIRTemp(bbOut->tyenv, Ity_I32);
-             IRExpr *exp_sp = IRExpr_Tmp( tmp_sp );
-             IRExpr *exp_ca = IRExpr_Const( IRConst_U32( pc ) );
-             IRExpr *exp_ra = IRExpr_Const( IRConst_U32( pc+len ) );
-             IRExpr *exp_get_sp = IRExpr_Get( OFFSET_x86_ESP, Ity_I32 );
-             IRExpr **args = mkIRExprVec_3( exp_sp, exp_ca, exp_ra );
-             IRDirty *dy = unsafeIRDirty_0_N( 3, hname, haddr, args );
-
-             addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_sp, exp_get_sp ) );
-             addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
+             IRExpr *exp_sp = emitIRAssign( bbOut, IRExpr_Get(OFFSET_x86_ESP, Ity_I32) );
+             emitDC_2( bbOut, hname, haddr, exp_sp, const32( (UInt) i_info ) );
           }
           break;
 
@@ -1366,6 +1529,7 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
     Addr32    guestIAddr = 0;
     Int       guestILen  = 0;
     unsigned int loc_instr = 0;
+    InstrInfo *currII;
 
     translations++;
 
@@ -1387,9 +1551,11 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
              loc_instr++;
              emitIncrementGlobal( bbOut, &instructions, loc_instr );
              loc_instr = 0;
+             currII = NULL;
              break;
          case Ist_Exit: 
-	     instrumentExit( bbOut, stIn->Ist.Exit.jk, guestIAddr, guestILen, 
+             currII = mk_i_info( currII, guestIAddr, guestILen );
+	     instrumentExit( bbOut, stIn->Ist.Exit.jk, currII, 
                              IRExpr_Const( stIn->Ist.Exit.dst ), loc_instr );
              break;
 
@@ -1405,12 +1571,14 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
              // This is an assignment to a temp, so it should be instrumented
              // if the rhs is a Load
              if( stIn->Ist.Tmp.data->tag == Iex_Load ) {
-                 instrumentLoad( bbOut, guestIAddr, stIn->Ist.Tmp.data->Iex.Load.addr );
+                 currII = mk_i_info( currII, guestIAddr, guestILen );
+                 instrumentLoad( bbOut, currII, stIn->Ist.Tmp.data->Iex.Load.addr );
              }
              break;
          case Ist_Store:
              // This is a store instruction, so it should be instrumented
-             instrumentStore( bbOut, guestIAddr, stIn->Ist.Store.addr );
+             currII = mk_i_info( currII, guestIAddr, guestILen );
+             instrumentStore( bbOut, currII, stIn->Ist.Store.addr );
              break;
          case Ist_Dirty:
              // This should maybe be instrumented, but we'll leave it for later
@@ -1424,14 +1592,14 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
        }
        addStmtToIRBB( bbOut, stIn );
     }
-
-    instrumentExit( bbOut, bbIn->jumpkind, guestIAddr, guestILen, bbIn->next, loc_instr );
+    currII = mk_i_info( currII, guestIAddr, guestILen );
+    instrumentExit( bbOut, bbIn->jumpkind, currII, bbIn->next, loc_instr );
     return bbOut;
 }
 
 static void printResultTable(const Char * traceFileName)
 {
-   int      i;
+  int      i,j;
    RTEntry *entry;
    SizeT results_buf_size = 100;
    RTEntry * result_array = VG_(malloc)(sizeof(RTEntry) * results_buf_size);
@@ -1439,21 +1607,23 @@ static void printResultTable(const Char * traceFileName)
    int fd = -1;
 
    tl_assert(result_array);
-   for( i=0; i<RESULT_ENTRIES; i++ )
-     for( entry=result_table[i]; entry != NULL; entry=entry->next )
-       if ((VG_(strcmp)(entry->h_file, "???") != 0) &&
-	   (VG_(strcmp)(entry->h_fn, "???") != 0))
-       {
-	 ++num_results;
-	 if (num_results >= results_buf_size)
-	 {
-	   results_buf_size *= 2;
-	   result_array = VG_(realloc)(result_array,
-				       sizeof(RTEntry) * results_buf_size);
-	   tl_assert(result_array);
-	 }
-	 result_array[num_results - 1] = * entry;
-       }
+   for( i=0; i<RESULT_ENTRIES; i++ ) 
+     if( line_table[i] != NULL )
+       for( j=0; j<RT_ENTRIES_PER_LINE; j++ )
+         for( entry=line_table[i]->entries[j]; entry != NULL; entry=entry->next )
+           if ((VG_(strcmp)(entry->h_file, "???") != 0) &&
+	       (VG_(strcmp)(entry->h_fn, "???") != 0))
+           {
+             ++num_results;
+             if (num_results >= results_buf_size)
+             {
+               results_buf_size *= 2;
+               result_array = VG_(realloc)(result_array,
+                                           sizeof(RTEntry) * results_buf_size);
+               tl_assert(result_array);
+             }
+             result_array[num_results - 1] = * entry;
+           }
 
    VG_(ssort)((void *) result_array, num_results, sizeof(RTEntry),
 	      (Int (*)(void *, void *)) result_entry_compare);
