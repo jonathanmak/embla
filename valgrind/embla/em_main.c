@@ -68,7 +68,7 @@
 #define  GET_FRAG_PTR(m,a)   m[a>>BITS_PER_FRAG]
 #define  GET_REF_ADDR(fp,a)  ( &( fp->refs[(a&FRAG_MASK) >> BITS_PER_REF] ) )
 
-#ifdef DEBUG
+#ifndef GURKA
 
 #define  BONK(s) VG_(write)( 2, s, VG_(strlen)( s ) )
 #define  DPRINT1(s,x)     { VG_(sprintf)( dbuf, s, x );       BONK( dbuf ); }
@@ -282,7 +282,7 @@ static TraceRec * newTraceRec(InstrInfo *i_info, TaggedPtr link)
 {
    n_calls_to_newTR++;
    if( last_trace_rec >= trace_pile + N_TRACE_RECS ) {
-       DPRINT1( "Bailing out after %u calls\n", n_calls_to_newTR );
+     // DPRINT1( "Bailing out after %u calls\n", n_calls_to_newTR );
        VG_(tool_panic)( "Trace pile overflow" );
    }
    last_trace_rec++;
@@ -422,9 +422,12 @@ typedef struct _StringEntry {
 
 static StringEntry *string_table[RESULT_ENTRIES];
 
+static char* questions;
+
 static char *intern_string( char *str )
 {
-   StringEntry * entry = string_table[ hash( str ) ];
+   StringEntry **entry_p = string_table + hash( str ),
+                *entry   = *entry_p;
 
    while( entry != NULL && VG_(strcmp)( str, entry->str ) ) {
       entry = entry->next;
@@ -435,6 +438,8 @@ static char *intern_string( char *str )
       entry->str = (char *) VG_(calloc)( VG_(strlen)( str ) + 1, sizeof( char ) );
       check( entry->str != NULL, "Out of memory" );
       VG_(strcpy)( entry->str, str );
+      entry->next = *entry_p;
+      *entry_p = entry;
    }
    return entry->str;
 }
@@ -737,7 +742,7 @@ static void compact(void)
    // Phase 4: Relocate live trace recs. Forwards
 
    // Phase 1:
-   BONK( "  Phase 1... " );
+   // BONK( "  Phase 1... " );
    tp = last_trace_rec;
    ap = last_trace_rec;
    sp = current_stack_frame;
@@ -781,7 +786,7 @@ static void compact(void)
    }
    delta = ap + 1 - trace_pile;
 
-   BONK( "done\n  Phase 2 (" ); 
+   // BONK( "done\n  Phase 2 (" ); 
    
    // Phase 2:
    for( sp=stack_base; sp <= current_stack_frame; sp++ ) {
@@ -789,7 +794,7 @@ static void compact(void)
             "Wrong header pointed to by sp->call_header" );
      sp->call_header = ToTrP( sp->call_header->link ) - delta;
    }
-   BONK( "stack, " );
+   // BONK( "stack, " );
    for( mp=smarks; mp<=smarks+topMark; mp++ ) {
      int flag = TP_GET_FLAGS( mp->tr->link );
      InstrInfo *i_info = mp->tr->i_info;
@@ -805,7 +810,7 @@ static void compact(void)
         mp->tr = ToTrP( mp->tr->link ) - delta;
      }
    }
-   BONK( "marks, " );
+   // BONK( "marks, " );
    for( i=0; i<FRAGS_IN_MAP; i++ ) {
      if( map[i] != NULL ) {
        for( j=0; j<REFS_PER_FRAG; j++ ) {
@@ -816,7 +821,7 @@ static void compact(void)
      }
    }
 
-   BONK( "map)\n  Phase 3... " ); 
+   // BONK( "map)\n  Phase 3... " ); 
    
    // Phase 3:
    tp = last_trace_rec;
@@ -860,7 +865,7 @@ static void compact(void)
       tp--;
    }
 
-   BONK( "done\n  Phase 4... " ); 
+   // BONK( "done\n  Phase 4... " ); 
    
    // Phase 4:
    tp = trace_pile;
@@ -926,7 +931,7 @@ static void compact(void)
       }
    }
    last_trace_rec = ap-1;
-   BONK( "done\n" );
+   // BONK( "done\n" );
    
 }
 
@@ -937,6 +942,7 @@ static void dump_trace_pile(void)
    int       off,i_idx;
 
    for( rec=trace_pile; rec <= last_trace_rec; rec++ ) {
+      DPRINT1( "%u: ", rec - trace_pile );
       if( rec->i_info != NULL ) {
          switch( TP_GET_FLAGS( rec->link ) ) {
             case TPT_REG:
@@ -957,7 +963,8 @@ static void dump_trace_pile(void)
                break;
          }
          i_idx = rec->i_info == &dummy_instr_info ? -1 : rec->i_info - ii_chunk;
-         DPRINT3( "%s %d %d\n", tag, i_idx, off );
+         DPRINT2( "%s %d", tag, i_idx );
+         DPRINT3( "(%s %d) %d\n", rec->i_info->line->file, rec->i_info->line->line, off );
       } else {
          switch( TP_GET_FLAGS( rec->link ) ) {
             case TPT_RET:
@@ -976,7 +983,7 @@ static void dump_trace_pile(void)
 }
          
 
-#define N_LEAST 10000
+#define N_LEAST 1000000
 static unsigned n_live_last = N_LEAST, 
                 max_use = N_TRACE_RECS - 100000,
                 real_nll=0;
@@ -985,17 +992,19 @@ static void gc(void)
 {
    unsigned n_used = last_trace_rec - trace_pile;
 
-   if( /* n_used-real_nll > 0 || */ n_used > max_use || n_used > 10 * n_live_last ) {
+   if( /* n_used-real_nll > 200 || */ n_used > max_use || n_used > 10 * n_live_last ) {
+      // DPRINT1( "\n\n%d\n", did_gc );
       // dump_trace_pile( );
       did_gc++;
-      DPRINT2("[ %llu  %u\n", instructions, n_used);
+      // DPRINT2("[ %llu  %u\n", instructions, n_used);
       compact( );
       n_live_last = last_trace_rec - trace_pile;
       real_nll = n_live_last;
-      DPRINT1("%u ]\n", n_live_last);
+      // DPRINT1("%u ]\n", n_live_last);
       if( n_live_last < N_LEAST ) {
          n_live_last = N_LEAST;
       }
+      // BONK( "\n" );
       // dump_trace_pile( );
    }
 }
@@ -1074,7 +1083,12 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
    //     in nca, or
    //   the address of the call site in the nca
 
-   IFDID( BONK( "getResultEntry... " ); )
+   // IFDID( BONK( "getResultEntry... " ); )
+
+   // DPRINT1( "%u ", last_trace_rec - trace_pile + 1 );
+   // DPRINT2( "curr: %s:%d ", curr_info->line->file, curr_info->line->line );
+   // DPRINT1( "ref: %u ", (unsigned) ref_addr );
+   // DPRINT2( "old: %s:%d ", old_tr->i_info->line->file, old_tr->i_info->line->line );
 
    while( TP_GET_FLAGS( nca_tr->link ) != TPT_OPEN ) { // tag 1 is open header
        old_tr = nca_tr;
@@ -1083,24 +1097,25 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
    // nca_tr now points to call header for NCA
    // old_tr now points to the relevant trace record in the NCA
 
-   IFDID( DPRINT1( "nca=%u... ", nca_tr-trace_pile ); )
+   // DPRINT1( "nca: %u ", nca_tr-trace_pile );
+   // DPRINT2( "%s:%d ", nca_tr->i_info->line->file, nca_tr->i_info->line->line ); 
 
    t_ind = TP_GET_FLAGS( old_tr->link ) == TPT_CLOSED; // tag 2 is closed header
    h_ind = nca_tr != curr_ctx->call_header;
 
-   IFDID( BONK( "ind... " ); )
+   // IFDID( BONK( "ind... " ); )
 
    t_info = old_tr->i_info;
-   IFDID( BONK( "t_info... " ); )
+   // IFDID( BONK( "t_info... " ); )
 
    h_info = h_ind ? ToStP( nca_tr->link )[1].call_header->i_info : curr_info;
 
-   IFDID( BONK( "h_info... " ); )
+   // IFDID( BONK( "h_info... " ); )
 
    t_addr = t_info->i_addr;
    h_addr = h_info->i_addr;
 
-   IFDID( BONK( "addr... " ); )
+   // IFDID( BONK( "addr... " ); )
 
    t_code = TP_GET_FLAG1( old_event ) && t_ind ? DF_HIDDEN : t_ind;
    h_code = curr_ctx->flags & SF_HIDDEN && h_ind ? DF_HIDDEN : h_ind;
@@ -1121,15 +1136,15 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
    code = DF_MK_KEY( r_code, h_code, t_code );
 
    // We now have all necessary info to look up the dependence
-   IFDID( BONK( "finding entry... " ); )
+   // IFDID( BONK( "finding entry... " ); )
 
    t_line = t_info->line->line;
    hash_value = ( t_line + code ) & ( RT_ENTRIES_PER_LINE-1 );
    entry = h_info->line->entries[hash_value];
 
-   IFDID( BONK( "chain... " ); )
+   // IFDID( BONK( "chain... " ); )
 
-   while( entry!=NULL && ( entry->t_line != t_line && entry->code != t_code ) ) {
+   while( entry!=NULL && ( entry->t_line != t_line || entry->code != code ) ) {
       entry = entry->next;
    }
    if( entry == NULL ) {
@@ -1152,7 +1167,13 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
        entry->next = h_info->line->entries[hash_value];
        h_info->line->entries[hash_value] = entry;
    }
-   IFDID( BONK( "done\n" ); )
+   // BONK( makeTitle( entry ) );
+   // if( h_info->line->file != t_info->line->file ||
+   //     h_info->line->func != t_info->line->func ) {
+   //     DPRINT2( "<%u,%u>", h_info->line->file, t_info->line->file );
+   //     DPRINT2( "<%u,%u>", h_info->line->func, t_info->line->func );
+   // }
+   // BONK( "\n" );
    return entry;
 
 }
@@ -1174,6 +1195,10 @@ static void em_post_clo_init(void)
    }
 
    opt.elim_stack_alias = 1;
+
+   questions = intern_string( "???" );
+   dummy_line_info.file = questions;
+   dummy_line_info.func = questions;
 
    smarks[0].sp = (Addr32) 0xffffffff;
    smarks[0].tr = trace_pile+1;
@@ -1614,6 +1639,7 @@ static void printResultTable(const Char * traceFileName)
            if ((VG_(strcmp)(entry->h_file, "???") != 0) &&
 	       (VG_(strcmp)(entry->h_fn, "???") != 0))
            {
+             // DPRINT1( "%s\n", ( makeTitle( entry ) ) );
              ++num_results;
              if (num_results >= results_buf_size)
              {
@@ -1656,6 +1682,7 @@ static void printResultTable(const Char * traceFileName)
 
 static void em_fini(Int exitcode)
 {
+
    VG_(message)(Vg_UserMsg, "Dependency trace has finished, storing in %s",
 		trace_file_name);
    printResultTable( trace_file_name );
