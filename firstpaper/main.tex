@@ -1,43 +1,41 @@
-\documentclass{acm_proc_article-sp}
+% Stuff from SPAA Latex template
+\documentclass[11pt]{article}
+
+% American letter size:
+\textwidth6.5in \textheight9in \oddsidemargin 0pt \evensidemargin 0pt
+\topmargin -47pt
+\usepackage{times}
+% End if SPAA template stuff.
 
 \usepackage{epic}
 \usepackage{color}
 \usepackage{verbdef}
 \usepackage{alltt}
 
-\begin{document}
-
-\title{Embla -- a Tool for Dependency Profiling}
-\numberofauthors{3}
-\author{
-\alignauthor Karl-Filip Fax\'en\\
-       \affaddr{Swedish Institute of Computer Science}\\
-       \affaddr{Box 1263}\\
-       \affaddr{SE-164 29 Kista}\\
-       \affaddr{Sweden}\\
-       \email{kff@sics.se}
-\alignauthor Lars Albertsson\\
-       \affaddr{Swedish Institute of Computer Science}\\
-       \affaddr{Box 1263}\\
-       \affaddr{SE-164 29 Kista}\\
-       \affaddr{Sweden}\\
-       \email{lalle@sics.se}
-\alignauthor Konstantin Popov\\
-       \affaddr{Swedish Institute of Computer Science}\\
-       \affaddr{Box 1263}\\
-       \affaddr{SE-164 29 Kista}\\
-       \affaddr{Sweden}\\
-       \email{kost@sics.se}
-}
-\date{\today}
-\maketitle
-
 \newcommand{\comment}[1]{\textit{[ #1 ]}}
 \newenvironment{comment_env}
   {\begin{itshape}}
   {\end{itshape}}
 
+\begin{document}
+
+\begin{titlepage}
+
+\title{Embla -- a Tool for Dependency Profiling \\
+  \Large (Regular submission)}
+\author{Karl-Filip Fax\'en, Lars Albertsson, Konstantin Popov, Sverker Janson\\
+       Swedish Institute of Computer Science\\
+       Box 1263\\
+       SE-164 29 Kista\\
+       Sweden\\
+       \{kff,lalle,kost,sverker\}@sics.se}
+\date{}
+\maketitle
+\thispagestyle{empty}
+
 \input{abstract}
+\end{titlepage}
+
 \input{intro}
 \input{using}
 \input{impover}
@@ -46,7 +44,7 @@
 \input{related}
 \input{future}
 
-\bibliographystyle{abbrv}
+\bibliographystyle{plain}
 \bibliography{embib}
 
 \end{document}
