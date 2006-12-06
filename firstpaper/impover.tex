@@ -6,60 +6,6 @@
 \section{Overview of the Implementation of Embla}
 
 
-\begin{figure*}
-\small
-\hrulefill
-\[
-\begin{picture}(500,210)(-30,0)
-% The memory table
-\put(-30,30){\framebox(40,180)[t]{\ }}
-\put(-30,100){\line(1,0){40}}
-\put(-30,110){\line(1,0){40}}
-\put(-30,10){\makebox(60,10){The memory table}}
-% A block
-\put(10,110){\line(4,3){20}}
-\put(10,100){\line(4,-3){20}}
-\put(30,85){\framebox(40,40){\ }}
-\put(30,115){\line(1,0){40}}
-\put(30,115){\makebox(40,10){Last write}}
-\put(30,105){\makebox(40,10){Last reads}}
-\put(30,90){\makebox(40,10){\vdots}}
-% An event
-\put(70,125){\line(2,1){20}}
-\put(70,115){\line(2,-1){20}}
-\put(90,105){\framebox(40,30){\ }}
-\put(90,125){\line(1,0){40}}
-\put(90,115){\line(1,0){40}}
-\put(90,105){\makebox(40,10){Time}}
-\put(90,115){\makebox(40,10){Instr}}
-\put(90,125){\makebox(40,10){Context}}
-\put(130,130){\vector(1,-2){40}}
-% The activation tree
-% Level 0 (root)
-\put(270,180){\framebox(30,30)[tl]{\it 1}}
-% Level 1 (1 node)
-\put(235,130){\framebox(30,30)[tl]{\it 2}} \put(250,160){\vector(3,2){30}}
-\put(270,150){\makebox(50,10)[l]{\it NCA(4,7)}}
-% Level 2 (2 nodes)
-\put(190,80){\framebox(30,30)[tl]{\it 3}} \put(205,110){\vector(2,1){40}}
-\put(280,80){\framebox(30,30)[tl]{\it 6}} \put(295,110){\vector(-2,1){40}}
-% Level 3 (3 nodes)
-\put(170,30){\framebox(30,30)[tl]{\it 4}} \put(185,60){\vector(3,4){15}}
-\put(210,30){\framebox(30,30)[tl]{\it 5}} \put(225,60){\vector(-3,4){15}}
-\put(260,30){\framebox(30,30)[tl]{\it 7}} \put(275,60){\vector(3,4){15}}
-\put(295,50){\makebox(50,10)[l]{\it Current frame}}
-% caption
-\put(170,10){\makebox(80,10){The activation tree}}
-% The result table
-\put(360,30){\framebox(80,180){\ }}
-\put(360,10){\makebox(80,10){The result table}}
-
-\end{picture}
-\]
-\hrulefill
-\caption{The main Embla data structures}
-\label{fembladata}
-\end{figure*}
 
 \newcommand{\backlink}[3]
 {\begin{picture}(#1,#2)

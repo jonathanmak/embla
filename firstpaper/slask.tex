@@ -33,3 +33,200 @@
 \caption{The list program, annotated with the dependencies in {\tt main}.}
 \label{flist}
 \end{figure}
+
+
+---------------------------------------
+
+\begin{figure}
+\small
+\hrulefill
+\begin{alltt}
+#include <stdlib.h>
+#include <stdio.h>
+
+static void inc(int *p)
+\verb+{+
+   *p=*p+1;
+\verb+}+
+
+int main(int argc, char **argv)
+\verb+{+
+   int *q=NULL,n=0;
+
+   {\color{red}spawn} inc(&n);
+   q = (int*) malloc( sizeof(int) );
+   inc(q);
+   inc(q);
+   {\color{red}synch;}
+   printf( "%d\verb+\+n", *q+n );
+   q = (int*) malloc( sizeof(int) );
+   return q==NULL;
+\verb+}+
+\end{alltt}
+\hrulefill
+\caption{The first example parallelized.}
+\label{fparfirstex}
+\end{figure}
+
+What, then, does the graph in Figure~\ref{ffirstex} tell us about
+the available parallelism in the program? It tells us that 
+the call to {\tt inc} on line 15 is independent on lines 13, 14
+and 16. Consequently, it can be parallelized, and we show the
+result in Figure~\ref{fparfirstex} where we have again used the 
+Cilk primitives {\tt spawn} and {\tt synch}.
+
+\begin{figure} 
+\small
+\input{ex7.deplist}
+\caption{First example program with dependency list.}
+\label{ffirstexlist}
+\end{figure}
+
+\subsection{Digging deeper: the dependency list}
+
+The dependency graph we have discussed above is an abstracted form of
+the information provided by Embla. If the region of interest lacks
+dependencies we are done; in order to motivate the transformation
+shown in Figure~\ref{fparfirstex}, we only need the dependency
+graph. But if Embla discovers more dependencies than we had hoped, we
+might wish to see if we can transform the program to eliminate them.
+For that task, it is useful to have a more detailed look.
+
+Hence we now turn to Figure~\ref{ffirstexlist} where we see a
+graphical representation of the individual dependencies found by
+Embla. There are three major dimensions in which this plot gives more
+details:
+
+\paragraph*{All dependencies are shown} 
+
+Rather than giving a single arrow if there is more than one kind of
+dependence, every kind is shown individually. If there is both a flow
+and an anti dependence between a pair of lines, there are two arrows
+(one red and one green). There is however no example of this in the
+figure.
+
+Dependency lists also show {\em self dependencies}, where the source
+and target of the dependence is on the same line. in that case, no
+arrow is shown, only the two endpoint symbols. 
+
+\paragraph*{Characterization of dependence endpoints}
+
+% Each dependence corresponds to a pair of memory referencing 
+% instruction executions, referred to as the {\em dependence 
+% endpoints}. 
+The dependence endpoints are not always part of the function
+containing the dependence but may be part of a function called
+(indirectly) from the line indicated by the dependency arrow. For instance, the
+endpoints of the flow dependence from line 14 to line 16 in the
+example are part of the function {\tt inc}. This observation gives
+rise to the following three kinds of endpoints:
+\begin{description}
+\item[$\cdot\ $] 
+A small dot represents a {\em direct dependency endpoint}, an 
+instruction that is
+generated from the source code at the indicated line. 
+% Thus the 
+% instruction is part of the function or procedure containing the 
+% line.
+\item[$\circ\hskip-0.35em\cdot\ $]
+A dot in a circle represents an {\em indirect dependency endpoint},
+an instruction that is part of a function (procedure) that was 
+(transitively) invoked by a function (procedure) call at the indicated 
+line.
+\item[$\circ\ $]
+An unfilled circle represents a {\em weak dependecy endpoint},
+which is like an indirect endpoint but the function containing 
+the instruction is on a blacklist of functions which, 
+like {\tt malloc}, would not give rise to dependencies in the 
+parallelized program.
+\end{description}
+A dependency can have endpoints of different kind. For instance,
+function calls give rise to flow dependencies between the write of the
+argument and its subsequent read in the called function (seen in the
+second column from the right in Figure~\ref{ffirstexlist} for the
+calls on lines 14 through 18.
+
+\paragraph*{Data location}
+
+Another dimension that the dependency list shows is where in memory
+the location associated with the dependency is situated. Currently, we
+distinguish references to the stack from other references but a more
+fine-grained characterization is certainly possible.
+\begin{description}
+\item[$\downarrow\ $]
+An unadorned arrow represents a
+ {\em stack dependence} where the location has been a part of 
+the stack from the first reference to the second (inclusive).
+\item[$\bar{\downarrow}\ $]
+An arrow with a bar across represents a
+{\em heap dependence} where the location has never been part of the stack.
+\end{description}
+Dependencies where the data location has been part of the stack, then
+not part of the stack, then part of the stack again are filtered away
+
+
+------------------------------------------
+
+\begin{figure} 
+\small
+\input{ex6.deplist}
+\caption{The dependency list of quicksort}
+\label{fquickl}
+\end{figure}
+
+---------------------------------------------
+
+\begin{figure*}
+\small
+\hrulefill
+\[
+\begin{picture}(500,210)(-30,0)
+% The memory table
+\put(-30,30){\framebox(40,180)[t]{\ }}
+\put(-30,100){\line(1,0){40}}
+\put(-30,110){\line(1,0){40}}
+\put(-30,10){\makebox(60,10){The memory table}}
+% A block
+\put(10,110){\line(4,3){20}}
+\put(10,100){\line(4,-3){20}}
+\put(30,85){\framebox(40,40){\ }}
+\put(30,115){\line(1,0){40}}
+\put(30,115){\makebox(40,10){Last write}}
+\put(30,105){\makebox(40,10){Last reads}}
+\put(30,90){\makebox(40,10){\vdots}}
+% An event
+\put(70,125){\line(2,1){20}}
+\put(70,115){\line(2,-1){20}}
+\put(90,105){\framebox(40,30){\ }}
+\put(90,125){\line(1,0){40}}
+\put(90,115){\line(1,0){40}}
+\put(90,105){\makebox(40,10){Time}}
+\put(90,115){\makebox(40,10){Instr}}
+\put(90,125){\makebox(40,10){Context}}
+\put(130,130){\vector(1,-2){40}}
+% The activation tree
+% Level 0 (root)
+\put(270,180){\framebox(30,30)[tl]{\it 1}}
+% Level 1 (1 node)
+\put(235,130){\framebox(30,30)[tl]{\it 2}} \put(250,160){\vector(3,2){30}}
+\put(270,150){\makebox(50,10)[l]{\it NCA(4,7)}}
+% Level 2 (2 nodes)
+\put(190,80){\framebox(30,30)[tl]{\it 3}} \put(205,110){\vector(2,1){40}}
+\put(280,80){\framebox(30,30)[tl]{\it 6}} \put(295,110){\vector(-2,1){40}}
+% Level 3 (3 nodes)
+\put(170,30){\framebox(30,30)[tl]{\it 4}} \put(185,60){\vector(3,4){15}}
+\put(210,30){\framebox(30,30)[tl]{\it 5}} \put(225,60){\vector(-3,4){15}}
+\put(260,30){\framebox(30,30)[tl]{\it 7}} \put(275,60){\vector(3,4){15}}
+\put(295,50){\makebox(50,10)[l]{\it Current frame}}
+% caption
+\put(170,10){\makebox(80,10){The activation tree}}
+% The result table
+\put(360,30){\framebox(80,180){\ }}
+\put(360,10){\makebox(80,10){The result table}}
+
+\end{picture}
+\]
+\hrulefill
+\caption{The main Embla data structures}
+\label{fembladata}
+\end{figure*}
