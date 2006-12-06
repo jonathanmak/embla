@@ -5,10 +5,40 @@
 
 \section{Future Work}
 
-\comment{Measure time.  Combine with profiling.}
+Embla is a prototype demonstrator, and not yet a sophisticated tool.  We
+believe that there are many interesting research issues worht
+investigating, which could lead to improvements in the usability.  First,
+Embla needs a scalable technique for visualisating the results.  \latex
+illustrations work for illustrating the profiling data collected, but does
+not scale to large programs.  
 
-\comment{Combine data from multiple runs.}
+The current Embla implementation only presents all independent subgraphs it
+finds, and does not consider run-time performance at all.  Many of the
+independent subgraphs are short, and have little potential for speedup,
+however.  A more mature implementation could measure run-time performance
+of arcs in the data dependency graph.  evaluate the potential performance
+gain, and present the longest mutually independent subgraphs first.  In
+this case, it would be reasonable to use a table-based presentation,
+similar to traditional performance profilers.
 
-\comment{Independent paths crossing procedure boundaries.}
+The current implementation only presents mutually independent subgraphs
+that begin and end in the same procedure call.  There is an opportunity for
+finding more parallelism if Embla could also find and present independent
+subgraphs that begin and join in different procedures.  There are also
+cases where subgraphs are mutually independent, except for a few data
+interdependencies.  If these interdependencies can be removed or stem from
+data accesses that could be reordered without harm, as could be the case
+e.g. with log file accesses or transactions, the procedure calls can be
+parallelised anyway.  Hence, they could be presented by Embla, along with
+information on the dependencies.  It would also be beneficial to improve
+Embla in order to allow developers to specify data access patterns that
+should be ignored for dependency calculation.
 
-\comment{Top list with parallelisable paths.}
+Similarly to a traditional profiler, Embla collects information from a
+single execution on input data that is assumed to be representative.  When
+the developer judges whether it would be reasonable to parallelise
+procedure calls, however, he will want to consider whether there are other
+data dependencies when executing the program with other input data sets.
+Hence, it is desirable to make Embla aggregate data dependencies from
+multiple executions, and only present the subgraphs that have few or no
+interdependencies on all the executions.
