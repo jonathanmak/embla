@@ -4,3 +4,48 @@
 % expression.  Answer y.
 
 \section{Related Work}
+
+The fork-join parallelism has been recognized as a simple yet widely
+acceptable pattern for building efficient parallel applications, and used e.g. in
+Cilk~\cite{BJKLR96}, the Java fork/join framework~\cite{Lea00}, the
+Filaments package~\cite{LF00}, and {TAM}~-- a compiler-controlled
+threaded abstract machine~\cite{CGSE93,GSC95}. 
+
+Many years of research has been devoted to automatic parallelization
+by compilers utilizing static analysis techniques, yet the common
+consensus is that the goal is unattainable beyond certain limited
+well-specified areas such as loop parallelization in scientific
+computation. Static analysis techniques have been also tried for the
+closely related topic of data race in multithreaded programs
+(see~\cite{Rinard01,NAW06} for surveys), yet some
+authors~\cite{Rinard01} believe that this approach is too complex, and
+the ultimate way to control data races is to use augmented type systems
+that can eliminated them in the first place.
+
+General program transformation techniques developed for parallelizing
+compilers, such as variable renaming for elimination of anti- and
+output- dependencies (see e.g.~\cite{Bacon:1994:CompilerTransformation}
+for a survey), should be applicable within our approach.
+
+Our approach has certain similarity to on-the-fly data race detection
+systems (such as~\cite{MellorCrummey91,SBNSA97,HRY02}) that can be
+usable in certain contexts depending on the amount of synchronization
+through shared memory, and the amount of overhead caused by instrumentation that
+can be tolerated by a particular application.
+
+Thread-level speculation~\cite{PO03} and data-dependency
+speculation~\cite{RS01b} can be useful within our approach as they could
+allow to utilize parallelism that is present in the program not always
+but most of the time.
+
+We believe that our tool can contribute in the area of run-time
+parallization~\cite{Rauchwerger98}, if the results of profiling are used
+incrementally by a suitable run-time system controlling parallel
+execution of a program.
+
+TODO~-- STILL NOT COVERED IN THE TEXT?!!: Our approach that aggregates
+the dependencies between nodes in the activation tree (also known as the
+dynamic call tree) into dependencies between nodes in a calling context
+tree, thereby minimizing the amount of space for entries in the memory
+table needed to handle recursive programs, was inspired by work on
+efficient profiling systems by Ammons, Ball and Larus~\cite{ABL97}.

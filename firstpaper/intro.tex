@@ -6,15 +6,18 @@
 \section{Introduction}
 
 As wire delays and thermal problems have made improvements in clock
-frequency much more difficult to realize, and increased levels of
+frequency much more difficult to realize~\cite{KAB03}, and increased levels of
 instruction level parallelism faces problems of design complexity and
 control dependencies, improving microprocessor performance has come to
-depend increasingly on thread level parallelism. Multicore chips, also
-known as CMPs (chip multiprocessors) pack several processor cores on a
+depend increasingly on thread level parallelism~\cite{Sutter05}. Multicore chips, also
+known as CMPs (chip multiprocessors)~\cite{ONHWC96} pack several processor cores on a
 single die, typically with per core L1 caches but sharing the L2
 cache. Processor cores can also be multithreaded, executing
-instructions from several threads simultaneously. Collectively 
-these techniques can be referred to as {\em CMT} (chip multithreading).
+instructions from several threads simultaneously~\cite{TEL95}. Collectively 
+these techniques can be referred to as {\em CMT} (chip
+multithreading). Studies revealed a large amount of inherent parallelism
+in typical applications, which is however difficult to utilize just by
+superscalar/pipelined architectures~\cite{AS92}, thereby justifying CMT designs.
 
 From the point of view of the software, a CMT processor looks just
 like a traditional shared memory symmetric multiprocessor. In particular, a CMT
@@ -65,7 +68,7 @@ We can express this as
 where {\tt spawn} starts the call in parallel and {\tt sync} waits
 for all {\tt spawn}'d acivities to terminate (here we have borrowed 
 programming constructs from the Cilk programming language 
-\cite{frigo98implementation}).
+\cite{BJKLR96,frigo98implementation}).
 
 This style of parallelism can be implemented efficiently (as is done
 for instance in the Cilk language) and is easy to understand although
