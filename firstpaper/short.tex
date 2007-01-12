@@ -43,15 +43,518 @@ it is completely language independent.
 
 \end{abstract}
 
+% Intro start ---------------------
 
-\input{intro}
-\input{using}
-\input{algorithm}
-\input{impover}
-%\input{embla}
-\input{discussion}
-\input{related}
-\input{future}
+\section{Introduction}
+
+Parallel programming is no longer optional.  To enjoy continued
+performance gains with future generation multicore processors,
+application developers must parallelize all software, old and new
+\cite{TEL95,ONHWC96,KAB03,Sutter05}.  For scalable parallel
+performance, program execution must be divided into large numbers of
+independent tasks that can be scheduled on available cores and
+hardware threads by runtime systems, such as thread libraries and
+fork-join frameworks \cite{}.  For some classes of programs, automatic
+parallelization is feasible, but with the current state-of-the-art,
+most software requires manual parallelization \cite{}.  Our work
+adresses the problem of assisting developers in this process, by
+identifying the potential for parallelism in programs, and with
+providing efficient tool support for this task.  In this paper, we
+present a data dependence profiling approach to the parallelization
+problem, an efficient algorithm to project data dependencies onto
+relevant parts of the program code, and its implementation, the tool
+Embla.
+
+We will focus on parallelization by introducing procedure-level
+fork-join parallelism.  To a first approximation, this means executing
+procedure calls asynchronously.  Consider the program fragment below:
+\begin{alltt}
+   p();
+   q();
+   r();
+\end{alltt}
+Suppose that the calls to {\tt p()} and {\tt q()} are independent,
+i.e., that neither procedure call writes to a memory location that the
+other call accesses.  In this case, the call to {\tt p()} can be
+executed asynchronously, by a different thread, and in parallel with
+the call to {\tt q()}.  Suppose further that {\tt p()} and {\tt r()}
+are not independent, so {\tt r()} can not be executed until the call
+{\tt p()} is completed.  We can now rewrite the program as
+\begin{alltt}
+   spawn p();
+   q();
+   sync;
+   r();
+\end{alltt}
+where we assume the availability of constructs {\tt spawn} to start
+the call in parallel and {\tt sync} to wait for all {\tt spawn}'d
+acivities to terminate (cf. \cite{BJKLR96,frigo98implementation}).
+
+This style of parallelism can be implemented efficiently and is easy
+to understand.  In particular, as long as {\tt p()} and {\tt q()} are
+independent, the parallel program will produce identical results to
+the sequential version.  Therefore it is sufficient to understand
+(debug, verify, \ldots) the sequential program; everything except
+performance carries over to the parallel version.
+
+The price for this approach is that one must find independent
+procedure calls (program fragments, in general).  Thus there must be
+such calls in the code and the programmer must be able to determine
+that they are in fact independent.  The availability of independent
+calls in the program depends on the algorithms used and can be further
+limited by sequential programming artifacts (such as re-use of
+variables and sequential book-keeping in an otherwise parallelizable
+algorithm).  Data dependence information can potentially help
+indentify and remove such obstacles to parallel execution, but this
+will not be further discussed here.
+
+Parallelizing compilers mostly target loop parallelization based on
+static data dependence analysis methods \cite{}.  Such analysers must
+by necessity be conservative.  Since they are static, they must use
+approximations which are always safe.  Good precision comes at a high
+computational cost, especially when analysing large programs.
+Analysing more general code, e.g., with pointers, remains a major
+challenge \cite{}.  Consequently, it has proved difficult to
+parallelize programs automatically in practice, and most production
+codes are written in an explicitly parallel way.
+
+In contrast, Embla
+observes the actual data dependencies that occur during program
+execution, project them onto relevant program parts, and interpret the
+lack of a runtime data dependence as an indication that the program
+parts involved are likely, but not guaranteed, to be independent.
+
+
+As in program testing, developers will be responsible for selecting
+program inputs that generate representative program executions with
+good coverage.
+
+% End intro --------------------
+
+% Begin using -----------------
+
+\section{Using Embla}
+
+\begin{figure} 
+\small
+\input{ex7.depgraph}
+\caption{Example program with dependency graph} \label{ffirstex}
+\end{figure}
+
+To get a feeling for what dependency profiling is and what Embla can do, 
+let us turn to the admittedly contrieved program in Figure~\ref{ffirstex}. 
+
+In Figure~\ref{ffirstex} we see, from 
+left to right, line numbers, colored data dependency arrows and source 
+lines. 
+
+The presence of a data dependency arrow between a pair of lines indicates
+that Embla has found one or more data dependencies between them
+(Embla does not find control dependencies). A data dependence is a pair
+of references, not both reads, to overlapping memory
+locations with no interveaning write. We will refer to these
+references as the {\em endpoints} of the dependence.
+For instance, in the figure, 
+there is a (red) arrow from line 13 to line 14 corresponding to
+the assignment to {\tt q} (the {\em early} endpoint) followed by its use 
+as an argument in {\tt inc(q)} (the {\em late} endpoint).
+
+Depending on whether the two endpoints of a dependence
+are reads or writes, data dependencies are typically divided into 
+three classes:
+\begin{description}
+\item[Flow:]
+A true data dependency where the location is first written then
+read. Also known as {\em read after write} (RAW). Shown in 
+{\bf \color{red} red} in the figure.
+\item[Anti:]
+A dependence caused by reuse of a location that is first read and then
+written. Also known as {\em write after read} (WAR). Shown in 
+{\bf \color{green} green} in the figure.
+\item[Output:]
+Similar to an anti dependence, but the second reference is also a
+write. Also known as {\em write after write} (WAW). Shown in 
+{\bf \color{blue} blue} in the figure.
+\end{description}
+If there are multiple dependencies of different class between the 
+same pair of lines, the color selection is prioritized in the
+order the dependencies are presented above. That is, if there is
+some flow dependence, the arrow is red, and so on. 
+We show dependencies in different colors since there are program
+transformations that in some cases can be used to eliminate 
+dependencies, and in this way Embla can give the user a hint as 
+to where this might be possible.
+
+For each of the dependency arrows in the figure that 
+we have dicussed up to now, the endpoints have been part of the 
+code for {\tt main}
+itself. Embla also tracks references made in function calls. For
+instance, there is a (red) flow dependence from line 14 to line 16
+representing the write in the first invocation of {\tt inc} to the 
+{\tt malloc}'d area pointed to by {\tt q} and the subsequent read 
+of the same location by a later invocation of {\tt inc}. 
+Note that these dependencies 
+are reported as pertaining to {\tt main} rather than {\tt inc},
+although the endpoints are part of the latter function. 
+But the importance of the dependence is that, in {\tt main}, the calls
+on line 14 and 16 can not be made in parallel.
+
+Dependencies between different invocations of {\tt malloc} form 
+an interesting special case.
+Each call to {\tt malloc} manipulates (updates) 
+administrative data structures like the free list. Embla will
+report dependencies arising from these updates, 
+effectively serializing all calls to 
+{\tt malloc}, and thus in addition all calls to functions calling
+{\tt malloc}. In reality, these calls need not be serialized since
+program semantics typically does not depend on the exact addresses 
+that data are allocated. It suffices that a thread safe 
+implementation of {\tt malloc} is used.
+
+Embla maintains a black list of functions that behave in this way.
+In the examples in this paper, the black list consists of the 
+{\tt malloc} family, but of course other functions can be included 
+as appropriate. 
+
+We give all dependencies where both endpoints are in blacklisted functions 
+a {\bf \color{cyan}light blue} color, independent of whether they are 
+flow, anti or output. This is because they will disappear when the
+program is run in parallel.
+
+
+% End using ------------------
+
+% Begin algorithm -------------------
+
+\section{Dependence Attribution}
+
+\begin{figure} \small
+\hrulefill
+\[
+\begin{picture}(160,90)(70,10)
+\put(120,90){\makebox(60,10)[c]{\it A:\ \tt main}}
+\put(150,90){\line(-1,-1){50}}
+\put(150,90){\line( 0,-1){50}}
+\put(150,90){\line( 1,-1){50}}
+\put(100,60){\makebox(20,10)[r]{\it 14}}
+\put(150,60){\makebox(20,10)[l]{\it 15}}
+\put(180,60){\makebox(20,10)[l]{\it 16}}
+\put(80,50){\makebox(20,10)[r]{\ldots}}
+\put(200,50){\makebox(20,10)[l]{\ldots}}
+\put(170,30){\makebox(60,10)[c]{\it D:\ \tt inc}}
+\put(120,30){\makebox(60,10)[c]{\it C:\ \tt inc}}
+\put(70,30){\makebox(60,10)[c]{\it B:\ \tt inc}}
+\put(70,10){\makebox(60,10)[c]{{\tt *q=}\ \ldots}}
+\put(170,10){\makebox(60,10)[c]{\ldots\ {\tt *q}\ \ldots}}
+\end{picture}
+\]
+\hrulefill
+\caption{Part of the call tree of Example 1, edges are annotated 
+with the line number of the corresponding call.} 
+\label{ffextree}
+\end{figure}
+
+Embla is designed to help programmers 
+rewrite source code, so we need to project 
+the dependencies discovered in the dynamic instruction stream onto the 
+source code in such a way as to inform the programmer about legal code 
+transformations. Since we are dealing with transformations on the level of
+procedure calls, we need to reflect the dependencies we find to that level 
+as well. That is, we always want to know the dependencies between different 
+lines in the same procedure.
+
+\subsection{From dependency endpoints to dependency edges: the call tree}
+
+Consider the program from Figure~\ref{ffirstex} where we have three consecutive
+calls to {\tt inc} in lines 14--16. Figure~\ref{ffextree} gives the relevant 
+part of the dynamic call tree. The flow dependence between line 14 and 16 is due 
+to the write in {\tt inc} from the first call and the read from the second call.
+Note that the same instructions in other calling contexts give rise to 
+different dependencies, eg the flow dependence from line 15 (call to {\tt inc})
+to line 17 (call to {\tt printf}).
+
+We accomplish this mapping by associating each memory location with a dynamic
+instruction execution event and we also keep track of how these events 
+relate to the dynamic call tree. Thus, for a memory reference event $E$ we 
+look up its data address to find the previous reference event $E'$ to that 
+location. Then we find the {\em nearest common anscestor} (NCA) of the call
+tree nodes of $E$ and $E'$ (for instance, the NCA of {\it B} and {\it D} is
+{\it A} in Figure~\ref{ffextree}). The NCA can be calculated from the previous
+reference event $E'$ itself by noting that all anscestors of the current
+reference event $E$ correspond to frames on the current call stack. If we mark 
+such nodes, we can search from $E'$ 
+towards the root of the call tree; the first node we reach that is on the 
+stack is the NCA.
+The line number (in the function corresponding to the NCA) of the source or 
+destination of the dependence is the line number of the last edge on the path 
+from the relevant event to the NCA (14 and 16, respectively, in 
+Figure~\ref{ffextree}).
+
+
+\begin{figure}
+\small
+\hrulefill
+\begin{verbatim}
+   DependenceEdge( oldEvent, currEvent ) {
+       oldLine = oldEvent.line;
+       ncaNode = oldEvent.node;
+       while( ncaNode is not on stack ) {
+           oldLine = ncaNode.line;
+           ncaNode = ncaNode.parent;
+       }
+       if( ncaNode != currEvent.node )
+           currLine = ncaNode.nextOnStack.line;
+       else
+           currLine = currEvent.line;
+       return ( oldLine, currLine );
+    }
+\end{verbatim}
+\hrulefill
+\caption{Constructing the dependence edge from the events corresponding
+to a previous and a new reference}
+\label{fdepedge}
+\end{figure}    
+
+The algorithm for computing the dependence edge given a data address and 
+the current reference event is given in Figure~\ref{fdepedge}. Here an 
+event represents the execution of a memory reference and a node corresponds 
+to a procedure invocation. An event {\tt e} has two attributes: {\tt e.line} 
+is the source line corresponding to {\tt e} and {\tt e.node} is the procedure 
+invocation that {\tt e} is part of. Similarly, if {\tt n} is a node, then 
+{\tt n.line} is the source line associated with the procedure call 
+corresponding to {\tt n}, {\tt n.parent} is the parent node in the call tree 
+and, if {\tt n} is in the stack, {\tt n.nextOnStack} is the node on top of 
+{\tt n} in the stack ({\tt n.nextOnStack.parent} = {\tt n}).
+
+Path compression can be used to decrease the number of iterations of the 
+{\tt while} loop.
+Every node {\tt n} that is visited but is not on the stack can have its parent set 
+to its closest ancestor on the stack. We conjecture that this reduces the 
+complexity of the algorithm to essentially constant time. We can however do even 
+better since the output of the edge calculation does only depend on the immediate
+descendants of nodes on the stack. Thus every subtree $T$ of the call tree, 
+including the events at its leaves, such
+that the root of $T$ is not on the stack can be represented by the root of $T$
+alone.
+
+\subsection{The state of a memory location: the memory table}
+
+When computing the dependencies created by a memory reference, we need to 
+map the data address of the reference to information about the previous
+reference to that location. What information we need depends on whether 
+the new refenece is a read or a write:
+\begin{description}
+\item[READ]
+We need the latest write to construct a flow dependence (RAW).
+\item[WRITE]
+We need the latest write to construct an output dependence (WAW) as well as
+all reads since that write to construct anti dependencies (WAR).
+\end{description}
+To see that we need all reads since the last write, consider the following
+example:
+\begin{verbatim}
+  x = 1;
+  y = x+1;
+  z = x+2;
+  x = 3;
+\end{verbatim}
+If only the last read is kept, the dependence between the second and fourth
+lines will be lost, and since subsequent reads do not yield dependencies, 
+there is no transitive dependence between these lines.
+Hence we keep track, for each memory location, of the the event corresponding 
+to the last write and a list of events corresponding to subsequent reads.
+
+An important aspect of compaction is that when a subtree of the dynamic
+call tree is compacted to be represented by its root node, the memory table
+needs to be updated to avoid dangling pointers to eliminated events. All
+pointers are then forwarded to point to the representative nodes. In this
+process, pointers to previously distinct events now may point at the same 
+tree nodes. In this case it is unnecessary to represent more than one 
+copy of each pointer, thus compacting the read lists. This optimization is 
+crucial in practice.
+
+\newcommand{\backlink}[3]
+{\begin{picture}(#1,#2)
+\put(0,0){\line(1,0){#1}}
+\put(#1,0){\line(0,1){#2}}
+\put(#1,#2){\vector(-1,0){#3}}
+\end{picture}}
+
+\newcommand{\rwblock}
+{\begin{picture}(100,40)(-40,0)
+\put(0,25){\line(4,3){20}}
+\put(0,15){\line(4,-3){20}}
+\put(-40,25){\line(1,0){40}}
+\put(-40,15){\line(1,0){40}}
+\put(20,0){\framebox(40,40){\ }}
+\put(20,30){\line(1,0){40}}
+\put(20,30){\makebox(40,10){Last write}}
+\put(20,20){\makebox(40,10){Last reads}}
+\put(20,5){\makebox(40,10){\vdots}}
+\end{picture}}
+\begin{figure*}
+\small
+\hrulefill
+\[
+\begin{picture}(250,210)(-30,0)
+% The memory table
+\put(-30,30){\framebox(40,180)[t]{\ }}
+\put(-30,10){\makebox(60,10){The memory table}}
+% A block
+\put(-30,145){\rwblock}
+\put(70,177){\vector(3,-2){30}}
+\put(-30,85){\rwblock}
+\put(70,113){\vector(4,-1){30}}
+\put(70,97){\vector(3,-2){30}}
+\put(-30,25){\rwblock}
+\put(70,50){\vector(2,-1){30}}
+% Trace pile
+\put(100,30){\framebox(40,180)[t]{\ }}
+\put(100,190){\framebox(40,10){Open C}}
+\put(100,170){\makebox(40,10){\vdots}}
+\put(100,160){\line(1,0){40}}
+\put(100,150){\makebox(40,10){Reg}}
+\put(140,157){\backlink{8}{36}{6}}
+\put(100,140){\framebox(40,10){Closed C}}
+\put(140,147){\backlink{16}{46}{6}}
+\put(100,120){\makebox(40,10){\vdots}}
+\put(100,100){\framebox(40,10){Reg}}
+\put(140,107){\backlink{8}{36}{6}}
+\put(100,85){\makebox(40,10){\vdots}}
+\put(100,70){\framebox(40,10){Reg}}
+\put(140,77){\backlink{16}{66}{6}}
+\put(100,50){\line(1,0){40}}
+\put(100,55){\makebox(40,10){\vdots}}
+\put(100,40){\makebox(40,10){Return}}
+\put(140,47){\backlink{24}{96}{6}}
+\put(100,30){\framebox(40,10){Reg}}
+\put(140,37){\backlink{32}{156}{14}}
+\end{picture}
+%
+% The next picture
+%
+\begin{picture}(200,210)(-30,0)
+% The memory table
+\put(-30,30){\framebox(40,180)[t]{\ }}
+\put(-30,10){\makebox(60,10){The memory table}}
+% A block
+\put(-30,145){\rwblock}
+\put(70,181){\vector(4,3){30}}
+\put(-30,85){\rwblock}
+\put(70,105){\vector(1,2){30}}
+\put(-30,25){\rwblock}
+\put(70,52){\vector(1,3){30}}
+% Trace pile
+\put(100,30){\framebox(40,180)[t]{\ }}
+\put(100,200){\makebox(40,10){Open C}}
+\put(100,200){\line(1,0){40}}
+\put(100,185){\makebox(40,10){\vdots}}
+\put(100,170){\framebox(40,10){Reg}}
+\put(140,177){\backlink{8}{26}{6}}
+\put(100,160){\makebox(40,10){Closed C}}
+\put(140,167){\backlink{16}{36}{6}}
+\put(100,150){\framebox(40,10){Return}}
+\put(140,157){\backlink{8}{6}{6}}
+\put(100,140){\makebox(40,10){Reg}}
+\put(140,147){\backlink{24}{56}{6}}
+\put(100,140){\line(1,0){40}}
+\end{picture}
+\]
+\hrulefill
+\caption{Compacting the trace pile: before and after}
+\label{fnyembladata}
+\end{figure*}
+
+
+Figure~\ref{fnyembladata} shows the data structures we have discussed:
+\begin{description}
+\item[The memory table:]
+Contains, for each block of memory, pointers to events or nodes representing
+the most recent write and the reads since that write. 
+Blocksize is a tradeoff between memory use and precision; the examples in 
+this paper were run with single byte blocks. 
+\item[The trace pile:]
+Contains trace records representing events and call tree nodes; thus the 
+trace pile implements the call tree. Most trace records contain 
+\begin{itemize}
+\item
+a pointer to a record containing information about the program 
+address of the corresponding instruction (corresponds to the {\tt line} 
+attribute in the previous discussion), and
+\item
+a pointer to the previous trace record representing a procedure call (the 
+{\tt node} or {\tt parent} attributes of events and nodes, respectively).
+\end{itemize}
+\end{description}
+
+If a dependency endpoint is part of the NCA (if the NCA is the current
+frame or the frame pointed to from the memory table) it is labelled as
+direct, otherwise it is indirect. If any of the activation frames on
+the path from an endpoint to the NCA is on the black list, we have a
+weak endpoint.
+
+
+
+% End algorithm -----------------------
+
+\section{The Implementation of Embla}
+
+Embla is based on instrumented execution of binary code. Although
+our examples of profiling output use a high level language (C),
+the profiling itself is on instruction level, followed by 
+mapping the information to source level using debugging information 
+in the standard way.
+
+Embla uses the Valgrind instrumentation infrastructure, so there
+is no offline code rewriting; the Embla tool behaves like an emulator
+of the hardware.
+
+% begin discussion --------------
+
+\section{Discussion}
+
+
+Since Embla is a testing tool, it may be the case that not
+all relevant imputs have been used, allowing a dependency to slip
+though the net. This will manifest itself as a bug in the parallel
+program, possibly in a nondeterministic manner. However, the root
+cause of the bug is the missed dependency, which is deterministic and
+which can be found by running Embla on the sequential program 
+with the offending input. Thus,
+while Embla does not give proof of absence of dependencies (as a
+static checker would), it reduces the problem of debugging a
+multithreaded program to the problem of debugging a sequential
+program. Here all of the standard testing machinery (regression 
+testing, test coverage tools, \ldots) can be used.
+
+\section{Related Work}
+
+The fork-join parallelism has been recognized as a simple yet widely
+acceptable pattern for building efficient parallel applications, and used e.g. in
+Cilk~\cite{BJKLR96}, the Java fork/join framework~\cite{Lea00}, the
+Filaments package~\cite{LF00}, and {TAM}~-- a compiler-controlled
+threaded abstract machine~\cite{CGSE93,GSC95}. 
+
+Many years of research has been devoted to automatic parallelization
+by compilers utilizing static analysis techniques, yet the common
+consensus is that the goal is unattainable beyond certain limited
+well-specified areas such as loop parallelization in scientific
+computation. Static analysis techniques have been also tried for the
+closely related topic of data race in multithreaded programs
+(see~\cite{Rinard01,NAW06} for surveys), yet some
+authors~\cite{Rinard01} believe that this approach is too complex, and
+the ultimate way to control data races is to use augmented type systems
+that can eliminated them in the first place.
+
+Our approach has certain similarity to on-the-fly data race detection
+systems (such as~\cite{MellorCrummey91,SBNSA97,HRY02}) that can be
+usable in certain contexts depending on the amount of synchronization
+through shared memory, and the amount of overhead caused by instrumentation that
+can be tolerated by a particular application.
+
+\section{Future Work}
+
+Deleted
 
 \bibliographystyle{plain}
 \bibliography{embib}

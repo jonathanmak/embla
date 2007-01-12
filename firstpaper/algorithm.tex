@@ -159,8 +159,10 @@ An important aspect of compaction is that when a subtree of the dynamic
 call tree is compacted to be represented by its root node, the memory table
 needs to be updated to avoid dangling pointers to eliminated events. All
 pointers are then forwarded to point to the representative nodes. In this
-process, pointers to previously distict events now may point at the same 
-tree nodes. 
+process, pointers to previously distinct events now may point at the same 
+tree nodes. In this case it is unnecessary to represent more than one 
+copy of each pointer, thus compacting the read lists. This optimization is 
+crucial in practice.
 
 \newcommand{\backlink}[3]
 {\begin{picture}(#1,#2)
@@ -255,41 +257,26 @@ tree nodes.
 \end{figure*}
 
 
-Figure~\ref{fnyembladata} shows the three fundamental data structures 
-in Embla:
+Figure~\ref{fnyembladata} shows the data structures we have discussed:
 \begin{description}
 \item[The memory table:]
-Contains, for each block of memory, information about the most 
-recent write and all reads since that write. 
+Contains, for each block of memory, pointers to events or nodes representing
+the most recent write and the reads since that write. 
 Blocksize is a tradeoff between memory use and precision; the examples in 
 this paper were run with single byte blocks. 
 \item[The trace pile:]
-Contains trace records representing instruction execution events that 
-Embla needs to refer to. Most trace records contain 
+Contains trace records representing events and call tree nodes; thus the 
+trace pile implements the call tree. Most trace records contain 
 \begin{itemize}
 \item
 a pointer to a record containing information about the program 
-address of the corresponding instruction, and
+address of the corresponding instruction (corresponds to the {\tt line} 
+attribute in the previous discussion), and
 \item
-a pointer to the previous trace record representing a procedure call.
+a pointer to the previous trace record representing a procedure call (the 
+{\tt node} or {\tt parent} attributes of events and nodes, respectively).
 \end{itemize}
-% \item[The activation tree:]
-% Contains a record for each stack frame allocated during execution. 
-% At any given point during execution, 
-% the rightmost branch of the activation tree corresponds to the stack.
-\item[The result table:]
-A hash table mapping dependency signatures to counters of RAW, WAR 
-and WAR dependencies. Dependency signatures identify the source and
-target of the dependency as well as other information of interest.
 \end{description}
-
-
-The figure also shows how the data structures are used when the
-profiled program does a memory read. From the memory table we find the
-activation frame that was active when the last write was made and we
-compute the {\em nearest common ancestor} (NCA) of that an the
-current frame. The flow dependence we find will be attributed to the
-function that the NCA corresponds to. 
 
 If a dependency endpoint is part of the NCA (if the NCA is the current
 frame or the frame pointed to from the memory table) it is labelled as
@@ -297,6 +284,7 @@ direct, otherwise it is indirect. If any of the activation frames on
 the path from an endpoint to the NCA is on the black list, we have a
 weak endpoint.
 
+\subsection{Eliminating spurious dependencies}
 
 Some anti and output dependencies are due to reusing the same
 locations for (logically) distinct data items. This happens for
@@ -317,35 +305,37 @@ another thread, it will automatically be made on a different stack and
 the dependence disappears. Register allocation is another source of
 anti and output dependencies since distinct variables are packed into
 the same register. In this case, the allocation can be changed to
-remove dependenies, a transformation known as {\em renaming}.
+remove dependencies, a transformation known as {\em renaming}.
 
-We currently try to avoid these spurious dependencies in the following
-way. The memory table contains time stamps (these are simply the
-number of (emulated) instructions executed since the start). We also
-keep track of the changing stack size during execution so that we can
-see if a memory location has been first in, then out of, then in the
-stack again. Thus when we see a memory location (now part of the
-stack) with time stamp $t$, we want to know if the stack has been
-small enough to exclude that location at some point $t'$ such that 
-$t<t'$. 
+The class of spurious dependencies that are caused by reuse of memory 
+by the stack can be eliminated by keeping track of the minimal stack
+size since each previous event (the trace pile keeps the events in their
+original order). Thus we want to know if, since the last reference (of a 
+particular kind) to a location currently part of the stack, the stack 
+has been small enough that the location was out of the stack. In that
+case that reference and the current reference do not give rise to any 
+dependencies.
 
 To this end, we maintain a {\em min stack} consisting of pairs $(t,s)$
-where $t$ is a time stamp and $s$ is a stack pointer value. Each pair
+where $t$ is a time stamp (an address in the trace pile) and $s$ is a 
+stack pointer value. Each pair
 $(t,s)$ in the min stack indicates that, at time $t$, the stack
-pointer was $s$ and at all times $t'$ the stack has been larger (since
-the x86 stack grows from high to low addresses, a small stack
-corresponds to a large stack pointer). In the min stack, both
-time stamps and stack sizes grow towards the top (that is, the stack
-pointers decrease).
+pointer was $s$ and at all times $t'>t$ the stack has been larger.
+Since the stack grows towards low addresses in some architectures and 
+towards high addresses in other, we use the notation $a \in s$ to say 
+that an address $a$ is part of the stack represented by stack pointer $s$.
+For and stack growing towards lower addresses, $a\in s$ means $a \geq s$
+wheras in the opposite case it means $a<s$.
 
 When the
 call stack grows, we push a new pair, consisting of the current time
 and the new stack pointer value, on top of the min stack. When the
-stack shrinks, we pop all pairs representing larger stacks off the min
+call stack shrinks, we pop all pairs representing larger stacks off the min
 stack.
 
-Thus, when we record a dependence at address $a$ with time stamp $t$,
-we see if we can find a pair $(s,t')$ in the min stack with $a<s$ and
+Thus, when we record a dependence at address $a$ with a previous 
+reference at time stamp $t$,
+we see if we can find a pair $(s,t')$ in the min stack with $a \not\in s$ and
 $t<t'$ (a smaller stack at a later time).
 
 We avoid spurious anti and output dependencies due to register
