@@ -5,104 +5,98 @@
 
 \section{Introduction}
 
-As wire delays and thermal problems have made improvements in clock
-frequency much more difficult to realize~\cite{KAB03}, and increased levels of
-instruction level parallelism faces problems of design complexity and
-control dependencies, improving microprocessor performance has come to
-depend increasingly on thread level parallelism~\cite{Sutter05}. Multicore chips, also
-known as CMPs (chip multiprocessors)~\cite{ONHWC96} pack several processor cores on a
-single die, typically with per core L1 caches but sharing the L2
-cache. Processor cores can also be multithreaded, executing
-instructions from several threads simultaneously~\cite{TEL95}. Collectively 
-these techniques can be referred to as {\em CMT} (chip
-multithreading). Studies revealed a large amount of inherent parallelism
-in typical applications, which is however difficult to utilize just by
-superscalar/pipelined architectures~\cite{AS92}, thereby justifying CMT designs.
+Parallel programming is no longer optional.  To enjoy continued
+performance gains with future generation multicore processors,
+application developers must parallelize all software, old and new
+\cite{TEL95,ONHWC96,KAB03,Sutter05}.  For scalable parallel
+performance, program execution must be divided into large numbers of
+independent tasks that can be scheduled on available cores and
+hardware threads by runtime systems, such as thread libraries and
+fork-join frameworks \cite{}.  For some classes of programs, automatic
+parallelization is feasible, but with the current state-of-the-art,
+most software requires manual parallelization \cite{}.  Our work
+adresses the problem of assisting developers in this process, by
+identifying the potential for parallelism in programs, and with
+providing efficient tool support for this task.  In this paper, we
+present a data dependence profiling approach to the parallelization
+problem, an efficient algorithm to project data dependencies onto
+relevant parts of the program code, and its implementation, the tool
+Embla.
 
-From the point of view of the software, a CMT processor looks just
-like a traditional shared memory symmetric multiprocessor. In particular, a CMT
-program consists of multiple threads with shared state. 
-Unfortunately, such code is much
-harder to write than single threaded code, both because there are many
-more program states to consider and because the relative execution
-speed of threads are, in general, nondeterministic.  Not only is it
-difficult to write multithreaded programs; most existing code is
-single threaded (with the exception of code for numeric computation
-and server oriented code).
-
-We think that a practical way of resolving this issue is through hand
-parallelization of sequential code. This method would both apply to
-the existing code base and to newly developed code. This paper
-presents a tool, Embla, to assist in this process.
-
-
-While the dependence information that Embla finds can be used to 
-support different models of parallelism, 
-Embla is initially aimed mainly at supporting procedure-level 
-fork-join parallelism. To a first approximation, this means executing 
-procedure calls asynchronously. Consider the program fragment below:
+We will focus on parallelization by introducing procedure-level
+fork-join parallelism.  To a first approximation, this means executing
+procedure calls asynchronously.  Consider the program fragment below:
 \begin{alltt}
-   foo();
-   bar();
-   baz();
+   p();
+   q();
+   r();
 \end{alltt}
-Suppose that {\tt foo()} and {\tt bar()} are {\em independent}, ie that 
-executing {\tt bar()} before {\tt foo()} does not change the meaning of
-the program\footnote{There are many ways to formally give meaning to a
-program, although it has never been done for C.}. A sufficient condition 
-for independence
-in this case is that {\tt foo()} and {\tt bar()} do not do any I/O and
-that neither call writes to a memory location that the other call 
-accesses. In that case the call to {\tt foo()} can be executed
-asynchronously, 
-by a different thread, and in parallel with the call to {\tt bar()}.
-Suppose further that {\tt foo()} and {\tt baz()} are not independent,
-so {\tt baz()} can not be executed until the call {\tt foo()} is completed.
-We can express this as 
+Suppose that the calls to {\tt p()} and {\tt q()} are independent,
+i.e., that neither procedure call writes to a memory location that the
+other call accesses.  In this case, the call to {\tt p()} can be
+executed asynchronously, by a different thread, and in parallel with
+the call to {\tt q()}.  Suppose further that {\tt p()} and {\tt r()}
+are not independent, so {\tt r()} can not be executed until the call
+{\tt p()} is completed.  We can now rewrite the program as
 \begin{alltt}
-   spawn foo();
-   bar();
+   spawn p();
+   q();
    sync;
-   baz();
+   r();
 \end{alltt}
-where {\tt spawn} starts the call in parallel and {\tt sync} waits
-for all {\tt spawn}'d acivities to terminate (here we have borrowed 
-programming constructs from the Cilk programming language 
-\cite{BJKLR96,frigo98implementation}).
 
-This style of parallelism can be implemented efficiently (as is done
-for instance in the Cilk language) and is easy to understand although
-not as powerful as general thread parallelism with arbitrary
-synchronization. In general, we can find more parallelism in a program 
-by using the latter, but in many cases, fork-join paralleism suffices 
-(especially for CMT processors which are not massively parallel).
-In particular, as long as {\tt foo()} and {\tt bar()}
-are independent, the behavior of the parallel program is identical to
-the behavior of the sequential version. Therefore it is sufficient to
-understand (debug, verify, \ldots) the sequential program; everything
-except performance carries over to the parallel version.
+where we assume the availability of constructs {\tt spawn} to start
+the call in parallel and {\tt sync} to wait for all {\tt spawn}'d
+acivities to terminate (cf. \cite{BJKLR96,frigo98implementation}).
+
+This style of parallelism can be implemented efficiently and is easy
+to understand.  In particular, as long as {\tt p()} and {\tt q()} are
+independent, the parallel program will produce identical results to
+the sequential version.  Therefore it is sufficient to understand
+(debug, verify, \ldots) the sequential program; everything except
+performance carries over to the parallel version.
 
 The price for this approach is that one must find independent
-procedure calls (program fragments, in general). Thus there must be
-such calls in the code and the programmer must be able to make sure
-that they are in fact independent. The first issue depends of course
-on the algorithms used in the program.
+procedure calls (program fragments, in general).  Thus there must be
+such calls in the code and the programmer must be able to determine
+that they are in fact independent.  The availability of independent
+calls in the program depends on the algorithms used and can be further
+limited by sequential programming artifacts (such as re-use of
+variables and sequential book-keeping in an otherwise parallelizable
+algorithm).  Data dependence information can potentially help
+indentify and remove such obstacles to parallel execution, but this
+will not be further discussed here.
 
-The second issue is typically
-dealt with using static analysis tools as is done in parallelizing
-compilers. Such analysers are however very complex and must by
-necessity be conservative (since they are static, they must use
-approximations which are always safe). Good precision also comes at a
-high computational cost, especially when analysing large programs.
-Consequently, it has proved difficult to parallelize programs 
-automatically in 
-practice, and most production codes are written in an explicitly 
-parallel way.
+Parallelizing compilers mostly target loop parallelization based on
+static data dependence analysis methods \cite{}.  Such analysers must
+by necessity be conservative.  Since they are static, they must use
+approximations which are always safe.  Good precision comes at a high
+computational cost, especially when analysing large programs.
+Analysing more general code, e.g., with pointers, remains a major
+challenge \cite{}.  Consequently, it has proved difficult to
+parallelize programs automatically in practice, and most production
+codes are written in an explicitly parallel way.
 
-Embla takes a different approach by observing program execution
-directly and recording the dependencies that occur. This means that
-Embla in effect is a testing tool which should make it easy to 
-integrate into existing software development processes.
+In contrast, data dependence profiling observes the actual
+dependencies that occur during program execution.
 
 
+  Embla will
+observe the actual data dependencies that occur during program
+execution, project them onto relevant program parts, and interpret the
+lack of a runtime data dependence as an indication that the program
+parts involved are likely, but not guaranteed, to be independent.
 
+is a heuristic method, aimed at
+helping developers identify relevant parts of programs.
+
+  As
+in program testing, developers will be responsible for selecting
+program inputs that generate representative program executions with
+good coverage.
+
+In the following sections, we will present, in Section 2, the Embla
+model of data dependece in programs, in Section 3, the Embla algorithm
+for projecting data dependencies onto program framgents, in Section 4,
+the implementation of the Embla tool, based on Valgrind, in Section 5,
+related work, and in Section 6, conclusions and future work.
