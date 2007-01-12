@@ -44,7 +44,6 @@ are not independent, so {\tt r()} can not be executed until the call
    sync;
    r();
 \end{alltt}
-
 where we assume the availability of constructs {\tt spawn} to start
 the call in parallel and {\tt sync} to wait for all {\tt spawn}'d
 acivities to terminate (cf. \cite{BJKLR96,frigo98implementation}).
@@ -77,21 +76,14 @@ challenge \cite{}.  Consequently, it has proved difficult to
 parallelize programs automatically in practice, and most production
 codes are written in an explicitly parallel way.
 
-In contrast, data dependence profiling observes the actual
-dependencies that occur during program execution.
-
-
-  Embla will
-observe the actual data dependencies that occur during program
+In contrast, Embla
+observes the actual data dependencies that occur during program
 execution, project them onto relevant program parts, and interpret the
 lack of a runtime data dependence as an indication that the program
 parts involved are likely, but not guaranteed, to be independent.
 
-is a heuristic method, aimed at
-helping developers identify relevant parts of programs.
 
-  As
-in program testing, developers will be responsible for selecting
+As in program testing, developers will be responsible for selecting
 program inputs that generate representative program executions with
 good coverage.
 

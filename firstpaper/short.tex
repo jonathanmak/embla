@@ -1,0 +1,59 @@
+\documentclass{acm_proc_article-sp}
+
+\usepackage{epic}
+\usepackage{color}
+\usepackage{verbdef}
+\usepackage{alltt}
+
+\newcommand{\comment}[1]{\textit{[ #1 ]}}
+\newenvironment{comment_env}
+  {\begin{itshape}}
+  {\end{itshape}}
+
+\begin{document}
+
+\title{Embla -- Data Dependence Profiling for Parallel Programming }
+\author{Karl-Filip Fax\'en, Lars Albertsson, Konstantin Popov, Sverker Janson\\
+       Swedish Institute of Computer Science\\
+       Box 1263\\
+       SE-164 29 Kista\\
+       Sweden\\
+       \{kff,lalle,kost,sverker\}@sics.se}
+\date{}
+\maketitle
+
+\begin{abstract}
+
+With the proliferation of multicore processors, there is an urgent need for
+tools and methodologies supporting parallelization of existing
+applications.  In this paper we present a novel tool for aiding
+programmers in parallelizing programs. The tool, Embla, is based on the
+Valgrind framework, and allows the user to
+discover the data dependencies in a sequential program, thereby exposing
+opportunities for parallelization.   Embla performs a dynamic analysis,
+and records dependencies as they
+arise during program execution.  It reports an optimistic view of
+parallelizable sequences, and ignores dependencies that do not arise during
+execution.  In contrast to static analysis tools,
+which by necessity make conservative approximation, Embla is able to find
+more parallelism in sequential programs, and relies on the programmer to
+transform the program in a correct manner. 
+Moreover, since the tool instruments the machine code of the program,
+it is completely language independent. 
+
+\end{abstract}
+
+
+\input{intro}
+\input{using}
+\input{algorithm}
+\input{impover}
+%\input{embla}
+\input{discussion}
+\input{related}
+\input{future}
+
+\bibliographystyle{plain}
+\bibliography{embib}
+
+\end{document}

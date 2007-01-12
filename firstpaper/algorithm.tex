@@ -1,0 +1,353 @@
+\section{Dependence Attribution}
+
+
+
+\begin{figure} \small
+\hrulefill
+\[
+\begin{picture}(160,90)(70,10)
+\put(120,90){\makebox(60,10)[c]{\it A:\ \tt main}}
+\put(150,90){\line(-1,-1){50}}
+\put(150,90){\line( 0,-1){50}}
+\put(150,90){\line( 1,-1){50}}
+\put(100,60){\makebox(20,10)[r]{\it 14}}
+\put(150,60){\makebox(20,10)[l]{\it 15}}
+\put(180,60){\makebox(20,10)[l]{\it 16}}
+\put(80,50){\makebox(20,10)[r]{\ldots}}
+\put(200,50){\makebox(20,10)[l]{\ldots}}
+\put(170,30){\makebox(60,10)[c]{\it D:\ \tt inc}}
+\put(120,30){\makebox(60,10)[c]{\it C:\ \tt inc}}
+\put(70,30){\makebox(60,10)[c]{\it B:\ \tt inc}}
+\put(70,10){\makebox(60,10)[c]{{\tt *q=}\ \ldots}}
+\put(170,10){\makebox(60,10)[c]{\ldots\ {\tt *q}\ \ldots}}
+\end{picture}
+\]
+\hrulefill
+\caption{Part of the call tree of Example 1, edges are annotated 
+with the line number of the corresponding call.} 
+\label{ffextree}
+\end{figure}
+
+Tracing programs to find dependencies is by no means a new endavour. Most 
+earlier efforts have however been aimed at studying different hardware 
+enhancements. In that context, the desired result is the execution time 
+under various hardware assumptions. Thus it was sufficient to keep track
+of the execution of the dynamic instruction stream, including dependencies
+between instructions; mapping the dependencies to source code was unnecessary.
+
+It is possible to find the minimal execution time by keeping track of the 
+earliest possible execution
+time of each instruction in the dynamic instruction stream. For each instruction 
+that writes to a memory location or a register, that location or register is 
+associated with the execution time of the writing instruction. The earliest
+execution time of an intruction that reads memory or registers is taken as the
+maximum of the time stamps of the items read plus the latency of the instruction 
+itself.
+
+
+A tool like Embla, on the other hand, that is designed to help programmers 
+rewrite source code, poses different demands. Here, we need to project 
+the dependencies discovered in the dynamic instruction stream onto the 
+source code in such a way as to inform the programmer about legal code 
+transformations. Since we are dealing with transformations on the level of
+procedure calls, we need to reflect the dependencies we find to that level 
+as well. That is, we always want to know the dependencies between different 
+lines in the same procedure.
+
+\subsection{From dependency endpoints to dependency edges: the call tree}
+
+Consider the program from Figure~\ref{ffirstex} where we have three consecutive
+calls to {\tt inc} in lines 14--16. Figure~\ref{ffextree} gives the relevant 
+part of the dynamic call tree. The flow dependence between line 14 and 16 is due 
+to the write in {\tt inc} from the first call and the read from the second call.
+Note that the same instructions in other calling contexts give rise to 
+different dependencies, eg the flow dependence from line 15 (call to {\tt inc})
+to line 17 (call to {\tt printf}).
+
+We accomplish this mapping by associating each memory location with a dynamic
+instruction execution event and we also keep track of how these events 
+relate to the dynamic call tree. Thus, for a memory reference event $E$ we 
+look up its data address to find the previous reference event $E'$ to that 
+location. Then we find the {\em nearest common anscestor} (NCA) of the call
+tree nodes of $E$ and $E'$ (for instance, the NCA of {\it B} and {\it D} is
+{\it A} in Figure~\ref{ffextree}). The NCA can be calculated from the previous
+reference event $E'$ itself by noting that all anscestors of the current
+reference event $E$ correspond to frames on the current call stack. If we mark 
+such nodes, we can search from $E'$ 
+towards the root of the call tree; the first node we reach that is on the 
+stack is the NCA.
+The line number (in the function corresponding to the NCA) of the source or 
+destination of the dependence is the line number of the last edge on the path 
+from the relevant event to the NCA (14 and 16, respectively, in 
+Figure~\ref{ffextree}).
+
+
+\begin{figure}
+\small
+\hrulefill
+\begin{verbatim}
+   DependenceEdge( oldEvent, currEvent ) {
+       oldLine = oldEvent.line;
+       ncaNode = oldEvent.node;
+       while( ncaNode is not on stack ) {
+           oldLine = ncaNode.line;
+           ncaNode = ncaNode.parent;
+       }
+       if( ncaNode != currEvent.node )
+           currLine = ncaNode.nextOnStack.line;
+       else
+           currLine = currEvent.line;
+       return ( oldLine, currLine );
+    }
+\end{verbatim}
+\hrulefill
+\caption{Constructing the dependence edge from the events corresponding
+to a previous and a new reference}
+\label{fdepedge}
+\end{figure}    
+
+The algorithm for computing the dependence edge given a data address and 
+the current reference event is given in Figure~\ref{fdepedge}. Here an 
+event represents the execution of a memory reference and a node corresponds 
+to a procedure invocation. An event {\tt e} has two attributes: {\tt e.line} 
+is the source line corresponding to {\tt e} and {\tt e.node} is the procedure 
+invocation that {\tt e} is part of. Similarly, if {\tt n} is a node, then 
+{\tt n.line} is the source line associated with the procedure call 
+corresponding to {\tt n}, {\tt n.parent} is the parent node in the call tree 
+and, if {\tt n} is in the stack, {\tt n.nextOnStack} is the node on top of 
+{\tt n} in the stack ({\tt n.nextOnStack.parent} = {\tt n}).
+
+Path compression can be used to decrease the number of iterations of the 
+{\tt while} loop.
+Every node {\tt n} that is visited but is not on the stack can have its parent set 
+to its closest ancestor on the stack. We conjecture that this reduces the 
+complexity of the algorithm to essentially constant time. We can however do even 
+better since the output of the edge calculation does only depend on the immediate
+descendants of nodes on the stack. Thus every subtree $T$ of the call tree, 
+including the events at its leaves, such
+that the root of $T$ is not on the stack can be represented by the root of $T$
+alone.
+
+\subsection{The state of a memory location: the memory table}
+
+When computing the dependencies created by a memory reference, we need to 
+map the data address of the reference to information about the previous
+reference to that location. What information we need depends on whether 
+the new refenece is a read or a write:
+\begin{description}
+\item[READ]
+We need the latest write to construct a flow dependence (RAW).
+\item[WRITE]
+We need the latest write to construct an output dependence (WAW) as well as
+all reads since that write to construct anti dependencies (WAR).
+\end{description}
+To see that we need all reads since the last write, consider the following
+example:
+\begin{verbatim}
+  x = 1;
+  y = x+1;
+  z = x+2;
+  x = 3;
+\end{verbatim}
+If only the last read is kept, the dependence between the second and fourth
+lines will be lost, and since subsequent reads do not yield dependencies, 
+there is no transitive dependence between these lines.
+Hence we keep track, for each memory location, of the the event corresponding 
+to the last write and a list of events corresponding to subsequent reads.
+
+An important aspect of compaction is that when a subtree of the dynamic
+call tree is compacted to be represented by its root node, the memory table
+needs to be updated to avoid dangling pointers to eliminated events. All
+pointers are then forwarded to point to the representative nodes. In this
+process, pointers to previously distict events now may point at the same 
+tree nodes. 
+
+\newcommand{\backlink}[3]
+{\begin{picture}(#1,#2)
+\put(0,0){\line(1,0){#1}}
+\put(#1,0){\line(0,1){#2}}
+\put(#1,#2){\vector(-1,0){#3}}
+\end{picture}}
+
+\newcommand{\rwblock}
+{\begin{picture}(100,40)(-40,0)
+\put(0,25){\line(4,3){20}}
+\put(0,15){\line(4,-3){20}}
+\put(-40,25){\line(1,0){40}}
+\put(-40,15){\line(1,0){40}}
+\put(20,0){\framebox(40,40){\ }}
+\put(20,30){\line(1,0){40}}
+\put(20,30){\makebox(40,10){Last write}}
+\put(20,20){\makebox(40,10){Last reads}}
+\put(20,5){\makebox(40,10){\vdots}}
+\end{picture}}
+\begin{figure*}
+\small
+\hrulefill
+\[
+\begin{picture}(250,210)(-30,0)
+% The memory table
+\put(-30,30){\framebox(40,180)[t]{\ }}
+\put(-30,10){\makebox(60,10){The memory table}}
+% A block
+\put(-30,145){\rwblock}
+\put(70,177){\vector(3,-2){30}}
+\put(-30,85){\rwblock}
+\put(70,113){\vector(4,-1){30}}
+\put(70,97){\vector(3,-2){30}}
+\put(-30,25){\rwblock}
+\put(70,50){\vector(2,-1){30}}
+% Trace pile
+\put(100,30){\framebox(40,180)[t]{\ }}
+\put(100,190){\framebox(40,10){Open C}}
+\put(100,170){\makebox(40,10){\vdots}}
+\put(100,160){\line(1,0){40}}
+\put(100,150){\makebox(40,10){Reg}}
+\put(140,157){\backlink{8}{36}{6}}
+\put(100,140){\framebox(40,10){Closed C}}
+\put(140,147){\backlink{16}{46}{6}}
+\put(100,120){\makebox(40,10){\vdots}}
+\put(100,100){\framebox(40,10){Reg}}
+\put(140,107){\backlink{8}{36}{6}}
+\put(100,85){\makebox(40,10){\vdots}}
+\put(100,70){\framebox(40,10){Reg}}
+\put(140,77){\backlink{16}{66}{6}}
+\put(100,50){\line(1,0){40}}
+\put(100,55){\makebox(40,10){\vdots}}
+\put(100,40){\makebox(40,10){Return}}
+\put(140,47){\backlink{24}{96}{6}}
+\put(100,30){\framebox(40,10){Reg}}
+\put(140,37){\backlink{32}{156}{14}}
+\end{picture}
+%
+% The next picture
+%
+\begin{picture}(200,210)(-30,0)
+% The memory table
+\put(-30,30){\framebox(40,180)[t]{\ }}
+\put(-30,10){\makebox(60,10){The memory table}}
+% A block
+\put(-30,145){\rwblock}
+\put(70,181){\vector(4,3){30}}
+\put(-30,85){\rwblock}
+\put(70,105){\vector(1,2){30}}
+\put(-30,25){\rwblock}
+\put(70,52){\vector(1,3){30}}
+% Trace pile
+\put(100,30){\framebox(40,180)[t]{\ }}
+\put(100,200){\makebox(40,10){Open C}}
+\put(100,200){\line(1,0){40}}
+\put(100,185){\makebox(40,10){\vdots}}
+\put(100,170){\framebox(40,10){Reg}}
+\put(140,177){\backlink{8}{26}{6}}
+\put(100,160){\makebox(40,10){Closed C}}
+\put(140,167){\backlink{16}{36}{6}}
+\put(100,150){\framebox(40,10){Return}}
+\put(140,157){\backlink{8}{6}{6}}
+\put(100,140){\makebox(40,10){Reg}}
+\put(140,147){\backlink{24}{56}{6}}
+\put(100,140){\line(1,0){40}}
+\end{picture}
+\]
+\hrulefill
+\caption{Compacting the trace pile: before and after}
+\label{fnyembladata}
+\end{figure*}
+
+
+Figure~\ref{fnyembladata} shows the three fundamental data structures 
+in Embla:
+\begin{description}
+\item[The memory table:]
+Contains, for each block of memory, information about the most 
+recent write and all reads since that write. 
+Blocksize is a tradeoff between memory use and precision; the examples in 
+this paper were run with single byte blocks. 
+\item[The trace pile:]
+Contains trace records representing instruction execution events that 
+Embla needs to refer to. Most trace records contain 
+\begin{itemize}
+\item
+a pointer to a record containing information about the program 
+address of the corresponding instruction, and
+\item
+a pointer to the previous trace record representing a procedure call.
+\end{itemize}
+% \item[The activation tree:]
+% Contains a record for each stack frame allocated during execution. 
+% At any given point during execution, 
+% the rightmost branch of the activation tree corresponds to the stack.
+\item[The result table:]
+A hash table mapping dependency signatures to counters of RAW, WAR 
+and WAR dependencies. Dependency signatures identify the source and
+target of the dependency as well as other information of interest.
+\end{description}
+
+
+The figure also shows how the data structures are used when the
+profiled program does a memory read. From the memory table we find the
+activation frame that was active when the last write was made and we
+compute the {\em nearest common ancestor} (NCA) of that an the
+current frame. The flow dependence we find will be attributed to the
+function that the NCA corresponds to. 
+
+If a dependency endpoint is part of the NCA (if the NCA is the current
+frame or the frame pointed to from the memory table) it is labelled as
+direct, otherwise it is indirect. If any of the activation frames on
+the path from an endpoint to the NCA is on the black list, we have a
+weak endpoint.
+
+
+Some anti and output dependencies are due to reusing the same
+locations for (logically) distinct data items. This happens for
+instance for stack locations when arguments are passed on the stack
+(as is common on the x86, for instance). Consider the following
+example:
+\begin{verbatim}
+    foo(x);
+    bar(y);
+\end{verbatim}
+The value of {\tt x} will be pushed on the stack. Then {\tt foo} will
+be called and will read {\tt x}. When that call has returned, {\tt y}
+will be pushed on the stack on the same address as {\tt x}, creating
+an anti dependence with {\tt foo}'s read. This kind of dependence can 
+easily be removed by a
+compiler. In fact, if the call to {\tt foo} is made asynchronously, in
+another thread, it will automatically be made on a different stack and
+the dependence disappears. Register allocation is another source of
+anti and output dependencies since distinct variables are packed into
+the same register. In this case, the allocation can be changed to
+remove dependenies, a transformation known as {\em renaming}.
+
+We currently try to avoid these spurious dependencies in the following
+way. The memory table contains time stamps (these are simply the
+number of (emulated) instructions executed since the start). We also
+keep track of the changing stack size during execution so that we can
+see if a memory location has been first in, then out of, then in the
+stack again. Thus when we see a memory location (now part of the
+stack) with time stamp $t$, we want to know if the stack has been
+small enough to exclude that location at some point $t'$ such that 
+$t<t'$. 
+
+To this end, we maintain a {\em min stack} consisting of pairs $(t,s)$
+where $t$ is a time stamp and $s$ is a stack pointer value. Each pair
+$(t,s)$ in the min stack indicates that, at time $t$, the stack
+pointer was $s$ and at all times $t'$ the stack has been larger (since
+the x86 stack grows from high to low addresses, a small stack
+corresponds to a large stack pointer). In the min stack, both
+time stamps and stack sizes grow towards the top (that is, the stack
+pointers decrease).
+
+When the
+call stack grows, we push a new pair, consisting of the current time
+and the new stack pointer value, on top of the min stack. When the
+stack shrinks, we pop all pairs representing larger stacks off the min
+stack.
+
+Thus, when we record a dependence at address $a$ with time stamp $t$,
+we see if we can find a pair $(s,t')$ in the min stack with $a<s$ and
+$t<t'$ (a smaller stack at a later time).
+
+We avoid spurious anti and output dependencies due to register
+allocation by not computing dependencies on registers and compiling
+the traced program without optimization. 
