@@ -230,3 +230,19 @@ not part of the stack, then part of the stack again are filtered away
 \caption{The main Embla data structures}
 \label{fembladata}
 \end{figure*}
+
+
+-------------------------------------------------
+
+The figure also shows how the data structures are used when the
+profiled program does a memory read. From the memory table we find the
+activation frame that was active when the last write was made and we
+compute the {\em nearest common ancestor} (NCA) of that an the
+current frame. The flow dependence we find will be attributed to the
+function that the NCA corresponds to. 
+
+If a dependency endpoint is part of the NCA (if the NCA is the current
+frame or the frame pointed to from the memory table) it is labelled as
+direct, otherwise it is indirect. If any of the activation frames on
+the path from an endpoint to the NCA is on the black list, we have a
+weak endpoint.

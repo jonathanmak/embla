@@ -1,10 +1,160 @@
-% -*- eval: (local-set-key "\M-q" 'undefined) -*-
-%
-% The line above will probably make Emacs ask if it is ok to evaluate the
-% expression.  Answer y.
-
 \section{Overview of the Implementation of Embla}
 
+
+
+\begin{figure} \small
+\hrulefill
+\[
+\begin{picture}(160,90)(70,10)
+\put(120,90){\makebox(60,10)[c]{\it A:\ \tt main}}
+\put(150,90){\line(-1,-1){50}}
+\put(150,90){\line( 0,-1){50}}
+\put(150,90){\line( 1,-1){50}}
+\put(100,60){\makebox(20,10)[r]{\it 14}}
+\put(150,60){\makebox(20,10)[l]{\it 15}}
+\put(180,60){\makebox(20,10)[l]{\it 16}}
+\put(80,50){\makebox(20,10)[r]{\ldots}}
+\put(200,50){\makebox(20,10)[l]{\ldots}}
+\put(170,30){\makebox(60,10)[c]{\it D:\ \tt inc}}
+\put(120,30){\makebox(60,10)[c]{\it C:\ \tt inc}}
+\put(70,30){\makebox(60,10)[c]{\it B:\ \tt inc}}
+\put(70,10){\makebox(60,10)[c]{{\tt *q=}\ \ldots}}
+\put(170,10){\makebox(60,10)[c]{\ldots\ {\tt *q}\ \ldots}}
+\end{picture}
+\]
+\hrulefill
+\caption{Part of the call tree of Example 1, edges are annotated 
+with the line number of the corresponding call.} 
+\label{ffextree}
+\end{figure}
+
+
+Embla is based on instrumented execution of binary code. Although
+our examples of profiling output use a high level language (C),
+the profiling itself is on instruction level, followed by 
+mapping the information to source level using debugging information 
+in the standard way.
+
+Embla uses the Valgrind instrumentation infrastructure, so there
+is no offline code rewriting; the Embla tool behaves like an emulator
+of the hardware.
+
+Tracing programs to find dependencies is by no means a new endavour. Most 
+earlier efforts have however been aimed at studying different hardware 
+enhancements. In that context, the desired result is the execution time 
+under various hardware assumptions. Thus it was sufficient to keep track
+of the execution of the dynamic instruction stream, including dependencies
+between instructions; mapping the dependencies to source code was unnecessary.
+
+It is possible to find the minimal execution time by keeping track of the 
+earliest possible execution
+time of each instruction in the dynamic instruction stream. For each instruction 
+that writes to a memory location or a register, that location or register is 
+associated with the execution time of the writing instruction. The earliest
+execution time of an intruction that reads memory or registers is taken as the
+maximum of the time stamps of the items read plus the latency of the instruction 
+itself.
+
+
+A tool like Embla, on the other hand, that is designed to help programmers 
+rewrite source code, poses different demands. Here, we need to project 
+the dependencies discovered in the dynamic instruction stream onto the 
+source code in such a way as to inform the programmer about legal code 
+transformations. Since we are dealing with transformations on the level of
+procedure calls, we need to reflect the dependencies we find to that level 
+as well. That is, we always want to know the dependencies between different 
+lines in the same procedure.
+
+Consider the program from Figure~\ref{ffirstex} where we have three consecutive
+calls to {\tt inc} in lines 14--16. Figure~\ref{ffextree} gives the relevant 
+part of the dynamic call tree. The flow dependence between line 14 and 16 is due 
+to the write in {\tt inc} from the first call and the read from the second call.
+Note that the same instructions in other calling contexts give rise to 
+different dependencies, eg the flow dependence from line 15 (call to {\tt inc})
+to line 17 (call to {\tt printf}).
+
+We accomplish this mapping by associating each memory location with a dynamic
+instruction execution event and we also keep track of how these events 
+relate to the dynamic call tree. Thus, for a memory reference event $E$ we 
+look up its data address to find the previous reference event $E'$ to that 
+location. Then we find the {\em nearest common anscestor} (NCA) of the call
+tree nodes of $E$ and $E'$ (for instance, the NCA of {\it B} and {\it D} is
+{\it A} in Figure~\ref{ffextree}). The NCA can be calculated from the previous
+reference event $E'$ itself by noting that all anscestors of the current
+reference event $E$ correspond to frames on the current call stack. If we mark 
+such nodes, we can search from $E'$ 
+towards the root of the call tree; the first node we reach that is on the 
+stack is the NCA.
+The line number (in the function corresponding to the NCA) of the source or 
+destination of the dependence is the line number of the last edge on the path 
+from the relevant event to the NCA (14 and 16, respectively, in 
+Figure~\ref{ffextree}).
+
+
+\begin{figure}
+\small
+\hrulefill
+\begin{verbatim}
+   DependenceEdge( oldEvent, currEvent ) {
+       oldLine = LineOf( oldEvent ) 
+       ncaNode = NodeOf( oldEvent )
+       while( ncaNode is not on stack )
+           oldLine = LineOf( ncaNode )
+           ncaNode = ParentOf( ncaNode )
+       if( ncaNode != NodeOf( currEvent ) )
+           currLine = LineOf( NextOnStack( ncaNode ) )
+       else
+           currLine = LineOf( currEvent )
+       return ( oldLine, currLine )
+    }
+\end{verbatim}
+\hrulefill
+\caption{Finding constructing the dependence edge from the events corresponding
+to a previous and a new reference}
+\label{fdepedge}
+\end{figure}    
+
+\begin{figure}
+\small
+\hrulefill
+\begin{verbatim}
+   DependenceEdge( oldEvent, currEvent ) {
+       oldLine = oldEvent.line
+       ncaNode = olsEvent.node
+       while( ncaNode is not on stack )
+           oldLine = ncaNode.line
+           ncaNode = ncaNode.parent
+       if( ncaNode != currEvent.node )
+           currLine = ncaNode.nextOnStack.line
+       else
+           currLine = currEvent.line
+       return ( oldLine, currLine )
+    }
+\end{verbatim}
+\hrulefill
+\caption{Finding constructing the dependence edge from the events corresponding
+to a previous and a new reference}
+\end{figure}    
+
+The algorithm for computing the dependence edge given a data address and the 
+current reference event is given in Figure~\ref{fdepedge}. Here an event 
+represents the execution of a memory reference and a node corresponds to a 
+procedure invocation. For an event $E$, {\tt LineOf($E$)} is the source line
+corresponding to $E$ and {\tt NodeOf($E$)} is the procedure invocation that $E$
+is part of. For a node $N$, {\tt LineOf($N$)} is the source line associated 
+with the procedure call corresponding to $N$, {\tt ParentOf($N$)} is the 
+parent node in the call tree and, if $N$ is in the stack, {\tt NextOnStack($N$)} 
+is the node on top of $N$ in the stack ({\tt ParentOf(NextOnStack($N$))} = $N$).
+
+Path compression can be used to decrease the number of iterations of the loop.
+Every node $N$ that is visited but is not on the stack can have its parent set 
+to its closest ancestor on the stack. We conjecture that this reduces the 
+complexity of the algorithm to essentially constant time. We can however do even 
+better since the output of the edge calculation does only depend on the immediate
+descendants of nodes on the stack. Thus every subtree $T$ of the call tree, 
+including the events at its leaves, such
+that the root of $T$ is not on the stack can be represented by the root of $T$
+alone.
 
 
 \newcommand{\backlink}[3]
@@ -96,22 +246,12 @@
 \end{picture}
 \]
 \hrulefill
-\caption{The main Embla data structures}
+\caption{Compacting the trace pile: before and after}
 \label{fnyembladata}
 \end{figure*}
 
 
-Embla is based on instrumented execution of binary code. Although
-our examples of profiling output use a high level language (C),
-the profiling itself is on instruction level, followed by 
-mapping the information to source level using debugging information 
-in the standard way.
-
-Embla uses the Valgrind instrumentation infrastructure, so there
-is no offline code rewriting; the Embla tool behaves like an emulator
-of the hardware.
-
-Figure~\ref{fembladata} shows the three fundamental data structures 
+Figure~\ref{fnyembladata} shows the three fundamental data structures 
 in Embla:
 \begin{description}
 \item[The memory table:]
@@ -119,15 +259,42 @@ Contains, for each block of memory, information about the most
 recent write and all reads since that write. 
 Blocksize is a tradeoff between memory use and precision; the examples in 
 this paper were run with single byte blocks. 
-\item[The activation tree:]
-Contains a record for each stack frame allocated during execution. 
-At any given point during execution, 
-the rightmost branch of the activation tree corresponds to the stack.
+\item[The trace pile:]
+Contains trace records representing instruction execution events that 
+Embla needs to refer to. Most trace records contain 
+\begin{itemize}
+\item
+a pointer to a record containing information about the program 
+address of the corresponding instruction, and
+\item
+a pointer to the previous trace record representing a procedure call.
+\end{itemize}
+% \item[The activation tree:]
+% Contains a record for each stack frame allocated during execution. 
+% At any given point during execution, 
+% the rightmost branch of the activation tree corresponds to the stack.
 \item[The result table:]
 A hash table mapping dependency signatures to counters of RAW, WAR 
 and WAR dependencies. Dependency signatures identify the source and
 target of the dependency as well as other information of interest.
 \end{description}
+In order to find all dependencies between a pair of lines, we also have
+to map the references occurring during the execution of procedures 
+called at those lines to the lines themselves. In general there may be 
+many activation records on top of each other, which raises the question 
+of how many records to ``unwind''. Consider the program in 
+figure~\ref{ffirstex}. Part of the call tree of the program is given 
+in figure~\ref{ffextree}. The dependence between lines 14 and 16 is due to
+the write by the {\tt inc} function when called from line 14 and the
+read by {\tt inc} when called from line 16. 
+
+
+
+
+
+
+
+
 The figure also shows how the data structures are used when the
 profiled program does a memory read. From the memory table we find the
 activation frame that was active when the last write was made and we
