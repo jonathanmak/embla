@@ -117,8 +117,8 @@ corresponding to {\tt n}, {\tt n.parent} is the parent node in the call tree
 and, if {\tt n} is in the stack, {\tt n.nextOnStack} is the node on top of 
 {\tt n} in the stack ({\tt n.nextOnStack.parent} = {\tt n}).
 
-Path compression can be used to decrease the number of iterations of the 
-{\tt while} loop.
+Path compression \cite{GF64} can be used to decrease the number of iterations 
+of the {\tt while} loop.
 Every node {\tt n} that is visited but is not on the stack can have its parent set 
 to its closest ancestor on the stack. We conjecture that this reduces the 
 complexity of the algorithm to essentially constant time. We can however do even 
