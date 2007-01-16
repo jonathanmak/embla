@@ -279,7 +279,8 @@ location. Then we find the {\em nearest common anscestor} (NCA) of the call
 tree nodes of $e$ and $e'$ (for instance, the NCA of {\it B} and {\it D} is
 {\it A} in Figure~\ref{ffextree}). The NCA can be calculated from the previous
 reference event $e'$ itself by noting that all anscestors of the current
-reference event $e$ correspond to frames on the current call stack. If we mark 
+reference event $e$ correspond to frames on the current call stack ({\it A} 
+and {\it D} in the example). If we mark 
 such nodes, we can search from $e'$ 
 towards the root of the call tree; the first node we reach that is on the 
 stack is the NCA.
