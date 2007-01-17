@@ -13,6 +13,7 @@
 \begin{document}
 
 \title{Embla -- Data Dependence Profiling for Parallel Programming }
+\subtitle{Extended Abstract}
 \author{Karl-Filip Fax\'en, Lars Albertsson, Konstantin Popov, Sverker Janson\\
        Swedish Institute of Computer Science\\
        Box 1263\\
@@ -91,20 +92,17 @@ Embla.
 \end{figure}
 
 We will focus on parallelization by introducing procedure-level
-fork-join parallelism.  To a first approximation, this means executing
-procedure calls asynchronously.  Consider the program fragment in
+fork-join parallelism.  Consider the program fragment in
 Figure~\ref{fforkjoin} (left):
 Suppose that the calls to {\tt p()} and {\tt q()} are independent,
-but that the call to {\tt r()} depends on the earlies calls. Then
+but that the call to {\tt r()} depends on the earlier calls. Then
 the call to {\tt p()} can be
-executed asynchronously, by a different thread, and in parallel with
-the call to {\tt q()}, as shown in the rightmost part of the figure.
+executed in parallel with
+the call to {\tt q()}, as shown to the right.
 Here we assume the availability of constructs {\tt spawn} to start
 the call in parallel and {\tt sync} to wait for all {\tt spawn}'d
 acivities to terminate (cf. \cite{BJKLR96,frigo98implementation}).
-
-This style of parallelism can be implemented efficiently and is easy
-to understand.  In particular, as long as {\tt p()} and {\tt q()} are
+As long as {\tt p()} and {\tt q()} are
 independent, the parallel program will produce identical results to
 the sequential version.  Therefore it is sufficient to understand
 (debug, verify, \ldots) the sequential program; everything except
@@ -216,7 +214,7 @@ of memory allocations is not important. If the
 parallelized version of the program uses a thread safe 
 implementation of {\tt malloc} these dependencies are irrelevant and
 can be ignored. Embla maintains a black list of functions that behave 
-in this way (the {\tt malloc} family in this paper).
+in this way (the {\tt malloc} family in this example).
 
 
 
@@ -229,21 +227,21 @@ in this way (the {\tt malloc} family in this paper).
 \begin{figure} \small
 \hrulefill
 \[
-\begin{picture}(160,90)(70,10)
-\put(120,90){\makebox(60,10)[c]{\it A:\ \tt main}}
-\put(150,90){\line(-1,-1){50}}
-\put(150,90){\line( 0,-1){50}}
-\put(150,90){\line( 1,-1){50}}
-\put(100,60){\makebox(20,10)[r]{\it 14}}
-\put(150,60){\makebox(20,10)[l]{\it 15}}
-\put(180,60){\makebox(20,10)[l]{\it 16}}
-\put(80,50){\makebox(20,10)[r]{\ldots}}
-\put(200,50){\makebox(20,10)[l]{\ldots}}
+\begin{picture}(160,60)(70,15)
+\put(120,65){\makebox(60,10)[c]{\it A:\ \tt main}}
+\put(150,65){\line(-2,-1){50}}
+\put(150,65){\line( 0,-1){25}}
+\put(150,65){\line( 2,-1){50}}
+\put(95,45){\makebox(20,10)[r]{\it 14}}
+\put(150,45){\makebox(20,10)[l]{\it 15}}
+\put(185,45){\makebox(20,10)[l]{\it 16}}
+\put(70,50){\makebox(20,10)[r]{\ldots}}
+\put(210,50){\makebox(20,10)[l]{\ldots}}
 \put(170,30){\makebox(60,10)[c]{\it D:\ \tt inc}}
 \put(120,30){\makebox(60,10)[c]{\it C:\ \tt inc}}
 \put(70,30){\makebox(60,10)[c]{\it B:\ \tt inc}}
-\put(70,10){\makebox(60,10)[c]{{\tt *q=}\ \ldots}}
-\put(170,10){\makebox(60,10)[c]{\ldots\ {\tt *q}\ \ldots}}
+\put(70,15){\makebox(60,10)[cb]{{\tt *q=}\ \ldots}}
+\put(170,15){\makebox(60,10)[cb]{\ldots\ {\tt *q}\ \ldots}}
 \end{picture}
 \]
 \hrulefill
@@ -315,7 +313,7 @@ to a previous and a new reference}
 \end{figure}    
 
 The algorithm for computing the dependence edge given the early and late
-endpoints (reference events) Figure~\ref{fdepedge}. Here an 
+endpoints (reference events) is given in Figure~\ref{fdepedge}. Here an 
 event represents the execution of a memory reference and a node corresponds 
 to a procedure invocation. An event {\tt e} has two attributes: {\tt e.line} 
 is the source line corresponding to {\tt e} and {\tt e.node} is the procedure 
@@ -349,19 +347,12 @@ We need the latest write to construct a flow dependence (RAW).
 We need the latest write to construct an output dependence (WAW) as well as
 all reads since that write to construct anti dependencies (WAR).
 \end{description}
-To see that we need all reads since the last write, consider the following
-example:
-\begin{verbatim}
-  x = 1;
-  y = x+1;
-  z = x+2;
-  x = 3;
-\end{verbatim}
-If only the last read is kept, the dependence between the second and fourth
-lines will be lost, and since subsequent reads do not yield dependencies, 
-there is no transitive dependence between these lines.
-Hence we keep track, for each memory location, of the the event corresponding 
-to the last write and a list of events corresponding to subsequent reads.
+If there are several reads with no interveaning write, a subsequent write
+(anti) depends on all of them. Since the reads do not depend on each other,
+we need to keep track of all of them in the memory table to generate the
+anti dependency edges explicitly. Since the write depends on them all and
+all subsequent references depend on the write, the read list can then be
+deallocated.
 
 An important aspect of compaction is that when a subtree of the dynamic
 call tree is compacted to be represented by its root node, the memory table
@@ -395,7 +386,7 @@ crucial in practice.
 \small
 \hrulefill
 \[
-\begin{picture}(250,210)(-30,0)
+\begin{picture}(250,200)(-30,10)
 % The memory table
 \put(-30,30){\framebox(40,180)[t]{\ }}
 \put(-30,10){\makebox(60,10){The memory table}}
@@ -432,7 +423,7 @@ crucial in practice.
 %
 % The next picture
 %
-\begin{picture}(200,210)(-30,0)
+\begin{picture}(200,200)(-30,10)
 % The memory table
 \put(-30,30){\framebox(40,180)[t]{\ }}
 \put(-30,10){\makebox(60,10){The memory table}}
