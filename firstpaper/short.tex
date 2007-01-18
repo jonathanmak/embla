@@ -292,6 +292,14 @@ Note that the same instructions in other calling contexts give rise to
 different dependencies, eg the flow dependence from line 15 (call to {\tt inc})
 to line 17 (call to {\tt printf}).
 
+The program transformations we target, parallel execution of source statements,
+essentially rearrange parts of the dynamic call tree by executing some subtrees 
+in parallel ({\it B} and {\it D} in the figure). Thus we map each instruction 
+level dependency to a dependency between subtrees by finding the parent of the 
+two subtrees containing the endpoints of the dependency, which we call the 
+{\em nearest common anscestor} (NCA) of the endpoints (the NCA of {\it B} and
+{\it D} is {\it A} in the figure). 
+
 We accomplish this mapping by associating each memory location with a dynamic
 instruction execution event and we also keep track of how these events 
 relate to the dynamic call tree. Thus, for a memory reference event $e$ we 
@@ -386,100 +394,8 @@ tree nodes. In this case it is unnecessary to represent more than one
 copy of each pointer, thus compacting the read lists. This optimization is 
 crucial in practice.
 
-\newcommand{\backlink}[3]
-{\begin{picture}(#1,#2)
-\put(0,0){\line(1,0){#1}}
-\put(#1,0){\line(0,1){#2}}
-\put(#1,#2){\vector(-1,0){#3}}
-\end{picture}}
-
-\newcommand{\rwblock}
-{\begin{picture}(100,40)(-40,0)
-\put(0,25){\line(4,3){20}}
-\put(0,15){\line(4,-3){20}}
-\put(-40,25){\line(1,0){40}}
-\put(-40,15){\line(1,0){40}}
-\put(20,0){\framebox(40,40){\ }}
-\put(20,30){\line(1,0){40}}
-\put(20,30){\makebox(40,10){Last write}}
-\put(20,20){\makebox(40,10){Last reads}}
-\put(20,5){\makebox(40,10){\vdots}}
-\end{picture}}
-\begin{figure*}
-\small
-\hrulefill
-\[
-\begin{picture}(250,200)(-30,10)
-% The memory table
-\put(-30,30){\framebox(40,180)[t]{\ }}
-\put(-30,10){\makebox(60,10){The memory table}}
-% A block
-\put(-30,145){\rwblock}
-\put(70,177){\vector(3,-2){30}}
-\put(-30,85){\rwblock}
-\put(70,113){\vector(4,-1){30}}
-\put(70,97){\vector(3,-2){30}}
-\put(-30,25){\rwblock}
-\put(70,50){\vector(2,-1){30}}
-% Trace pile
-\put(100,30){\framebox(40,180)[t]{\ }}
-\put(100,190){\framebox(40,10){Open C}}
-\put(100,170){\makebox(40,10){\vdots}}
-\put(100,160){\line(1,0){40}}
-\put(100,150){\makebox(40,10){Reg}}
-\put(140,157){\backlink{8}{36}{6}}
-\put(100,140){\framebox(40,10){Closed C}}
-\put(140,147){\backlink{16}{46}{6}}
-\put(100,120){\makebox(40,10){\vdots}}
-\put(100,100){\framebox(40,10){Reg}}
-\put(140,107){\backlink{8}{36}{6}}
-\put(100,85){\makebox(40,10){\vdots}}
-\put(100,70){\framebox(40,10){Reg}}
-\put(140,77){\backlink{16}{66}{6}}
-\put(100,50){\line(1,0){40}}
-\put(100,55){\makebox(40,10){\vdots}}
-\put(100,40){\makebox(40,10){Return}}
-\put(140,47){\backlink{24}{96}{6}}
-\put(100,30){\framebox(40,10){Reg}}
-\put(140,37){\backlink{32}{156}{14}}
-\end{picture}
-%
-% The next picture
-%
-\begin{picture}(200,200)(-30,10)
-% The memory table
-\put(-30,30){\framebox(40,180)[t]{\ }}
-\put(-30,10){\makebox(60,10){The memory table}}
-% A block
-\put(-30,145){\rwblock}
-\put(70,181){\vector(4,3){30}}
-\put(-30,85){\rwblock}
-\put(70,105){\vector(1,2){30}}
-\put(-30,25){\rwblock}
-\put(70,52){\vector(1,3){30}}
-% Trace pile
-\put(100,30){\framebox(40,180)[t]{\ }}
-\put(100,200){\makebox(40,10){Open C}}
-\put(100,200){\line(1,0){40}}
-\put(100,185){\makebox(40,10){\vdots}}
-\put(100,170){\framebox(40,10){Reg}}
-\put(140,177){\backlink{8}{26}{6}}
-\put(100,160){\makebox(40,10){Closed C}}
-\put(140,167){\backlink{16}{36}{6}}
-\put(100,150){\framebox(40,10){Return}}
-\put(140,157){\backlink{8}{6}{6}}
-\put(100,140){\makebox(40,10){Reg}}
-\put(140,147){\backlink{24}{56}{6}}
-\put(100,140){\line(1,0){40}}
-\end{picture}
-\]
-\hrulefill
-\caption{Compacting the trace pile: before and after}
-\label{fnyembladata}
-\end{figure*}
 
 
-Figure~\ref{fnyembladata} shows the data structures we have discussed:
 \begin{description}
 \item[The memory table:]
 Contains, for each block of memory, pointers to events or nodes representing
