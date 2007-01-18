@@ -31,7 +31,7 @@ applications.  In this paper we present a novel tool for aiding
 programmers in parallelizing programs. The tool, Embla, is based on the
 Valgrind framework, and allows the user to
 discover the data dependencies in a sequential program, thereby exposing
-opportunities for parallelization.   Embla performs a dynamic analysis,
+opportunities for parallelization.  Embla performs a dynamic analysis,
 and records dependencies as they
 arise during program execution.  It reports an optimistic view of
 parallelizable sequences, and ignores dependencies that do not arise during
@@ -40,7 +40,7 @@ which by necessity make conservative approximation, Embla is able to find
 more parallelism in sequential programs, and relies on the programmer to
 transform the program in a correct manner. 
 Moreover, since the tool instruments the machine code of the program,
-it is completely language independent. 
+it is largely language independent. 
 
 \end{abstract}
 
@@ -57,10 +57,10 @@ independent tasks that can be scheduled on available cores and
 hardware threads by runtime systems, such as thread libraries and
 fork-join frameworks \cite{}.  For some classes of programs, automatic
 parallelization is feasible, but with the current state-of-the-art,
-most software requires manual parallelization \cite{}.  Our work
-addresses the problem of assisting developers in this process, by
-identifying the potential for parallelism in programs, and with
-providing efficient tool support for this task.  In this paper, we
+most software requires manual parallelization \cite{}. 
+Our work aims to help developers find the potential for parallelism in 
+programs, in particular by providing efficient tool support.
+In this paper, we
 present a data dependence profiling approach to the parallelization
 problem, an efficient algorithm to project data dependencies onto
 relevant parts of the program code, and its implementation, the tool
@@ -102,11 +102,11 @@ the call to {\tt q()}, as shown to the right.
 Here we assume the availability of constructs {\tt spawn} to start
 the call in parallel and {\tt sync} to wait for all {\tt spawn}'d
 acivities to terminate (cf. \cite{BJKLR96,frigo98implementation}).
-As long as {\tt p()} and {\tt q()} are
-independent, the parallel program will produce identical results to
-the sequential version.  Therefore it is sufficient to understand
-(debug, verify, \ldots) the sequential program; everything except
-performance carries over to the parallel version.
+% As long as {\tt p()} and {\tt q()} are
+% independent, the parallel program will produce identical results to
+% the sequential version.  Therefore it is sufficient to understand
+% (debug, verify, \ldots) the sequential program; everything except
+% performance carries over to the parallel version.
 
 The price for using this approach is that one must find independent
 procedure calls (program fragments, in general).  The availability 
@@ -121,8 +121,9 @@ will not be further discussed here.
 Parallelizing compilers mostly target loop parallelization based on
 static data dependence analysis methods \cite{}.  Such analysers must
 by necessity be conservative.  Since they are static, they must use
-approximations which are always safe.  Good precision comes at a high
-computational cost, especially when analysing large programs.
+approximations which are always safe.  
+% Good precision comes at a high
+% computational cost, especially when analysing large programs.
 Analysing more general code, e.g., with pointers, remains a major
 challenge \cite{}.  Consequently, it has proved difficult to
 parallelize programs automatically in practice, and most production
@@ -136,6 +137,22 @@ parts involved are likely, but not guaranteed, to be independent.
 As in program testing, developers will be responsible for selecting
 program inputs that generate representative program executions with
 good coverage.
+
+Should a dependency slip through the net, it might manifest itself as a 
+difference in behaviour between the parallel and sequential versions of the
+program for some input (and if this methodology is followed, that is the only 
+possible source of such a difference). Rerunning the sequential program under
+Embla with the offending input is however guaranteed to yield the missing 
+dependency.
+Thus debugging the parallel program is reduced to debugging the sequential 
+program, in contrast to the case of ad hoc construction of multithreded
+code.
+
+In addition to data dependencies, control dependencies and I/O limit parallelism,
+and Embla could be extended to deal with them (easily in the case of I/O). We
+do however leave these extensions for future work and note that the control
+dependencies are trivial in the case of fork/join parallelism and easily handled 
+by the user of Embla.
 
 % End intro --------------------
 
@@ -155,8 +172,8 @@ were we see, from left to right, line numbers, colored data dependency
 arrows and source lines. 
 
 The presence of a data dependency arrow between a pair of lines indicates
-that Embla has found one or more data dependencies between them
-(Embla does not find control dependencies). A data dependence is a pair
+that Embla has found one or more data dependencies between them. 
+A data dependence is a pair
 of references, not both reads, to overlapping memory
 locations with no interveaning write. We will refer to these
 references as the {\em endpoints} of the dependence.
@@ -250,6 +267,10 @@ with the line number of the corresponding call.}
 \label{ffextree}
 \end{figure}
 
+% To be useful to the programmer, the instruction level dependencies detected 
+% by Embla must be mapped to source level. As discussed above, the dependency
+% that Embla reports is not always in the same function as the dependency endpoints.
+
 Embla is designed to help programmers 
 rewrite source code, so we need to project 
 the dependencies discovered in the dynamic instruction stream onto the 
@@ -263,7 +284,9 @@ lines in the same procedure.
 
 Consider the program from Figure~\ref{ffirstex} where we have three consecutive
 calls to {\tt inc} in lines 14--16. Figure~\ref{ffextree} gives the relevant 
-part of the dynamic call tree. The flow dependence between line 14 and 16 is due 
+part of the dynamic call tree where the nodes are procedure activations and the 
+edges correspond to call
+return pairs. The flow dependence between line 14 and 16 is due 
 to the write in {\tt inc} from the first call and the read from the second call.
 Note that the same instructions in other calling contexts give rise to 
 different dependencies, eg the flow dependence from line 15 (call to {\tt inc})
@@ -498,24 +521,6 @@ in the standard way.
 Embla uses the Valgrind instrumentation infrastructure, so there
 is no offline code rewriting; the Embla tool behaves like an emulator
 of the hardware.
-
-% begin discussion --------------
-
-\section{Discussion}
-
-
-Since Embla is a testing tool, it may be the case that not
-all relevant imputs have been used, allowing a dependency to slip
-though the net. This will manifest itself as a bug in the parallel
-program, possibly in a nondeterministic manner. However, the root
-cause of the bug is the missed dependency, which is deterministic and
-which can be found by running Embla on the sequential program 
-with the offending input. Thus,
-while Embla does not give proof of absence of dependencies (as a
-static checker would), it reduces the problem of debugging a
-multithreaded program to the problem of debugging a sequential
-program. Here all of the standard testing machinery (regression 
-testing, test coverage tools, \ldots) can be used.
 
 \section{Related Work}
 
