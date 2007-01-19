@@ -292,44 +292,38 @@ Note that the same instructions in other calling contexts give rise to
 different dependencies, eg the flow dependence from line 15 (call to {\tt inc})
 to line 17 (call to {\tt printf}).
 
-The (dynamic) call tree can be thought of as a trace with structure. The nodes
-are procedure invocations and the edges correspond to call/return pairs.
-We will denote an invocation of procedure $P$ as $P^i$ for some unique 
-identifier $i$. Thus an edge $P^i \rightarrow Q^j$ means that $P$
-during invocation $P^i$ called $Q$ yielding invocation $Q^j$. The edges of a
-call tree node are ordered; thus for each node $P^i$ we have a sequence
-$N_1 \ldots N_n$ of nodes corresponding to procedure calls executed in
-that order. A depth first pre-order traversal of the dynamic call tree
-corresponds to execution.
+The {\em instruction trace} $T$ is a sequence of {\em instruction execution 
+events} $e_1, \ldots, e_n$ which give rise to the {\em call tree} where a 
+node is a subsequence of $N \subseteq T$ bracketed by a pair of matched call 
+and return events. The {\em parent} of a node $N$ is the smallest $M$ such
+that $N \subseteq M$ and $N \not= M$, and we say that $N$ is a {\em child} 
+of $M$. Two nodes with the same parent are {\em siblings}.
+Thus the children of a node are all call events in it together 
+with all instructions executed during these calls.
 
 The program transformations we target, parallel execution of source statements,
 essentially rearrange parts of the dynamic call tree by executing some subtrees 
-in parallel. As ususl, we say that two subtrees can be executed in parallel
-if they can be executed in arbitrary order. Thus we want to know, for each
-call tree node $P^i$, the ordering constraints on the children of $P^i$ (that
-is, permissible rearrangements wrt the order in the original program). We
-now claim that we have a dependence between two children $Q^j$ and $R^k$ if
-and only if we have an instruction level dependency $a \prec b$ with
-$a \in Q^j$ and $b \in R^k$. We write this as $Q^j \prec R^k$. 
-An immediate consequence is that each instruction level dependency $a \prec b$
-corresponds to precisely one node dependency $N \prec M$.
+in parallel. Two subtrees can be executed in parallel
+if there are no dependencies between them. 
+% Thus we want to know, for each
+% call tree node $N$, the ordering constraints on the children of $N$ (that
+% is, permissible rearrangements wrt the order in the original trace). 
+Dependencies between instruction execution events are written as $e_i \prec e_j$
+and induce dependencies between subtrees as follows: If $M \not= N$ are 
+siblings, $e_i \in M$, $e_j \in N$ and $e_i \prec e_j$ then $M \prec N$.
+We claim that each instruction level dependency $e_i \prec e_j$ gives rise to 
+exactly one subtree dependency $M \prec N$ (different instruction level 
+dependencies may give rise to the same tree dependency).
 
 \newcommand{\li}{{\cal L}}
-Given that we have computed a node dependency $Q^j \prec R^k$ we map it to
-the source dependency $\li(Q^j) \prec \li(R^k)$ where $\li$ maps a node to the
-line number of the call site creating the node. This is of course an
-approximation; $\li(Q^j) \prec \li(R^k)$ corresponds to the set of all node
-dependencies $M \prec N$ such that $M$ and $N$ are siblings, $\li(M)=\li(Q^j)$
-and $\li(n)=\li(R^k)$.
+Given that we have computed a tree dependency $M \prec N$ we map it to
+the source dependency $\li(M) \prec \li(N)$ where $\li$ maps a node to the
+line number of the call site creating the node (the call instruction associated 
+with the call that is the first event of the node). This is of course an
+approximation; $\li(M) \prec \li(N)$ corresponds to the set of all node
+dependencies $M' \prec N'$ such that $M' \not= N'$ are siblings, $\li(M)=\li(M')$
+and $\li(N)=\li(N')$.
 
-The program transformations we target, parallel execution of source statements,
-essentially rearrange parts of the dynamic call tree by executing some subtrees 
-in parallel ({\it C} with {\it B} and {\it D} in the figure). Thus we map each 
-instruction 
-level dependency to a dependency between subtrees by finding the parent of the 
-two subtrees containing the endpoints of the dependency, which we call the 
-{\em nearest common anscestor} (NCA) of the endpoints (the NCA of {\it B} and
-{\it D} is {\it A} in the figure). 
 
 We accomplish this mapping by associating each memory location with a dynamic
 instruction execution event and we also keep track of how these events 
