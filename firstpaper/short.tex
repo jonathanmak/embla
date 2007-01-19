@@ -171,8 +171,8 @@ let us turn to the admittedly contrieved program in Figure~\ref{ffirstex}
 were we see, from left to right, line numbers, colored data dependency 
 arrows and source lines. 
 
-The presence of a data dependency arrow between a pair of lines indicates
-that Embla has found one or more data dependencies between them. 
+% The presence of a data dependency arrow between a pair of lines indicates
+% that Embla has found one or more data dependencies between them. 
 A data dependence is a pair
 of references, not both reads, to overlapping memory
 locations with no interveaning write. We will refer to these
@@ -294,7 +294,8 @@ to line 17 (call to {\tt printf}).
 
 The program transformations we target, parallel execution of source statements,
 essentially rearrange parts of the dynamic call tree by executing some subtrees 
-in parallel ({\it B} and {\it D} in the figure). Thus we map each instruction 
+in parallel ({\it C} with {\it B} and {\it D} in the figure). Thus we map each 
+instruction 
 level dependency to a dependency between subtrees by finding the parent of the 
 two subtrees containing the endpoints of the dependency, which we call the 
 {\em nearest common anscestor} (NCA) of the endpoints (the NCA of {\it B} and
