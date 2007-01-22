@@ -168,52 +168,27 @@ by the user of Embla.
 
 To get a feeling for what dependency profiling is and what Embla can do, 
 let us turn to the admittedly contrieved program in Figure~\ref{ffirstex}
-were we see, from left to right, line numbers, colored data dependency 
+were we see, from left to right, line numbers, data dependency 
 arrows and source lines. 
 
-% The presence of a data dependency arrow between a pair of lines indicates
-% that Embla has found one or more data dependencies between them. 
 A data dependence is a pair
 of references, not both reads, to overlapping memory
 locations with no interveaning write. We will refer to these
 references as the {\em endpoints} of the dependence.
 For instance, in the figure, 
-there is a (red) arrow from line 13 to line 14 corresponding to
+there is an arrow from line 13 to line 14 corresponding to
 the assignment to {\tt q} (the {\em early} endpoint) followed by its use 
-as an argument in {\tt inc(q)} (the {\em late} endpoint).
-
-Depending on whether the two endpoints of a dependence
-are reads or writes, data dependencies are typically divided into 
-three classes:
-\begin{description}
-\item[Flow:]
-A true data dependency where the location is first written then
-read. Also known as {\em read after write} (RAW). Shown in 
-{\bf \color{red} red} in the figure.
-\item[Anti:]
-A dependence caused by reuse of a location that is first read and then
-written. Also known as {\em write after read} (WAR). Shown in 
-{\bf \color{green} green} in the figure.
-\item[Output:]
-Similar to an anti dependence, but the second reference is also a
-write. Also known as {\em write after write} (WAW). Shown in 
-{\bf \color{blue} blue} in the figure.
-\end{description}
-If there are multiple dependencies of different class between the 
-same pair of lines, the color selection is prioritized in the
-order the dependencies are presented above (if there is
-some flow dependence, the arrow is red, and so on). 
-We show dependencies in different colors since there are program
-transformations that in some cases can be used to eliminate anti and
-output
-dependencies, and in this way Embla can give the user a hint as 
-to where this might be possible.
+as an argument in {\tt inc(q)} (the {\em late} endpoint). Embla
+internally distinguishes between flow (RAW), anti (WAR) and output (WAW) 
+dependencies, but in the figures in this paper, we do not make this
+distinction. Embla can be instructed to show dependency types, which can be
+useful for figuring out the reasons for individual dependencies.
 
 For each of the dependency arrows in the figure that 
 we have dicussed up to now, the endpoints have been part of the 
 code for {\tt main}
 itself. Embla also tracks references made in function calls. For
-instance, there is a (red) flow dependence from line 14 to line 16
+instance, there is a flow dependence from line 14 to line 16
 representing the write in the first invocation of {\tt inc} to the 
 {\tt malloc}'d area pointed to by {\tt q} and the subsequent read 
 of the same location by a later invocation of {\tt inc}. 
@@ -223,9 +198,9 @@ although the endpoints are part of the latter function.
 But the importance of the dependence is that, in {\tt main}, the calls
 on line 14 and 16 can not be made in parallel.
 
-The dependencies given in {\bf \color{cyan}light blue} color 
-(from line 13 to line 18) are due to manipulation of administrative 
-data structures by {\tt malloc}. If taken at face value these will
+The dependency given with a dotted arrow 
+(from line 13 to line 18) is due to manipulation of administrative 
+data structures by {\tt malloc}. If taken at face value such dependencies will
 serialize all calls to {\tt malloc}, but fortunately, the exact order
 of memory allocations is not important. If the 
 parallelized version of the program uses a thread safe 
