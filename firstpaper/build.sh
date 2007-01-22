@@ -2,9 +2,13 @@
 
 set -ex
 
-latex main
-bibtex main
-latex main
-latex main
-dvips -o main.ps main.dvi
-dvipdf main.dvi
+papers=short # main
+
+for paper in ${papers}; do
+  latex ${paper}
+  bibtex ${paper}
+  latex ${paper}
+  latex ${paper}
+  dvips -o ${paper}.ps ${paper}.dvi
+  dvipdf ${paper}.dvi
+done

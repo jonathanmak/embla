@@ -99,7 +99,7 @@ but that the call to {\tt r()} depends on the earlier calls. Then
 the call to {\tt p()} can be
 executed in parallel with
 the call to {\tt q()}, as shown to the right.
-Here we assume the availability of constructs {\tt spawn} to start
+Here we assume the availability of a construct {\tt spawn} to start
 the call in parallel and {\tt sync} to wait for all {\tt spawn}'d
 acivities to terminate (cf. \cite{BJKLR96,frigo98implementation}).
 % As long as {\tt p()} and {\tt q()} are
@@ -108,51 +108,46 @@ acivities to terminate (cf. \cite{BJKLR96,frigo98implementation}).
 % (debug, verify, \ldots) the sequential program; everything except
 % performance carries over to the parallel version.
 
-The price for using this approach is that one must find independent
-procedure calls (program fragments, in general).  The availability 
-of independent
+In order to use this approach, one must find independent
+procedure calls.  The availability of independent
 calls in the program depends on the algorithms used and can be further
-limited by sequential programming artifacts (such as re-use of
+limited by sequential programming artifacts, such as re-use of
 variables and sequential book-keeping in an otherwise parallelizable
-algorithm).  Data dependence information can potentially help
+algorithm.  Data dependence information can potentially help
 indentify and remove such obstacles to parallel execution, but this
 will not be further discussed here.
 
 Parallelizing compilers mostly target loop parallelization based on
-static data dependence analysis methods \cite{}.  Such analysers must
-by necessity be conservative.  Since they are static, they must use
-approximations which are always safe.  
+static data dependence analysis methods \cite{}.  Such analysers are
+necessity conservative, and use
+approximations that are always safe.  
 % Good precision comes at a high
 % computational cost, especially when analysing large programs.
 Analysing more general code, e.g., with pointers, remains a major
 challenge \cite{}.  Consequently, it has proved difficult to
-parallelize programs automatically in practice, and most production
+parallelize programs automatically, and most production
 codes are written in an explicitly parallel way.
 
 In contrast, Embla
 observes the actual data dependencies that occur during program
 execution, project them onto relevant program parts, and interpret the
 lack of a runtime data dependence as an indication that the program
-parts involved are likely, but not guaranteed, to be independent.
-As in program testing, developers will be responsible for selecting
+parts involved are likely to be independent.
+Developers will be responsible for selecting
 program inputs that generate representative program executions with
 good coverage.
 
-Should a dependency slip through the net, it might manifest itself as a 
+Should a dependency remain undetected, it might manifest itself as a 
 difference in behaviour between the parallel and sequential versions of the
-program for some input (and if this methodology is followed, that is the only 
-possible source of such a difference). Rerunning the sequential program under
-Embla with the offending input is however guaranteed to yield the missing 
-dependency.
-Thus debugging the parallel program is reduced to debugging the sequential 
+program for some input. Rerunning the sequential program under
+Embla with the offending input will, however, yield the missing dependency.
+Hence, debugging the parallel program is reduced to debugging the sequential 
 program, in contrast to the case of ad hoc construction of multithreded
 code.
 
-In addition to data dependencies, control dependencies and I/O limit parallelism,
-and Embla could be extended to deal with them (easily in the case of I/O). We
-do however leave these extensions for future work and note that the control
-dependencies are trivial in the case of fork/join parallelism and easily handled 
-by the user of Embla.
+In addition to data dependencies, and Embla could easily be extended to
+deal with I/O dependencies that limit parallelism them. We will, however,
+leave these extensions for future work.
 
 % End intro --------------------
 
