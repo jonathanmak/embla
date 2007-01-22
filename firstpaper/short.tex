@@ -119,7 +119,7 @@ will not be further discussed here.
 
 Parallelizing compilers mostly target loop parallelization based on
 static data dependence analysis methods \cite{}.  Such analysers are
-necessity conservative, and use
+by necessity conservative, and use
 approximations that are always safe.  
 % Good precision comes at a high
 % computational cost, especially when analysing large programs.
@@ -131,7 +131,7 @@ codes are written in an explicitly parallel way.
 In contrast, Embla
 observes the actual data dependencies that occur during program
 execution, project them onto relevant program parts, and interpret the
-lack of a runtime data dependence as an indication that the program
+lack of a runtime data dependency as an indication that the program
 parts involved are likely to be independent.
 Developers will be responsible for selecting
 program inputs that generate representative program executions with
@@ -141,7 +141,7 @@ Should a dependency remain undetected, it might manifest itself as a
 difference in behaviour between the parallel and sequential versions of the
 program for some input. Rerunning the sequential program under
 Embla with the offending input will, however, yield the missing dependency.
-Hence, debugging the parallel program is reduced to debugging the sequential 
+Thus, debugging the parallel program is reduced to debugging the sequential 
 program, in contrast to the case of ad hoc construction of multithreded
 code.
 
@@ -200,8 +200,8 @@ serialize all calls to {\tt malloc}, but fortunately, the exact order
 of memory allocations is not important. If the 
 parallelized version of the program uses a thread safe 
 implementation of {\tt malloc} these dependencies are irrelevant and
-can be ignored. Embla maintains a black list of functions that behave 
-in this way (the {\tt malloc} family in this example).
+can be ignored. Embla maintains a suppression list, with functions that behave 
+in this way.
 
 
 
@@ -248,28 +248,29 @@ with the line number of the corresponding call.}
 % procedure calls, we need to reflect the dependencies we find to that level 
 % as well. That is, we always want to know the dependencies between different 
 % lines in the same procedure.
-We are interested in dependencies between program statements (lines), and in 
+We are interested in dependencies between program statements, and in 
 this section we discuss how to compute these dependencies efficiently from
-the instruction level dependencies Embla directly observes.
+the instruction level dependencies directly observed by Embla.
 
 \subsection{From dependency endpoints to dependency edges: the call tree}
 
 Consider the {\em dynamic instruction stream} $S$ where each element 
 corresponds to the execution
 of an instruction. We can view this stream as a tree where the leaves are 
-events that do not correspond to call or return instructions and each 
+events that do not correspond to call or return instructions, and each 
 non-leaf node is a call
 event followed by a sequence of nodes and a return event. We call
 this tree the {\em execution tree} of $S$. 
 Each node corresponds to some execution of a procedure body.
 Figure~\ref{ffextree} shows part of
-the execution tree of figure~\ref{ffirstex} where we have omitted the 
-leaves. The nodes marked {\it B}, {\it C} and {\it D} correspond to 
+the execution tree of Figure~\ref{ffirstex} where we have omitted the 
+leaves. The nodes marked {\it B}, {\it C}, and {\it D} correspond to 
 the three consecutive calls to {\tt inc} at lines 14--16 of {\tt main}.
 
-The transformations we target will execute {\em siblings} (sub trees with
-the same parent, thus part of the same procedure activation) in parallel, hence we 
-are interested in dependencies between siblings. These arise from the 
+The transformations we target will execute {\em siblings}, subtrees with
+the same parent, in parallel.  Hence, we 
+are interested in dependencies between siblings.  Sibling dependencies
+arise from the 
 dependencies in the instruction stream; if $M$ and $N$ are siblings and
 there is an instruction level dependency from an instruction in $M$ 
 to an instruction in $N$ we have a (tree) dependency between $M$ and $N$
@@ -280,7 +281,7 @@ between siblings in the execution tree since there is only one node
 in the execution tree  
 where the two events fall in two distinct children (siblings of each other)
 that could potentially be rearranged. We call that node the {\em nearest
-common anscestor} (NCA) of the endpoints of the instruction level dependency.
+common ancestor} (NCA) of the endpoints of the instruction level dependency.
 Note that either or both of the children could be a leaf, in which case the
 corresponding dependency endpoint would be direct.
 For example, in figure~\ref{ffextree}
