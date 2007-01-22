@@ -214,7 +214,7 @@ in this way (the {\tt malloc} family in this example).
 
 % Begin algorithm -------------------
 
-\section{Dependence Attribution}
+\section{The Dependence Attribution Algorithm}
 
 \begin{figure} \small
 \hrulefill
@@ -244,80 +244,58 @@ with the line number of the corresponding call.}
 
 % To be useful to the programmer, the instruction level dependencies detected 
 % by Embla must be mapped to source level. As discussed above, the dependency
-% that Embla reports is not always in the same function as the dependency endpoints.
-
-Embla is designed to help programmers 
-rewrite source code, so we need to project 
-the dependencies discovered in the dynamic instruction stream onto the 
-source code in such a way as to inform the programmer about legal code 
-transformations. Since we are dealing with transformations on the level of
-procedure calls, we need to reflect the dependencies we find to that level 
-as well. That is, we always want to know the dependencies between different 
-lines in the same procedure.
+% that Embla reports is not always in the same function as the dependency endpoints
+% Embla is designed to help programmers 
+% rewrite source code, so we need to project 
+% the dependencies discovered in the dynamic instruction stream onto the 
+% source code in such a way as to inform the programmer about legal code 
+% transformations. Since we are dealing with transformations on the level of
+% procedure calls, we need to reflect the dependencies we find to that level 
+% as well. That is, we always want to know the dependencies between different 
+% lines in the same procedure.
+We are interested in dependencies between program statements (lines), and in 
+this section we discuss how to compute these dependencies efficiently from
+the instruction level dependencies Embla directly observes.
 
 \subsection{From dependency endpoints to dependency edges: the call tree}
 
-Consider the program from Figure~\ref{ffirstex} where we have three consecutive
-calls to {\tt inc} in lines 14--16. Figure~\ref{ffextree} gives the relevant 
-part of the dynamic call tree where the nodes are procedure activations and the 
-edges correspond to call
-return pairs. The flow dependence between line 14 and 16 is due 
-to the write in {\tt inc} from the first call and the read from the second call.
-Note that the same instructions in other calling contexts give rise to 
-different dependencies, eg the flow dependence from line 15 (call to {\tt inc})
-to line 17 (call to {\tt printf}).
+Consider the {\em dynamic instruction stream} $S$ where each element 
+corresponds to the execution
+of an instruction. We can view this stream as a tree where the leaves are 
+events that do not correspond to call or return instructions and each 
+non-leaf node is a call
+event followed by a sequence of nodes and a return event. We call
+this tree the {\em execution tree} of $S$. 
+Each node corresponds to some execution of a procedure body.
+Figure~\ref{ffextree} shows part of
+the execution tree of figure~\ref{ffirstex} where we have omitted the 
+leaves. The nodes marked {\it B}, {\it C} and {\it D} correspond to 
+the three consecutive calls to {\tt inc} at lines 14--16 of {\tt main}.
 
-The {\em instruction trace} $T$ is a sequence of {\em instruction execution 
-events} $e_1, \ldots, e_n$ which give rise to the {\em call tree} where a 
-node is a subsequence of $N \subseteq T$ bracketed by a pair of matched call 
-and return events. The {\em parent} of a node $N$ is the smallest $M$ such
-that $N \subseteq M$ and $N \not= M$, and we say that $N$ is a {\em child} 
-of $M$. Two nodes with the same parent are {\em siblings}.
-Thus the children of a node are all call events in it together 
-with all instructions executed during these calls.
+The transformations we target will execute {\em siblings} (sub trees with
+the same parent, thus part of the same procedure activation) in parallel, hence we 
+are interested in dependencies between siblings. These arise from the 
+dependencies in the instruction stream; if $M$ and $N$ are siblings and
+there is an instruction level dependency from an instruction in $M$ 
+to an instruction in $N$ we have a (tree) dependency between $M$ and $N$
+and we call $M$ the {\em source} and $N$ the {\em target} of the dependency.
 
-The program transformations we target, parallel execution of source statements,
-essentially rearrange parts of the dynamic call tree by executing some subtrees 
-in parallel. Two subtrees can be executed in parallel
-if there are no dependencies between them. 
-% Thus we want to know, for each
-% call tree node $N$, the ordering constraints on the children of $N$ (that
-% is, permissible rearrangements wrt the order in the original trace). 
-Dependencies between instruction execution events are written as $e_i \prec e_j$
-and induce dependencies between subtrees as follows: If $M \not= N$ are 
-siblings, $e_i \in M$, $e_j \in N$ and $e_i \prec e_j$ then $M \prec N$.
-We claim that each instruction level dependency $e_i \prec e_j$ gives rise to 
-exactly one subtree dependency $M \prec N$ (different instruction level 
-dependencies may give rise to the same tree dependency).
+In fact, each instruction level dependency yields exactly one dependency
+between siblings in the execution tree since there is only one node
+in the execution tree  
+where the two events fall in two distinct children (siblings of each other)
+that could potentially be rearranged. We call that node the {\em nearest
+common anscestor} (NCA) of the endpoints of the instruction level dependency.
+Note that either or both of the children could be a leaf, in which case the
+corresponding dependency endpoint would be direct.
+For example, in figure~\ref{ffextree}
+the dependency between the write in {\it B} and the read in {\it D} yields
+only the dependence between the nodes {\it B} and {\it D} and the NCA of
+{\it B} and {\it D} is {\it A}. 
 
-\newcommand{\li}{{\cal L}}
-Given that we have computed a tree dependency $M \prec N$ we map it to
-the source dependency $\li(M) \prec \li(N)$ where $\li$ maps a node to the
-line number of the call site creating the node (the call instruction associated 
-with the call that is the first event of the node). This is of course an
-approximation; $\li(M) \prec \li(N)$ corresponds to the set of all node
-dependencies $M' \prec N'$ such that $M' \not= N'$ are siblings, $\li(M)=\li(M')$
-and $\li(N)=\li(N')$.
-
-
-We accomplish this mapping by associating each memory location with a dynamic
-instruction execution event and we also keep track of how these events 
-relate to the dynamic call tree. Thus, for a memory reference event $e$ we 
-look up its data address to find the previous reference event $e'$ to that 
-location. Then we find the {\em nearest common anscestor} (NCA) of the call
-tree nodes of $e$ and $e'$ (for instance, the NCA of {\it B} and {\it D} is
-{\it A} in Figure~\ref{ffextree}). The NCA can be calculated from the previous
-reference event $e'$ itself by noting that all anscestors of the current
-reference event $e$ correspond to frames on the current call stack ({\it A} 
-and {\it D} in the example). If we mark 
-such nodes, we can search from $e'$ 
-towards the root of the call tree; the first node we reach that is on the 
-stack is the NCA.
-The line number (in the function corresponding to the NCA) of the source or 
-destination of the dependence is the line number of the last edge on the path 
-from the relevant event to the NCA (14 and 16, respectively, in 
-Figure~\ref{ffextree}).
-
+The dependence is then reported as a dependence between the source lines
+associated with the source and target nodes, respectively; in the example
+between lines 14 and 16 in {\tt main}.
 
 \begin{figure}
 \small
@@ -343,27 +321,37 @@ to a previous and a new reference}
 \label{fdepedge}
 \end{figure}    
 
-The algorithm for computing the dependence edge given the early and late
-endpoints (reference events) is given in Figure~\ref{fdepedge}. Here an 
-event represents the execution of a memory reference and a node corresponds 
-to a procedure invocation. An event {\tt e} has two attributes: {\tt e.line} 
-is the source line corresponding to {\tt e} and {\tt e.node} is the procedure 
-invocation that {\tt e} is part of. Similarly, if {\tt n} is a node, then 
+The algorithm for computing the source level dependency given the 
+instruction level dependency is given in Figure~\ref{fdepedge}. Here we
+have made use of the fact that the NCA must be part of the path from the
+late instruction level endpoint to the root node in the execution tree 
+(this path corresponds to the stack). Since we discover the dependencies
+in the order their late endpoints occur in the instruction stream, we
+can easily keep track of which tree nodes correspond to the stack. Thus
+we can search from the early endpoint towards the root; the first node
+on the stack is the NCA.
+
+In the algorithm, an 
+{\tt Event} represents a leaf node and a {\tt Node} corresponds 
+to a non-leaf node. An event {\tt e} has two attributes: {\tt e.line} 
+is the source line corresponding to {\tt e} and {\tt e.node} is the tree node
+that {\tt e} is part of. Similarly, if {\tt n} is a node, then 
 {\tt n.line} is the source line associated with the procedure call 
-corresponding to {\tt n}, {\tt n.parent} is the parent node in the call tree 
+corresponding to {\tt n}, {\tt n.parent} is the parent node in the execution tree 
 and, if {\tt n} is in the stack, {\tt n.nextOnStack} is the node on top of 
 {\tt n} in the stack ({\tt n.nextOnStack.parent} = {\tt n}).
 
 Path compression can be used to decrease the number of iterations of the 
 {\tt while} loop.
-Every node {\tt n} that is visited but is not on the stack can have its parent set 
+Every node {\tt n} that is visited but is not on the stack can have its parent set
 to its closest ancestor on the stack. We conjecture that this reduces the 
-complexity of the algorithm to essentially constant time. We can however do even 
-better since the output of the edge calculation does only depend on the immediate
-descendants of nodes on the stack. Thus every subtree $T$ of the call tree, 
-including the events at its leaves, such
-that the root of $T$ is not on the stack can be represented by the root of $T$
-alone.
+complexity of the algorithm to essentially constant time. 
+% We can however do even better since the output of the tree dependence 
+% calculation does only depend on the immediate
+% descendants of nodes on the stack. Thus every subtree $T$ of the call tree, 
+% including the events at its leaves, such
+% that the root of $T$ is not on the stack can be represented by the root of $T$
+% alone.
 
 \subsection{The state of a memory location: the memory table}
 
@@ -426,7 +414,7 @@ weak endpoint.
 
 % End algorithm -----------------------
 
-\section{The Implementation of Embla}
+\section{Implementation and Preliminary Experiments}
 
 Embla is based on instrumented execution of binary code. Although
 our examples of profiling output use a high level language (C),
