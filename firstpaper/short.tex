@@ -252,7 +252,7 @@ We are interested in dependencies between program statements, and in
 this section we discuss how to compute these dependencies efficiently from
 the instruction level dependencies directly observed by Embla.
 
-\subsection{From dependency endpoints to dependency edges: the call tree}
+\subsection{The execution tree}
 
 Consider the {\em dynamic instruction stream} $S$ where each element 
 corresponds to the execution
@@ -293,6 +293,36 @@ The dependence is then reported as a dependence between the source lines
 associated with the source and target nodes, respectively; in the example
 between lines 14 and 16 in {\tt main}.
 
+\newcommand{\tracepile}{trace pile}
+
+\subsection{Computing dependencies}
+
+Embla uses two main data structures: The \tracepile, which implements 
+the execution tree, and the memory table which maps addresses to tree
+nodes corresponding to the last write and subsequent reads of that
+location. For each reference, we look up the data address in the memory 
+table. If the reference is a read, we use the latest write to generate
+a flow dependency (RAW). If it is a write, we use the latest write to 
+construct an output dependence (WAW) as well as all reads since that 
+write to construct anti dependencies (WAR).
+
+If there are several reads with no interveaning write, a subsequent write
+(anti) depends on all of them. Since the reads do not depend on each other,
+we need to keep track of all of them in the memory table to generate the
+anti dependency edges explicitly. Since the write depends on them all and
+all subsequent references depend on the write, the read list can then be
+deallocated.
+
+The \tracepile\ contains the nodes of the execution tree in the same order
+as in the instruction stream. For each node {\tt n}, {\tt n.line} is the 
+source line associated with the procedure call 
+corresponding to {\tt n}, {\tt n.parent} is the parent node in the execution tree 
+and, if {\tt n} on the path between the root node of the tree and the most recent 
+event (leaf node), {\tt n.next} is the last child of {\tt n} (the node one step 
+closer to the most recent one), so {\tt n.next.parent} = {\tt n}. This
+path corresponds to the call stack; {\tt n.next} is the stack frame on
+top of {\tt n}.
+
 \begin{figure}
 \small
 \hrulefill
@@ -305,7 +335,7 @@ between lines 14 and 16 in {\tt main}.
            ncaNode = ncaNode.parent;
        }
        if( ncaNode != currEvent.node )
-           currLine = ncaNode.nextOnStack.line;
+           currLine = ncaNode.next.line;
        else
            currLine = currEvent.line;
        return ( oldLine, currLine );
@@ -317,25 +347,14 @@ to a previous and a new reference}
 \label{fdepedge}
 \end{figure}    
 
-The algorithm for computing the source level dependency given the 
-instruction level dependency is given in Figure~\ref{fdepedge}. Here we
+For each instruction level dependency found using the memory table,
+a source level dependency is computed using the algorithm in 
+Figure~\ref{fdepedge}. Here we
 have made use of the fact that the NCA must be part of the path from the
-late instruction level endpoint to the root node in the execution tree 
-(this path corresponds to the stack). Since we discover the dependencies
-in the order their late endpoints occur in the instruction stream, we
-can easily keep track of which tree nodes correspond to the stack. Thus
+late instruction level endpoint to the root node in the execution tree. 
+Thus
 we can search from the early endpoint towards the root; the first node
 on the stack is the NCA.
-
-In the algorithm, an 
-{\tt Event} represents a leaf node and a {\tt Node} corresponds 
-to a non-leaf node. An event {\tt e} has two attributes: {\tt e.line} 
-is the source line corresponding to {\tt e} and {\tt e.node} is the tree node
-that {\tt e} is part of. Similarly, if {\tt n} is a node, then 
-{\tt n.line} is the source line associated with the procedure call 
-corresponding to {\tt n}, {\tt n.parent} is the parent node in the execution tree 
-and, if {\tt n} is in the stack, {\tt n.nextOnStack} is the node on top of 
-{\tt n} in the stack ({\tt n.nextOnStack.parent} = {\tt n}).
 
 Path compression can be used to decrease the number of iterations of the 
 {\tt while} loop.
@@ -349,25 +368,17 @@ complexity of the algorithm to essentially constant time.
 % that the root of $T$ is not on the stack can be represented by the root of $T$
 % alone.
 
-\subsection{The state of a memory location: the memory table}
 
-When computing the dependencies created by a memory reference, we need to 
-map the data address of the reference to information about the previous
-reference to that location. What information we need depends on whether 
-the new refenece is a read or a write:
-\begin{description}
-\item[READ]
-We need the latest write to construct a flow dependence (RAW).
-\item[WRITE]
-We need the latest write to construct an output dependence (WAW) as well as
-all reads since that write to construct anti dependencies (WAR).
-\end{description}
-If there are several reads with no interveaning write, a subsequent write
-(anti) depends on all of them. Since the reads do not depend on each other,
-we need to keep track of all of them in the memory table to generate the
-anti dependency edges explicitly. Since the write depends on them all and
-all subsequent references depend on the write, the read list can then be
-deallocated.
+We can do better than path compression by {\em compacting} the \tracepile. 
+Once a procedure call has returned, we will not distinguish between 
+different events during its (completed) execution. We will only use the
+(identical) {\tt parent} fields of the nodes to look for the NCA. We 
+thus periodically compact the \tracepile\ by updating the pointers in 
+the memory table by following the {\tt parent} fields and reclaim the no longer
+referenced tree nodes.
+
+
+
 
 An important aspect of compaction is that when a subtree of the dynamic
 call tree is compacted to be represented by its root node, the memory table
@@ -377,34 +388,6 @@ process, pointers to previously distinct events now may point at the same
 tree nodes. In this case it is unnecessary to represent more than one 
 copy of each pointer, thus compacting the read lists. This optimization is 
 crucial in practice.
-
-
-
-\begin{description}
-\item[The memory table:]
-Contains, for each block of memory, pointers to events or nodes representing
-the most recent write and the reads since that write. 
-Blocksize is a tradeoff between memory use and precision; the examples in 
-this paper were run with single byte blocks. 
-\item[The trace pile:]
-Contains trace records representing events and call tree nodes; thus the 
-trace pile implements the call tree. Most trace records contain 
-\begin{itemize}
-\item
-a pointer to a record containing information about the program 
-address of the corresponding instruction (corresponds to the {\tt line} 
-attribute in the previous discussion), and
-\item
-a pointer to the previous trace record representing a procedure call (the 
-{\tt node} or {\tt parent} attributes of events and nodes, respectively).
-\end{itemize}
-\end{description}
-
-If a dependency endpoint is part of the NCA (if the NCA is the current
-frame or the frame pointed to from the memory table) it is labelled as
-direct, otherwise it is indirect. If any of the activation frames on
-the path from an endpoint to the NCA is on the black list, we have a
-weak endpoint.
 
 
 
