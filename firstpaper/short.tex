@@ -186,15 +186,14 @@ dependencies, but in the figures in this paper, we do not make this
 distinction. Embla can be instructed to show dependency types, which can be
 useful for figuring out the reasons for individual dependencies.
 
-For each of the dependency arrows in the figure that 
-we have discussed up to now, the endpoints have been part of the 
-code for {\tt main}
-itself. Embla also tracks references made in function calls. For
+The endpoints of the dependency arrow discussed above are parts of
+the code for {\tt main} itself, but Embla also tracks references made 
+in function calls. For
 instance, there is a flow dependence from line 14 to line 16
 representing the write in the first invocation of {\tt inc} to the 
 {\tt malloc}'d area pointed to by {\tt q} and the subsequent read 
 of the same location by a later invocation of {\tt inc}. 
-Note that these dependencies 
+These dependencies 
 are reported as pertaining to {\tt main} rather than {\tt inc},
 although the endpoints are part of the latter function. 
 But the importance of the dependence is that, in {\tt main}, the calls
@@ -239,7 +238,7 @@ in this way.
 \end{picture}
 \]
 \hrulefill
-\caption{Part of the call tree of Example 1, edges are annotated 
+\caption{Part of the execution tree of Example 1, edges are annotated 
 with the line number of the corresponding call.} 
 \label{ffextree}
 \end{figure}
@@ -275,8 +274,9 @@ leaves. The nodes marked {\it B}, {\it C}, and {\it D} correspond to
 the three consecutive calls to {\tt inc} at lines 14--16 of {\tt main}.
 
 The transformations we target will execute {\em siblings}, subtrees with
-the same parent, in parallel.  Hence, we 
-are interested in dependencies between siblings.  Sibling dependencies
+the same parent, in parallel (in figure~\ref{ffextree}, {\it B}, {\it C} 
+and {\it D} are siblings).  Hence, we 
+are interested in dependencies between siblings. These
 arise from the 
 dependencies in the instruction stream; if $M$ and $N$ are siblings and
 there is an instruction level dependency from an instruction in $M$ 
@@ -293,11 +293,11 @@ Note that either or both of the children could be a leaf, in which case the
 corresponding dependency endpoint would be direct.
 For example, in figure~\ref{ffextree}
 the dependency between the write in {\it B} and the read in {\it D} yields
-only the dependence between the nodes {\it B} and {\it D} and the NCA of
+only the tree dependency between the nodes {\it B} and {\it D} and the NCA of
 {\it B} and {\it D} is {\it A}. 
 
 The dependence is then reported as a dependence between the source lines
-associated with the source and target nodes, respectively; in the example
+associated with the source and target subtrees, respectively; in the example
 between lines 14 and 16 in {\tt main}.
 
 \newcommand{\tracepile}{trace pile}
@@ -307,26 +307,33 @@ between lines 14 and 16 in {\tt main}.
 Embla uses two main data structures: The \tracepile, which implements 
 the execution tree, and the memory table which maps addresses to tree
 nodes corresponding to the last write and subsequent reads of that
-location. For each reference, we look up the data address in the memory 
-table. If the reference is a read, we use the latest write to generate
-a flow dependency (RAW). If it is a write, we use the latest write to 
+location. The \tracepile\ contains the part of the execution tree
+corresponding to the part of the instructions stream that has been
+executed so far.
+For each reference, we look up the data address in the memory 
+table. If the reference is a read, we use the previous write to generate
+a flow dependency (RAW). If it is a write, we use the previous write to 
 construct an output dependence (WAW) as well as all reads since that 
 write to construct anti dependencies (WAR).
 
 If there are several reads with no intervening write, a subsequent write
 (anti) depends on all of them. Since the reads do not depend on each other,
 we need to keep track of all of them in the memory table to generate the
-anti dependency edges explicitly. Since the write depends on them all and
-all subsequent references depend on the write, the read list can then be
-deallocated.
+anti dependency edges explicitly. When that write has been processed 
+the read list can be deallocated since
+the write depends on all of the reads and
+all subsequent references depend on the write.
 
 The \tracepile\ contains the nodes of the execution tree in the same order
 as in the instruction stream. For each node {\tt n}, {\tt n.line} is the 
-source line associated with the procedure call 
+source line associated with the instruction (leaf) or procedure call
+(non-leaf) 
 corresponding to {\tt n}, {\tt n.parent} is the parent node in the execution tree 
-and, if {\tt n} on the path between the root node of the tree and the most recent 
+and, if {\tt n} is 
+on the path between the root node of the tree and the most recent 
 event (leaf node), {\tt n.next} is the last child of {\tt n} (the node one step 
-closer to the most recent one), so {\tt n.next.parent} = {\tt n}. This
+closer to the most recent one
+along that path), so {\tt n.next.parent} = {\tt n}. This
 path corresponds to the call stack; {\tt n.next} is the stack frame on
 top of {\tt n}.
 
@@ -365,7 +372,8 @@ on the stack is the NCA.
 
 Path compression can be used to decrease the number of iterations of the 
 {\tt while} loop.
-Every node {\tt n} that is visited but is not on the stack can have its parent set
+Every node {\tt n} that is visited but is not on the stack can have its 
+{\tt parent} field set
 to its closest ancestor on the stack. We conjecture that this reduces the 
 complexity of the algorithm to essentially constant time. 
 % We can however do even better since the output of the tree dependence 
@@ -388,7 +396,7 @@ referenced tree nodes.
 
 
 An important aspect of compaction is that when a subtree of the dynamic
-call tree is compacted to be represented by its root node, the memory table
+execution tree is compacted to be represented by its root node, the memory table
 needs to be updated to avoid dangling pointers to eliminated events. All
 pointers are then forwarded to point to the representative nodes. In this
 process, pointers to previously distinct events now may point at the same 
@@ -411,6 +419,43 @@ in the standard way.
 Embla uses the Valgrind instrumentation infrastructure, so there
 is no offline code rewriting; the Embla tool behaves like an emulator
 of the hardware.
+
+\begin{table}
+\begin{center} \newcommand{\sms}{\hskip0.4em}
+\begin{tabular}{|@{\sms}l@{\sms}|r@{\sms}r|r@{\sms}r@{\sms}r|r@{\sms}r@{\sms}r|} \hline
+ & & & \multicolumn{3}{|c|}{No RLC} & 
+\multicolumn{3}{c|}{RLC} \\
+Prog & \#L & \#sD & \#iD & RSz & T 
+                              & \#iD & RSz & T \\ \hline
+\tt ex & 17 & 15 & 3.7K & 12K & 0.8 & 3.7K & 12K & 0.8 \\
+\tt nfib & 22 & 7 & 32M & 14K & 6.7 & 32M & 14K & 6.9 \\
+\tt qs & 79 & 83 & 82M & 39M & 24.7 & 82M & 35M & 22.7 \\
+\tt mpeg & 6053 & 3330 & & & & 3.2G & 109M & 626.5 \\ \hline
+\end{tabular}
+\end{center}
+RLC: Read List Compaction, 
+\#L: \#non blank source lines, \#sD: \#source dependencies, \#iD: 
+\#instruction
+leve dependencies, RSz: max bytes for read lists, T: run time (s)
+\caption{Some experimental results} \label{trex}
+\end{table}
+
+We have run some preliminary experiments to see that the tool behaves as
+expected. Some results are reported in Table~\ref{trex}. It is interesting
+to see that read list compaction has a very different effect on different 
+programs depending on how common long sequences of reads of the same 
+locations are (the RSz columns). We also see that the number of instruction 
+level dependencies (the \#iD columns) are affected since the read lists 
+are shorter when a write does occur (of course, the eliminated read list 
+items would have yielded no new source level dependencies).
+
+We note that Embla finds the expected independence of the recursive calls 
+in the recursive divide-and-conquer programs quicksort ({\tt qs}) and
+fibonnaci ({\tt nfib}) although the former is an in-place version coded 
+with pointers and pointer arithmetic, something that is well known to be 
+difficult to deal with for static analysers. We have also done naive
+hand parallelisation of these programs according to the information 
+yielded by Embla and obtained the expected good speedup.
 
 \bibliographystyle{plain}
 \bibliography{embib}
