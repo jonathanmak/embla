@@ -138,7 +138,11 @@ lack of a runtime data dependency as an indication that the program
 parts involved are likely to be independent.
 Developers will be responsible for selecting
 program inputs that generate representative program executions with
-good coverage.
+good coverage.  In the future, Embla will measure the potential speed
+improvement for parallelizing independent program parts and produce a
+report with suggested program transforms that will yield the maximum
+benefit.  The reporting mechanism is future work, however.  This paper
+presents the mechanism for collecting runtime data dependence information.
 
 Should a dependency remain undetected, it might manifest itself as a 
 difference in behaviour between the parallel and sequential versions of the
