@@ -304,8 +304,8 @@ between lines 14 and 16 in {\tt main}.
 
 \subsection{Computing dependencies}
 
-Embla uses two main data structures: The \tracepile, which implements 
-the execution tree, and the memory table which maps addresses to tree
+Embla uses two main data structures: The {\em \tracepile}, which implements 
+the execution tree, and the {\em memory table} which maps addresses to tree
 nodes corresponding to the last write and subsequent reads of that
 location. The \tracepile\ contains the part of the execution tree
 corresponding to the part of the instructions stream that has been
@@ -414,8 +414,8 @@ crucial in practice.
 
 Embla is based on instrumented execution of binary code. Although
 our examples of profiling output use a high level language (C),
-the profiling itself is on instruction level, followed by 
-mapping the information to source level using debugging information 
+the profiling itself is on the instruction level, followed by 
+mapping the information to the source level using debugging information 
 in the standard way.
 
 Embla uses the Valgrind instrumentation infrastructure, so there
@@ -442,20 +442,21 @@ leve dependencies, RSz: max bytes for read lists, T: run time (s)
 \caption{Some experimental results} \label{trex}
 \end{table}
 
-We have run some preliminary experiments to see that the tool behaves as
+We have run some preliminary experiments to verify that the tool performs as
 expected. Some results are reported in Table~\ref{trex}. The programs are 
-{\tt ex}, our example from figure~\ref{ffirstex}, {\tt fib}, a recursive
+{\tt ex}, our example from Figure~\ref{ffirstex}, {\tt fib}, a recursive
 Fibonnaci implementation, {\tt qs}, a recursive quicksort implementation 
 and {\tt mpeg}, an MPeg encoder encoding 10 frames.
 
 It is interesting
 to see that read list compaction has a very different effect on different 
-programs depending on how common long sequences of reads of the same 
-locations are (the RSz columns), ranging from no difference for {\tt ex} and 
+programs depending on the frequency of long sequences of reads from the same 
+location (the RSz columns), ranging from no difference for {\tt ex} and 
 {\tt fib} to a 20x difference for {\tt mpeg}. We also see that the number of 
 instruction 
 level dependencies (the \#iD columns) are affected since the read lists 
-are shorter when a write does occur (of course, the eliminated read list 
+are shorter when a write occurs following compaction (however, the 
+eliminated read list 
 items would have yielded no new source level dependencies).
 
 We note that Embla finds the expected independence of the recursive calls 
@@ -471,12 +472,12 @@ yielded by Embla and obtained the expected good speedup.
 We have presented Embla, a data dependence profiling tool, discussed the 
 main issues and the algorithms used to resolve them. We argue that
 data dependence profiling is a useful and practical complement to static
-analysis for parallelization of new and legacy code. Finally, we have 
+analysis for parallelisation of new and legacy code. Finally, we have 
 reported on a few initial experiments with Embla.
 
 In the future we plan additional refinements of Embla as well as the 
 application to real legacy code. We also look forward to doing more
-parallelization experiments using parallel environments such as OpenMP.
+parallelisation experiments using parallel environments such as OpenMP.
 
 
 \bibliographystyle{plain}
