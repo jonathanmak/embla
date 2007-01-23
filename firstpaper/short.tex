@@ -274,7 +274,7 @@ leaves. The nodes marked {\it B}, {\it C}, and {\it D} correspond to
 the three consecutive calls to {\tt inc} at lines 14--16 of {\tt main}.
 
 The transformations we target will execute {\em siblings}, subtrees with
-the same parent, in parallel (in figure~\ref{ffextree}, {\it B}, {\it C} 
+the same parent, in parallel (in Figure~\ref{ffextree}, {\it B}, {\it C} 
 and {\it D} are siblings).  Hence, we 
 are interested in dependencies between siblings. These
 arise from the 
@@ -291,7 +291,7 @@ that could potentially be rearranged. We call that node the {\em nearest
 common ancestor} (NCA) of the endpoints of the instruction level dependence.
 Note that either or both of the children could be a leaf, in which case the
 corresponding dependence endpoint would be direct.
-For example, in figure~\ref{ffextree}
+For example, in Figure~\ref{ffextree}
 the dependence between the write in {\it B} and the read in {\it D} yields
 only the tree dependence between the nodes {\it B} and {\it D} and the NCA of
 {\it B} and {\it D} is {\it A}. 
