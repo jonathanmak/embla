@@ -50,21 +50,19 @@ it is largely language independent.
 
 Parallel programming is no longer optional.  To enjoy continued
 performance gains with future generation multicore processors,
-application developers must parallelize all software, old and new
-\cite{TEL95,ONHWC96,KAB03,Sutter05}.  For scalable parallel
+application developers must parallelize all software, old and
+new~\cite{TEL95,ONHWC96,KAB03,VIAVAC05}.  For scalable parallel
 performance, program execution must be divided into large numbers of
-independent tasks that can be scheduled on available cores and
-hardware threads by runtime systems, such as thread libraries and
-fork-join frameworks \cite{}.  For some classes of programs, automatic
-parallelization is feasible, but with the current state-of-the-art,
-most software requires manual parallelization \cite{}. 
-Our work aims to help developers find the potential for parallelism in 
-programs, in particular by providing efficient tool support.
-In this paper, we
-present a data dependence profiling approach to the parallelization
-problem, an efficient algorithm to project data dependencies onto
-relevant parts of the program code, and its implementation, the tool
-Embla.
+independent tasks that can be scheduled on available cores and hardware
+threads by runtime systems.  For some classes of programs, static
+analysis and automatic parallelization is feasible~\cite{KA02}, but with
+the current state-of-the-art, most software requires manual
+parallelization.  Our work aims to help developers find the potential
+for parallelism in programs, in particular by providing efficient tool
+support.  In this paper, we present a data dependence profiling approach
+to the parallelization problem, an efficient algorithm to project data
+dependencies onto relevant parts of the program code, and its
+implementation, the tool Embla.
 
 \begin{figure}
 \small
@@ -92,7 +90,11 @@ Embla.
 \end{figure}
 
 We will focus on parallelization by introducing procedure-level
-fork-join parallelism.  Consider the program fragment in
+fork-join parallelism. The fork-join framework was first introduced
+in~\cite{Conway63} and used in many parallel programming environments,
+including Cilk~\cite{BJKLR96}, the Java fork/join
+framework~\cite{Lea00}, OpenMP~\cite{DM98}, and the Filaments
+package~\cite{LF00}. Consider the program fragment in
 Figure~\ref{fforkjoin} (left):
 Suppose that the calls to {\tt p()} and {\tt q()} are independent,
 but that the call to {\tt r()} depends on the earlier calls. Then
@@ -101,7 +103,7 @@ executed in parallel with
 the call to {\tt q()}, as shown to the right.
 Here we assume the availability of a construct {\tt spawn} to start
 the call in parallel and {\tt sync} to wait for all {\tt spawn}'d
-acivities to terminate (cf. \cite{BJKLR96,frigo98implementation}).
+acivities to terminate (cf.~\cite{BJKLR96}).
 % As long as {\tt p()} and {\tt q()} are
 % independent, the parallel program will produce identical results to
 % the sequential version.  Therefore it is sufficient to understand
@@ -118,15 +120,16 @@ indentify and remove such obstacles to parallel execution, but this
 will not be further discussed here.
 
 Parallelizing compilers mostly target loop parallelization based on
-static data dependence analysis methods \cite{}.  Such analysers are
+static data dependence analysis methods~\cite{KA02}.  Such analysers are
 by necessity conservative, and use
 approximations that are always safe.  
 % Good precision comes at a high
 % computational cost, especially when analysing large programs.
 Analysing more general code, e.g., with pointers, remains a major
-challenge \cite{}.  Consequently, it has proved difficult to
-parallelize programs automatically, and most production
-codes are written in an explicitly parallel way.
+challenge~TODOREF\cite{}.  Consequently, it has proved difficult to
+parallelize programs automatically, and most production codes are either
+written in an explicitly parallel way or rely on speculative, run-time
+parallelization techniques~\cite{PO03,CL03}.
 
 In contrast, Embla
 observes the actual data dependencies that occur during program
@@ -404,31 +407,6 @@ in the standard way.
 Embla uses the Valgrind instrumentation infrastructure, so there
 is no offline code rewriting; the Embla tool behaves like an emulator
 of the hardware.
-
-\section{Related Work}
-
-The fork-join parallelism has been recognized as a simple yet widely
-acceptable pattern for building efficient parallel applications, and used e.g. in
-Cilk~\cite{BJKLR96}, the Java fork/join framework~\cite{Lea00}, the
-Filaments package~\cite{LF00}, and {TAM}~-- a compiler-controlled
-threaded abstract machine~\cite{CGSE93,GSC95}. 
-
-Many years of research has been devoted to automatic parallelization
-by compilers utilizing static analysis techniques, yet the common
-consensus is that the goal is unattainable beyond certain limited
-well-specified areas such as loop parallelization in scientific
-computation. Static analysis techniques have been also tried for the
-closely related topic of data race in multithreaded programs
-(see~\cite{Rinard01,NAW06} for surveys), yet some
-authors~\cite{Rinard01} believe that this approach is too complex, and
-the ultimate way to control data races is to use augmented type systems
-that can eliminated them in the first place.
-
-Our approach has certain similarity to on-the-fly data race detection
-systems (such as~\cite{MellorCrummey91,SBNSA97,HRY02}) that can be
-usable in certain contexts depending on the amount of synchronization
-through shared memory, and the amount of overhead caused by instrumentation that
-can be tolerated by a particular application.
 
 \bibliographystyle{plain}
 \bibliography{embib}

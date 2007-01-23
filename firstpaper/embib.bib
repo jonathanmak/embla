@@ -58,12 +58,13 @@
 
 @article{KAB03,
   x-author =	 {Nam Sung Kim and Todd Austin and David Blaauw and
-                  Trevor Mudge and Kriszti{\'a}n Flautner and Jie S. Hu
-                  and Mary Jane Irwin and Mahmut Kandemir and
+                  Trevor Mudge and Kriszti{\'a}n Flautner and Jie
+                  S. Hu and Mary Jane Irwin and Mahmut Kandemir and
                   Vijaykrishnan Narayanan},
-  author =	 {N. Kim and T. Austin and D. Blaauw and T. Mudge and
+  x-author =	 {N. Kim and T. Austin and D. Blaauw and T. Mudge and
                   K. Flautner and J. Hu and M. Irwin and M. Kandemir
                   and V. Narayanan},
+  author =	 {{N. Kim \textit{et al.}}},
   title =	 {Leakage Current: {Moore's Law} Meets Static Power},
   journal =	 {{IEEE} Computer},
   year =	 {2003},
@@ -75,10 +76,10 @@
 }
 
 @inproceedings{TEL95,
-  author =	 {D.M. Tullsen and S.J. Eggers and H.M. Levy},
+  author =	 {D. Tullsen and S. Eggers and H. Levy},
   title =	 {Simultaneous Multithreading: Maximizing On-Chip
                   Parallelism},
-  booktitle =	 {The $22^{th}$ Annual International Symposium on
+  booktitle =	 {The $22^{th}$ Annual Int. Symp. on
                   Computer Architecture},
   pages =	 {392--403},
   crossref =	 {ISCA95},
@@ -89,24 +90,27 @@
    key = {ISCA95},
    title = {The $22^{th}$ Annual International Symposium on Computer
 		 Architecture},
-   month = jun # " 22--24 ",
-   address = {Santa Margherita Ligure, Italy},
-   publisher = {ACM Press},
+   x-month = jun # " 22--24 ",
+   x-address = {Santa Margherita Ligure, Italy},
+   x-publisher = {ACM Press},
    year = {1995},
    x-note = not_here
 }
 
 @inproceedings{ONHWC96,
-  author =	 {Kunle Olukotun and Basem A. Nayfeh and Lance Hammond
+  x-author =	 {Kunle Olukotun and Basem A. Nayfeh and Lance Hammond
                   and Ken Wilson and Kunyung Chang},
+  author =	 {K. Olukotun and B. Nayfeh and L. Hammond
+                  and K. Wilson and K. Chang},
   title =	 {The case for a single-chip multiprocessor},
-  booktitle =	 {ASPLOS-VII: Proceedings of the seventh international
-                  conference on Architectural support for programming
-                  languages and operating systems},
+  booktitle =	 {Proceedings of the $7^{th}$ International
+                  Conference on Architectural Support for Programming
+                  Languages and Operating Systems},
   year =	 {1996},
+  x-month =	 oct#" 1--5 ",
   isbn =	 {0-89791-767-7},
   pages =	 {2--11},
-  address =	 {Cambridge, Massachusetts},
+  x-address =	 {Cambridge, Massachusetts},
   publisher =	 {ACM Press},
   x-location =	 {olukotun-ASPLOSVII.pdf.gz}
 }
@@ -184,41 +188,9 @@
   pages =	 {36--43},
   location =	 {San Francisco, California, United States},
   publisher =	 {ACM Press},
-  address =	 {New York, NY, USA},
+  address =	 {New York},
   x-location =	 {lea-java-forkjoin.pdf.gz}
 }
-
-
-@article{CGSE93,
-  author =	 {Culler, David E. and Goldstein, Seth Copen and
-                  Schauser, Klaus Erik and von Eicken, Thorsten},
-  title =	 {{TAM}~-- A Compiler Controlled Threaded Abstract
-                  Machine},
-  journal =	 {Journal of Parallel and Distributed Computing,
-                  Special Issue on Dataflow},
-  volume =	 {18},
-  number =	 {3},
-  year =	 {1993},
-  issn =	 {0743-7315},
-  pages =	 {347--370},
-  month =	 jun,
-  publisher =	 {Academic Press, Inc.},
-  x-location =	 {culler-jpdc93.ps.gz}
-}
-
-@inproceedings{GSC95,
-  x-author =	 {Seth Copen Goldstein and Klaus Erik Schauser and
-                  David Culler},
-  author =	 {S. Goldstein and K. Schauser and D. Culler},
-  title =	 {Enabling Primitives For Compiling Parallel
-                  Languages},
-  year =	 {1995},
-  month =	 may,
-  booktitle =	 {Third Workshop on Languages, Compilers, and Run-Time
-                  Systems for Scalable Computers},
-  x-location =	 {goldstein-ep-c-pl.pdf.gz}
-}
-
 
 @inproceedings{Rinard01,
   author =	 {Martin C. Rinard},
@@ -232,7 +204,6 @@
   address =	 {London, UK},
   x-locatino =	 {rinard-analysis.ps.gz}
 }
-
 
 @inproceedings{NAW06,
   x-author =	 {Mayur Naik and Alex Aiken and John Whaley},
@@ -349,16 +320,17 @@
 }
 
 @inproceedings{PO03,
-  author =	 {Manohar K. Prabhu and Kunle Olukotun},
+  x-author =	 {Manohar K. Prabhu and Kunle Olukotun},
+  author =	 {M. Prabhu and K. Olukotun},
   title =	 {Using thread-level speculation to simplify manual
                   parallelization},
-  booktitle =	 {Proceedings of the ninth ACM SIGPLAN symposium on
-                  Principles and practice of parallel programming},
+  booktitle =	 {Proceedings of the $9^{th}$ ACM SIGPLAN Symp. on
+                  Principles and Practice of Parallel Programming},
   year =	 {2003},
   isbn =	 {1-58113-588-2},
-  pages =	 {1--12},
-  location =	 {San Diego, California, USA},
-  publisher =	 {ACM Press},
+  x-pages =	 {1--12},
+  x-address =	 {San Diego, California, USA},
+  x-publisher =	 {ACM Press},
   abstract =	 {In this paper, we provide examples of how
                   thread-level speculation (TLS) simplifies manual
                   parallelization and enhances its performance. A
@@ -445,3 +417,105 @@
  publisher = {ACM Press},
  address = {New York, NY, USA},
  }
+
+@inproceedings{Conway63,
+  author =	 {M. Conway},
+  title =	 {A multiprocessor system design},
+  booktitle =	 {Proceedings of AFIPS FJCC'63},
+  pages =	 {139-148},
+  year =	 {1963},
+  volume =	 {24},
+  x-address =	 {Las Vegas, USA},
+  x-month =	 nov,
+  publisher =	 {Spartan Books},
+  x-annotation = {The fork/join framework.},
+  x-note =	 not_here
+}
+
+@article{VIAVAC05,
+  x-author =	 {Neil Vachharajani and Matthew Iyer and Chinmay Ashok
+                  and Manish Vachharajani and David I. August and
+                  Daniel A. Connors},
+  author =	 {N. Vachharajani and M. Iyer and C. Ashok and
+                  M. Vachharajani and D. August and D. Connors},
+  title =	 {Chip multi-processor scalability for single-threaded
+                  applications},
+  journal =	 {SIGARCH Computer Architecture News},
+  volume =	 {33},
+  number =	 {4},
+  year =	 {2005},
+  issn =	 {0163-5964},
+  pages =	 {44--53},
+  abstract =	 {The exponential increase in uniprocessor performance
+                  has begun to slow. Designers have been unable to
+                  scale performance while managing thermal, power, and
+                  electrical effects. Furthermore, design complexity
+                  limits the size of monolithic processors that can be
+                  designed while keeping costs reasonable. Industry
+                  has responded by moving toward chip multi-processor
+                  architectures (CMP). These architectures are
+                  composed from replicated processors utilizing the
+                  die area afforded by newer design processes. While
+                  this approach mitigates the issues with design
+                  complexity, power, and electrical effects, it does
+                  nothing to directly improve the performance of
+                  contemporary or future single-threaded
+                  applications.This paper examines the scalability
+                  potential for exploiting the parallelism in
+                  single-threaded applications on these CMP
+                  platforms. The paper explores the total available
+                  parallelism in unmodified sequential applications
+                  and then examines the viability of exploiting this
+                  parallelism on CMP machines. Using the results from
+                  this analysis, the paper forecasts that CMPs, using
+                  the "intrinsic" parallelism in a program, can
+                  sustain the performance improvement users have come
+                  to expect from new processors for only 6-8 years
+                  provided many successful parallelization efforts
+                  emerge. Given this outlook, the paper advocates
+                  exploring methodologies which achieve parallelism
+                  beyond this "intrinsic" limit of programs.},
+  x-location =	 {vachharajani-cmp-s-sta.pdf.gz}
+}
+
+@book{KA02,
+  author =	 {Ken Kennedy and John R. Allen},
+  title =	 {Optimizing Compilers for Modern Architectures: a
+                  Dependence-Based Approach},
+  year =	 {2002},
+  isbn =	 {1-55860-286-0},
+  publisher =	 {Morgan Kaufmann Publishers Inc.},
+  address =	 {San Francisco, CA, USA},
+}
+
+@article{CL03,
+  x-author =	 {Marcelo Cintra and Diego R. Llanos},
+  author =	 {M. Cintra and D. Llanos},
+  title =	 {Toward efficient and robust software speculative
+                  parallelization on multiprocessors},
+  journal =	 {Proceedings of the ACM
+                  SIGPLAN Symposium on Principles and Practice of
+                  Parallel Programming},
+  volume =	 {38},
+  number =	 {10},
+  year =	 {2003},
+  issn =	 {0362-1340},
+  pages =	 {13--24},
+  x-publisher =	 {ACM Press},
+  x-location =	 {cintra-er-ssp.pdf.gz}
+}
+
+@article{DM98,
+  x-author =	 {Leonardo Dagum and Ramesh Menon},
+  author =	 {L. Dagum and R. Menon},
+  title =	 {{OpenMP}: An Industry-Standard {API} for Shared-Memory
+                  Programming},
+  journal =	 {IEEE Computational Science \& Engineering},
+  volume =	 {5},
+  number =	 {1},
+  year =	 {1998},
+  issn =	 {1070-9924},
+  pages =	 {46--55},
+  publisher =	 {IEEE Computer Society Press},
+  x-location =	 {dagum-openmp.pdf.gz}
+}
