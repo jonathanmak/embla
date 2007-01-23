@@ -103,7 +103,7 @@ executed in parallel with
 the call to {\tt q()}, as shown to the right.
 Here we assume the availability of a construct {\tt spawn} to start
 the call in parallel and {\tt sync} to wait for all {\tt spawn}'d
-acivities to terminate (cf.~\cite{BJKLR96}).
+activities to terminate (cf.~\cite{BJKLR96}).
 % As long as {\tt p()} and {\tt q()} are
 % independent, the parallel program will produce identical results to
 % the sequential version.  Therefore it is sufficient to understand
@@ -116,7 +116,7 @@ calls in the program depends on the algorithms used and can be further
 limited by sequential programming artifacts, such as re-use of
 variables and sequential book-keeping in an otherwise parallelizable
 algorithm.  Data dependence information can potentially help
-indentify and remove such obstacles to parallel execution, but this
+identify and remove such obstacles to parallel execution, but this
 will not be further discussed here.
 
 Parallelizing compilers mostly target loop parallelization based on
@@ -149,7 +149,7 @@ difference in behaviour between the parallel and sequential versions of the
 program for some input. Rerunning the sequential program under
 Embla with the offending input will, however, yield the missing dependency.
 Thus, debugging the parallel program is reduced to debugging the sequential 
-program, in contrast to the case of ad hoc construction of multithreded
+program, in contrast to the case of ad hoc construction of multithreaded
 code.
 
 In addition to data dependencies, and Embla could easily be extended to
@@ -187,7 +187,7 @@ distinction. Embla can be instructed to show dependency types, which can be
 useful for figuring out the reasons for individual dependencies.
 
 For each of the dependency arrows in the figure that 
-we have dicussed up to now, the endpoints have been part of the 
+we have discussed up to now, the endpoints have been part of the 
 code for {\tt main}
 itself. Embla also tracks references made in function calls. For
 instance, there is a flow dependence from line 14 to line 16
@@ -313,7 +313,7 @@ a flow dependency (RAW). If it is a write, we use the latest write to
 construct an output dependence (WAW) as well as all reads since that 
 write to construct anti dependencies (WAR).
 
-If there are several reads with no interveaning write, a subsequent write
+If there are several reads with no intervening write, a subsequent write
 (anti) depends on all of them. Since the reads do not depend on each other,
 we need to keep track of all of them in the memory table to generate the
 anti dependency edges explicitly. Since the write depends on them all and
