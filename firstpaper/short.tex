@@ -30,11 +30,11 @@ tools and methodologies supporting parallelization of existing
 applications.  In this paper we present a novel tool for aiding
 programmers in parallelizing programs. The tool, Embla, is based on the
 Valgrind framework, and allows the user to
-discover the data dependencies in a sequential program, thereby exposing
+discover the data dependences in a sequential program, thereby exposing
 opportunities for parallelization.  Embla performs a dynamic analysis,
-and records dependencies as they
+and records dependences as they
 arise during program execution.  It reports an optimistic view of
-parallelizable sequences, and ignores dependencies that do not arise during
+parallelizable sequences, and ignores dependences that do not arise during
 execution.  In contrast to static analysis tools,
 which by necessity make conservative approximation, Embla is able to find
 more parallelism in sequential programs, and relies on the programmer to
@@ -61,7 +61,7 @@ parallelization.  Our work aims to help developers find the potential
 for parallelism in programs, in particular by providing efficient tool
 support.  In this paper, we present a data dependence profiling approach
 to the parallelization problem, an efficient algorithm to project data
-dependencies onto relevant parts of the program code, and its
+dependences onto relevant parts of the program code, and its
 implementation, the tool Embla.
 
 \begin{figure}
@@ -89,12 +89,14 @@ implementation, the tool Embla.
 \label{fforkjoin}
 \end{figure}
 
-We will focus on parallelization by introducing procedure-level
+We will focus on parallelization by introducing
 fork-join parallelism. The fork-join framework was first introduced
-in~\cite{Conway63} and used in many parallel programming environments,
+by Conway~\cite{Conway63} and is used in many parallel
+programming environments,
 including Cilk~\cite{BJKLR96}, the Java fork/join
-framework~\cite{Lea00}, OpenMP~\cite{DM98}, and the Filaments
-package~\cite{LF00}. Consider the program fragment in
+framework~\cite{Lea00}, OpenMP~\cite{DM98}, and Filaments~\cite{LF00}.
+
+Consider the program fragment in
 Figure~\ref{fforkjoin} (left):
 Suppose that the calls to {\tt p()} and {\tt q()} are independent,
 but that the call to {\tt r()} depends on the earlier calls. Then
@@ -110,9 +112,10 @@ activities to terminate (cf.~\cite{BJKLR96}).
 % (debug, verify, \ldots) the sequential program; everything except
 % performance carries over to the parallel version.
 
-In order to use this approach, one must find independent
-procedure calls.  The availability of independent
-calls in the program depends on the algorithms used and can be further
+To use this approach, one must find two or more
+independent adjacent parts of the program code.
+The availability of such independent program parts depends on
+the algorithms used and can be further
 limited by sequential programming artifacts, such as re-use of
 variables and sequential book-keeping in an otherwise parallelizable
 algorithm.  Data dependence information can potentially help
@@ -120,41 +123,41 @@ identify and remove such obstacles to parallel execution, but this
 will not be further discussed here.
 
 Parallelizing compilers mostly target loop parallelization based on
-static data dependence analysis methods~\cite{KA02}.  Such analysers are
+static data dependence analysis methods~\cite{KA02}.  Such analyzers are
 by necessity conservative, and use
 approximations that are always safe.  
 % Good precision comes at a high
-% computational cost, especially when analysing large programs.
-Analysing more general code, e.g., with pointers, remains a major
+% computational cost, especially when analyzing large programs.
+Analyzing more general code, e.g., with pointers, remains a major
 challenge.  Consequently, it has proved difficult to
 parallelize programs automatically, and most production codes are either
 written in an explicitly parallel way or rely on speculative, run-time
 parallelization techniques~\cite{PO03,CL03}.
 
 In contrast, Embla
-observes the actual data dependencies that occur during program
-execution, project them onto relevant program parts, and interpret the
+observes the actual data dependences that occur during program
+execution, projects them onto relevant program parts, and interprets the
 lack of a runtime data dependence as an indication that the program
 parts involved are likely to be independent.
 Developers will be responsible for selecting
 program inputs that generate representative program executions with
-good coverage.  In the future, Embla will measure the potential speed
-improvement for parallelizing independent program parts and produce a
-report with suggested program transforms that will yield the maximum
-benefit.  The reporting mechanism is future work, however.  This paper
-presents the mechanism for collecting runtime data dependence information.
+good coverage.
 
 Should a dependence remain undetected, it might manifest itself as a 
-difference in behaviour between the parallel and sequential versions of the
+difference in behavior between the parallel and sequential versions of the
 program for some input. Rerunning the sequential program under
 Embla with the offending input will, however, yield the missing dependence.
 Thus, debugging the parallel program is reduced to debugging the sequential 
 program, in contrast to the case of ad hoc construction of multithreaded
 code.
 
-In addition to data dependencies, and Embla could easily be extended to
-deal with I/O dependencies that limit parallelism them. We will, however,
-leave these extensions for future work.
+In addition to data dependences, Embla can be extended to
+deal with I/O dependences that limit parallelism.  Another potential
+extension is to measure the potential speed
+improvement for parallelizing independent program parts and produce a
+report with suggested program transforms that will yield the maximum
+benefit.  These extensions are both future work.  This paper
+presents the mechanism for collecting runtime data dependence information.
 
 % End intro --------------------
 
@@ -169,11 +172,11 @@ leave these extensions for future work.
 \end{figure}
 
 To get a feeling for what dependence profiling is and what Embla can do, 
-let us turn to the admittedly contrived program in Figure~\ref{ffirstex}
-were we see, from left to right, line numbers, data dependence 
+let us turn to the (contrived) example program in Figure~\ref{ffirstex},
+where we see, from left to right, line numbers, data dependence 
 arrows and source lines. 
 
-A data dependence is a pair
+A {\em data dependence} is a pair
 of references, not both reads, to overlapping memory
 locations with no intervening write. We will refer to these
 references as the {\em endpoints} of the dependence.
@@ -182,9 +185,9 @@ there is an arrow from line 13 to line 14 corresponding to
 the assignment to {\tt q} (the {\em early} endpoint) followed by its use 
 as an argument in {\tt inc(q)} (the {\em late} endpoint). Embla
 internally distinguishes between flow (RAW), anti (WAR) and output (WAW) 
-dependencies, but in the figures in this paper, we do not make this
+dependences, but in the figures in this paper, we do not make this
 distinction. Embla can be instructed to show dependence types, which can be
-useful for figuring out the reasons for individual dependencies.
+useful for figuring out the reasons for individual dependences.
 
 The endpoints of the dependence arrow discussed above are parts of
 the code for {\tt main} itself, but Embla also tracks references made 
@@ -193,7 +196,7 @@ instance, there is a flow dependence from line 14 to line 16
 representing the write in the first invocation of {\tt inc} to the 
 {\tt malloc}'d area pointed to by {\tt q} and the subsequent read 
 of the same location by a later invocation of {\tt inc}. 
-These dependencies 
+These dependences 
 are reported as pertaining to {\tt main} rather than {\tt inc},
 although the endpoints are part of the latter function. 
 But the importance of the dependence is that, in {\tt main}, the calls
@@ -201,15 +204,14 @@ on line 14 and 16 can not be made in parallel.
 
 The dependence given with a dotted arrow 
 (from line 13 to line 18) is due to manipulation of administrative 
-data structures by {\tt malloc}. If taken at face value such dependencies will
+data structures by {\tt malloc}. If taken at face value such dependences will
 serialize all calls to {\tt malloc}, but fortunately, the exact order
 of memory allocations is not important. If the 
 parallelized version of the program uses a thread safe 
-implementation of {\tt malloc} these dependencies are irrelevant and
+implementation of {\tt malloc} these dependences are irrelevant and
 can be ignored. Embla maintains a suppression list, with functions that behave 
-in this way.
-
-
+in this way.  Similarly, dependences arise due to the
+manipulation of the call stack, which are also irrelevant for parallelization.
 
 % End using ------------------
 
@@ -243,20 +245,20 @@ with the line number of the corresponding call.}
 \label{ffextree}
 \end{figure}
 
-% To be useful to the programmer, the instruction level dependencies detected 
+% To be useful to the programmer, the instruction level dependences detected 
 % by Embla must be mapped to source level. As discussed above, the dependence
 % that Embla reports is not always in the same function as the dependence endpoints
 % Embla is designed to help programmers 
 % rewrite source code, so we need to project 
-% the dependencies discovered in the dynamic instruction stream onto the 
+% the dependences discovered in the dynamic instruction stream onto the 
 % source code in such a way as to inform the programmer about legal code 
 % transformations. Since we are dealing with transformations on the level of
-% procedure calls, we need to reflect the dependencies we find to that level 
-% as well. That is, we always want to know the dependencies between different 
+% procedure calls, we need to reflect the dependences we find to that level 
+% as well. That is, we always want to know the dependences between different 
 % lines in the same procedure.
-We are interested in dependencies between program statements, and in 
-this section we discuss how to compute these dependencies efficiently from
-the instruction level dependencies directly observed by Embla.
+We are interested in dependences between program statements, and in 
+this section we discuss how to compute these dependences efficiently from
+the instruction level dependences directly observed by Embla.
 
 \subsection{The execution tree}
 
@@ -276,9 +278,9 @@ the three consecutive calls to {\tt inc} at lines 14--16 of {\tt main}.
 The transformations we target will execute {\em siblings}, subtrees with
 the same parent, in parallel (in Figure~\ref{ffextree}, {\it B}, {\it C} 
 and {\it D} are siblings).  Hence, we 
-are interested in dependencies between siblings. These
+are interested in dependences between siblings. These
 arise from the 
-dependencies in the instruction stream; if $M$ and $N$ are siblings and
+dependences in the instruction stream; if $M$ and $N$ are siblings and
 there is an instruction level dependence from an instruction in $M$ 
 to an instruction in $N$ we have a (tree) dependence between $M$ and $N$
 and we call $M$ the {\em source} and $N$ the {\em target} of the dependence.
@@ -302,7 +304,7 @@ between lines 14 and 16 in {\tt main}.
 
 \newcommand{\tracepile}{trace pile}
 
-\subsection{Computing dependencies}
+\subsection{Computing dependences}
 
 Embla uses two main data structures: The {\em \tracepile}, which implements 
 the execution tree, and the {\em memory table} which maps addresses to tree
@@ -314,7 +316,7 @@ For each reference, we look up the data address in the memory
 table. If the reference is a read, we use the previous write to generate
 a flow dependence (RAW). If it is a write, we use the previous write to 
 construct an output dependence (WAW) as well as all reads since that 
-write to construct anti dependencies (WAR).
+write to construct anti dependences (WAR).
 
 If there are several reads with no intervening write, a subsequent write
 (anti) depends on all of them. Since the reads do not depend on each other,
@@ -436,9 +438,9 @@ Prog & \#L & \#sD & \#iD & RSz & T
 \end{tabular}
 \end{center}
 RLC: Read List Compaction, 
-\#L: \#non blank source lines, \#sD: \#source dependencies, \#iD: 
+\#L: \#non blank source lines, \#sD: \#source dependences, \#iD: 
 \#instruction
-leve dependencies, RSz: max bytes for read lists, T: run time (s)
+leve dependences, RSz: max bytes for read lists, T: run time (s)
 \caption{Some experimental results} \label{trex}
 \end{table}
 
@@ -454,17 +456,17 @@ programs depending on the frequency of long sequences of reads from the same
 location (the RSz columns), ranging from no difference for {\tt ex} and 
 {\tt fib} to a 20x difference for {\tt mpeg}. We also see that the number of 
 instruction 
-level dependencies (the \#iD columns) are affected since the read lists 
+level dependences (the \#iD columns) are affected since the read lists 
 are shorter when a write occurs following compaction (however, the 
 eliminated read list 
-items would have yielded no new source level dependencies).
+items would have yielded no new source level dependences).
 
 We note that Embla finds the expected independence of the recursive calls 
 in the recursive divide-and-conquer programs {\tt qs} and
 {\tt fib} although {\tt qs} is an in-place version coded 
 with pointers and pointer arithmetic, something that is well known to be 
-difficult to deal with for static analysers. We have also done naive
-hand parallelisation of these programs according to the information 
+difficult to deal with for static analyzers. We have also done naive
+hand parallelization of these programs according to the information 
 yielded by Embla and obtained the expected good speedup.
 
 \section{Conclusion}
@@ -472,12 +474,13 @@ yielded by Embla and obtained the expected good speedup.
 We have presented Embla, a data dependence profiling tool, discussed the 
 main issues and the algorithms used to resolve them. We argue that
 data dependence profiling is a useful and practical complement to static
-analysis for parallelisation of new and legacy code. Finally, we have 
+analysis for parallelization of new and legacy code. Finally, we have 
 reported on a few initial experiments with Embla.
 
-In the future we plan additional refinements of Embla as well as the 
-application to real legacy code. We also look forward to doing more
-parallelisation experiments using parallel environments such as OpenMP.
+In the future we plan extensions and refinements of Embla as well as
+the application to real legacy code. We also look forward to doing
+more parallelization experiments using parallel environments such as
+OpenMP.
 
 
 \bibliographystyle{plain}
