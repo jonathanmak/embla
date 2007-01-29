@@ -87,6 +87,11 @@ implementation, the tool Embla.
 \label{fforkjoin}
 \end{figure}
 
+We are interested in the following methodology for constructing
+parallel programs: Start from a sequential program, identify
+independent parts of that program (here Embla can be used) and rewrite
+the program to obtain parallel executioon of the independent parts.
+
 We will focus on parallelization by introducing
 fork-join parallelism. The fork-join framework was first introduced
 by Conway~\cite{Conway63} and is used in many parallel
@@ -110,8 +115,8 @@ activities to terminate (cf.~\cite{BJKLR96}).
 % (debug, verify, \ldots) the sequential program; everything except
 % performance carries over to the parallel version.
 
-To use this approach, one must find two or more
-independent adjacent parts of the program code.
+Embla can help programmers find independent parts of the 
+program code. 
 The availability of such independent program parts depends on
 the algorithms used and can be further
 limited by sequential programming artifacts, such as re-use of
@@ -127,7 +132,8 @@ approximations that are always safe.
 % Good precision comes at a high
 % computational cost, especially when analyzing large programs.
 Analyzing more general code, e.g., with pointers, remains a major
-challenge.  Consequently, it has proved difficult to
+challenge and correctness is typically guaranteed only in the absence of
+bounds violations.  Consequently, it has proved difficult to
 parallelize programs automatically, and most production codes are either
 written in an explicitly parallel way or rely on speculative, run-time
 parallelization techniques~\cite{PO03,CL03}.
@@ -141,13 +147,18 @@ Developers will be responsible for selecting
 program inputs that generate representative program executions with
 good coverage.
 
-Should a dependence remain undetected, it might manifest itself as a 
-difference in behavior between the parallel and sequential versions of the
-program for some input. Rerunning the sequential program under
-Embla with the offending input will, however, yield the missing dependence.
-Thus, debugging the parallel program is reduced to debugging the sequential 
-program, in contrast to the case of ad hoc construction of multithreaded
-code.
+By construction, the methodology mentioned above preserves the
+semantics and determinancy of the sequential program under the
+assumption that all dependencies are found.  Should a dependence
+remain undetected, it might manifest itself as a difference in
+behavior between the parallel and sequential versions of the program
+for some input. Given that the sequential program is deterministic,
+rerunning it under Embla with the offending input will yield the
+missing dependence.  Thus the programmining methodology supported by
+Embla replaces the problem of finding synchronization errors in the
+parallelized, nondeterministic, program with the problem of finding
+all of the relevant dependencies in the sequential program.
+
 
 In addition to data dependences, Embla can be extended to
 deal with I/O dependences that limit parallelism.  Another potential
@@ -183,8 +194,8 @@ there is an arrow from line 13 to line 14 corresponding to
 the assignment to {\tt q} (the {\em early} endpoint) followed by its use 
 as an argument in {\tt inc(q)} (the {\em late} endpoint). Embla
 internally distinguishes between flow (RAW), anti (WAR) and output (WAW) 
-dependences, but in the figures in this paper, we do not make this
-distinction. Embla can be instructed to show dependence types, which can be
+dependences, but we do not make that distinction in this paper. Embla 
+can be instructed to show dependence types, which can be
 useful for figuring out the reasons for individual dependences.
 
 The endpoints of the dependence arrow discussed above are parts of
