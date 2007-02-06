@@ -1,0 +1,580 @@
+#LyX 1.4.3 created this file. For more info see http://www.lyx.org/
+\lyxformat 245
+\begin_document
+\begin_header
+\textclass article
+\language english
+\inputencoding auto
+\fontscheme default
+\graphics default
+\paperfontsize default
+\spacing single
+\papersize a4paper
+\use_geometry false
+\use_amsmath 1
+\cite_engine basic
+\use_bibtopic false
+\paperorientation portrait
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\defskip medskip
+\quotes_language english
+\papercolumns 2
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+Multicore@SICS
+\end_layout
+
+\begin_layout Author
+Karl-Filip Faxen
+\begin_inset Foot
+status open
+
+\begin_layout Standard
+Swedish Institute of Computer Science
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Abstract
+This document describes the Multicore@SICS research agenda.
+ The research agenda focuses on 
+\emph on
+Dependence based Paralle Programming
+\emph default
+, a novel approach to programming multicore processors.
+\end_layout
+
+\begin_layout Section
+Introduction
+\end_layout
+
+\begin_layout Standard
+With the widespread use of multicore processors, there is a dire need for
+ a scalable approach to parallel programming.
+ Multicore processors are being used both for high absolute performance,
+ as the difficulties of achieving clock frequencies in excess of 4GHz effectivel
+y creates an upper bound on the performance of a single core, and for low
+ power implementations as two 1GHz cores consume less power than a single
+ 2GHz core.
+ These advantages come with a cost, though: The machine level programs that
+ a multicore processor runs must be multithreaded.
+ This can be achieved using a number of different technologies:
+\end_layout
+
+\begin_layout Itemize
+A standard language such as C using a library such as 
+\family typewriter
+pthreads
+\family default
+.
+\end_layout
+
+\begin_layout Itemize
+A language with native threads, such as Java or Oz.
+\end_layout
+
+\begin_layout Itemize
+A conventional language with parallel constructs added, such as C or Fortran
+ with Open MP.
+\end_layout
+
+\begin_layout Itemize
+An unconventional parallel language such as High Performance Fortran, X10,
+ Chapel or Fortress.
+\end_layout
+
+\begin_layout Itemize
+A sequential language with a parallelizing compiler.
+\end_layout
+
+\begin_layout Standard
+The technologies are listed in order of increasing distance from the programming
+ model of the hardware.
+ We propose a new programming model,
+\emph on
+ Dependence Based Parallel Programming 
+\emph default
+(DBPP), which sits between to the parallel language model and the parallelizing
+ compiler model.
+ The main features of the DBPP model are:
+\end_layout
+
+\begin_layout Itemize
+Parallelism is explicitly marked in the code, by pragmas or full featured
+ language constructs.
+\end_layout
+
+\begin_layout Itemize
+The parallelism markup can be ignored, creating a sequential reading of
+ the code.
+\end_layout
+
+\begin_layout Itemize
+The semantics of the parallel and sequential readings of a 
+\emph on
+dependence correct
+\emph default
+ program are identical.
+ In particular, if the sequential reading is deterministic, then so is the
+ parallel reading.
+\end_layout
+
+\begin_layout Itemize
+Correctness is a matter of honoring dependencies in the code.
+ Dependent computations must not be marked as parallel.
+ A variety of levels of tool support for ensuring correctness can be envisioned:
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+No tool support.
+\end_layout
+
+\begin_layout Itemize
+Dynamic dependence analysis such as the Embla tool.
+\end_layout
+
+\begin_layout Itemize
+Static dependence analysis.
+\end_layout
+
+\begin_layout Itemize
+Dependence types.
+\end_layout
+
+\end_deeper
+\begin_layout Standard
+We intend the DBPP model both for development of new code and for parallelizatio
+n of legacy applications.
+ In the first case, we get the benefit that debugging the program can be
+ made entirely on the sequential reading which is considerably simpler than
+ debugging of parallel code (especially if the code is explicitly threaded).
+ For legacy code, taking sequential semantics as the starting point is absolutel
+y essential.
+\end_layout
+
+\begin_layout Section
+Reseach issues
+\end_layout
+
+\begin_layout Standard
+The DBPP model gives rise to a number of different research questions.
+\end_layout
+
+\begin_layout Subsection
+Models of parallelism
+\end_layout
+
+\begin_layout Standard
+There are several possible parallel execution structures, including fork/join,
+ futures and dataflow variables which are more or less useful depending
+ on the underlying sequential language.
+ In addition, one can think of other models such as clocked pipelining where
+ two computations are partially overlapped.
+\end_layout
+
+\begin_layout Standard
+A related issue is operations which have a parallel and a sequential reading,
+ but where the implementation of the operation cannot be done efficiently
+ within the DBPP model, for instance because the interleaving of different
+ steps is timing dependent.
+ An example would be traversing a graph to see how many nodes were reachable
+ from a certain root node.
+ Here the order in which the nodes are visited might be nondeterministic
+ but the end result is deterministic.
+ The question is whether this kind of computations can be captured in a
+ small number of general patterns.
+\end_layout
+
+\begin_layout Subsection
+Implementation substrate
+\end_layout
+
+\begin_layout Standard
+DBPP programs will spawn parallel activities.
+ In fact, the restricted synchronization model (equivalent to sequential
+ execution) will emphasize this drive towards small grain parallel activity
+ since the main forms of synchronization are where computations are spawned
+ and joined (for the simple fork/join model, these are the only ones).
+ Lower overhead makes more opportunities for parallelism profitable, paving
+ the way for better scalabitlty.
+ Also, it makes the programmer's job easier since less consideration needs
+ to be given to grain size and tradeoffs between parallelism and overhead
+ avoidance.
+\end_layout
+
+\begin_layout Standard
+Hence it is important to be able to create parallel activities with minimum
+ overhead, ideally zero but at least on the order of a subroutine call.
+ This level of overhead immediately rules out kernel involvment and is also
+ probably incompatible with a pure library implementation.
+ Indeed, we believe that code generator involvement is necessary in the
+ limit.
+ Also, because of the sequential reference execution, all parallelism is
+ optional.
+ Thus 
+\emph on
+lazy task creation
+\emph default
+ appears to be a useful technique.
+\end_layout
+
+\begin_layout Standard
+This support is conspicuously absent from standard language implementations
+ today, although it has been included in some experimental languages such
+ as Multilisp, Muse, Aurora and Cilk-5.
+ Adding light weight parallel activity creation and synchronization to a
+ mainstream language implementation such as GCC is thus an important goal.
+\end_layout
+
+\begin_layout Subsection
+Scheduling
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Caption
+A hierarchical multicore processor
+\end_layout
+
+\end_inset
+
+Parallel activities need to be scheduled on the available cores.
+ There are several performance issues here:
+\end_layout
+
+\begin_layout Description
+Locality: Scheduling a computation to run on a core where the it needs are
+ not located carries the cost of moving the data into the caches of that
+ core.
+ This cost may be large, for a core located on a different chip, or very
+ small, for cores sharing all levels of cache (this happens for hardware
+ threads sharing a core).
+\end_layout
+
+\begin_layout Description
+Reuse: It is beneficial if the computations scheduled on cores sharing cache
+ also share data since they will otherwise compete for space in the cache.
+ Also, communication between the computations becomes very cheap and cache
+ misses might be amortized over several cores.
+\end_layout
+
+\begin_layout Description
+Overhead: All other things being equal, it is faster to schedule a computation
+ at the same core as its parent in the computation tree since this scheduling
+ can be achieved without synchronization simply by following the normal
+ control flow.
+ Thus the scheduler should not be invoked needlessly.
+\end_layout
+
+\begin_layout Standard
+Thus scheduling should be both low overhead, low synchronization and clever
+ in its placement of code.
+ Schedulers such as work stealing and parallel depth first are interesting
+ starting points, but must be extended to handle hierarchical systems where
+ some hardware threads share cores (and all levels in the cache hierarchy)
+ with the cores being grouped around shared L2 caches, the groups grouped
+ in L3 clusters and several chips used in a multiprocessor.
+\end_layout
+
+\begin_layout Standard
+Differences between multicore processors and traditional multiprocessors
+ include the following:
+\end_layout
+
+\begin_layout Description
+Shared
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+ 
+\end_layout
+
+\end_inset
+
+caches: Cores on a chip typically share some part of the cache hierarchy
+ (even if perhaps not all cores share cache in future chips with large numbers
+ of cores).
+ 
+\end_layout
+
+\begin_layout Description
+Memory
+\begin_inset ERT
+status open
+
+\begin_layout Standard
+
+ 
+\end_layout
+
+\end_inset
+
+bandwidth: All the cores on a single chip share the off chip bandwidth,
+ leaving less bandwitdh for each core.
+ Of course, other ways of making chips faster also give each instruction
+ less bandwidth (unless the latter in increased), but it seems likely that
+ multicore will be more effective in increasing nominal performance than
+ earlier technologies so the effect will be more pronounced.
+\end_layout
+
+\begin_layout Standard
+Together, these two effects implies that 
+\emph on
+other cores will be closer than memory
+\emph default
+, which is the revese of the situation in a conventional multiprocessor
+ and will have profound effects on how multicore processors should be programmed.
+\end_layout
+
+\begin_layout Subsection
+Dynamic dependence analysis
+\end_layout
+
+\begin_layout Standard
+We already have the Embla prototype, but there are a number of things that
+ should be added and improved.
+ Here is a short list:
+\end_layout
+
+\begin_layout Itemize
+Registers should be tracked.
+ This raises the issue of registers used to implement the calling conventions,
+ like the stack pointer and possibly frame pointer.
+ These should be handled specially so that no dependencies involving them
+ will be reported.
+ So for instance, a frame pointer relative memory reference does not depend
+ on the instruction setting the frame pointer.
+\end_layout
+
+\begin_layout Itemize
+Embla should give more useful instructions for the parallelisation of the
+ program.
+ In particular, it should report the exploitable leve of parallelism according
+ to the dependencies it finds.
+ However, it would also be good if it identified places we would like to
+ parallelize but where existing dependencies are in the way.
+\end_layout
+
+\begin_layout Itemize
+More information about dependencies between sub trees, especially when they
+ are either on the same memory address or only occur in small sections of
+ code.
+ Then it becomes easier to transform the program to remove dependencies.
+\end_layout
+
+\begin_layout Itemize
+Embla must be able to analyse programs containing threads, since this is
+ common in industry.
+ The memory table is rather unaffected by this wheras the trace pile must
+ be redesigned.
+ The simplest possibility appears to have one trace pile for each thread
+ in the analysed program, so 
+\family typewriter
+pthread_create()
+\family default
+ also allocates a new trace pile.
+\end_layout
+
+\begin_layout Itemize
+Embla needs to aggregate information from several runs of the analysed program
+ to improve coverage.
+\end_layout
+
+\begin_layout Itemize
+Sub word accesses are still not handled correctly.
+\end_layout
+
+\begin_layout Itemize
+As a support for parallelisation on architectures not sharing all of the
+ cache hierarchy, Embla could keep track of the volume of data that needs
+ to be moved from one cache to another if a computation is executed by another
+ core.
+ Since it is easy to keep track of work as numbers of instructions, we get
+ a granularity measurement in the form of a 
+\emph on
+migration induced miss ratio
+\emph default
+.
+\end_layout
+
+\begin_layout Subsection
+Static dependence analysis
+\end_layout
+
+\begin_layout Standard
+Dynamic dependency analysis by necessity only gives guarantees about executions
+ with the same input as used in the analysis run(s).
+ A static analysis, on the other hand, may give information about every
+ possible execution.
+ For this very reason they are also more conservative; they may report dependenc
+ies that no real execution produces.
+\end_layout
+
+\begin_layout Standard
+Static and dynamic analysis may be combined.
+ The static analysis then gives an upper bound and the dynamic analysis
+ a lower bound to the dependencies in the program.
+ Programmer attention could be directed to the places where these boounds
+ disagree.
+\end_layout
+
+\begin_layout Standard
+There exists several data flow analysers for conventional languages, some
+ of which are used in parallelizing compilers.
+ These could definitely be used together with the DBPP approach.
+\end_layout
+
+\begin_layout Subsection
+Dependence typing
+\end_layout
+
+\begin_layout Standard
+The DBPP model requires programs to be use parallelism in a way consistent
+ with the dependencies in the program.
+ This is similar to a strongly typed language where operations must be used
+ in a type consistent manner.
+ This raises the issue of whether dependence correctness can be checked
+ statically by a type system rejecting programs with race conditions.
+ Type systems come in several flavors:
+\end_layout
+
+\begin_layout Description
+Inference: No (or very little) type information is needed in the program.
+ Instead, a 
+\emph on
+type inferencer
+\emph default
+ computes a type for the program.
+ If the type system has the 
+\emph on
+principal type
+\emph default
+ property, every program has a most general type 
+\begin_inset Formula $\sigma$
+\end_inset
+
+ such that all other types for the program can be obtained by syntactic
+ transformations of 
+\begin_inset Formula $\sigma$
+\end_inset
+
+.
+ Type inference is very convenient for the programmer, but there is a limit
+ to how powerful the type system can be.
+ This restriction is similar to the restriction that program analyzers by
+ necessity must be approximative.
+\end_layout
+
+\begin_layout Description
+Checking: The program contains type information and the 
+\emph on
+type checker
+\emph default
+ verifies that it is consistent.
+ While slightly less convenient, it allows more powerful type systems that
+ are able to infer types for more programs.
+ Effectively, the programmer can help a type inferencer to look for a proof
+ that the program is correct by writing down more complex types for the
+ procedures of the program than the type inferencer could have found.
+\end_layout
+
+\begin_layout Standard
+A hybrid system is possible, either by interpreting the absence of type
+ signature for a procedure as a shorthand for a default signature much like
+ old versions of C assumed 
+\family typewriter
+int
+\family default
+ as a default return type of a function when no explicit type could be found,
+ or by checking types when they are given and inferring types when no type
+ signature is present (this is reminiscent of the Haskell type system).
+\end_layout
+
+\begin_layout Standard
+Given that we are interested in adding dependence types to the type system
+ of an existing language, the dependence information becomes a 
+\emph on
+refinement
+\emph default
+ of the existing system.
+ This makes the computation of default signatures viable, as demonstrated
+ by Cyclone.
+\end_layout
+
+\begin_layout Subsection
+Hybrid models
+\end_layout
+
+\begin_layout Standard
+In some cases, a pure DBPP approach may not be possible or desirable, for
+ instance when the problem contains natural concurrency or when insufficient
+ parallelism can be exploited by a deterministic solution.
+ In particular, many legacy systems are already threaded for reasons of
+ I/O or user interface.
+ Hence DBPP needs to coexist with more general threaded code execution.
+ In this case it is desirable that, while the nondeterministic parts of
+ the code make the program as a whole nondeterministic, the deterministic
+ part remain so (actually, that one can reason about them as if the whole
+ program were deterministic).
+ For threads in legacy code, it is important that the DBPP methodology can
+ be applied to each of the threads with predictable result.
+\end_layout
+
+\begin_layout Subsection
+Semantics
+\end_layout
+
+\begin_layout Standard
+While it is intuitive that a parallel computation respecting dependencies
+ will preserve the sequential semantics, this needs to be proved, especially
+ for hybrid models.
+\end_layout
+
+\begin_layout Subsection
+Methodology
+\end_layout
+
+\begin_layout Standard
+We need to explore effective ways of using the DBPP approach, including
+ which tool support is needed.
+ This is especially true for the challenging task of parallelizing legacy
+ code since that will certainly entail the removal of sequential coding
+ artifacts.
+ We need tools for diagnosing such artifacts and refactoring support for
+ removing them.
+\end_layout
+
+\begin_layout Section
+FP7 Project
+\end_layout
+
+\begin_layout Standard
+This section discusses the subset of the Agenda that is suitable to include
+ in an FP7 project.
+ The objective of the project is to create methodologies and tool for programmin
+g multicore processors.
+ In order to include something that is multicore specific, we will deal
+ with the effects of the cache hierarchies.
+\end_layout
+
+\end_body
+\end_document
