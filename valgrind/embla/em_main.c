@@ -30,9 +30,7 @@
 /* 
    Things that should be changed include, but are not limited to, the following:
    - There is an assumption throughout that we run code for a LE 32 bit machine.
-   - Funny things will happen if we access the same place with words and bytes
    - spChange and adjust_shadow_sp are maybe not both needed
-   - howHidden should not be called for every load and store
 */
 
 #include "pub_tool_basics.h"
@@ -54,6 +52,8 @@
 #define  BUF_SIZE               512
 #define  II_CHUNK_SIZE      1000000
 // #define  STRING_TABLE         10007  // smallest prime >= 10000
+
+#define  READ_LIST_COMPACT  1        // 0 turn off read list compaction
 
 #define  RT_IDX_BITS                        3
 #define  RT_ENTRIES_PER_LINE (1<<RT_IDX_BITS)  // must be power of 2
@@ -85,11 +85,21 @@
 #endif
 
 #define DO_PROFILE 1
+#define PRECISE_ICOUNT 1
+// #define DO_NOT_INSTRUMENT 1
+// #define MOCK_RTENTRY 1
+// #define EMPTY_RECORD
+
+#ifdef INSTR_LVL_DEPS
+#define N_INSTR_DEPS 4
+#endif
+
+#define DO_CHECK 1
 
 #ifdef DO_CHECK
 static void check(int c, Char *s)
 {
-   if( !c ) {
+   if( !( c ) ) {
      VG_(tool_panic)( s );
    }
 }
@@ -142,12 +152,16 @@ static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
 #define  TPT_BRIDGE       1   // Bridging a gap of dead nodes
 #define  TPT_RET_LIVE     2   // A live return header (important for phase 2)
 
+#define SAVE_RESTORE_TRACKING 1
+
 
 #ifdef DO_PROFILE
 #define PROFILE( c ) c
 #else
 #define PROFILE( c ) 
 #endif
+
+typedef enum { SR_NONE, SR_SAVE, SR_RESTORE } SRCode;
 
 static struct {
     int elim_stack_alias;
@@ -186,6 +200,12 @@ typedef
 
 static RTEntry mock_rtentry = {"mock", "", 0, 'o', 0, 0, 'c', 'c', 0, 0, 0, NULL};
 
+/********************************************************************************
+ *                                                                              *
+ * Statment, instruction and line info                                          *
+ *                                                                              *
+ ********************************************************************************/
+
 typedef struct _LineInfo {
    RTEntry  *entries[RT_ENTRIES_PER_LINE];
    unsigned line;
@@ -196,13 +216,86 @@ typedef struct _LineInfo {
 
 static LineInfo dummy_line_info = { { }, 0, "", "", NULL };
 
+#ifdef INSTR_LVL_DEPS
+typedef struct _InstrInfoList {
+   struct _InstrInfo     *i_info;
+   struct _InstrInfoList *next;
+   UInt n_raw, n_war, n_waw;
+}
+#endif
+
 typedef struct {
    Addr32   i_addr;
    unsigned i_len;
    LineInfo *line;
+#ifdef SAVE_RESTORE_TRACKING
+   Int      sr_size;
+   Int      sr_offset;
+#endif
+#ifdef INSTR_LVL_DEPS
+   InstrInfoList (*i_deps)[N_INSTR_DEPS];
+#endif
 } InstrInfo;
 
-static InstrInfo dummy_instr_info = {1, 0, &dummy_line_info};
+#ifdef INSTR_LVL_DEPS
+#define DUMMY_II_INITIALIZER   ,{}
+#else
+#define DUMMY_II_INITIALIZER  /* */
+#endif
+
+static InstrInfo dummy_instr_info = {1, 0, &dummy_line_info DUMMY_II_INITIALIZER};
+
+#define SI_SAVE_REST  1
+
+typedef struct {
+   InstrInfo  *i_info;
+   UShort      offset;
+   UChar       size;
+   UChar       flags;
+   UShort      nElems;
+   UShort      bias;
+} StmInfo;
+
+#define STM_INFO_BLOCKSIZE 10000
+
+static StmInfo *stmInfoBlock = NULL;
+static int      stmInfoIndex = STM_INFO_BLOCKSIZE;
+
+static StmInfo *mkStmInfoI( InstrInfo *i_info, Int base, Int nElems, Int bias, 
+                            UChar size, UChar flags )
+{
+
+    if( stmInfoIndex >= STM_INFO_BLOCKSIZE ) {
+       stmInfoBlock = (StmInfo *) VG_(calloc)( STM_INFO_BLOCKSIZE, sizeof( StmInfo ) );
+       check( stmInfoBlock != NULL, "Out of memory!" );
+       stmInfoIndex = 0;
+    }
+    stmInfoBlock[stmInfoIndex].i_info = i_info;
+    stmInfoBlock[stmInfoIndex].offset = base;
+    stmInfoBlock[stmInfoIndex].size   = size;
+    stmInfoBlock[stmInfoIndex].flags  = flags;
+    stmInfoBlock[stmInfoIndex].nElems = nElems;
+    stmInfoBlock[stmInfoIndex].bias   = bias;
+    stmInfoIndex++;
+    
+    return stmInfoBlock + stmInfoIndex - 1;
+}
+
+static StmInfo *mkStmInfo( InstrInfo *i_info, UShort offset, UChar size, UChar flags )
+{
+
+    return mkStmInfoI( i_info, offset, 0, 0, size, flags );
+}
+
+/********************************************************************************
+ *                                                                              *
+ * Other stuff                                                                  *
+ *                                                                              *
+ ********************************************************************************/ 
+
+
+
+
 
 static Addr32 lowest_shadow_sp=0xffffffff, highest_shadow_sp=0;
 
@@ -339,6 +432,18 @@ static StackFrame * current_stack_frame = stack_base;
 
 */
 
+static void bumpCounter(StatData *c, StatData n, StatData *min, StatData *max)
+{
+   StatData nv = *c + n;
+   *c = nv;
+
+   if( n<0 && min!=NULL && nv<*min ) {
+      *min = nv;
+   } else if( max!=NULL && nv>*max ) {
+      *max = nv;
+   }
+}
+
 static TaggedPtr newRegularEvent(StackFrame *frame, InstrInfo *i_info)
 {
    TraceRec  *tr   = newTraceRec( i_info, mkTaggedPtr2( frame->call_header, TPT_REG ) );
@@ -373,6 +478,9 @@ static EventList *consEvent(Event e, EventList *t)
       }
       freeEvent[N-1].next = NULL;
    }
+
+   PROFILE( bumpCounter( &read_list_elements, 1, NULL, &max_read_list_elements ); )
+
    l = freeEvent;
    freeEvent = freeEvent->next;
    l->ev   = e;
@@ -380,18 +488,53 @@ static EventList *consEvent(Event e, EventList *t)
    return l;
 }
 
+static EventList *copyEventList( EventList *l )
+{
+   EventList  *out=NULL, *p=NULL;
+
+   if( l == NULL ) {
+       return NULL;
+   }
+
+   out = p = consEvent( l->ev, NULL );
+   l = l->next;
+
+   while( l != NULL ) {
+       p->next = consEvent( l->ev, NULL );
+       l = l->next;
+   }
+   return out;
+}
+
 static void deleteEvent(EventList *l)
 {
    l->next = freeEvent;
    freeEvent = l;
+
+   PROFILE( bumpCounter( &read_list_elements, -1, NULL, NULL ); )
 }
-   
+
+typedef
+   struct {
+     TraceRec  *frame; 
+     Event      regLastWrite;
+     short      offset, size;
+     UInt      *edge;
+   }
+   SaveDesc;
+
+SaveDesc * saved_save_desc;
+int saved_offset, *saved_edge;
+Event saved_timestamp;
+
 
 // If the last reference was a write, lastRead is NULL
 typedef
    struct {
      EventList *lastRead;
      Event      lastWrite;
+     int        offsize;      // Positive => accesssUnit, negative => subordinate
+     SaveDesc  *saveDesc;
    }
    RefInfo;
 
@@ -403,19 +546,61 @@ typedef
 
 static MapFragment **map;
 
-static Char buf[512+2*CONT_LEN];
-
-static void bumpCounter(StatData *c, StatData n, StatData *min, StatData *max)
-{
-   StatData nv = *c + n;
-   *c = nv;
-
-   if( n<0 && min!=NULL && nv<*min ) {
-      *min = nv;
-   } else if( max!=NULL && nv>*max ) {
-      *max = nv;
+typedef
+   struct {
+     Event lastWrite;
+     int   offsize;   // Positive => access unit, negative => subordinate
    }
+   RegisterInfo;
+
+static RegisterInfo *registerMap;
+static int registerMapSize;
+
+static void validateRegisterMap( void )
+{
+    int i=0, j, a=0;
+
+    do {
+       int s = registerMap[i].offsize;
+       if( s<=0 ) {
+          DPRINT3( "Negative AU size: %d at index %d after %llu\n", s, i, instructions );
+          s = 1;
+          a=1;
+       }
+       for( j=1; j<s; j++ ) {
+          if( registerMap[i+j].offsize != -j ) {
+              DPRINT3( "Funny offsize %d at index %d after %llu instructions\n",
+                        registerMap[i+j].offsize, j, instructions );
+              a = 1;
+          }
+       }
+       i += s;
+    } while( i < registerMapSize );
+
+    check( a==0, "Funny register map\n" );
 }
+
+static void ensureRegisterMap( int size )
+{
+    int i;
+
+    if( registerMap == NULL ) {
+        registerMapSize = size;
+        registerMap = (RegisterInfo *) VG_(calloc)( size, sizeof( RegisterInfo ) );
+        check( registerMap != NULL, "Out of memory for register map!" );
+        for( i=0; i<size; i+=8 ) {
+            int j;
+            registerMap[i].lastWrite = mkTaggedPtr2( trace_pile+1, TPT_REG );
+            registerMap[i].offsize   = 8;
+            for( j=1; j<8; j++ ) {
+                registerMap[i+j].offsize = -j;
+            }
+        }
+    }
+}
+        
+
+static Char buf[512+2*CONT_LEN];
 
 static UInt hash(const Char *s) 
 {
@@ -523,9 +708,19 @@ static InstrInfo *mk_i_info(InstrInfo *curr, Addr32 i_addr, unsigned i_len)
       ii_idx = 0;
    }
    
-   ii_chunk[ii_idx].i_addr = i_addr;
-   ii_chunk[ii_idx].i_len  = i_len;
-   ii_chunk[ii_idx].line   = mk_line_info( i_addr );
+   ii_chunk[ii_idx].i_addr    = i_addr;
+   ii_chunk[ii_idx].i_len     = i_len;
+   ii_chunk[ii_idx].line      = mk_line_info( i_addr );
+   ii_chunk[ii_idx].sr_offset = 0;
+   ii_chunk[ii_idx].sr_size   = 0;
+
+#ifdef INSTR_LVL_DEPS
+   int i;
+
+   for( i=0; i<N_INSTR_DEPS; i++ ) {
+      ii_chunk[ii_idx].i_deps[i] = NULL;
+   }
+#endif
 
    return ii_chunk + ii_idx++;
 }
@@ -572,6 +767,15 @@ static void adjust_shadow_sp(Addr32 sp)
     }
 }
 
+#ifdef EMPTY_RECORD
+
+static VG_REGPARM(1)
+void recordSpChange(Addr32 newSp)
+{
+}
+
+#else
+
 static VG_REGPARM(1)
 void recordSpChange(Addr32 newSp)
 {
@@ -600,6 +804,8 @@ void recordSpChange(Addr32 newSp)
 
 }
 
+#endif
+
 unsigned long long inStack_calls, inStack_iters;
 
 static unsigned inStack( Addr32 oldAddr, TraceRec *oldTR )
@@ -616,6 +822,10 @@ static unsigned inStack( Addr32 oldAddr, TraceRec *oldTR )
    }
    return DF_STACK;
 }
+
+/***************************************************
+ * Hidden function handling                        *
+ ***************************************************/
 
 static int howHidden( Addr32 addr )
 {
@@ -746,7 +956,7 @@ static EventList * compactReads( EventList *in_p, int delta )
             break;
          }
       }
-      if( found ) {
+      if( found && READ_LIST_COMPACT ) {
          deleteEvent( lp );
       } else {
          if( readtable[ev_key] == NULL ) {
@@ -857,16 +1067,27 @@ static void compact(void)
      }
    }
    // BONK( "marks, " );
+   // need to do the registers as well ...
+
+   for( i=0; i<registerMapSize; i++ ) {
+     registerMap[i].lastWrite = forward( registerMap[i].lastWrite, delta );
+   }
+   // BONK( "registers, " );
+
    for( i=0; i<FRAGS_IN_MAP; i++ ) {
      if( map[i] != NULL ) {
        for( j=0; j<REFS_PER_FRAG; j++ ) {
          info = map[i]->refs + j;
          info->lastWrite = forward( info->lastWrite, delta );
          info->lastRead = compactReads( info->lastRead, delta );
+         if( info->saveDesc != NULL ) {
+           SaveDesc *sd = info->saveDesc;
+           sd->frame = ToTrP( forward( (Event) sd->frame, delta ) );
+           sd->regLastWrite = forward( sd->regLastWrite, delta );
+         }
        }
      }
    }
-
    // BONK( "map)\n  Phase 3... " ); 
    
    // Phase 3:
@@ -1108,6 +1329,17 @@ static Int result_entry_compare(const RTEntry * e1, const RTEntry * e2)
 
 unsigned long long getResultEntry_calls, getResultEntry_nca, getResultEntry_entry;
 
+#ifdef MOCK_RTENTRY
+
+static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
+                               Event old_event,
+                               Addr32 ref_addr)
+{
+   return &mock_rtentry;
+}
+
+#else
+
 static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
                                Event old_event,
                                Addr32 ref_addr)
@@ -1120,8 +1352,13 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
    UInt        hash_value, h_code, t_code, r_code, code;
    UInt        t_line;
    RTEntry    *entry;
+   // static int cnt = 0;
 
    PROFILE( getResultEntry_calls++; )    // counting
+
+   // if( ++cnt % 0x800000 == 0 ) { 
+   //   DPRINT1( "ninstrs=%llu\n", instructions );
+   // }
 
    // The tail (source) of the dependence is related to the old reference
    // The head (sink)   of the dependence is related to the new reference
@@ -1150,33 +1387,6 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
    // DPRINT1( "nca: %u ", nca_tr-trace_pile );
    // DPRINT2( "%s:%d ", nca_tr->i_info->line->file, nca_tr->i_info->line->line ); 
 
-#if 0
-
-   t_ind = TP_GET_FLAGS( old_tr->link ) == TPT_CLOSED; // tag 2 is closed header
-   h_ind = nca_tr != curr_ctx->call_header;
-
-   // IFDID( BONK( "ind... " ); )
-
-   t_info = old_tr->i_info;
-   // IFDID( BONK( "t_info... " ); )
-
-   h_info = h_ind ? ToStP( nca_tr->link )[1].call_header->i_info : curr_info;
-
-   // IFDID( BONK( "h_info... " ); )
-
-   // t_addr = t_info->i_addr;
-   // h_addr = h_info->i_addr;
-
-   // IFDID( BONK( "addr... " ); )
-
-   t_code = TP_GET_FLAG1( old_event ) && t_ind ? DF_HIDDEN : t_ind;
-   h_code = curr_ctx->flags & SF_HIDDEN && h_ind ? DF_HIDDEN : h_ind;
-
-   // Check if this is a false dependency due to stack aliasing (pop then push)
-   // or if it is in the stack or if it is something else
-
-#else
-
    if( TP_GET_FLAGS( old_tr->link ) == TPT_CLOSED ) {
      // The tail is indirect
      t_code = TP_GET_FLAG1( old_event ) ? DF_HIDDEN : DF_INDIRECT;
@@ -1194,12 +1404,14 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
      h_code = DF_DIRECT;
    }
 
-#endif
-
    if( ref_addr >= lowest_shadow_sp && ref_addr <= highest_shadow_sp ) {
       r_code = inStack( ref_addr, old_tr );
    } else {
       r_code = DF_HEAP;
+   }
+
+   if( r_code == DF_FALSE ) {
+       return &mock_rtentry;
    }
 
    code = DF_MK_KEY( r_code, h_code, t_code );
@@ -1247,7 +1459,8 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
    return entry;
 
 }
-   
+
+#endif
 
 static void em_post_clo_init(void)
 {
@@ -1288,13 +1501,131 @@ static void em_post_clo_init(void)
 
 
 /***********************************
+ * Save/restore discovery routines *
+ ***********************************/
+
+typedef 
+    union _SaveDescFreeList {
+      SaveDesc                 saveDesc;
+      union _SaveDescFreeList *next;
+    }
+    SaveDescFreeList;
+
+SaveDescFreeList *saveDescFreeList;
+
+static SaveDesc* freeSaveDesc( SaveDesc *sd )
+{
+    if( sd != NULL ) {
+      SaveDescFreeList *list = (SaveDescFreeList *) sd;
+      list->next = saveDescFreeList;
+      saveDescFreeList = list;
+    }
+    return NULL;
+}
+
+static SaveDesc* ensureSaveDesc( SaveDesc *sd )
+{
+    int N = 1024;
+
+    if( sd != NULL ) return sd;
+
+    if( saveDescFreeList == NULL ) {
+      int i;
+      saveDescFreeList = (SaveDescFreeList *) 
+                             VG_(calloc)( N, sizeof( SaveDescFreeList ) );
+      if( saveDescFreeList == NULL ) {
+          VG_(tool_panic)( "Out of memory!" );
+      }
+      for( i=0; i<N-1; i++ ) {
+        saveDescFreeList[i].next = &( saveDescFreeList[i+1] );
+      }
+      saveDescFreeList[N-1].next = NULL;
+    }
+    
+    sd = &( saveDescFreeList -> saveDesc );
+    saveDescFreeList = saveDescFreeList->next;
+    return sd;
+}
+
+// Called by the instrumentation for a Store
+// - 'sd'        is the old SaveDesc for that memory location
+// - 'addr'      is the address at which the register is potentially saved
+// - 'offset'    is the offset in the guest state array corresponding to the register
+// - 'size'      is the size in bytes of the register saved
+// - 'lastWrite' is an Event representing the last write (PUT) to the register
+// - 'edge'      points to the counter for the dependence that we may not want to generate
+
+static SaveDesc* 
+potentialSave( SaveDesc *sd, Addr32 addr, short offset, short size, Event lastWrite,
+               UInt *edge )
+{
+    if( addr < lowest_shadow_sp-8 || addr >= highest_shadow_sp ||
+        current_stack_frame->call_header < ToTrP( lastWrite ) ) {
+      return freeSaveDesc( sd );
+    }
+    sd = ensureSaveDesc( sd );
+    sd->frame        = current_stack_frame->call_header;
+    sd->offset       = offset;
+    sd->size         = size;
+    sd->edge         = edge;
+    sd->regLastWrite = lastWrite;
+
+    return sd;
+}
+
+// Check the typing, and what should be returned!
+// Correct, the trace record returned will be used to update the state table so that,
+// if we have a restore, it looks like the last time it was written was the last
+// write before the save
+// Call with: the save descriptor of the load (stored in saved_save_desc)
+//            offset used to access the guest state
+//            the size of the access
+//            the trace record corresponding to the current instruction
+
+static Event potentialRestore( SaveDesc *sd, short offset, short size, Event tr )
+{
+    if( sd==NULL || sd->offset != offset || sd->size != size ||
+        sd->frame != current_stack_frame->call_header ) {
+      return tr;
+    }
+    ( *( sd->edge ) ) --;
+    return sd->regLastWrite;
+}
+
+
+
+
+
+
+/***********************************
  * Recording routines              *
  ***********************************/
+
+
+static void splitAccessUnit(RefInfo *item, int size)
+{
+    int i,j; 
+
+    if( item->offsize > size ) {
+        for( i=size; i<item->offsize; i+=size ) {
+            item[i].offsize = size;
+            item[i].lastWrite = item[0].lastWrite;
+            item[i].lastRead = copyEventList( item[0].lastRead );
+            for( j=1; j<size; j++ ) {
+                item[i+j].offsize = -j;
+            }
+         }
+         item->offsize = size;
+         // also delete save descriptor
+         freeSaveDesc( item->saveDesc );
+     }
+}
 
 static RefInfo* getRefInfo(Addr32 addr)
 {
     MapFragment *frag = GET_FRAG_PTR(map,addr);
     int          i;
+    const int init_size = 8;
 
     if( frag==NULL ) {
         frag = (MapFragment *) VG_(calloc)(1, sizeof(MapFragment));
@@ -1306,77 +1637,434 @@ static RefInfo* getRefInfo(Addr32 addr)
         for(i=0; i<REFS_PER_FRAG; i++) {
             frag->refs[i].lastWrite = mkTaggedPtr2( trace_pile+1, TPT_REG );
             frag->refs[i].lastRead = NULL;
+            if( i%init_size == 0 ) {
+               frag->refs[i].offsize = init_size;
+            } else {
+               frag->refs[i].offsize = - i%init_size;
+            }
+            frag->refs[i].saveDesc = 0;
         }
     }
 
     return GET_REF_ADDR(frag,addr);
 }
 
-static VG_REGPARM(3)
-void recordLoad(InstrInfo *i_info, Addr32 addr, Addr32 sp)
+#ifdef EMPTY_RECORD
+
+static VG_REGPARM(2)
+void recordLoad( StmInfo *i_info, Addr32 addr )
 {
-    RefInfo     *refp;
-    RTEntry     *res_entry;
+}
 
-    // adjust_shadow_sp( sp );
-    // checkIfHidden( current_stack_frame, i_info->i_addr, 1 );
-
-    refp = getRefInfo( addr );
-
-    res_entry = getResultEntry( current_stack_frame,
-                                i_info, 
-                                refp->lastWrite, 
-                                addr );
-    
-    res_entry->n_raw++;
-
-    refp->lastRead = consEvent( newRegularEvent( current_stack_frame, i_info ), 
-                                refp->lastRead );
-
-    gc( );
+static VG_REGPARM(2)
+void recordStore( StmInfo *s_info, Addr32 addr )
+{
 }
 
 static VG_REGPARM(3)
-void recordStore(InstrInfo *i_info, Addr32 addr, Addr32 sp)
+void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target) 
 {
-    RefInfo     *refp=getRefInfo( addr );
+}
+
+static VG_REGPARM(2)
+void recordRet(Addr32 sp, Addr32 target) 
+{
+}
+
+static VG_REGPARM(1)
+void recordPut( StmInfo *s_info )
+{
+}
+
+static VG_REGPARM(1)
+void recordGet( StmInfo *s_info )
+{
+}
+
+static VG_REGPARM(2)
+void recordGetI( StmInfo *s_info, IRExpr *exp_ix )
+{
+}
+
+#else
+
+static int maybeSplitBlock( RefInfo *refp, Addr32 addr, int size )
+{
+
+    unsigned mask = size^(size-1);
+
+    if( ( size&(size-1) ) == 0 && ( (mask>>1)&addr ) == 0 ) {
+        // size is a power of two and addr is aligned to that power
+        // implies an aligned access
+
+        if( ( (unsigned) refp->offsize ) > ( (unsigned) size ) ) {
+            // we need to split
+            RefInfo *block = refp->offsize > 0 ? refp : refp + refp->offsize;
+            splitAccessUnit( block, size );
+        }
+        return size;
+
+    } else {
+        // an unaligned access
+        // there are two reasons why we get here
+        // 1. the size is not a power of two
+        // 2. the size does not divide the address
+        // of course, both of the above could be the case
+        // Ideally, we'd like to find the largest power of two that divides the address
+        // and is not greater than the size
+
+        RefInfo *block = refp->offsize > 0 ? refp : refp + refp->offsize;
+        int     b_size = block->offsize;
+        int     or_val = addr | size | b_size;
+        int     or_gpd = or_val & ( or_val ^ (or_val-1) );
+
+        splitAccessUnit( block, or_gpd );
+
+        return or_gpd - ( addr & (b_size-1) );
+
+    }
+
+}
+
+static VG_REGPARM(2)
+void recordLoad(StmInfo *s_info, Addr32 addr )
+{
+    RefInfo     *refp;
     RTEntry     *res_entry;
-    EventList   *ev_list, *ev_next;
+    int          size = s_info->size;
+    InstrInfo   *i_info = s_info->i_info;
+    int          static_sr = ( s_info->flags & SI_SAVE_REST ) != 0;
 
-    // adjust_shadow_sp( sp );
-    // checkIfHidden( current_stack_frame, i_info->i_addr, 1 );
+    // BONK( "Load\n" );
+    // validateRegisterMap( );
 
-    // is it a WAR or a WAW?
-    if( refp->lastRead == NULL ) {        // DONE !
-        // last reference was a write: a WAW
+
+    // save/restore info in flags; if flags&SI_SAVE_REST == 1 we have a potential restore
+
+    refp = getRefInfo( addr );
+
+    if( refp->offsize == size ) {
         res_entry = getResultEntry( current_stack_frame,
                                     i_info, 
                                     refp->lastWrite, 
                                     addr );
-        res_entry->n_waw++;
-    } else {
-        // last reference was a read: a WAR
-        for( ev_list = refp->lastRead; ev_list != NULL; ev_list = ev_list->next ) {
-            res_entry = getResultEntry( current_stack_frame,
-                                        i_info, 
-                                        ev_list->ev, 
-                                        addr );
-            res_entry->n_war++;
+    
+        res_entry->n_raw++;
+
+        if( static_sr ) {
+          // the load part of a potential restore
+          //    pick up the save descriptor for the imminent PUT
+          saved_save_desc = refp->saveDesc;
         }
+
+        refp->lastRead = consEvent( newRegularEvent( current_stack_frame, i_info ), 
+                                    refp->lastRead );
+
+    } else {
+
+        Addr32 l_addr = addr;
+        int    l_size = size;
+
+        do { 
+
+            // BONK( "General load... " );
+
+            int num_bytes, i;
+
+            // split block if larger than reference
+            // if reference is unaligned we split the block as necessary
+            // and prepare to iterate over the aligned fragments
+
+            num_bytes = maybeSplitBlock( refp, l_addr, l_size );
+
+            for( i = 0; i < num_bytes; i += refp[i].offsize ) {
+
+
+                res_entry = getResultEntry( current_stack_frame,
+                                            i_info, 
+                                            refp[i].lastWrite, 
+                                            addr );
+                res_entry->n_raw++;
+
+                refp[i].lastRead 
+                        = consEvent( newRegularEvent( current_stack_frame, i_info ), 
+                                     refp[i].lastRead );
+            }
+
+            // BONK( "done\n" );
+
+            if( num_bytes == l_size ) break;
+
+            l_addr += num_bytes;
+            l_size -= num_bytes;
+            refp = getRefInfo( l_addr );
+
+        } while ( 1 );
+
     }
 
-    // last reference is now a write
-    // delete the read list
-    for( ev_list = refp->lastRead; ev_list != NULL; ev_list = ev_next ) {
-        ev_next = ev_list->next;
-        deleteEvent( ev_list );
-        PROFILE( bumpCounter( &read_list_elements, -1, NULL, NULL ); )
-    }
-    refp->lastRead  = NULL;
-    refp->lastWrite = newRegularEvent( current_stack_frame, i_info );
+    gc( );
+}
+
+
+static VG_REGPARM(2)
+void recordStore( StmInfo *s_info, Addr32 addr )
+{
+    int          size   = s_info->size;
+    InstrInfo   *i_info = s_info->i_info;
+    int          static_sr = s_info->flags & SI_SAVE_REST;
+    RefInfo     *refp;
+    RTEntry     *res_entry;
+    EventList   *ev_list, *ev_next;
+    int         l_addr = addr, l_size = size;
+
+    // BONK( "Store\n" );
+    // validateRegisterMap( );
+
+    do {
+
+        int num_bytes, i;
+
+        refp = getRefInfo( l_addr );
+
+        if( refp->offsize == l_size ) {
+            num_bytes = l_size;
+            // There once was a GET (a little while ago) that saved offset,
+            // timestamp and edge
+            // If the GET was overlapping, so that we do not count this as a 
+            // potential save, it set saved_edge to NULL
+            if( static_sr && l_size==size && saved_edge != NULL ) {
+                refp->saveDesc = potentialSave( refp->saveDesc, addr, saved_offset, 
+                                                size, saved_timestamp, 
+                                                saved_edge );
+            }
+        } else {
+            num_bytes = maybeSplitBlock( refp, l_addr, l_size );
+        }
+
+        for( i = 0; i < num_bytes; i += refp[i].offsize ) {
+
+            // is it a WAR or a WAW?
+            if( refp[i].lastRead == NULL ) {        // DONE !
+                // last reference was a write: a WAW
+                res_entry = getResultEntry( current_stack_frame,
+                                            i_info, 
+                                            refp[i].lastWrite, 
+                                            addr );
+                res_entry->n_waw++;
+            } else {
+                // last reference was a read: a WAR
+                for( ev_list = refp[i].lastRead; ev_list!=NULL; ev_list = ev_list->next ) {
+                    res_entry = getResultEntry( current_stack_frame,
+                                                i_info, 
+                                                ev_list->ev, 
+                                                addr );
+                    res_entry->n_war++;
+                }
+            }
+
+            // last reference is now a write
+            // delete the read list
+            for( ev_list = refp[i].lastRead; ev_list != NULL; ev_list = ev_next ) {
+                ev_next = ev_list->next;
+                deleteEvent( ev_list );
+            }
+            refp[i].lastRead  = NULL;
+            
+        }
+        refp->lastWrite = newRegularEvent( current_stack_frame, i_info );
+        // merge
+        for( i=refp->offsize; i<num_bytes; i++ ) {
+            refp[i].offsize = -i;
+        }
+        refp->offsize = num_bytes;
+        l_size -= num_bytes;
+        l_addr += num_bytes;
+
+    } while( l_size > 0 );
 
     gc( );
 
+}
+
+static void splitReg( RegisterInfo *regp, int size )
+{
+    int i;
+    RegisterInfo *base = regp->offsize < 0 ? regp + regp->offsize : regp;
+
+    for( i = size; i < base->offsize; i += size ) {
+        int j;
+        for( j=1; j<size; j++ ) {
+            base[i+j].offsize = -j;
+            base[i+j].lastWrite = base->lastWrite;
+        }
+        base[i].offsize = size;
+        base[i].lastWrite = base->lastWrite;
+    }
+    base->offsize = size;
+}
+
+static VG_REGPARM(1)
+void recordPut(StmInfo *s_info)
+{
+    int        offset = s_info->offset;
+    int        size   = s_info->size;
+    InstrInfo *i_info = s_info->i_info;
+    int        static_sr = s_info->flags & SI_SAVE_REST;
+
+    RegisterInfo *regp = registerMap + offset;
+
+    // BONK( "Put\n" );
+    // validateRegisterMap( );
+
+    if( ( (unsigned) regp->offsize ) < ( (unsigned) size ) ) {
+        int i;
+        for( i = regp->offsize; i < size; i++ ) {
+           regp[i].offsize = -i;
+        }
+        regp->offsize = size;
+    } else if( ( (unsigned) regp->offsize ) > ( (unsigned) size ) ) {
+        splitReg( regp, size );
+    }
+
+    regp->lastWrite = newRegularEvent( current_stack_frame, i_info );
+    
+    // restore recognition
+    if( static_sr && saved_save_desc != NULL ) {
+        regp->lastWrite 
+           = (Event)
+              potentialRestore(saved_save_desc, offset, size, regp->lastWrite );
+    }
+
+    gc( );
+
+}
+
+static VG_REGPARM(1)
+void recordGet(StmInfo *s_info)
+{
+    int        offset = s_info->offset;
+    int        size   = s_info->size;
+    InstrInfo *i_info = s_info->i_info;
+    int        static_sr = s_info->flags & SI_SAVE_REST;
+
+    RegisterInfo *regp = registerMap + offset, *p;
+    RTEntry *res_entry = NULL; // Not necessary since loop always iterates
+
+    // BONK( "Get... " );
+    // validateRegisterMap( );
+
+    if( offset == OFFSET_x86_ESP ) return;
+
+    if( ( (unsigned) regp->offsize ) > ( (unsigned) size ) ) {
+        splitReg( regp, size );
+    }
+
+    for( p = regp; p < regp+size; p = p + p->offsize ) {
+        // DPRINT1( "%d ", p->offsize );
+
+        // check( p->offsize > 0, "Funny offsize\n" );
+
+        res_entry = getResultEntry( current_stack_frame, 
+                                    i_info,
+                                    regp->lastWrite,
+                                    0 ); // will not be part of the stack
+        res_entry->n_raw++;
+    }
+
+    if( static_sr && regp->offsize == size ) {
+        saved_offset    = offset;
+        saved_timestamp = regp->lastWrite;
+        saved_edge      = &( res_entry->n_raw );
+    } else {
+        saved_edge = NULL;
+    }
+
+    gc( );
+
+    // BONK( "done\n" );
+}
+
+static VG_REGPARM(2)
+void recordPutI(StmInfo *s_info, Int ix)
+{
+    int  base   = s_info->offset; // aka base
+    int  nElems = s_info->nElems;
+    int  bias   = s_info->bias;
+
+    int        size   = s_info->size;
+    int        offset = base + size * ( ( ix+bias ) % nElems );
+    InstrInfo *i_info = s_info->i_info;
+    int        static_sr = s_info->flags & SI_SAVE_REST;
+
+    RegisterInfo *regp = registerMap + offset;
+
+    // BONK( "PutI\n" );
+    // validateRegisterMap( );
+
+    if( ( (unsigned) regp->offsize ) < ( (unsigned) size ) ) {
+        int i;
+        for( i = regp->offsize; i < size; i++ ) {
+           regp[i].offsize = -i;
+        }
+        regp->offsize = size;
+    } else if( ( (unsigned) regp->offsize ) > ( (unsigned) size ) ) {
+        splitReg( regp, size );
+    }
+
+    regp->lastWrite = newRegularEvent( current_stack_frame, i_info );
+    
+    // restore recognition
+    if( static_sr && saved_save_desc != NULL ) {
+        regp->lastWrite 
+           = (Event)
+              potentialRestore(saved_save_desc, offset, size, regp->lastWrite );
+    }
+
+    gc( );
+
+}
+
+static VG_REGPARM(2)
+void recordGetI(StmInfo *s_info, Int ix)
+{
+    int  base   = s_info->offset; // aka base
+    int  nElems = s_info->nElems;
+    int  bias   = s_info->bias;
+
+    int        size   = s_info->size;
+    int        offset = base + size * ( ( ix+bias ) % nElems );
+    InstrInfo *i_info = s_info->i_info;
+    int        static_sr = s_info->flags & SI_SAVE_REST;
+
+    RegisterInfo *regp = registerMap + offset, *p;
+    RTEntry *res_entry = NULL; // Not necessary since loop always iterates
+
+    // BONK( "GetI\n" );
+    // validateRegisterMap( );
+
+    if( ( (unsigned) regp->offsize ) > ( (unsigned) size ) ) {
+        splitReg( regp, size );
+    }
+
+    for( p = regp; p < regp+size; p = p + p->offsize ) {
+
+        res_entry = getResultEntry( current_stack_frame, 
+                                    i_info,
+                                    regp->lastWrite,
+                                    0 ); // will not be part of the stack
+        res_entry->n_raw++;
+    }
+
+    if( static_sr && regp->offsize == size ) {
+        saved_offset    = offset;
+        saved_timestamp = regp->lastWrite;
+        saved_edge      = &( res_entry->n_raw );
+    } else {
+        saved_edge = NULL;
+    }
+
+    gc( );
 }
 
 static VG_REGPARM(3)
@@ -1385,6 +2073,9 @@ void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target)
     StackFrame * newFrame = current_stack_frame + 1;
     Addr32 ca = i_info->i_addr, ra = ca + i_info->i_len;
     TraceRec * newTR = newTraceRec( i_info, mkTaggedPtr2( newFrame, TPT_OPEN ) );
+
+    // BONK( "Call\n" );
+    // validateRegisterMap( );
 
     if( newFrame==stack_base+N_STACK_FRAMES ) {
         VG_(tool_panic)("Out of memory!");
@@ -1400,7 +2091,8 @@ void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target)
     current_stack_frame = newFrame;
 
     // Set hiddenness (recheck)
-    checkIfHidden( current_stack_frame, target, 0 ); 
+    checkIfHidden( current_stack_frame, target, 0 );
+    // call trace record insertion goes here 
 
     gc( );
 
@@ -1420,12 +2112,17 @@ static void pop_stack_frame(void)
       (void) newTraceRec( 0, mkTaggedPtr2( this_call, TPT_RET ) );
 
       current_stack_frame--;
+
+      // return trace record insterion goes here
    }
 }
 
 static VG_REGPARM(2)
 void recordRet(Addr32 sp, Addr32 target) 
 {
+    // BONK( "Ret\n" );
+    // validateRegisterMap( );
+
    // Should check that we are really returning to the next stack frame
    // and in that case make it the current stack frame
    
@@ -1463,6 +2160,7 @@ void recordRet(Addr32 sp, Addr32 target)
 
 }
 
+#endif
 
 //
 // Utility functions for emitting assignments and dirty helper calls
@@ -1506,20 +2204,65 @@ static IRExpr* const32( unsigned val )
 // Code instrumentation functions
 //
 
-static void instrumentLoad( IRBB *bbOut, InstrInfo *i_info, IRExpr *exp_addr )
+static int sizeofIRExpr( IRBB *bb, IRExpr *exp )
 {
-    IRExpr *exp_sp = emitIRAssign( bbOut, IRExpr_Get( OFFSET_x86_ESP, Ity_I32 ) );
-    IRExpr *exp_ii = const32( (UInt) i_info );
-    emitDC_3( bbOut, "recordLoad", &recordLoad, exp_ii, exp_addr, exp_sp );
+    return sizeofIRType( typeOfIRExpr( bb, exp ) );
 }
 
-static void instrumentStore( IRBB *bbOut, InstrInfo *i_info, IRExpr *exp_addr )
+
+static void instrumentLoad( IRBB *bbOut, InstrInfo *i_info, IRExpr *exp_addr, 
+                            UChar size, UChar flags )
 {
-    IRExpr *exp_sp = emitIRAssign( bbOut, IRExpr_Get( OFFSET_x86_ESP, Ity_I32 ) );
-    IRExpr *exp_ii = const32( (UInt) i_info );
-    emitDC_3( bbOut, "recordStore", &recordStore, exp_ii, exp_addr, exp_sp );
+    StmInfo *s_info = mkStmInfo( i_info, 0, size, flags );
+    IRExpr *exp_si = const32( (UInt) s_info );
+
+    emitDC_2( bbOut, "recordLoad", &recordLoad, exp_si, exp_addr );
 }
 
+static void instrumentStore( IRBB *bbOut, InstrInfo *i_info, IRExpr *exp_addr, UChar size,
+                             UChar flags )
+{
+    StmInfo *s_info = mkStmInfo( i_info, 0, size, flags );
+    IRExpr  *exp_si = const32( (UInt) s_info );
+    emitDC_2( bbOut, "recordStore", &recordStore, exp_si, exp_addr );
+}
+
+static void instrumentGet( IRBB *bbOut, InstrInfo *i_info, int offset, int size, UChar flags )
+{
+    StmInfo *s_info = mkStmInfo( i_info, offset, size, flags );
+    IRExpr *exp_si  = const32( (UInt) s_info );
+    emitDC_1( bbOut, "recordGet", &recordGet, exp_si );
+}
+
+static void instrumentPut( IRBB *bbOut, InstrInfo *i_info, int offset, int size, UChar flags )
+{
+    StmInfo *s_info = mkStmInfo( i_info, offset, size, flags );
+    IRExpr *exp_si  = const32( (UInt) s_info );
+    emitDC_1( bbOut, "recordPut", &recordPut, exp_si );
+}
+
+static void instrumentGetI( IRBB *bbOut, InstrInfo *i_info, IRExpr *exp, Int size, UChar flags )
+{
+    IRArray    *arr = exp->Iex.GetI.descr;
+    int        bias = exp->Iex.GetI.bias;
+    StmInfo *s_info = mkStmInfoI( i_info, arr->base, arr->nElems, bias, size, flags );
+    IRExpr *exp_si  = const32( (UInt) s_info );
+
+    emitDC_2( bbOut, "recordGetI", &recordGetI, exp_si, exp->Iex.GetI.ix );
+}
+
+#if 1
+static void instrumentPutI( IRBB *bbOut, InstrInfo *i_info, IRStmt *stm, Int size, UChar flags )
+{
+    IRArray    *arr = stm->Ist.PutI.descr;
+    int        bias = stm->Ist.PutI.bias;
+    StmInfo *s_info = mkStmInfoI( i_info, arr->base, arr->nElems, bias, size, flags );
+    IRExpr *exp_si  = const32( (UInt) s_info );
+
+    emitDC_2( bbOut, "recordPutI", &recordPutI, exp_si, stm->Ist.PutI.ix );
+}
+
+#endif
 
 // untility function for emitting code to increment a global variable
 
@@ -1617,7 +2360,123 @@ static void instrumentExit(IRBB *bbOut, IRJumpKind jk, InstrInfo *i_info, IRExpr
     }
 }
 
+
+/**********************************************
+ * Instrument save/restore (static detection) *
+ **********************************************/
+
 int stack_modified = 1;
+
+static int tempUsed( IRExpr *expr, IRTemp t )
+{
+    int i;
+
+    switch( expr->tag ) {
+      case Iex_Get:   return 0;
+      case Iex_GetI:  return 0;
+      case Iex_Tmp:   return t == expr->Iex.Tmp.tmp;
+      case Iex_Binop: return tempUsed( expr->Iex.Binop.arg1, t ) 
+                          || tempUsed( expr->Iex.Binop.arg2, t );
+      case Iex_Unop:  return tempUsed( expr->Iex.Unop.arg, t );
+      case Iex_Load:  return tempUsed( expr->Iex.Load.addr, t );
+      case Iex_Const: return 0;
+      case Iex_Mux0X: return tempUsed( expr->Iex.Mux0X.cond, t)
+                          || tempUsed( expr->Iex.Mux0X.expr0, t)
+                          || tempUsed( expr->Iex.Mux0X.exprX, t);
+      case Iex_CCall: for( i=0; expr->Iex.CCall.args[i] != NULL; i++ ) {
+                          if( tempUsed( expr->Iex.CCall.args[i], t ) ) {
+                              return 1;
+                          }
+                      }
+                      return 0;
+      case Iex_Binder: return 0; // Can not happen!
+    }
+    return 0; // Unreachable!
+}
+// Returns 0 if the static condition is unfulfilled or offset+1000 if it finds a restore
+// or 1000 if it finds a save. The caller knows which it is looking for.
+
+static int sr_check( IRBB* bbIn, int bbIn_idx, IRTemp t, SRCode sr_code, int size )
+{
+    int          i;
+    IRStmt  *stIn;
+    IRExpr *tmpExp;
+    int     offset=0;
+    int     state = sr_code==SR_SAVE ? 1 : 2;
+
+    // state==1 -> seen GET/GETI, looking for STORE
+    // state==2 -> seen LOAD, looking for PUT/PUTI
+    // state==3 -> seen GET/GETI and STORE, looking for end
+    // state==4 -> seen LOAD and PUT/PUTI, looking for end
+
+    for( i = bbIn_idx+1; i < bbIn->stmts_used; i++ ) {
+        stIn = bbIn->stmts[i];
+        switch( stIn->tag ) {
+          case Ist_IMark:
+              return ( state==3 || state==4 ) ? offset-bbIn_idx : 0;
+              break;
+          case Ist_NoOp:
+              break;
+          case Ist_AbiHint:
+              break;
+          case Ist_Put:
+              tmpExp = stIn->Ist.Put.data;
+              if( state==2 && tmpExp->tag == Iex_Tmp && tmpExp->Iex.Tmp.tmp == t
+                  && sizeofIRType( typeOfIRExpr( bbIn->tyenv, tmpExp ) ) == size ) {
+                  state = 4;
+                  offset = i;
+              } else if( tempUsed( tmpExp, t ) ) {
+                  return 0;
+              }
+              break;
+          case Ist_PutI:
+              tmpExp = stIn->Ist.PutI.data;
+              if( state==2 && tmpExp->tag == Iex_Tmp && tmpExp->Iex.Tmp.tmp == t 
+                  && sizeofIRType( typeOfIRExpr( bbIn->tyenv, tmpExp ) ) == size ) {
+                  state = 4;
+                  offset = i;
+              } else if( tempUsed( tmpExp, t ) ) {
+                  return 0;
+              }
+              break;
+          case Ist_Tmp:
+              if( tempUsed( stIn->Ist.Tmp.data, t ) ) {
+                  return 0;
+              }
+              break;
+          case Ist_Store:
+              tmpExp = stIn->Ist.Store.data;
+              if( state==1 && tmpExp->tag == Iex_Tmp && tmpExp->Iex.Tmp.tmp == t 
+                  && sizeofIRType( typeOfIRExpr( bbIn->tyenv, tmpExp ) ) == size ) {
+                  state = 3;
+              } else if( tempUsed( tmpExp, t ) || tempUsed( stIn->Ist.Store.addr, t ) ) {
+                  return 0;
+              }
+              break;
+          case Ist_Dirty:
+              // this is slightly unsafe, overestimating what is a save or restore
+              // maybe we should just return false here?
+#if 0
+              for( tmpExp = stIn->Ist.Dirty.details[0]; tmpExp != NULL; tmpExp++ ) {
+                  if( tempUsed( tmpExp, t ) ) {
+                      return 0;
+                  }
+              }
+#else
+              return 0;
+#endif
+              break;
+          case Ist_MFence:
+              break;
+          case Ist_Exit:
+              if( tempUsed( stIn->Ist.Exit.guard, t ) ) {
+                  return 0;
+              }
+              break;
+        }
+    }
+    return 1;
+}
 
 static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
 			   Addr64 orig_addr_noredir, VexGuestExtents * vge,
@@ -1630,6 +2489,13 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
     Int       guestILen  = 0;
     unsigned int loc_instr = 0;
     InstrInfo *currII;
+    SRCode     sr_code = SR_NONE;
+    int        sr_index = -1; 
+    IRExpr    *tmpExpr;
+    int       ref_size, offset;
+    UChar     flags;
+
+    ensureRegisterMap( layout->total_sizeB );
 
     translations++;
 
@@ -1640,10 +2506,12 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
 
     for( bbIn_idx = 0; bbIn_idx < bbIn->stmts_used; bbIn_idx++ ) {
        stIn = bbIn->stmts[bbIn_idx];
-       
+
+#ifndef DO_NOT_INSTRUMENT       
        switch( stIn->tag ) {
 
          case Ist_IMark:
+	     sr_code = SR_NONE;
              if( stack_modified ) { 
                 emitSpChange( bbOut );
                 stack_modified = 0;
@@ -1678,21 +2546,74 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
              if( stIn->Ist.Put.offset == OFFSET_x86_ESP ) {
                 stack_modified = 1;
              }
+             flags = sr_code != SR_NONE && sr_index==bbIn_idx ? SI_SAVE_REST : 0;
+             currII = mk_i_info( currII, guestIAddr, guestILen );
+             ref_size = sizeofIRType( typeOfIRExpr( bbIn->tyenv, stIn->Ist.Put.data ) );
+             instrumentPut( bbOut, currII, stIn->Ist.Put.offset, ref_size, flags );
              break;
          case Ist_PutI:
+             // Similar to above, but needs to compute offset dynamically
+             flags = sr_code != SR_NONE && sr_index==bbIn_idx ? SI_SAVE_REST : 0;
+             currII = mk_i_info( currII, guestIAddr, guestILen );
+             ref_size = sizeofIRType( typeOfIRExpr( bbIn->tyenv, stIn->Ist.PutI.data ) );
+             instrumentPut( bbOut, currII, stIn, ref_size, flags );
              break;
          case Ist_Tmp:
              // This is an assignment to a temp, so it should be instrumented
-             // if the rhs is a Load
-             if( stIn->Ist.Tmp.data->tag == Iex_Load ) {
+             // if the rhs is a Load, GET or GETI
+             tmpExpr = stIn->Ist.Tmp.data;
+             switch( tmpExpr->tag ) {
+               case Iex_Load:
                  currII = mk_i_info( currII, guestIAddr, guestILen );
-                 instrumentLoad( bbOut, currII, stIn->Ist.Tmp.data->Iex.Load.addr );
+
+                 ref_size = sizeofIRType( tmpExpr->Iex.Load.ty );
+                 flags = 0;
+                 if( sr_code == SR_NONE ) {
+                    IRTemp t = stIn->Ist.Tmp.tmp;
+                    offset = sr_check( bbIn, bbIn_idx, t, SR_RESTORE, ref_size );
+                    if( offset!=0 ) { 
+                       sr_code = SR_RESTORE;
+                       sr_index = bbIn_idx + offset;
+                       currII->sr_size = ref_size;
+                       flags |= SI_SAVE_REST;
+                    }
+                 }
+                 instrumentLoad( bbOut, currII, tmpExpr->Iex.Load.addr, ref_size, flags );
+                 break;
+               case Iex_Get: // similar to above
+                 currII = mk_i_info( currII, guestIAddr, guestILen );
+                 flags = sr_index==bbIn_idx ? SI_SAVE_REST : 0;
+                 ref_size = sizeofIRType( tmpExpr->Iex.Get.ty );
+                 offset = sr_check( bbIn, bbIn_idx, stIn->Ist.Tmp.tmp, sr_code, ref_size );
+                 if( sr_code==SR_NONE && offset!=0 
+                     && tmpExpr->Iex.Get.offset != OFFSET_x86_ESP ) { 
+                   sr_code = SR_SAVE;
+                   currII->sr_size = ref_size;
+                 }
+                 instrumentGet( bbOut, currII, tmpExpr->Iex.Get.offset, ref_size, flags );
+                 break;
+               case Iex_GetI: // again similar, but needs to compute offset dynamically
+                 currII = mk_i_info( currII, guestIAddr, guestILen );
+                 flags = sr_index==bbIn_idx ? SI_SAVE_REST : 0;
+                 ref_size = sizeofIRType( tmpExpr->Iex.GetI.descr->elemTy );
+                 offset = sr_check( bbIn, bbIn_idx, stIn->Ist.Tmp.tmp, sr_code, ref_size );
+                 if( sr_code==SR_NONE && offset!=0 ) { 
+                   sr_code = SR_SAVE;
+                   currII->sr_size = ref_size;
+                 }
+                 instrumentGetI( bbOut, currII, tmpExpr, ref_size, flags );
+                 break;
+               default:
+                 break;
              }
              break;
          case Ist_Store:
              // This is a store instruction, so it should be instrumented
+             flags = sr_code != SR_NONE && sr_index==bbIn_idx ? SI_SAVE_REST : 0;
              currII = mk_i_info( currII, guestIAddr, guestILen );
-             instrumentStore( bbOut, currII, stIn->Ist.Store.addr );
+             // should handle save restore
+             ref_size = sizeofIRType( typeOfIRExpr( bbIn->tyenv, stIn->Ist.Store.data ) );
+             instrumentStore( bbOut, currII, stIn->Ist.Store.addr, ref_size, flags );
              break;
          case Ist_Dirty:
              // This should maybe be instrumented, but we'll leave it for later
@@ -1704,8 +2625,10 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
              break;
 
        }
+#endif
        addStmtToIRBB( bbOut, stIn );
     }
+#ifndef DO_NOT_INSTRUMENT
 #ifndef PRECISE_ICOUNT
     emitIncrementGlobal( bbOut, &instructions, loc_instr );
 #endif
@@ -1715,6 +2638,7 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
     }
     currII = mk_i_info( currII, guestIAddr, guestILen );
     instrumentExit( bbOut, bbIn->jumpkind, currII, bbIn->next, loc_instr );
+#endif
     return bbOut;
 }
 
