@@ -33,6 +33,29 @@
    - spChange and adjust_shadow_sp are maybe not both needed
 */
 
+//
+//  Compilation options
+//
+
+#define  READ_LIST_COMPACT  1        // 0 turn off read list compaction
+#define  DEBUG_PRINT        1
+#define  DO_PROFILE         1
+#define  PRECISE_ICOUNT     1
+#define  DO_CHECK           1
+#define  INSTR_LVL_DEPS     1
+#define  TRACE_REG_DEPS     0
+
+#define  EMPTY_RECORD       0
+#define  DO_NOT_INSTRUMENT  0
+#define  MOCK_RTENTRY       0
+#define  EMPTY_RECORD       0
+#define  FULL_CONTOURS      0
+
+
+//
+// Other includes and definitions
+//
+
 #include "pub_tool_basics.h"
 #include "pub_tool_debuginfo.h"
 #include "pub_tool_libcfile.h"
@@ -53,8 +76,6 @@
 #define  II_CHUNK_SIZE      1000000
 // #define  STRING_TABLE         10007  // smallest prime >= 10000
 
-#define  READ_LIST_COMPACT  1        // 0 turn off read list compaction
-
 #define  RT_IDX_BITS                        3
 #define  RT_ENTRIES_PER_LINE (1<<RT_IDX_BITS)  // must be power of 2
 
@@ -68,7 +89,7 @@
 #define  GET_FRAG_PTR(m,a)   m[a>>BITS_PER_FRAG]
 #define  GET_REF_ADDR(fp,a)  ( &( fp->refs[(a&FRAG_MASK) >> BITS_PER_REF] ) )
 
-#ifndef GURKA
+#if DEBUG_PRINT
 
 #define  BONK(s) VG_(write)( 2, s, VG_(strlen)( s ) )
 #define  DPRINT1(s,x)     { VG_(sprintf)( dbuf, s, x );       BONK( dbuf ); }
@@ -84,19 +105,11 @@
 
 #endif
 
-#define DO_PROFILE 1
-#define PRECISE_ICOUNT 1
-// #define DO_NOT_INSTRUMENT 1
-// #define MOCK_RTENTRY 1
-// #define EMPTY_RECORD
-
-#ifdef INSTR_LVL_DEPS
+#if INSTR_LVL_DEPS
 #define N_INSTR_DEPS 4
 #endif
 
-#define DO_CHECK 1
-
-#ifdef DO_CHECK
+#if DO_CHECK
 static void check(int c, Char *s)
 {
    if( !( c ) ) {
@@ -155,7 +168,7 @@ static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
 #define SAVE_RESTORE_TRACKING 1
 
 
-#ifdef DO_PROFILE
+#if DO_PROFILE
 #define PROFILE( c ) c
 #else
 #define PROFILE( c ) 
@@ -216,29 +229,25 @@ typedef struct _LineInfo {
 
 static LineInfo dummy_line_info = { { }, 0, "", "", NULL };
 
-#ifdef INSTR_LVL_DEPS
+#if INSTR_LVL_DEPS
 typedef struct _InstrInfoList {
    struct _InstrInfo     *i_info;
    struct _InstrInfoList *next;
    UInt n_raw, n_war, n_waw;
-}
+} InstrInfoList;
 #endif
 
 typedef struct {
    Addr32   i_addr;
    unsigned i_len;
    LineInfo *line;
-#ifdef SAVE_RESTORE_TRACKING
-   Int      sr_size;
-   Int      sr_offset;
-#endif
-#ifdef INSTR_LVL_DEPS
-   InstrInfoList (*i_deps)[N_INSTR_DEPS];
+#if INSTR_LVL_DEPS
+   InstrInfoList *(i_deps[N_INSTR_DEPS]);
 #endif
 } InstrInfo;
 
-#ifdef INSTR_LVL_DEPS
-#define DUMMY_II_INITIALIZER   ,{}
+#if INSTR_LVL_DEPS
+#define DUMMY_II_INITIALIZER   ,{NULL,NULL,NULL,NULL}
 #else
 #define DUMMY_II_INITIALIZER  /* */
 #endif
@@ -295,49 +304,9 @@ static StmInfo *mkStmInfo( InstrInfo *i_info, UShort offset, UChar size, UChar f
 
 
 
-
-
 static Addr32 lowest_shadow_sp=0xffffffff, highest_shadow_sp=0;
 
 static Char dbuf[BUF_SIZE] __attribute__((unused));
-
-#ifdef TAGGED_PTR_BITFIELD
-
-typedef 
-   struct {
-     unsigned addr:30;
-     unsigned flag1:1;
-     unsigned flag2:1;
-   }
-   TaggedPtr;
-
-static TaggedPtr mkTaggedPtr(void *ptr, unsigned flag1, unsigned flag2)
-{
-   TaggedPtr t;
-   check( ( (unsigned) ptr & 3 ) == 0, "Unaligned pointer in mkTaggedPtr" );
-   t.addr = ((unsigned) ptr) >> 2; 
-   t.flag1 = flag1;
-   t.flag2 = flag2;
-
-   return t;
-}
-
-static TaggedPtr mkTaggedPtr2(void *ptr, unsigned flag)
-{
-   return mkTaggedPtr( ptr, (flag>>1)&1, flag&1 );
-}
-
-#define TPTR_UNTAG( t_ptr ) ( t_ptr.addr << 2 )
-#define ToTrP( t_ptr ) ( (TraceRec   *) TPTR_UNTAG( t_ptr ) )
-#define ToStP( t_ptr ) ( (StackFrame *) TPTR_UNTAG( t_ptr ) )
-
-#define TP_GET_FLAGS( t_ptr ) ( t_ptr.flag1<<1 | t_ptr.flag2 )
-#define TP_GET_FLAG1( t_ptr ) ( t_ptr.flag1 )
-#define TP_GET_FLAG2( t_ptr ) ( t_ptr.flag2 )
-
-#define EQUAL_EVENT(x,y) (TP_GET_FLAGS( x ) == TP_GET_FLAGS( y ) && x.addr == y.addr )
-
-#else
 
 typedef unsigned TaggedPtr;
 
@@ -346,17 +315,6 @@ static TaggedPtr mkTaggedPtr(void *ptr, unsigned flag1, unsigned flag2)
 
    return ( (unsigned) ptr ) | ( ( flag1<<1 ) & 2 ) | ( flag2 & 1 );
 }
-
-#if 0
-
-static TaggedPtr mkTaggedPtr2(void *ptr, unsigned flag)
-{
-   check( ( (unsigned) ptr & 3 ) == 0, "Unaligned pointer in mkTaggedPtr" );
-
-   return ( (unsigned) ptr ) | ( flag & 3 );
-}
-
-#endif
 
 #define mkTaggedPtr2(ptr,flag) ( ( (unsigned) (ptr) ) | ( (flag) & 3) )
 
@@ -369,8 +327,6 @@ static TaggedPtr mkTaggedPtr2(void *ptr, unsigned flag)
 #define TP_GET_FLAG2( t_ptr ) ( t_ptr & 1 )
 
 #define EQUAL_EVENT(x,y) ( x == y )
-
-#endif
 
 typedef 
    struct {
@@ -514,6 +470,8 @@ static void deleteEvent(EventList *l)
    PROFILE( bumpCounter( &read_list_elements, -1, NULL, NULL ); )
 }
 
+#if TRACE_REG_DEPS
+
 typedef
    struct {
      TraceRec  *frame; 
@@ -527,6 +485,7 @@ SaveDesc * saved_save_desc;
 int saved_offset, *saved_edge;
 Event saved_timestamp;
 
+#endif
 
 // If the last reference was a write, lastRead is NULL
 typedef
@@ -534,7 +493,9 @@ typedef
      EventList *lastRead;
      Event      lastWrite;
      int        offsize;      // Positive => accesssUnit, negative => subordinate
+#if TRACE_REG_DEPS
      SaveDesc  *saveDesc;
+#endif
    }
    RefInfo;
 
@@ -546,6 +507,7 @@ typedef
 
 static MapFragment **map;
 
+#if TRACE_REG_DEPS
 typedef
    struct {
      Event lastWrite;
@@ -598,7 +560,7 @@ static void ensureRegisterMap( int size )
         }
     }
 }
-        
+#endif        
 
 static Char buf[512+2*CONT_LEN];
 
@@ -711,10 +673,8 @@ static InstrInfo *mk_i_info(InstrInfo *curr, Addr32 i_addr, unsigned i_len)
    ii_chunk[ii_idx].i_addr    = i_addr;
    ii_chunk[ii_idx].i_len     = i_len;
    ii_chunk[ii_idx].line      = mk_line_info( i_addr );
-   ii_chunk[ii_idx].sr_offset = 0;
-   ii_chunk[ii_idx].sr_size   = 0;
 
-#ifdef INSTR_LVL_DEPS
+#if INSTR_LVL_DEPS
    int i;
 
    for( i=0; i<N_INSTR_DEPS; i++ ) {
@@ -767,7 +727,7 @@ static void adjust_shadow_sp(Addr32 sp)
     }
 }
 
-#ifdef EMPTY_RECORD
+#if EMPTY_RECORD
 
 static VG_REGPARM(1)
 void recordSpChange(Addr32 newSp)
@@ -994,6 +954,7 @@ static void compact(void)
    //             - Memory table
    //             - Stack marks
    //             - Shadow stack
+   //             - Registers
    // Phase 3: Construct list for forwards traversal. Backwards
    // Phase 4: Relocate live trace recs. Forwards
 
@@ -1069,10 +1030,12 @@ static void compact(void)
    // BONK( "marks, " );
    // need to do the registers as well ...
 
+#if TRACE_REG_DEPS
    for( i=0; i<registerMapSize; i++ ) {
      registerMap[i].lastWrite = forward( registerMap[i].lastWrite, delta );
    }
    // BONK( "registers, " );
+#endif
 
    for( i=0; i<FRAGS_IN_MAP; i++ ) {
      if( map[i] != NULL ) {
@@ -1080,11 +1043,13 @@ static void compact(void)
          info = map[i]->refs + j;
          info->lastWrite = forward( info->lastWrite, delta );
          info->lastRead = compactReads( info->lastRead, delta );
+#if TRACE_REG_DEPS
          if( info->saveDesc != NULL ) {
            SaveDesc *sd = info->saveDesc;
            sd->frame = ToTrP( forward( (Event) sd->frame, delta ) );
            sd->regLastWrite = forward( sd->regLastWrite, delta );
          }
+#endif
        }
      }
    }
@@ -1504,6 +1469,8 @@ static void em_post_clo_init(void)
  * Save/restore discovery routines *
  ***********************************/
 
+#if TRACE_REG_DEPS
+
 typedef 
     union _SaveDescFreeList {
       SaveDesc                 saveDesc;
@@ -1592,10 +1559,7 @@ static Event potentialRestore( SaveDesc *sd, short offset, short size, Event tr 
     return sd->regLastWrite;
 }
 
-
-
-
-
+#endif
 
 /***********************************
  * Recording routines              *
@@ -1616,8 +1580,10 @@ static void splitAccessUnit(RefInfo *item, int size)
             }
          }
          item->offsize = size;
+#if TRACE_REG_DEPS
          // also delete save descriptor
          freeSaveDesc( item->saveDesc );
+#endif
      }
 }
 
@@ -1642,14 +1608,16 @@ static RefInfo* getRefInfo(Addr32 addr)
             } else {
                frag->refs[i].offsize = - i%init_size;
             }
-            frag->refs[i].saveDesc = 0;
+#if TRACE_REG_DEPS
+            frag->refs[i].saveDesc = NULL;
+#endif
         }
     }
 
     return GET_REF_ADDR(frag,addr);
 }
 
-#ifdef EMPTY_RECORD
+#if EMPTY_RECORD
 
 static VG_REGPARM(2)
 void recordLoad( StmInfo *i_info, Addr32 addr )
@@ -1671,6 +1639,8 @@ void recordRet(Addr32 sp, Addr32 target)
 {
 }
 
+#if TRACE_REG_DEPS
+
 static VG_REGPARM(1)
 void recordPut( StmInfo *s_info )
 {
@@ -1685,6 +1655,8 @@ static VG_REGPARM(2)
 void recordGetI( StmInfo *s_info, IRExpr *exp_ix )
 {
 }
+
+#endif
 
 #else
 
@@ -1751,12 +1723,13 @@ void recordLoad(StmInfo *s_info, Addr32 addr )
     
         res_entry->n_raw++;
 
+#if TRACE_REG_DEPS
         if( static_sr ) {
           // the load part of a potential restore
           //    pick up the save descriptor for the imminent PUT
           saved_save_desc = refp->saveDesc;
         }
-
+#endif
         refp->lastRead = consEvent( newRegularEvent( current_stack_frame, i_info ), 
                                     refp->lastRead );
 
@@ -1829,6 +1802,8 @@ void recordStore( StmInfo *s_info, Addr32 addr )
 
         if( refp->offsize == l_size ) {
             num_bytes = l_size;
+
+#if TRACE_REG_DEPS
             // There once was a GET (a little while ago) that saved offset,
             // timestamp and edge
             // If the GET was overlapping, so that we do not count this as a 
@@ -1838,6 +1813,7 @@ void recordStore( StmInfo *s_info, Addr32 addr )
                                                 size, saved_timestamp, 
                                                 saved_edge );
             }
+#endif
         } else {
             num_bytes = maybeSplitBlock( refp, l_addr, l_size );
         }
@@ -1886,6 +1862,8 @@ void recordStore( StmInfo *s_info, Addr32 addr )
     gc( );
 
 }
+
+#if TRACE_REG_DEPS
 
 static void splitReg( RegisterInfo *regp, int size )
 {
@@ -2067,6 +2045,8 @@ void recordGetI(StmInfo *s_info, Int ix)
     gc( );
 }
 
+#endif
+
 static VG_REGPARM(3)
 void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target) 
 {
@@ -2227,6 +2207,8 @@ static void instrumentStore( IRBB *bbOut, InstrInfo *i_info, IRExpr *exp_addr, U
     emitDC_2( bbOut, "recordStore", &recordStore, exp_si, exp_addr );
 }
 
+#if TRACE_REG_DEPS
+
 static void instrumentGet( IRBB *bbOut, InstrInfo *i_info, int offset, int size, UChar flags )
 {
     StmInfo *s_info = mkStmInfo( i_info, offset, size, flags );
@@ -2251,7 +2233,6 @@ static void instrumentGetI( IRBB *bbOut, InstrInfo *i_info, IRExpr *exp, Int siz
     emitDC_2( bbOut, "recordGetI", &recordGetI, exp_si, exp->Iex.GetI.ix );
 }
 
-#if 1
 static void instrumentPutI( IRBB *bbOut, InstrInfo *i_info, IRStmt *stm, Int size, UChar flags )
 {
     IRArray    *arr = stm->Ist.PutI.descr;
@@ -2266,7 +2247,7 @@ static void instrumentPutI( IRBB *bbOut, InstrInfo *i_info, IRStmt *stm, Int siz
 
 // untility function for emitting code to increment a global variable
 
-#if 1
+#if 0
 
 static void emitIncrementGlobal(IRBB *bbOut, void *addr, unsigned int amount)
 {
@@ -2367,6 +2348,8 @@ static void instrumentExit(IRBB *bbOut, IRJumpKind jk, InstrInfo *i_info, IRExpr
 
 int stack_modified = 1;
 
+#if TRACE_REG_DEPS
+
 static int tempUsed( IRExpr *expr, IRTemp t )
 {
     int i;
@@ -2393,8 +2376,11 @@ static int tempUsed( IRExpr *expr, IRTemp t )
     }
     return 0; // Unreachable!
 }
-// Returns 0 if the static condition is unfulfilled or offset+1000 if it finds a restore
-// or 1000 if it finds a save. The caller knows which it is looking for.
+
+// Called with a BB 'b', an index 'i' into 'b', a temp 't' that is target of an assign,
+// an SRCode 's' that is SR_SAVE if the caller has seen a GET and SR_RESTORE if the
+// caller has seen a LOAD (at index 'i' of 'b'), and the size of the GET or LOAD.
+// Returns the index of the matching PUT or STORE or 0 if no match.
 
 static int sr_check( IRBB* bbIn, int bbIn_idx, IRTemp t, SRCode sr_code, int size )
 {
@@ -2404,16 +2390,16 @@ static int sr_check( IRBB* bbIn, int bbIn_idx, IRTemp t, SRCode sr_code, int siz
     int     offset=0;
     int     state = sr_code==SR_SAVE ? 1 : 2;
 
-    // state==1 -> seen GET/GETI, looking for STORE
-    // state==2 -> seen LOAD, looking for PUT/PUTI
-    // state==3 -> seen GET/GETI and STORE, looking for end
-    // state==4 -> seen LOAD and PUT/PUTI, looking for end
+    // state==1 -> seen GET/GETI, looking for STORE to make a save
+    // state==2 -> seen LOAD, looking for PUT/PUTI to make a restore
+    // state==3 -> seen GET/GETI and STORE (a save), looking for end
+    // state==4 -> seen LOAD and PUT/PUTI (a restore), looking for end
 
     for( i = bbIn_idx+1; i < bbIn->stmts_used; i++ ) {
         stIn = bbIn->stmts[i];
         switch( stIn->tag ) {
           case Ist_IMark:
-              return ( state==3 || state==4 ) ? offset-bbIn_idx : 0;
+              return ( state==3 || state==4 ) ? offset : 0;
               break;
           case Ist_NoOp:
               break;
@@ -2449,6 +2435,7 @@ static int sr_check( IRBB* bbIn, int bbIn_idx, IRTemp t, SRCode sr_code, int siz
               if( state==1 && tmpExp->tag == Iex_Tmp && tmpExp->Iex.Tmp.tmp == t 
                   && sizeofIRType( typeOfIRExpr( bbIn->tyenv, tmpExp ) ) == size ) {
                   state = 3;
+                  offset = i;
               } else if( tempUsed( tmpExp, t ) || tempUsed( stIn->Ist.Store.addr, t ) ) {
                   return 0;
               }
@@ -2475,8 +2462,10 @@ static int sr_check( IRBB* bbIn, int bbIn_idx, IRTemp t, SRCode sr_code, int siz
               break;
         }
     }
-    return 1;
+    return ( state==3 || state==4 ) ? offset : 0;
 }
+
+#endif
 
 static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
 			   Addr64 orig_addr_noredir, VexGuestExtents * vge,
@@ -2493,9 +2482,11 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
     int        sr_index = -1; 
     IRExpr    *tmpExpr;
     int       ref_size, offset;
-    UChar     flags;
+    UChar     flags = 0;
 
+#if TRACE_REG_DEPS
     ensureRegisterMap( layout->total_sizeB );
+#endif
 
     translations++;
 
@@ -2507,11 +2498,11 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
     for( bbIn_idx = 0; bbIn_idx < bbIn->stmts_used; bbIn_idx++ ) {
        stIn = bbIn->stmts[bbIn_idx];
 
-#ifndef DO_NOT_INSTRUMENT       
+#if !DO_NOT_INSTRUMENT       
        switch( stIn->tag ) {
 
          case Ist_IMark:
-	     sr_code = SR_NONE;
+	     sr_index = -1;
              if( stack_modified ) { 
                 emitSpChange( bbOut );
                 stack_modified = 0;
@@ -2519,16 +2510,17 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
              guestIAddr = (Addr32) stIn->Ist.IMark.addr;
              guestILen  = stIn->Ist.IMark.len;
              loc_instr++;
-#ifdef PRECISE_ICOUNT
+#if PRECISE_ICOUNT
              emitIncrementGlobal( bbOut, &instructions, 1 );
 #endif
              currII = NULL;
              break;
+
          case Ist_Exit: 
              currII = mk_i_info( currII, guestIAddr, guestILen );
 	     instrumentExit( bbOut, stIn->Ist.Exit.jk, currII, 
                              IRExpr_Const( stIn->Ist.Exit.dst ), loc_instr );
-#ifndef PRECISE_ICOUNT
+#if !PRECISE_ICOUNT
              emitIncrementGlobal( bbOut, &instructions, loc_instr );
              loc_instr = 0;
 #endif
@@ -2540,23 +2532,29 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
 
          case Ist_NoOp:
              break;
+
          case Ist_AbiHint:
              break;
+
          case Ist_Put:
              if( stIn->Ist.Put.offset == OFFSET_x86_ESP ) {
                 stack_modified = 1;
              }
-             flags = sr_code != SR_NONE && sr_index==bbIn_idx ? SI_SAVE_REST : 0;
+#if TRACE_REG_DEPS
+             flags = sr_index==bbIn_idx ? SI_SAVE_REST : 0;
              currII = mk_i_info( currII, guestIAddr, guestILen );
              ref_size = sizeofIRType( typeOfIRExpr( bbIn->tyenv, stIn->Ist.Put.data ) );
              instrumentPut( bbOut, currII, stIn->Ist.Put.offset, ref_size, flags );
+#endif
              break;
          case Ist_PutI:
+#if TRACE_REG_DEPS
              // Similar to above, but needs to compute offset dynamically
-             flags = sr_code != SR_NONE && sr_index==bbIn_idx ? SI_SAVE_REST : 0;
+             flags = sr_index==bbIn_idx ? SI_SAVE_REST : 0;
              currII = mk_i_info( currII, guestIAddr, guestILen );
              ref_size = sizeofIRType( typeOfIRExpr( bbIn->tyenv, stIn->Ist.PutI.data ) );
              instrumentPut( bbOut, currII, stIn, ref_size, flags );
+#endif
              break;
          case Ist_Tmp:
              // This is an assignment to a temp, so it should be instrumented
@@ -2565,51 +2563,60 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
              switch( tmpExpr->tag ) {
                case Iex_Load:
                  currII = mk_i_info( currII, guestIAddr, guestILen );
-
                  ref_size = sizeofIRType( tmpExpr->Iex.Load.ty );
+#if TRACE_REG_DEPS
                  flags = 0;
-                 if( sr_code == SR_NONE ) {
+                 if( sr_index == -1 ) {
                     IRTemp t = stIn->Ist.Tmp.tmp;
                     offset = sr_check( bbIn, bbIn_idx, t, SR_RESTORE, ref_size );
                     if( offset!=0 ) { 
-                       sr_code = SR_RESTORE;
-                       sr_index = bbIn_idx + offset;
-                       currII->sr_size = ref_size;
-                       flags |= SI_SAVE_REST;
+                       sr_index = offset;
+                       flags = SI_SAVE_REST;
                     }
                  }
+#endif
                  instrumentLoad( bbOut, currII, tmpExpr->Iex.Load.addr, ref_size, flags );
                  break;
+#if TRACE_REG_DEPS
                case Iex_Get: // similar to above
                  currII = mk_i_info( currII, guestIAddr, guestILen );
-                 flags = sr_index==bbIn_idx ? SI_SAVE_REST : 0;
                  ref_size = sizeofIRType( tmpExpr->Iex.Get.ty );
-                 offset = sr_check( bbIn, bbIn_idx, stIn->Ist.Tmp.tmp, sr_code, ref_size );
-                 if( sr_code==SR_NONE && offset!=0 
-                     && tmpExpr->Iex.Get.offset != OFFSET_x86_ESP ) { 
-                   sr_code = SR_SAVE;
-                   currII->sr_size = ref_size;
+                 flags = 0;
+                 // We never SAVE the stack pointer!
+                 if( sr_index == -1 && tmpExpr->Iex.Get.offset != OFFSET_x86_ESP ) {
+		    IRTemp t = stIn->Ist.Tmp.tmp;
+                    offset = sr_check( bbIn, bbIn_idx, t, SR_SAVE, ref_size );
+                    if( offset != 0 ) { 
+                      sr_index = offset;
+                      flags = SI_SAVE_REST;
+                    }
                  }
                  instrumentGet( bbOut, currII, tmpExpr->Iex.Get.offset, ref_size, flags );
                  break;
                case Iex_GetI: // again similar, but needs to compute offset dynamically
                  currII = mk_i_info( currII, guestIAddr, guestILen );
-                 flags = sr_index==bbIn_idx ? SI_SAVE_REST : 0;
                  ref_size = sizeofIRType( tmpExpr->Iex.GetI.descr->elemTy );
-                 offset = sr_check( bbIn, bbIn_idx, stIn->Ist.Tmp.tmp, sr_code, ref_size );
-                 if( sr_code==SR_NONE && offset!=0 ) { 
-                   sr_code = SR_SAVE;
-                   currII->sr_size = ref_size;
+                 flags = 0;
+                 if( sr_index == -1 ) {
+		    IRTemp t = stIn->Ist.Tmp.tmp;
+                    offset = sr_check( bbIn, bbIn_idx, t, SR_SAVE, ref_size );
+                    if( offset != 0 ) { 
+                      sr_index = offset;
+                      flags = SI_SAVE_REST;
+                    }
                  }
                  instrumentGetI( bbOut, currII, tmpExpr, ref_size, flags );
                  break;
+#endif
                default:
                  break;
              }
              break;
          case Ist_Store:
              // This is a store instruction, so it should be instrumented
-             flags = sr_code != SR_NONE && sr_index==bbIn_idx ? SI_SAVE_REST : 0;
+#if TRACE_REG_DEPS
+             flags = sr_index==bbIn_idx ? SI_SAVE_REST : 0;
+#endif
              currII = mk_i_info( currII, guestIAddr, guestILen );
              // should handle save restore
              ref_size = sizeofIRType( typeOfIRExpr( bbIn->tyenv, stIn->Ist.Store.data ) );
@@ -2628,8 +2635,8 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
 #endif
        addStmtToIRBB( bbOut, stIn );
     }
-#ifndef DO_NOT_INSTRUMENT
-#ifndef PRECISE_ICOUNT
+#if !DO_NOT_INSTRUMENT
+#if !PRECISE_ICOUNT
     emitIncrementGlobal( bbOut, &instructions, loc_instr );
 #endif
     if( stack_modified ) { 
@@ -2708,7 +2715,7 @@ static void em_fini(Int exitcode)
    VG_(message)(Vg_UserMsg, "Dependency trace has finished, storing in %s",
 		trace_file_name);
    printResultTable( trace_file_name );
-#ifdef DO_PROFILE
+#if DO_PROFILE
    VG_(message)(Vg_UserMsg, "Max mem frags:    %10u (%10u bytes)", 
                             mem_table_frags, 
                             mem_table_frags*sizeof( MapFragment ) );
