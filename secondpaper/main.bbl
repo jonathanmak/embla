@@ -1,0 +1,120 @@
+\begin{thebibliography}{10}
+
+\bibitem{ABL97}
+G.~Ammons, T.~Ball, and J.~Larus.
+\newblock Exploiting hardware performance counters with flow and context
+  sensitive profiling.
+\newblock {\em ACM SIGPLAN Notices}, 32(5):85--96, 1997.
+
+\bibitem{Bacon:1994:CompilerTransformation}
+David~F. Bacon, Susan~L. Graham, and Oliver~J. Sharp.
+\newblock Compiler transformations for high-performance computing.
+\newblock {\em ACM Comput. Surv.}, 26(4):345--420, 1994.
+
+\bibitem{BJKLR96}
+R.~Blumofe, C.~Joerg, B.~Kuszmaul, C.~Leiserson, K.~Randall, and Y.~Zhou.
+\newblock {Cilk}: An efficient multithreaded runtime system.
+\newblock {\em Journal of Parallel and Distributed Comuting}, 37(1):55--69,
+  August 1996.
+
+\bibitem{frigo98implementation}
+Matteo Frigo, Charles~E. Leiserson, and Keith~H. Randall.
+\newblock The implementation of the {Cilk-5} multithreaded language.
+\newblock In {\em {SIGPLAN} Conference on Programming Language Design and
+  Implementation}, pages 212--223, 1998.
+
+\bibitem{GF64}
+Benrard~A. Galler and Michael~J. Fisher.
+\newblock An improved equivalence algorithm.
+\newblock {\em Commun. ACM}, 7(5):301--303, 1964.
+
+\bibitem{HRY02}
+K.-S. Ha, E.-K. Ryu, and K.-Y. Yoo.
+\newblock Space-efficient first race detection in shared memory programs with
+  nested parallelism.
+\newblock In Juha Fagerholm, Juha Haataja, Jari J{\"a}rvinen, Mikko Lyly, Peter
+  R{\aa}back, and Ville Savolainen, editors, {\em Applied Parallel Computing
+  Advanced Scientific Computing, 6th International Conference (PARA 2002)},
+  volume 2367 of {\em LNCS}, pages 253--263, Espoo, Finland, June 15--18 2002.
+  Springer.
+
+\bibitem{Lea00}
+D.~Lea.
+\newblock A {Java} fork/join framework.
+\newblock In {\em JAVA '00: Proceedings of the ACM 2000 conference on Java
+  Grande}, pages 36--43, New York, 2000. ACM Press.
+
+\bibitem{LF00}
+D.K. Lowenthal and V.W. Freeh.
+\newblock Architecture-independent parallelism for both shared- and
+  distributed-memory machines using the {Filaments} package.
+\newblock {\em Parallel Computing}, August 2000.
+
+\bibitem{MellorCrummey91}
+J.~Mellor-Crummey.
+\newblock On-the-fly detection of data races for programs with nested fork-join
+  parallelism.
+\newblock In {\em Proceedings of Supercomputing '91}, pages 24--33. ACM Press,
+  1991.
+
+\bibitem{KAB03}
+{N. Kim \textit{et al.}}
+\newblock Leakage current: {Moore's Law} meets static power.
+\newblock {\em {IEEE} Computer}, 36(12):68--75, December 2003.
+
+\bibitem{NAW06}
+M.~Naik, A.~Aiken, and J.~Whaley.
+\newblock Effective static race detection for java.
+\newblock In {\em PLDI 06: Proceedings of the ACM SIGPLAN 2006 Conference on
+  Programming Language Design and Implementation}, pages 308--319, Ottawa,
+  Ontario, Canada, June 10--16 2006. ACM Press.
+\newblock SIGPLAN Notices 41(6).
+
+\bibitem{ONHWC96}
+K.~Olukotun, B.~Nayfeh, L.~Hammond, K.~Wilson, and K.~Chang.
+\newblock The case for a single-chip multiprocessor.
+\newblock In {\em Proceedings of the $7^{th}$ International Conference on
+  Architectural Support for Programming Languages and Operating Systems}, pages
+  2--11. ACM Press, 1996.
+
+\bibitem{PO03}
+M.~Prabhu and K.~Olukotun.
+\newblock Using thread-level speculation to simplify manual parallelization.
+\newblock In {\em Proceedings of the $9^{th}$ ACM SIGPLAN Symp. on Principles
+  and Practice of Parallel Programming}, 2003.
+
+\bibitem{Rauchwerger98}
+L.~Rauchwerger.
+\newblock Run-time parallelization: {It's} time has come.
+\newblock {\em Parallel Computing}, 24(3--4):527--556, 1998.
+
+\bibitem{Rinard01}
+Martin~C. Rinard.
+\newblock Analysis of multithreaded programs.
+\newblock In {\em SAS '01: Proceedings of the 8th International Symposium on
+  Static Analysis}, pages 1--19, London, UK, 2001. Springer-Verlag.
+
+\bibitem{RS01b}
+Peter Rundberg and Per Stenstr{\"o}m.
+\newblock An all-software thread-level data dependence speculation system for
+  multiprocessors.
+\newblock {\em J. Instruction-Level Parallelism}, 3, 2001.
+
+\bibitem{SBNSA97}
+S.~Savage, M.~Burrows, G.~Nelson, P.~Sobalvarro, and T.~Anderson.
+\newblock Eraser: a dynamic data race detector for multithreaded programs.
+\newblock {\em ACM Transactions on Computer Systems}, 15(4):391--411, 1997.
+
+\bibitem{Sutter05}
+Herb Sutter.
+\newblock The free lunch is over: A fundamental turn toward concurrency in
+  software.
+\newblock {\em Dr. Dobb's Journal}, 30(3), March 2005.
+
+\bibitem{TEL95}
+D.~Tullsen, S.~Eggers, and H.~Levy.
+\newblock Simultaneous multithreading: Maximizing on-chip parallelism.
+\newblock In {\em The $22^{th}$ Annual Int. Symp. on Computer Architecture},
+  pages 392--403, 1995.
+
+\end{thebibliography}

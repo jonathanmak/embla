@@ -1,0 +1,150 @@
+\section{Using Embla}
+
+\begin{figure} 
+\small
+\input{ex7.depgraph}
+\caption{Example program with dependency graph} \label{ffirstex}
+\end{figure}
+
+To get a feeling for what dependency profiling is and what Embla can do, 
+let us turn to the admittedly contrieved program in Figure~\ref{ffirstex}. 
+
+\subsection{A first look: the dependency graph}
+
+In Figure~\ref{ffirstex} we see, from 
+left to right, line numbers, colored data dependency arrows and source 
+lines. 
+
+The presence of a data dependency arrow between a pair of lines indicates
+that Embla has found one or more data dependencies between them
+(Embla does not find control dependencies). A data dependence is a pair
+of references, not both reads, to overlapping memory
+locations with no interveaning write. We will refer to these
+references as the {\em endpoints} of the dependence.
+For instance, in the figure, 
+there is a (red) arrow from line 13 to line 14 corresponding to
+the assignment to {\tt q} (the {\em early} endpoint) followed by its use 
+as an argument in {\tt inc(q)} (the {\em late} endpoint).
+
+Depending on whether the two endpoints of a dependence
+are reads or writes, data dependencies are typically divided into 
+three classes:
+\begin{description}
+\item[Flow:]
+A true data dependency where the location is first written then
+read. Also known as {\em read after write} (RAW). Shown in 
+{\bf \color{red} red} in the figure.
+\item[Anti:]
+A dependence caused by reuse of a location that is first read and then
+written. Also known as {\em write after read} (WAR). Shown in 
+{\bf \color{green} green} in the figure.
+\item[Output:]
+Similar to an anti dependence, but the second reference is also a
+write. Also known as {\em write after write} (WAW). Shown in 
+{\bf \color{blue} blue} in the figure.
+\end{description}
+If there are multiple dependencies of different class between the 
+same pair of lines, the color selection is prioritized in the
+order the dependencies are presented above. That is, if there is
+some flow dependence, the arrow is red. Otherwise if there is 
+some antidependence, the arrow is green, otherwise blue. We will 
+come to the light blue arrows shortly.
+
+
+We show dependencies in different colors since there are program
+transformations that in some cases can be used to eliminate 
+dependencies. Since we are discussing an approach to tool-supported
+hand parallelisation, program transformations to remove dependencies
+and increase parallelism are potentially useful. Hence Embla is 
+designed to support them by tipping the user off as to which
+dependencies might be removable.
+
+Flow dependencies are unavoidable since they represent the data flow 
+in the program, but anti and output dependencies can sometimes be 
+removed by {\em renaming}. Consider the (green) arrows from line 
+14, 16 and 17 to line 18 in the figure. These correspond to three
+reads of {\tt q} followed by an assignment to {\tt q}. Here we 
+are dealing with two different values which happen to be stored 
+in the same variable. We could easily invent a new variable, e.g. 
+{\tt r}, and replace {\tt q} by {\tt r} on line 18 and 19. This 
+transformation would remove the dependencies from line 14, 16 and
+17 to line 18. 
+
+Similarly, an output dependence like the one from line 11 to line 13
+(blue) can sometimes, and indeed in this case, be eliminated by 
+removing the first write (the initialization of {\tt q} on line 11).
+Renaming is of course also applicable to output dependencies.
+
+For each of the dependency arrows in the figure that 
+we have dicussed up to now, the endpoints have been part of the 
+code for {\tt main}
+itself. Embla also tracks references made in function calls. For
+instance, there is a (red) flow dependence from line 14 to line 16
+representing the write in the first invocation of {\tt inc} to the 
+{\tt malloc}'d area pointed to by {\tt q} and the subsequent read 
+of the same location by a later invocation of {\tt inc}. 
+Note that these dependencies 
+are reported as pertaining to {\tt main} rather than {\tt inc},
+although the endpoints are part of the latter function. 
+But the importance of the dependence is that, in {\tt main}, the calls
+on line 14 and 16 can not be made in parallel.
+
+Dependencies between different invocations of {\tt malloc} form 
+an interesting special case.
+Each call to {\tt malloc} manipulates (updates) 
+administrative data structures like the free list. Embla will
+report dependencies arising from these updates, 
+effectively serializing all calls to 
+{\tt malloc}, and thus in addition all calls to functions calling
+{\tt malloc}. In reality, these calls need not be serialized since
+program semantics typically does not depend on the exact addresses 
+that data are allocated. It suffices that a thread safe 
+implementation of {\tt malloc} is used.
+
+Embla maintains a black list of functions that behave in this way.
+In the examples in this paper, the black list consists of the 
+{\tt malloc} family, but of course other functions can be included 
+as appropriate. 
+
+We give all dependencies where both endpoints are in blacklisted functions 
+a {\bf \color{cyan}light blue} color, independent of whether they are 
+flow, anti or output. This is because they will disappear when the
+program is run in parallel.
+
+An important thing to remember when interpreting the output of Embla 
+is that although it takes the form of annotated source code, the 
+profiling is performed on the executable machine code. Thus one must
+keep the mappning of source code to machine code in mind. A case in 
+point is the (red) flow dependence between the opening brace of a 
+function and its closing brace (for instance from line 5 to line 7).
+This dependence corresponds to pushing the frame pointer onto the 
+stack as part of the function prologue and popping it in the 
+epilogue.
+
+% and not shown, as discussed in the implementation section.
+
+\begin{figure} 
+\small
+\input{ex6.depgraph}
+\caption{The dependency graph of quicksort}
+\label{fquickg}
+\end{figure}
+
+\subsection{A look at quicksort}
+
+Figure~\ref{fquickg} gives another example;
+quicksort (we have suppressed all dependencies except those in the
+function {\tt qs} itself which implements the recursion).
+This is an interesting program since it uses a recursive divide and
+conquer algorithm which gives hope for a lot of parallelism. However,
+the implementation is sequential and uses in-place update of a single
+array. The question is whether Embla can find the parallelism that
+should be buried there. 
+
+To find out, let us turn to the definition of {\tt qs} in
+figure~\ref{fquickg} where we find the two recursive calls at lines 36
+and 37. What we do not find is a data dependecy between them; hence
+Embla has found that the functions are independent. We know of no 
+static analysis that could find this independence, especially as it 
+is expressed using pointer arithmetic rather than indexing operations,
+as is representative of legacy C code.

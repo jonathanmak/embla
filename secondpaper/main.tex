@@ -1,0 +1,54 @@
+% STuff from the IEEE LaTeX template
+
+\documentclass[times, 10pt,twocolumn]{article} 
+\usepackage{latex8}
+\usepackage{times}
+
+%\documentstyle[times,art10,twocolumn,latex8]{article}
+
+%------------------------------------------------------------------------- 
+% take the % away on next line to produce the final camera-ready version 
+% \pagestyle{empty}
+
+\usepackage{epic}
+\usepackage{color}
+\usepackage{verbdef}
+\usepackage{alltt}
+
+\newcommand{\comment}[1]{\textit{[ #1 ]}}
+\newenvironment{comment_env}
+  {\begin{itshape}}
+  {\end{itshape}}
+
+\begin{document}
+
+\begin{titlepage}
+
+\title{Embla -- Data Dependence Profiling for Parallel Programming \\
+  \Large (DRAFT---do not redistribute)}
+\author{Karl-Filip Fax\'en, Lars Albertsson, Konstantin Popov, Sverker Janson\\
+       Swedish Institute of Computer Science\\
+       Box 1263\\
+       SE-164 29 Kista\\
+       Sweden\\
+       \{kff,lalle,kost,sverker\}@sics.se}
+\date{}
+\maketitle
+\thispagestyle{empty}
+
+\input{abstract}
+\end{titlepage}
+
+\input{intro}
+\input{using}
+\input{algorithm}
+\input{impover}
+%\input{embla}
+\input{discussion}
+\input{related}
+\input{future}
+
+\bibliographystyle{plain}
+\bibliography{embib}
+
+\end{document}

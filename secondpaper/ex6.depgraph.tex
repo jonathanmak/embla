@@ -1,0 +1,197 @@
+\verbdef\jkffxb$#include <stdlib.h> $
+\verbdef\jkffxc$#include <stdio.h> $
+\verbdef\jkffxd$ $
+\verbdef\jkffxe$static int a[] =  $
+\verbdef\jkffxf$   {17, 3, 84, 89, 4, 5, 23, 43,  $
+\verbdef\jkffxg$    21, 7, 2, 1, 55, 63, 21}; $
+\verbdef\jkffxh$static int n = 15; $
+\verbdef\jkffxi$ $
+\verbdef\jkffxj$static int *part(int *a, int n) $
+\verbdef\jkffxba${ $
+\verbdef\jkffxbb$   int i = a[0]; $
+\verbdef\jkffxbc$   int k = a[n-1]; $
+\verbdef\jkffxbd$   int *lp = a; $
+\verbdef\jkffxbe$   int *hp = a+n-1; $
+\verbdef\jkffxbf$ $
+\verbdef\jkffxbg$   while( lp<hp ) { $
+\verbdef\jkffxbh$      if( k<i ) { $
+\verbdef\jkffxbi$         *lp = k; $
+\verbdef\jkffxbj$          lp++; $
+\verbdef\jkffxca$          k = *lp; $
+\verbdef\jkffxcb$      } else { $
+\verbdef\jkffxcc$          *hp = k; $
+\verbdef\jkffxcd$           hp--; $
+\verbdef\jkffxce$           k = *hp; $
+\verbdef\jkffxcf$      } $
+\verbdef\jkffxcg$   } $
+\verbdef\jkffxch$   *lp = i; $
+\verbdef\jkffxci$   return lp; $
+\verbdef\jkffxcj$} $
+\verbdef\jkffxda$ $
+\verbdef\jkffxdb$static void qs(int *a, int n) $
+\verbdef\jkffxdc${ $
+\verbdef\jkffxdd$   if( n>1 ) { $
+\verbdef\jkffxde$      int *lp = part( a, n ); $
+\verbdef\jkffxdf$      int m = lp-a; $
+\verbdef\jkffxdg$      qs( a, m ); $
+\verbdef\jkffxdh$      qs( lp+1, n-m-1 ); $
+\verbdef\jkffxdi$   } $
+\verbdef\jkffxdj$} $
+\verbdef\jkffxea$ $
+\verbdef\jkffxeb$  $
+\verbdef\jkffxec$ $
+\verbdef\jkffxed$int main(int argc, char **argv) $
+\verbdef\jkffxee${ $
+\verbdef\jkffxef$   int i; $
+\verbdef\jkffxeg$    $
+\verbdef\jkffxeh$   qs( a, n ); $
+\verbdef\jkffxei$   for( i=0; i<n; i++ ) { $
+\verbdef\jkffxej$      printf( "%d ", a[i] ); $
+\verbdef\jkffxfa$   } $
+\verbdef\jkffxfb$   printf( "\n" ); $
+\verbdef\jkffxfc$ $
+\verbdef\jkffxfd$} $
+\hrulefill
+\[
+\begin{picture}(420,530)(-55,-530)
+
+\put(-55,-10){\makebox(15,10)[r]{\it 1:}}%
+\put(0,-10){\makebox(100,10)[l]{\jkffxb}}
+\put(-55,-20){\makebox(15,10)[r]{\it 2:}}%
+\put(0,-20){\makebox(100,10)[l]{\jkffxc}}
+\put(-55,-30){\makebox(15,10)[r]{\it 3:}}%
+\put(0,-30){\makebox(100,10)[l]{\jkffxd}}
+\put(-55,-40){\makebox(15,10)[r]{\it 4:}}%
+\put(0,-40){\makebox(100,10)[l]{\jkffxe}}
+\put(-55,-50){\makebox(15,10)[r]{\it 5:}}%
+\put(0,-50){\makebox(100,10)[l]{\jkffxf}}
+\put(-55,-60){\makebox(15,10)[r]{\it 6:}}%
+\put(0,-60){\makebox(100,10)[l]{\jkffxg}}
+\put(-55,-70){\makebox(15,10)[r]{\it 7:}}%
+\put(0,-70){\makebox(100,10)[l]{\jkffxh}}
+\put(-55,-80){\makebox(15,10)[r]{\it 8:}}%
+\put(0,-80){\makebox(100,10)[l]{\jkffxi}}
+\put(-55,-90){\makebox(15,10)[r]{\it 9:}}%
+\put(0,-90){\makebox(100,10)[l]{\jkffxj}}
+\put(-55,-100){\makebox(15,10)[r]{\it 10:}}%
+\put(0,-100){\makebox(100,10)[l]{\jkffxba}}
+\put(-55,-110){\makebox(15,10)[r]{\it 11:}}%
+\put(0,-110){\makebox(100,10)[l]{\jkffxbb}}
+\put(-55,-120){\makebox(15,10)[r]{\it 12:}}%
+\put(0,-120){\makebox(100,10)[l]{\jkffxbc}}
+\put(-55,-130){\makebox(15,10)[r]{\it 13:}}%
+\put(0,-130){\makebox(100,10)[l]{\jkffxbd}}
+\put(-55,-140){\makebox(15,10)[r]{\it 14:}}%
+\put(0,-140){\makebox(100,10)[l]{\jkffxbe}}
+\put(-55,-150){\makebox(15,10)[r]{\it 15:}}%
+\put(0,-150){\makebox(100,10)[l]{\jkffxbf}}
+\put(-55,-160){\makebox(15,10)[r]{\it 16:}}%
+\put(0,-160){\makebox(100,10)[l]{\jkffxbg}}
+\put(-55,-170){\makebox(15,10)[r]{\it 17:}}%
+\put(0,-170){\makebox(100,10)[l]{\jkffxbh}}
+\put(-55,-180){\makebox(15,10)[r]{\it 18:}}%
+\put(0,-180){\makebox(100,10)[l]{\jkffxbi}}
+\put(-55,-190){\makebox(15,10)[r]{\it 19:}}%
+\put(0,-190){\makebox(100,10)[l]{\jkffxbj}}
+\put(-55,-200){\makebox(15,10)[r]{\it 20:}}%
+\put(0,-200){\makebox(100,10)[l]{\jkffxca}}
+\put(-55,-210){\makebox(15,10)[r]{\it 21:}}%
+\put(0,-210){\makebox(100,10)[l]{\jkffxcb}}
+\put(-55,-220){\makebox(15,10)[r]{\it 22:}}%
+\put(0,-220){\makebox(100,10)[l]{\jkffxcc}}
+\put(-55,-230){\makebox(15,10)[r]{\it 23:}}%
+\put(0,-230){\makebox(100,10)[l]{\jkffxcd}}
+\put(-55,-240){\makebox(15,10)[r]{\it 24:}}%
+\put(0,-240){\makebox(100,10)[l]{\jkffxce}}
+\put(-55,-250){\makebox(15,10)[r]{\it 25:}}%
+\put(0,-250){\makebox(100,10)[l]{\jkffxcf}}
+\put(-55,-260){\makebox(15,10)[r]{\it 26:}}%
+\put(0,-260){\makebox(100,10)[l]{\jkffxcg}}
+\put(-55,-270){\makebox(15,10)[r]{\it 27:}}%
+\put(0,-270){\makebox(100,10)[l]{\jkffxch}}
+\put(-55,-280){\makebox(15,10)[r]{\it 28:}}%
+\put(0,-280){\makebox(100,10)[l]{\jkffxci}}
+\put(-55,-290){\makebox(15,10)[r]{\it 29:}}%
+\put(0,-290){\makebox(100,10)[l]{\jkffxcj}}
+\put(-55,-300){\makebox(15,10)[r]{\it 30:}}%
+\put(0,-300){\makebox(100,10)[l]{\jkffxda}}
+\put(-55,-310){\makebox(15,10)[r]{\it 31:}}%
+\put(0,-310){\makebox(100,10)[l]{\jkffxdb}}
+\put(-55,-320){\makebox(15,10)[r]{\it 32:}}%
+\put(0,-320){\makebox(100,10)[l]{\jkffxdc}}
+{\color{black} \dottedline{3}(-10,-315)(0,-315)}
+\put(-55,-330){\makebox(15,10)[r]{\it 33:}}%
+\put(0,-330){\makebox(100,10)[l]{\jkffxdd}}
+\put(-55,-340){\makebox(15,10)[r]{\it 34:}}%
+\put(0,-340){\makebox(100,10)[l]{\jkffxde}}
+{\color{black} \dottedline{3}(-10,-335)(0,-335)}
+\put(-55,-350){\makebox(15,10)[r]{\it 35:}}%
+\put(0,-350){\makebox(100,10)[l]{\jkffxdf}}
+{\color{black} \dottedline{3}(-10,-345)(0,-345)}
+\put(-55,-360){\makebox(15,10)[r]{\it 36:}}%
+\put(0,-360){\makebox(100,10)[l]{\jkffxdg}}
+{\color{black} \dottedline{3}(-10,-355)(0,-355)}
+\put(-55,-370){\makebox(15,10)[r]{\it 37:}}%
+\put(0,-370){\makebox(100,10)[l]{\jkffxdh}}
+{\color{black} \dottedline{3}(-10,-365)(0,-365)}
+\put(-55,-380){\makebox(15,10)[r]{\it 38:}}%
+\put(0,-380){\makebox(100,10)[l]{\jkffxdi}}
+\put(-55,-390){\makebox(15,10)[r]{\it 39:}}%
+\put(0,-390){\makebox(100,10)[l]{\jkffxdj}}
+{\color{black} \dottedline{3}(-10,-385)(0,-385)}
+\put(-55,-400){\makebox(15,10)[r]{\it 40:}}%
+\put(0,-400){\makebox(100,10)[l]{\jkffxea}}
+\put(-55,-410){\makebox(15,10)[r]{\it 41:}}%
+\put(0,-410){\makebox(100,10)[l]{\jkffxeb}}
+\put(-55,-420){\makebox(15,10)[r]{\it 42:}}%
+\put(0,-420){\makebox(100,10)[l]{\jkffxec}}
+\put(-55,-430){\makebox(15,10)[r]{\it 43:}}%
+\put(0,-430){\makebox(100,10)[l]{\jkffxed}}
+\put(-55,-440){\makebox(15,10)[r]{\it 44:}}%
+\put(0,-440){\makebox(100,10)[l]{\jkffxee}}
+\put(-55,-450){\makebox(15,10)[r]{\it 45:}}%
+\put(0,-450){\makebox(100,10)[l]{\jkffxef}}
+\put(-55,-460){\makebox(15,10)[r]{\it 46:}}%
+\put(0,-460){\makebox(100,10)[l]{\jkffxeg}}
+\put(-55,-470){\makebox(15,10)[r]{\it 47:}}%
+\put(0,-470){\makebox(100,10)[l]{\jkffxeh}}
+\put(-55,-480){\makebox(15,10)[r]{\it 48:}}%
+\put(0,-480){\makebox(100,10)[l]{\jkffxei}}
+\put(-55,-490){\makebox(15,10)[r]{\it 49:}}%
+\put(0,-490){\makebox(100,10)[l]{\jkffxej}}
+\put(-55,-500){\makebox(15,10)[r]{\it 50:}}%
+\put(0,-500){\makebox(100,10)[l]{\jkffxfa}}
+\put(-55,-510){\makebox(15,10)[r]{\it 51:}}%
+\put(0,-510){\makebox(100,10)[l]{\jkffxfb}}
+\put(-55,-520){\makebox(15,10)[r]{\it 52:}}%
+\put(0,-520){\makebox(100,10)[l]{\jkffxfc}}
+\put(-55,-530){\makebox(15,10)[r]{\it 53:}}%
+\put(0,-530){\makebox(100,10)[l]{\jkffxfd}}
+
+\put(-20,-345){\color{black}\circle*{2}}
+\put(-20,-355){\color{black}\circle*{2}}
+\put(-30,-365){\color{black}\circle*{2}}
+\put(-10,-385){\color{black}\circle*{2}}
+\put(-10,-315){\color{black}\circle*{2}}
+\put(-30,-335){\color{black}\circle*{2}}
+{\color{red}\dashline[200]{3}(-10.0,-318.0)(-10.0,-382.0)}%
+{\color{red}\dashline[200]{3}(-10.0,-382.0)(-9.0,-379.0)}%
+{\color{red}\dashline[200]{3}(-10.0,-382.0)(-11.0,-379.0)}%
+{\color{red}\dashline[200]{3}(-27.9,-337.1)(-22.1,-342.9)}%
+{\color{red}\dashline[200]{3}(-22.1,-342.9)(-23.5,-340.1)}%
+{\color{red}\dashline[200]{3}(-22.1,-342.9)(-24.9,-341.5)}%
+{\color{red}\dashline[200]{3}(-28.7,-337.7)(-21.3,-352.3)}%
+{\color{red}\dashline[200]{3}(-21.3,-352.3)(-21.8,-349.2)}%
+{\color{red}\dashline[200]{3}(-21.3,-352.3)(-23.6,-350.1)}%
+{\color{red}\dashline[200]{3}(-30.0,-338.0)(-30.0,-362.0)}%
+{\color{red}\dashline[200]{3}(-30.0,-362.0)(-29.0,-359.0)}%
+{\color{red}\dashline[200]{3}(-30.0,-362.0)(-31.0,-359.0)}%
+{\color{red}\dashline[200]{3}(-20.0,-348.0)(-20.0,-352.0)}%
+{\color{red}\dashline[200]{3}(-20.0,-352.0)(-19.0,-349.0)}%
+{\color{red}\dashline[200]{3}(-20.0,-352.0)(-21.0,-349.0)}%
+{\color{red}\dashline[200]{3}(-21.3,-347.7)(-28.7,-362.3)}%
+{\color{red}\dashline[200]{3}(-28.7,-362.3)(-26.4,-360.1)}%
+{\color{red}\dashline[200]{3}(-28.7,-362.3)(-28.2,-359.2)}%
+\end{picture}
+\]
+\hrulefill

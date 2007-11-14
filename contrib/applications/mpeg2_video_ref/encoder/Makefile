@@ -34,7 +34,7 @@
 #
 CC = gcc
 #CFLAGS = -O2
-CFLAGS = --static -g
+CFLAGS = --static -g -O0
 
 #
 # SPARCworks acc

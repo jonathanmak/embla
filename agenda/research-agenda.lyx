@@ -356,7 +356,7 @@ We already have the Embla prototype, but there are a number of things that
 \end_layout
 
 \begin_layout Itemize
-Registers should be tracked.
+[DONE!] Registers should be tracked.
  This raises the issue of registers used to implement the calling conventions,
  like the stack pointer and possibly frame pointer.
  These should be handled specially so that no dependencies involving them
@@ -400,7 +400,7 @@ Embla needs to aggregate information from several runs of the analysed program
 \end_layout
 
 \begin_layout Itemize
-Sub word accesses are still not handled correctly.
+[DONE!] Sub word accesses are still not handled correctly.
 \end_layout
 
 \begin_layout Itemize
@@ -433,7 +433,7 @@ ies that no real execution produces.
 Static and dynamic analysis may be combined.
  The static analysis then gives an upper bound and the dynamic analysis
  a lower bound to the dependencies in the program.
- Programmer attention could be directed to the places where these boounds
+ Programmer attention could be directed to the places where these bounds
  disagree.
 \end_layout
 
@@ -498,13 +498,13 @@ type checker
 \end_layout
 
 \begin_layout Standard
-A hybrid system is possible, either by interpreting the absence of type
- signature for a procedure as a shorthand for a default signature much like
- old versions of C assumed 
+A hybrid system is possible, either by interpreting the absence of (dependence)
+ type signature for a procedure as a shorthand for a default signature (much
+ like old versions of C assumed 
 \family typewriter
 int
 \family default
- as a default return type of a function when no explicit type could be found,
+ as a default return type of a function when no explicit type could be found),
  or by checking types when they are given and inferring types when no type
  signature is present (this is reminiscent of the Haskell type system).
 \end_layout

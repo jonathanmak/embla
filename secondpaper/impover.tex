@@ -1,0 +1,13 @@
+\section{The Implementation of Embla}
+
+
+Embla is based on instrumented execution of binary code. Although
+our examples of profiling output use a high level language (C),
+the profiling itself is on instruction level, followed by 
+mapping the information to source level using debugging information 
+in the standard way.
+
+Embla uses the Valgrind instrumentation infrastructure, so there
+is no offline code rewriting; the Embla tool behaves like an emulator
+of the hardware.
+

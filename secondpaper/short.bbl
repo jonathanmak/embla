@@ -1,0 +1,79 @@
+\begin{thebibliography}{10}
+
+\bibitem{BJKLR96}
+R.~Blumofe, C.~Joerg, B.~Kuszmaul, C.~Leiserson, K.~Randall, and Y.~Zhou.
+\newblock {Cilk}: An efficient multithreaded runtime system.
+\newblock {\em Journal of Parallel and Distributed Comuting}, 37(1):55--69,
+  August 1996.
+
+\bibitem{CL03}
+M.~Cintra and D.~Llanos.
+\newblock Toward efficient and robust software speculative parallelization on
+  multiprocessors.
+\newblock {\em Proceedings of the ACM SIGPLAN Symposium on Principles and
+  Practice of Parallel Programming}, 38(10):13--24, 2003.
+
+\bibitem{Conway63}
+M.~Conway.
+\newblock A multiprocessor system design.
+\newblock In {\em Proceedings of AFIPS FJCC'63}, volume~24, pages 139--148.
+  Spartan Books, 1963.
+
+\bibitem{DM98}
+L.~Dagum and R.~Menon.
+\newblock {OpenMP}: An industry-standard {API} for shared-memory programming.
+\newblock {\em IEEE Computational Science \& Engineering}, 5(1):46--55, 1998.
+
+\bibitem{KA02}
+Ken Kennedy and John~R. Allen.
+\newblock {\em Optimizing Compilers for Modern Architectures: a
+  Dependence-Based Approach}.
+\newblock Morgan Kaufmann Publishers Inc., San Francisco, CA, USA, 2002.
+
+\bibitem{Lea00}
+D.~Lea.
+\newblock A {Java} fork/join framework.
+\newblock In {\em JAVA '00: Proceedings of the ACM 2000 conference on Java
+  Grande}, pages 36--43, New York, 2000. ACM Press.
+
+\bibitem{LF00}
+D.K. Lowenthal and V.W. Freeh.
+\newblock Architecture-independent parallelism for both shared- and
+  distributed-memory machines using the {Filaments} package.
+\newblock {\em Parallel Computing}, August 2000.
+
+\bibitem{KAB03}
+{N. Kim \textit{et al.}}
+\newblock Leakage current: {Moore's Law} meets static power.
+\newblock {\em {IEEE} Computer}, 36(12):68--75, December 2003.
+
+\bibitem{ONHWC96}
+K.~Olukotun, B.~Nayfeh, L.~Hammond, K.~Wilson, and K.~Chang.
+\newblock The case for a single-chip multiprocessor.
+\newblock In {\em Proceedings of the $7^{th}$ International Conference on
+  Architectural Support for Programming Languages and Operating Systems}, pages
+  2--11. ACM Press, 1996.
+
+\bibitem{PO03}
+M.~Prabhu and K.~Olukotun.
+\newblock Using thread-level speculation to simplify manual parallelization.
+\newblock In {\em Proceedings of the $9^{th}$ ACM SIGPLAN Symp. on Principles
+  and Practice of Parallel Programming}, 2003.
+
+\bibitem{MPEG}
+{MPEG} software~simulation group.
+\newblock Reference {MPEG-2} video codec software.
+\newblock http://www.mpeg.org/MPEG/MSSG/.
+
+\bibitem{TEL95}
+D.~Tullsen, S.~Eggers, and H.~Levy.
+\newblock Simultaneous multithreading: Maximizing on-chip parallelism.
+\newblock In {\em The $22^{th}$ Annual Int. Symp. on Computer Architecture},
+  pages 392--403, 1995.
+
+\bibitem{VIAVAC05}
+N.~Vachharajani, M.~Iyer, C.~Ashok, M.~Vachharajani, D.~August, and D.~Connors.
+\newblock Chip multi-processor scalability for single-threaded applications.
+\newblock {\em SIGARCH Computer Architecture News}, 33(4):44--53, 2005.
+
+\end{thebibliography}

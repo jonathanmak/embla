@@ -35,4 +35,4 @@ if [ ! -f bike_frame1210.U ] ; then
 fi
 
 $valgrind --tool=embla \
-  ${encoder_dir}/mpeg2encode ${data_dir}/bike.par bike_out.mpg
+ ${encoder_dir}/mpeg2encode ${data_dir}/bike.par bike_out.mpg

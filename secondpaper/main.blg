@@ -1,0 +1,48 @@
+This is BibTeX, Version 0.99c (Web2C 7.5.4)
+The top-level auxiliary file: main.aux
+The style file: plain.bst
+Database file #1: embib.bib
+Warning--I didn't find a database entry for "CGSE93"
+Warning--I didn't find a database entry for "GSC95"
+You've used 19 entries,
+            2118 wiz_defined-function locations,
+            649 strings with 7566 characters,
+and the built_in function-call counts, 7187 in all, are:
+= -- 727
+> -- 311
+< -- 9
++ -- 127
+- -- 102
+* -- 504
+:= -- 1149
+add.period$ -- 64
+call.type$ -- 19
+change.case$ -- 105
+chr.to.int$ -- 0
+cite$ -- 19
+duplicate$ -- 294
+empty$ -- 570
+format.name$ -- 102
+if$ -- 1547
+int.to.chr$ -- 0
+int.to.str$ -- 19
+missing$ -- 19
+newline$ -- 99
+num.names$ -- 40
+pop$ -- 107
+preamble$ -- 1
+purify$ -- 86
+quote$ -- 0
+skip$ -- 214
+stack$ -- 0
+substring$ -- 464
+swap$ -- 86
+text.length$ -- 9
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 76
+warning$ -- 0
+while$ -- 75
+width$ -- 21
+write$ -- 222
+(There were 2 warnings)

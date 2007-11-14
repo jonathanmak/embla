@@ -1,9 +1,18 @@
-\documentclass{acm_proc_article-sp}
+% Stuff from the IEEE LaTeX template
+
+\documentclass[times, 10pt,twocolumn]{article} 
+\usepackage{latex8}
+\usepackage{times}
+
+%------------------------------------------------------------------------- 
+% take the % away on next line to produce the final camera-ready version 
+% \pagestyle{empty}
 
 \usepackage{epic}
 \usepackage{color}
 \usepackage{verbdef}
 \usepackage{alltt}
+\usepackage{latexsym}
 
 \newcommand{\comment}[1]{\textit{[ #1 ]}}
 \newenvironment{comment_env}
@@ -13,11 +22,11 @@
 \begin{document}
 
 \title{Embla -- Data Dependence Profiling for Parallel Programming }
-\subtitle{Extended Abstract}
-\author{Karl-Filip Fax\'en, Lars Albertsson, Konstantin Popov, Sverker Janson\\
+%\subtitle{Extended Abstract}
+\author{Karl-Filip Fax\'en, Konstantin Popov, Sverker Janson\\
        Swedish Institute of Computer Science\\
        Box 1263, SE-164 29 Kista, Sweden\\
-       \{kff,lalle,kost,sverker\}@sics.se}
+       \{kff,kost,sverker\}@sics.se}
 \date{}
 \maketitle
 
@@ -33,13 +42,13 @@ opportunities for parallelization.  Embla performs a dynamic analysis,
 and records dependences as they
 arise during program execution.  It reports an optimistic view of
 parallelizable sequences, and ignores dependences that do not arise during
-execution.  In contrast to static analysis tools,
-which by necessity make conservative approximation, Embla is able to find
-more parallelism in sequential programs, and relies on the programmer to
-transform the program in a correct manner. 
+execution.  
 Moreover, since the tool instruments the machine code of the program,
 it is largely language independent. 
 
+We also investigate the relation between the dependencies observed for 
+different inputs to the same program and present an analysis of the 
+SPEC CPU2006 benchmark 403.gcc.
 \end{abstract}
 
 % Intro start ---------------------
@@ -60,7 +69,8 @@ for parallelism in programs, in particular by providing efficient tool
 support.  In this paper, we present a data dependence profiling approach
 to the parallelization problem, an efficient algorithm to project data
 dependences onto relevant parts of the program code, and its
-implementation, the tool Embla.
+implementation, the tool Embla, as well as an analysis of the dependencies 
+observed when running the GCC compiler on different inputs.
 
 \begin{figure}
 \small
@@ -301,7 +311,7 @@ between lines 14 and 16 in {\tt main}.
 
 \newcommand{\tracepile}{trace pile}
 
-\subsection{Computing dependences}
+\subsection{Computing dependences} \label{snca}
 
 Embla uses two main data structures: The {\em \tracepile}, which implements 
 the execution tree, and the {\em memory table} which maps addresses to tree
@@ -402,11 +412,7 @@ tree nodes. In this case it is unnecessary to represent more than one
 copy of each pointer, thus compacting the read lists. This optimization is 
 crucial in practice.
 
-
-
-% End algorithm -----------------------
-
-\section{Implementation and Preliminary Experiments}
+\subsection{Prototype implementation}
 
 Embla is based on instrumented execution of binary code. Although
 our examples of profiling output use a high level language (C),
@@ -417,6 +423,9 @@ in the standard way.
 Embla uses the Valgrind instrumentation infrastructure, so there
 is no offline code rewriting; the Embla tool behaves like an emulator
 of the hardware.
+
+
+% End algorithm -----------------------
 
 \begin{table}
 \begin{center} \newcommand{\sms}{\hskip0.4em}
@@ -437,6 +446,8 @@ RLC: Read List Compaction,
 leve dependences, RSz: max bytes for read lists, T: run time (s)
 \caption{Some experimental results} \label{trex}
 \end{table}
+
+\section{Preliminary Experiments}
 
 We have run some preliminary experiments to verify that the tool performs as
 expected. Some results are reported in Table~\ref{trex}. The programs are 
@@ -463,16 +474,152 @@ difficult to deal with for static analyzers. We have also done naive
 hand parallelization of these programs according to the information 
 yielded by Embla and obtained the expected good speedup.
 
+\begin{table*}
+\[
+\begin{tabular}{|l|rrrr@{\ }r|rrrr@{\ }r|rr@{\,}r|r|} \hline
+Filter & \multicolumn{5}{c|}{\# Dependencies} 
+     & \multicolumn{5}{c|}{Size of deltas}
+     & \multicolumn{3}{c|}{Relative sizes (\%)}
+     & \# $\emptyset$  \\
+     & max & min & avg & total & \% of N
+     & max & min & avg & total & \% of N
+     & max & min & g-mean & \\ \hline \hline
+\multicolumn{15}{|c|}{ All 403.gcc source files } \\ \hline
+N & 57733 & 8070 & 37589  & 80876 &  & 492 & 0 & 74  & 6502 &  & 1.08 & 0.00 & 0.09 & 9 \\
+T & 39654 & 5637 & 26654  & 58336 & 72.1  & 434 & 0 & 41  & 3630 & 55.8  & 1.33 & 0.00 & 0.06 & 14 \\
+\hline \hline
+\multicolumn{15}{|c|}{ {\tt c-parse.c}, {\tt combine.c}, 
+  {\tt insn-recog.c}, and {\tt toplev.c} } \\
+\hline
+N & 13218 & 718 & 7099  & 22158 &  & 215 & 0 & 33  & 2885 &  & 1.92 & 0.00 & 0.24 & 15 \\
+T & 6499 & 636 & 3657  & 12001 & 54.2  & 134 & 0 & 13  & 1154 & 40.0  & 2.96 & 0.00 & 0.18 & 28 \\
+C & 5008 & 398 & 2978  & 7166 & 32.3  & 64 & 0 & 6  & 568 & 19.7  & 1.53 & 0.00 & 0.14 & 40 \\
+CT & 3139 & 347 & 1901  & 4936 & 22.3  & 39 & 0 & 4  & 331 & 11.5  & 1.44 & 0.00 & 0.22 & 56 \\
+\hline
+\end{tabular}
+\]
+Filters are {\bf N}one, {\bf T}ransitive or {\bf C}ontrol flow, \# Dependencies and Size of deltas
+give maximum, minimum and average sizes of $D_i$ and $D_i^{\ast}$, respectively, over $i\in \cal A$
+as well as sizes of $\cup_{i \in \cal A} D_i$ and $\cup_{i \in \cal A} D_i^{\ast}$. \% of N gives 
+the total for the row as a percentage of the total of the N row. Relative sizes give the maximum, 
+minimum and geometric mean size of $D_i^{\ast}$ as a percentage of $D_i$. Finally, \#~$\emptyset$
+gives the number of inputs that yielded empty $D_i^{\ast}$.
+\caption{Dependence statistics} \label{tdepstat}
+\end{table*}
+
+\subsection{Analysis of dependencies in GCC}
+
+We are ultimately interested in knowing how well the dependencies
+collected during testing predict the dependencies encountered in
+production runs.  Since the sequential program we test is
+deterministic, the issue becomes how well the behaviour under the
+testing inputs predict the behaviour under other inputs.
+
+To shed some light on this issue, we have studied the SPEC CPU 2006
+benchmark 403.gcc, a variant of the popular open source Gnu C
+Compiler. This is a very challenging program since, being an
+optimizing compiler, it essentially looks for a large set of patterns
+in its input an applies different code to different patterns.
+
+We have collected flow (RAW) data dependencies for 88 different files
+(6--6328 lines of pre-processed C code) drawn from the code base of
+403.gcc itself. These dependencies do not include dependencies due to
+{\tt malloc} and friends.
+
+Each dependence is a triple $({\it f}, {\it l}_1 \leftarrow {\it l}_2)$
+meaning that $\it l_1$ in source file $\it f$ depends on line
+$\it l_2$ in the same file (recall that a dependence is always a
+pair of lines in the same function). We only look at forward dependencies where $\it l_1 >
+l_2$. Backward dependencies occur only in loops and the current
+Embla prototype does not handle loop-carried dependencies adequately.
+In particular, Embla does not recognize induction variables, hence
+reporting all loops as having loop-carried dependencies. Loop bodies 
+may still be parallelized using only forward dependencies.
+
+The 88 inputs yield a total of 80876 dependencies, which
+can be compared to the 484930 C source lines (excluding headers) of
+this build of GCC. Evidently, the dependencies are rather sparse due
+in part to the large number of lines not containing memory references at all,
+and the number of unique source lines that occur in some dependence is
+49196 (hence lines that occur in dependencies do so in on the average
+about 1.6 lines, another measure of their sparseness).
+
+Since we do not know the set of all dependencies that could be
+provoked by some input, we give dependency deltas, sets of
+dependencies that are generated by some input but not with some
+reference set of inputs, rather than presenting coverages as
+percentages of all dependencies. Thus, if the dependencies found with input data set $i$ is
+$D_i$, we study \[D_j^I = D_j \setminus \bigcup_{i \in I} D_i\] for
+some set of inputs $I$ not containing $j$. In particular, we have
+$D_j^\ast = D_j^{{\cal A} \setminus j}$ where $\cal A$ is the set of
+all the 88 inputs.
+
+Table~\ref{tdepstat} shows some statistics on the dependencies found
+in 403.gcc. From the relative sizes columns we see that at most about 1\% of the 
+dependencies in any $D_i$ are preserved in $D_i^{\ast}$; these are the dependencies 
+that are only provoked by input $i$. The \#~$\emptyset$ column shows that 9 out of the
+88 $D_i^{\ast}$ were empty, meaning that these inputs generated no dependencies
+that were not generated by other inputs.
+
+Looking at the dependencies in the $D_i^{\ast}$ sets, we noticed that many of them were 
+transitively implied by others. That is, for many $(f, l_1 \leftarrow l_2) 
+\in D_i^{\ast}$ there were $(f, l_1 \leftarrow l), (f, l \leftarrow l_2) \in D_i$ for some $l$.
+These dependencies give the same constraints on parallelization and make $(f, l_1 \leftarrow l_2)$
+redundant. The T filter removes these redundant dependencies, yielding a 28\% reduction in 
+overall dependence numbers and a 44\% reduction in the $D_i^{\ast}$ sets.
+
+We next noticed many data dependencies that were subsumed by control
+dependencies (which Embla currently does not capture). To get an idea
+of the magnitude of this contribution, we implemented an approximate
+control flow analysis by hand for four modules of 403.gcc that were
+top contributors to the $D_i^{\ast}$ sets and appeared to have
+nontrivial control flow. We also moved dependence endpoints up in the
+syntax tree, e.g. from a branch in an if statement to the if statement
+itself in a fashion analogous to the NCA computation discussed in
+section~\ref{snca}.
+
+The results are given in the four bottom rows of Table~\ref{tdepstat}
+where we focus exclusively on dependencies $(f,l_1 \leftarrow l_2)$ where f is
+one of the four modules. We see from the first row that these modules
+account for almost half of the size of the $D_i^{\ast}$ sets. Looking
+at the rightmos column, we see that control flow filtering alone makes
+almost half of the $D_i^{\ast}$ sets empty, and that together with
+transitive filtering almost two thirds are eliminated.
+
+
+\begin{figure*}
+\input{plot1} \input{plot2}
+\caption{Coverage deltas (x-axis) versus dependence deltas (y-axis)
+for no (left) or CT filtering} \label{fplot}
+\end{figure*}
+
+To account for the remaining $D_i^{\ast}$ sets we turned to coverage
+analysis using the {\tt gcov} tool. We form $L_i$ and $L_i^{\ast}$
+sets containing lines executed in the same way as for dependencies
+above. Figure~\ref{fplot} plots the size of $L_i^{\ast}$ along the
+x-axis and $D_i^{\ast}$ along the y-axis. The left hand plot shows the
+unfiltered data for all modules wheras the right hand one shows the
+data for the CT-filtered four modules. The left hand plot shows a very
+clear correlation between execution coverage and dependendence
+coverage wheras the right hand plot is less conclusive; it will be
+interesting to see the effect of control flow filtering of all
+modules. However, of the 30 inputs that yielded empty $L_i^{\ast}$ sets, only one
+had a nonempty (actually singleton) $D_i^{\ast}$ set.
+
+
+
 \section{Conclusion}
 
-We have presented Embla, a data dependence profiling tool, discussed the 
-main issues and the algorithms used to resolve them. We argue that
-data dependence profiling is a useful and practical complement to static
-analysis for parallelization of new and legacy code. Finally, we have 
-reported on a few initial experiments with Embla.
+We have presented Embla, a data dependence profiling tool, discussed
+the main issues and the algorithms used to resolve them. We argue that
+data dependence profiling is a useful and practical complement to
+static analysis for parallelization of new and legacy code. Finally,
+we have reported on a few initial experiments with Embla showing a
+strong correlation between executing the same part of a program and
+generating the same dependencies.
 
 In the future we plan extensions and refinements of Embla as well as
-the application to real legacy code. We also look forward to doing
+the application to real legacy code and 
 more parallelization experiments using parallel environments such as
 OpenMP.
 
