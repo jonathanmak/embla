@@ -46,9 +46,14 @@ execution.
 Moreover, since the tool instruments the machine code of the program,
 it is largely language independent. 
 
-We also investigate the relation between the dependencies observed for 
-different inputs to the same program and present an analysis of the 
-SPEC CPU2006 benchmark 403.gcc.
+Since Embla finds the dependencies that occur for particular
+executions, the confidence one would assign to its results depend on
+whether different executions yield different (bad) or largely the same
+(good) dependencies. We present a preliminary investigation into this
+issue using 88 different inputs to the SPEC CPU2006 benchmark 403.gcc.
+The results indicate that there is a strong correlation between coverage
+and finding dependencies; executing the entire program is likely to 
+reveal all dependencies.
 \end{abstract}
 
 % Intro start ---------------------
@@ -102,7 +107,7 @@ parallel programs: Start from a sequential program, identify
 independent parts of that program (here Embla can be used) and rewrite
 the program to obtain parallel executioon of the independent parts.
 
-We will focus on parallelization by introducing
+We will focus on introducing
 fork-join parallelism. The fork-join framework was first introduced
 by Conway~\cite{Conway63} and is used in many parallel
 programming environments,
@@ -131,21 +136,20 @@ The availability of such independent program parts depends on
 the algorithms used and can be further
 limited by sequential programming artifacts, such as re-use of
 variables and sequential book-keeping in an otherwise parallelizable
-algorithm.  Data dependence information can potentially help
+algorithm.  Data dependence information can help
 identify and remove such obstacles to parallel execution, but this
 will not be further discussed here.
 
 Parallelizing compilers mostly target loop parallelization based on
-static data dependence analysis methods~\cite{KA02}.  Such analyzers are
-by necessity conservative, and use
-approximations that are always safe.  
-% Good precision comes at a high
-% computational cost, especially when analyzing large programs.
-Analyzing more general code, e.g., with pointers, remains a major
-challenge and correctness is typically guaranteed only in the absence of
-bounds violations.  Consequently, it has proved difficult to
-parallelize programs automatically, and most production codes are either
-written in an explicitly parallel way or rely on speculative, run-time
+static data dependence analysis methods~\cite{KA02}.  Such analyzers
+are by necessity conservative, and use approximations that are always
+safe.  Analyzing more general code, e.g., with pointers, remains a
+major challenge. For unsafe languages like C, correctness of the
+analysis results is only guaranteed for well behaved programs; an
+out-of-bounds array index can yield program behaviour not predicted by
+the analysis. Consequently, it has proved difficult to parallelize
+programs automatically, and most production codes are either written
+in an explicitly parallel way or rely on speculative, run-time
 parallelization techniques~\cite{PO03,CL03}.
 
 In contrast, Embla
@@ -155,7 +159,8 @@ lack of a runtime data dependence as an indication that the program
 parts involved are likely to be independent.
 Developers will be responsible for selecting
 program inputs that generate representative program executions with
-good coverage.
+good coverage. Section~\ref{sgcc} presents an analysis of how the
+dependencies found varies with different inputs.
 
 By construction, the methodology mentioned above preserves the
 semantics and determinancy of the sequential program under the
@@ -171,7 +176,7 @@ all of the relevant dependencies in the sequential program.
 
 
 In addition to data dependences, Embla can be extended to
-deal with I/O dependences that limit parallelism.  Another potential
+detect I/O dependences that limit parallelism.  Another potential
 extension is to measure the potential speed
 improvement for parallelizing independent program parts and produce a
 report with suggested program transforms that will yield the maximum
@@ -507,7 +512,7 @@ gives the number of inputs that yielded empty $D_i^{\ast}$.
 \caption{Dependence statistics} \label{tdepstat}
 \end{table*}
 
-\subsection{Analysis of dependencies in GCC}
+\subsection{Analysis of dependencies in GCC} \label{sgcc}
 
 We are ultimately interested in knowing how well the dependencies
 collected during testing predict the dependencies encountered in
@@ -526,11 +531,11 @@ We have collected flow (RAW) data dependencies for 88 different files
 403.gcc itself. These dependencies do not include dependencies due to
 {\tt malloc} and friends.
 
-Each dependence is a triple $({\it f}, {\it l}_1 \leftarrow {\it l}_2)$
-meaning that $\it l_1$ in source file $\it f$ depends on line
-$\it l_2$ in the same file (recall that a dependence is always a
-pair of lines in the same function). We only look at forward dependencies where $\it l_1 >
-l_2$. Backward dependencies occur only in loops and the current
+Each dependence is a triple $({ f}, { l}_1 \leftarrow { l}_2)$
+meaning that $ l_1$ in source file $ f$ depends on line
+$ l_2$ in the same file (recall that a dependence is always a
+pair of lines in the same function). We only look at forward dependencies where 
+$l_1>l_2$. Backward dependencies occur only in loops and the current
 Embla prototype does not handle loop-carried dependencies adequately.
 In particular, Embla does not recognize induction variables, hence
 reporting all loops as having loop-carried dependencies. Loop bodies 
