@@ -23,10 +23,11 @@
 
 \title{Embla -- Data Dependence Profiling for Parallel Programming }
 %\subtitle{Extended Abstract}
-\author{Karl-Filip Fax\'en, Konstantin Popov, Sverker Janson\\
+\author{Karl-Filip Fax\'en, Konstantin Popov, Sverker Janson, 
+       Lars Albertsson\thanks{The author is now employed by Google.}\\
        Swedish Institute of Computer Science\\
        Box 1263, SE-164 29 Kista, Sweden\\
-       \{kff,kost,sverker\}@sics.se}
+       \{kff,kost,sverker,lalle\}@sics.se}
 \date{}
 \maketitle
 
@@ -34,7 +35,7 @@
 
 With the proliferation of multicore processors, there is an urgent need for
 tools and methodologies supporting parallelization of existing
-applications.  In this paper we present a novel tool for aiding
+applications.  In this paper, we present a novel tool for aiding
 programmers in parallelizing programs. The tool, Embla, is based on the
 Valgrind framework, and allows the user to
 discover the data dependences in a sequential program, thereby exposing
@@ -60,7 +61,7 @@ reveal all dependencies.
 
 \section{Introduction}
 
-Parallel programming is no longer optional.  To enjoy continued
+Parallel programming is no longer optional.  In order to enjoy continued
 performance gains with future generation multicore processors,
 application developers must parallelize all software, old and
 new~\cite{TEL95,ONHWC96,KAB03,VIAVAC05}.  For scalable parallel
@@ -70,7 +71,7 @@ threads by runtime systems.  For some classes of programs, static
 analysis and automatic parallelization is feasible~\cite{KA02}, but with
 the current state-of-the-art, most software requires manual
 parallelization.  Our work aims to help developers find the potential
-for parallelism in programs, in particular by providing efficient tool
+for parallelism in programs by providing efficient tool
 support.  In this paper, we present a data dependence profiling approach
 to the parallelization problem, an efficient algorithm to project data
 dependences onto relevant parts of the program code, and its
@@ -98,21 +99,18 @@ observed when running the GCC compiler on different inputs.
 \end{minipage} 
 \]
 \hrulefill
-\caption{Example of Fork/join parallelism.}
+\caption{Example of fork-join parallelism.}
 \label{fforkjoin}
 \end{figure}
 
 We are interested in the following methodology for constructing
 parallel programs: Start from a sequential program, identify
 independent parts of that program (here Embla can be used) and rewrite
-the program to obtain parallel executioon of the independent parts.
+the program to obtain parallel execution of the independent parts.
 
 We will focus on introducing
-fork-join parallelism. The fork-join framework was first introduced
-by Conway~\cite{Conway63} and is used in many parallel
-programming environments,
-including Cilk~\cite{BJKLR96}, the Java fork/join
-framework~\cite{Lea00}, OpenMP~\cite{DM98}, and Filaments~\cite{LF00}.
+fork-join parallelism~\cite{Conway63}, a framework used
+in many parallel programming environments~\cite{BJKLR96, Lea00, DM98, LF00}.
 
 Consider the program fragment in
 Figure~\ref{fforkjoin} (left):
@@ -123,16 +121,15 @@ executed in parallel with
 the call to {\tt q()}, as shown to the right.
 Here we assume the availability of a construct {\tt spawn} to start
 the call in parallel and {\tt sync} to wait for all {\tt spawn}'d
-activities to terminate (cf.~\cite{BJKLR96}).
+activities to terminate (cf. Cilk~\cite{BJKLR96}).
 % As long as {\tt p()} and {\tt q()} are
 % independent, the parallel program will produce identical results to
 % the sequential version.  Therefore it is sufficient to understand
 % (debug, verify, \ldots) the sequential program; everything except
 % performance carries over to the parallel version.
 
-Embla can help programmers find independent parts of the 
-program code. 
-The availability of such independent program parts depends on
+Embla aims at helping programmers find independent parts of the 
+program code.  The availability independent program parts depends on
 the algorithms used and can be further
 limited by sequential programming artifacts, such as re-use of
 variables and sequential book-keeping in an otherwise parallelizable
@@ -162,14 +159,14 @@ program inputs that generate representative program executions with
 good coverage. Section~\ref{sgcc} presents an analysis of how the
 dependencies found varies with different inputs.
 
-By construction, the methodology mentioned above preserves the
-semantics and determinancy of the sequential program under the
+The methodology mentioned above preserves the
+semantics and determinacy of the sequential program under the
 assumption that all dependencies are found.  Should a dependence
 remain undetected, it might manifest itself as a difference in
 behavior between the parallel and sequential versions of the program
 for some input. Given that the sequential program is deterministic,
 rerunning it under Embla with the offending input will yield the
-missing dependence.  Thus the programmining methodology supported by
+missing dependence.  Thus, the programming methodology supported by
 Embla replaces the problem of finding synchronization errors in the
 parallelized, nondeterministic, program with the problem of finding
 all of the relevant dependencies in the sequential program.
@@ -180,7 +177,10 @@ detect I/O dependences that limit parallelism.  Another potential
 extension is to measure the potential speed
 improvement for parallelizing independent program parts and produce a
 report with suggested program transforms that will yield the maximum
-benefit.  These extensions are both future work.  This paper
+benefit.  Moreover, Embla presents rich and detailed information; in order
+for the parallelizable code sections to be clearly visible, it must be
+processed and presented concisely.  These extensions are future work.
+This paper
 presents the mechanism for collecting runtime data dependence information.
 
 % End intro --------------------
@@ -208,8 +208,9 @@ For instance, in the figure,
 there is an arrow from line 13 to line 14 corresponding to
 the assignment to {\tt q} (the {\em early} endpoint) followed by its use 
 as an argument in {\tt inc(q)} (the {\em late} endpoint). Embla
-internally distinguishes between flow (RAW), anti (WAR) and output (WAW) 
-dependences, but we do not make that distinction in this paper. Embla 
+distinguishes between flow (RAW), anti (WAR) and output (WAW) 
+dependences and is able to present them to the user, but we do not make
+that distinction in this paper. Embla 
 can be instructed to show dependence types, which can be
 useful for figuring out the reasons for individual dependences.
 
@@ -230,10 +231,8 @@ The dependence given with a dotted arrow
 (from line 13 to line 18) is due to manipulation of administrative 
 data structures by {\tt malloc}. If taken at face value such dependences will
 serialize all calls to {\tt malloc}, but fortunately, the exact order
-of memory allocations is not important. If the 
-parallelized version of the program uses a thread safe 
-implementation of {\tt malloc} these dependences are irrelevant and
-can be ignored. Embla maintains a suppression list, with functions that behave 
+of memory allocations is irrelevant. Embla maintains a suppression list,
+with functions that behave 
 in this way.  Similarly, dependences arise due to the
 manipulation of the call stack, which are also irrelevant for parallelization.
 
@@ -297,7 +296,7 @@ there is an instruction level dependence from an instruction in $M$
 to an instruction in $N$ we have a (tree) dependence between $M$ and $N$
 and we call $M$ the {\em source} and $N$ the {\em target} of the dependence.
 
-In fact, each instruction level dependence yields exactly one dependence
+Each instruction level dependence yields exactly one dependence
 between siblings in the execution tree since there is only one node
 in the execution tree  
 where the two events fall in two distinct children (siblings of each other)
@@ -419,15 +418,11 @@ crucial in practice.
 
 \subsection{Prototype implementation}
 
-Embla is based on instrumented execution of binary code. Although
-our examples of profiling output use a high level language (C),
-the profiling itself is on the instruction level, followed by 
-mapping the information to the source level using debugging information 
-in the standard way.
-
-Embla uses the Valgrind instrumentation infrastructure, so there
-is no offline code rewriting; the Embla tool behaves like an emulator
-of the hardware.
+Embla uses the Valgrind instrumentation infrastructure.  It emulates
+the hardware, and there is no code rewriting.  Our examples of profiling
+output use C, but
+the profiling is done on the instruction level, and the information is
+mapped to the source level using debugging information.
 
 
 % End algorithm -----------------------
@@ -448,7 +443,7 @@ Prog & \#L & \#sD & \#iD & RSz & T
 RLC: Read List Compaction, 
 \#L: \#non blank source lines, \#sD: \#source dependences, \#iD: 
 \#instruction
-leve dependences, RSz: max bytes for read lists, T: run time (s)
+leave dependences, RSz: max bytes for read lists, T: run time (s)
 \caption{Some experimental results} \label{trex}
 \end{table}
 
@@ -457,8 +452,8 @@ leve dependences, RSz: max bytes for read lists, T: run time (s)
 We have run some preliminary experiments to verify that the tool performs as
 expected. Some results are reported in Table~\ref{trex}. The programs are 
 {\tt ex}, our example from Figure~\ref{ffirstex}, {\tt fib}, a recursive
-Fibonnaci implementation, {\tt qs}, a recursive quicksort implementation 
-and {\tt mpeg}, an MPeg encoder~\cite{MPEG} encoding 10 frames.
+Fibonacci implementation, {\tt qs}, a recursive quicksort implementation 
+and {\tt mpeg}, an MPEG encoder~\cite{MPEG} encoding 10 frames.
 
 It is interesting
 to see that read list compaction has a very different effect on different 
@@ -473,11 +468,12 @@ items would have yielded no new source level dependences).
 
 We note that Embla finds the expected independence of the recursive calls 
 in the recursive divide-and-conquer programs {\tt qs} and
-{\tt fib} although {\tt qs} is an in-place version coded 
+{\tt fib}, even though {\tt qs} is an in-place version coded 
 with pointers and pointer arithmetic, something that is well known to be 
 difficult to deal with for static analyzers. We have also done naive
 hand parallelization of these programs according to the information 
 yielded by Embla and obtained the expected good speedup.
+% Need backup for this statement.  What was the speedup?
 
 \begin{table*}
 \[
@@ -517,11 +513,11 @@ gives the number of inputs that yielded empty $D_i^{\ast}$.
 We are ultimately interested in knowing how well the dependencies
 collected during testing predict the dependencies encountered in
 production runs.  Since the sequential program we test is
-deterministic, the issue becomes how well the behaviour under the
-testing inputs predict the behaviour under other inputs.
+deterministic, the issue becomes how well the behavior under the
+testing inputs predict the behavior under other inputs.
 
-To shed some light on this issue, we have studied the SPEC CPU 2006
-benchmark 403.gcc, a variant of the popular open source Gnu C
+We have studied the SPEC CPU 2006
+benchmark 403.gcc, a variant of the Gnu C
 Compiler. This is a very challenging program since, being an
 optimizing compiler, it essentially looks for a large set of patterns
 in its input an applies different code to different patterns.
@@ -587,7 +583,7 @@ The results are given in the four bottom rows of Table~\ref{tdepstat}
 where we focus exclusively on dependencies $(f,l_1 \leftarrow l_2)$ where f is
 one of the four modules. We see from the first row that these modules
 account for almost half of the size of the $D_i^{\ast}$ sets. Looking
-at the rightmos column, we see that control flow filtering alone makes
+at the rightmost column, we see that control flow filtering alone makes
 almost half of the $D_i^{\ast}$ sets empty, and that together with
 transitive filtering almost two thirds are eliminated.
 
@@ -603,10 +599,10 @@ analysis using the {\tt gcov} tool. We form $L_i$ and $L_i^{\ast}$
 sets containing lines executed in the same way as for dependencies
 above. Figure~\ref{fplot} plots the size of $L_i^{\ast}$ along the
 x-axis and $D_i^{\ast}$ along the y-axis. The left hand plot shows the
-unfiltered data for all modules wheras the right hand one shows the
+unfiltered data for all modules whereas the right hand one shows the
 data for the CT-filtered four modules. The left hand plot shows a very
-clear correlation between execution coverage and dependendence
-coverage wheras the right hand plot is less conclusive; it will be
+clear correlation between execution coverage and dependence
+coverage whereas the right hand plot is less conclusive; it will be
 interesting to see the effect of control flow filtering of all
 modules. However, of the 30 inputs that yielded empty $L_i^{\ast}$ sets, only one
 had a nonempty (actually singleton) $D_i^{\ast}$ set.
