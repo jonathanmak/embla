@@ -240,7 +240,7 @@ manipulation of the call stack, which are also irrelevant for parallelization.
 
 % Begin algorithm -------------------
 
-\section{The Dependence Attribution Algorithm}
+\section{Computing Dependencies}   \label{snca}
 
 \begin{figure} \small
 \hrulefill
@@ -268,54 +268,36 @@ with the line number of the corresponding call.}
 \label{ffextree}
 \end{figure}
 
-We are interested in dependences between program statements, and in 
-this section we discuss how to compute these dependences efficiently from
-the instruction level dependences directly observed by Embla.
+Embla maintains an {\em execution tree} that captures full context for
+every function call. Every execution tree node corresponds to an
+individual function call, and the path from the node to the root of the
+tree corresponds to the call stack at the moment of the call. For
+example, Figure~\ref{ffextree} depicts a fragment of the execution tree
+for our example, capturing the calls of {\tt inc} and lines 14, 15 and
+16 from {\tt main}.
 
-\subsection{The execution tree}
+Embla traces dependences between individual instructions in the binary
+code during program execution. The endpoints of these dependences belong
+in general to different function calls. For instance, on
+Figure~\ref{ffextree} read {\tt *q} in the call of {\tt inc} at line 16
+of {\tt main} (node {\it D}) depends on write {\tt *q=...} in the call
+of {\tt inc} at line 14 (node {\it B}).
 
-Consider the {\em instruction trace} $S$ where each element corresponds 
-to the execution of an instruction. From this trace we can construct a 
-tree where the leaves are events from $S$, and each 
-internal node is a call
-event followed by a sequence of nodes and a return event. We call
-this tree $T$ the {\em execution tree} of $S$. 
-Each node corresponds to some execution of a procedure body.
-Figure~\ref{ffextree} shows part of
-the execution tree of Figure~\ref{ffirstex} where we have omitted the 
-leaves. The nodes marked {\it B}, {\it C}, and {\it D} correspond to 
-the three consecutive calls to {\tt inc} at lines 14--16 of {\tt main}.
-
-The transformations we target will execute {\em siblings}, subtrees with
-the same parent, in parallel (in Figure~\ref{ffextree}, {\it B}, {\it C} 
-and {\it D} are siblings).  Hence, we 
-are interested in dependences between siblings. These
-arise from the 
-dependences in the instruction trace; if $M$ and $N$ are siblings and
-there is an instruction level dependence from an instruction in $M$ 
-to an instruction in $N$ we have a (tree) dependence between $M$ and $N$
-and we call $M$ the {\em source} and $N$ the {\em target} of the dependence.
-
-Each instruction level dependence yields exactly one dependence
-between siblings in the execution tree since there is only one node
-in the execution tree  
-where the two events fall in two distinct children (siblings of each other)
-that could potentially be rearranged. We call that node the {\em nearest
-common ancestor} (NCA) of the endpoints of the instruction level dependence.
-Note that either or both of the children could be a leaf, in which case the
-corresponding dependence endpoint would be direct.
-For example, in Figure~\ref{ffextree}
-the dependence between the write in {\it B} and the read in {\it D} yields
-only the tree dependence between the nodes {\it B} and {\it D} and the NCA of
-{\it B} and {\it D} is {\it A}. 
-
-The dependence is then reported as a dependence between the source lines
-associated with the source and target subtrees, respectively; in the example
-between lines 14 and 16 in {\tt main}.
+Every dependence between two source lines in a single function call,
+like the one between lines 14 and 16 in our example, is caused by an
+instruction-level dependence. Embla computes the source-level depedences
+from the instruction-level ones using the execution tree as follows. For
+every instruction-level dependence, Embla identifies the function calls
+where the endpoints occured (nodes {\it B} and {\it D} for the example
+above), and computes the {\em nearest common ancestor} node (NCA) of
+those nodes in the execution tree. The NCA corresponds to a function
+call with two source-level instructions that are dependent because of
+the instruction-level dependence (lines 14 and 16 in {\tt main} in the
+example).
 
 \newcommand{\tracepile}{trace pile}
 
-\subsection{Computing dependences} \label{snca}
+%\subsection{Computing dependences}
 
 Embla uses two main data structures: The {\em \tracepile}, which implements 
 the execution tree, and the {\em memory table} which maps addresses to tree
@@ -349,39 +331,6 @@ closer to the most recent one
 along that path), so {\tt n.next.parent} = {\tt n}. This
 path corresponds to the call stack; {\tt n.next} is the stack frame on
 top of {\tt n}.
-
-\begin{figure}
-\small
-\hrulefill
-\begin{verbatim}
-   DependenceEdge( oldEvent, currEvent ) {
-       oldLine = oldEvent.line;
-       ncaNode = oldEvent.node;
-       while( ncaNode is not on stack ) {
-           oldLine = ncaNode.line;
-           ncaNode = ncaNode.parent;
-       }
-       if( ncaNode != currEvent.node )
-           currLine = ncaNode.next.line;
-       else
-           currLine = currEvent.line;
-       return ( oldLine, currLine );
-    }
-\end{verbatim}
-\hrulefill
-\caption{Constructing the dependence edge from the events corresponding
-to a previous and a new reference}
-\label{fdepedge}
-\end{figure}    
-
-For each instruction level dependence found using the memory table,
-a source level dependence is computed using the algorithm in 
-Figure~\ref{fdepedge}. Here we
-have made use of the fact that the NCA must be part of the path from the
-late instruction level endpoint to the root node in the execution tree. 
-Thus
-we can search from the early endpoint towards the root; the first node
-on the stack is the NCA.
 
 Path compression can be used to decrease the number of iterations of the 
 {\tt while} loop.
@@ -443,7 +392,7 @@ Prog & \#L & \#sD & \#iD & RSz & T
 RLC: Read List Compaction, 
 \#L: \#non blank source lines, \#sD: \#source dependences, \#iD: 
 \#instruction
-leave dependences, RSz: max bytes for read lists, T: run time (s)
+level dependences, RSz: max bytes for read lists, T: run time (s)
 \caption{Some experimental results} \label{trex}
 \end{table}
 
@@ -522,34 +471,34 @@ Compiler. This is a very challenging program since, being an
 optimizing compiler, it essentially looks for a large set of patterns
 in its input an applies different code to different patterns.
 
-We have collected flow (RAW) data dependencies for 88 different files
+We have collected flow (RAW) data dependencies for 84 different files
 (6--6328 lines of pre-processed C code) drawn from the code base of
 403.gcc itself. These dependencies do not include dependencies due to
 {\tt malloc} and friends.
 
-Each dependence is a triple $({ f}, { l}_1 \leftarrow { l}_2)$
-meaning that $ l_1$ in source file $ f$ depends on line
-$ l_2$ in the same file (recall that a dependence is always a
-pair of lines in the same function). We only look at forward dependencies where 
-$l_1>l_2$. Backward dependencies occur only in loops and the current
-Embla prototype does not handle loop-carried dependencies adequately.
-In particular, Embla does not recognize induction variables, hence
-reporting all loops as having loop-carried dependencies. Loop bodies 
-may still be parallelized using only forward dependencies.
+Each dependence is a triple $(f, l_1 \leftarrow l_2)$
+meaning that $l_1$ in source file $f$ depends on line
+$l_2$ in the same file (recall that a dependence is always a
+pair of lines in the same function). 
+% We only look at forward dependencies where 
+% $l_1>l_2$. Backward dependencies occur only in loops and the current
+% Embla prototype does not handle loop-carried dependencies adequately.
+% In particular, Embla does not recognize induction variables, hence
+% reporting all loops as having loop-carried dependencies. Loop bodies 
+% may still be parallelized using only forward dependencies.
 
-The 88 inputs yield a total of 80876 dependencies, which
+The 84 inputs yield a total of 125041 dependencies, which
 can be compared to the 484930 C source lines (excluding headers) of
 this build of GCC. Evidently, the dependencies are rather sparse due
-in part to the large number of lines not containing memory references at all,
-and the number of unique source lines that occur in some dependence is
-49196 (hence lines that occur in dependencies do so in on the average
-about 1.6 lines, another measure of their sparseness).
+in part to the large number of lines that do not contain memory references at all.
+The number of unique source lines that occur in some dependence is
+51323 (hence lines that occur in dependencies do so in on the average
+about 2.4 lines, another measure of their sparseness).
 
-Since we do not know the set of all dependencies that could be
-provoked by some input, we give dependency deltas, sets of
+To quantify the effect of differences between inputs on the set of 
+dependencies found, we compute {\em dependency deltas}; sets of
 dependencies that are generated by some input but not with some
-reference set of inputs, rather than presenting coverages as
-percentages of all dependencies. Thus, if the dependencies found with input data set $i$ is
+reference set of inputs. Thus, if the dependencies found with input data set $i$ is
 $D_i$, we study \[D_j^I = D_j \setminus \bigcup_{i \in I} D_i\] for
 some set of inputs $I$ not containing $j$. In particular, we have
 $D_j^\ast = D_j^{{\cal A} \setminus j}$ where $\cal A$ is the set of
