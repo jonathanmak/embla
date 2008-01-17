@@ -1,12 +1,12 @@
-<html>
+<html xmlns:cf="http://docbook.sourceforge.net/xmlns/chunkfast/1.0">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
 <title>4. NEWS</title>
 <link rel="stylesheet" href="vg_basic.css" type="text/css">
-<meta name="generator" content="DocBook XSL Stylesheets V1.65.1">
-<link rel="home" href="index.html" title="Valgrind Documentation">
-<link rel="up" href="dist.html" title="Distribution Documents">
-<link rel="previous" href="dist.install.html" title="3. INSTALL">
+<meta name="generator" content="DocBook XSL Stylesheets V1.69.0">
+<link rel="start" href="index.html" title="Valgrind Documentation">
+<link rel="up" href="dist.html" title="Valgrind Distribution Documents">
+<link rel="prev" href="dist.install.html" title="3. INSTALL">
 <link rel="next" href="dist.readme.html" title="5. README">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -14,17 +14,187 @@
 <td width="22px" align="center" valign="middle"><a accesskey="p" href="dist.install.html"><img src="images/prev.png" width="18" height="21" border="0" alt="Prev"></a></td>
 <td width="25px" align="center" valign="middle"><a accesskey="u" href="dist.html"><img src="images/up.png" width="21" height="18" border="0" alt="Up"></a></td>
 <td width="31px" align="center" valign="middle"><a accesskey="h" href="index.html"><img src="images/home.png" width="27" height="20" border="0" alt="Up"></a></td>
-<th align="center" valign="middle">Distribution Documents</th>
+<th align="center" valign="middle">Valgrind Distribution Documents</th>
 <td width="22px" align="center" valign="middle"><a accesskey="n" href="dist.readme.html"><img src="images/next.png" width="18" height="21" border="0" alt="Next"></a></td>
 </tr></table></div>
 <div class="chapter" lang="en">
-<div class="titlepage">
-<div><div><h2 class="title">
-<a name="dist.news"></a>4. NEWS</h2></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h2 class="title">
+<a name="dist.news"></a>4. NEWS</h2></div></div></div>
 <div class="literallayout"><p><br>
       <br>
+Release 3.1.0 (25 November 2005)<br>
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~<br>
+3.1.0 is a feature release with a number of significant improvements:<br>
+AMD64 support is much improved, PPC32 support is good enough to be<br>
+usable, and the handling of memory management and address space is<br>
+much more robust.  In detail:<br>
+<br>
+- AMD64 support is much improved.  The 64-bit vs. 32-bit issues in<br>
+  3.0.X have been resolved, and it should "just work" now in all<br>
+  cases.  On AMD64 machines both 64-bit and 32-bit versions of<br>
+  Valgrind are built.  The right version will be invoked<br>
+  automatically, even when using --trace-children and mixing execution<br>
+  between 64-bit and 32-bit executables.  Also, many more instructions<br>
+  are supported.<br>
+<br>
+- PPC32 support is now good enough to be usable.  It should work with<br>
+  all tools, but please let us know if you have problems.  Three<br>
+  classes of CPUs are supported: integer only (no FP, no Altivec),<br>
+  which covers embedded PPC uses, integer and FP but no Altivec<br>
+  (G3-ish), and CPUs capable of Altivec too (G4, G5).<br>
+<br>
+- Valgrind's address space management has been overhauled.  As a<br>
+  result, Valgrind should be much more robust with programs that use<br>
+  large amounts of memory.  There should be many fewer "memory<br>
+  exhausted" messages, and debug symbols should be read correctly on<br>
+  large (eg. 300MB+) executables.  On 32-bit machines the full address<br>
+  space available to user programs (usually 3GB or 4GB) can be fully<br>
+  utilised.  On 64-bit machines up to 32GB of space is usable; when<br>
+  using Memcheck that means your program can use up to about 14GB.<br>
+<br>
+  A side effect of this change is that Valgrind is no longer protected<br>
+  against wild writes by the client.  This feature was nice but relied<br>
+  on the x86 segment registers and so wasn't portable.<br>
+<br>
+- Most users should not notice, but as part of the address space<br>
+  manager change, the way Valgrind is built has been changed.  Each<br>
+  tool is now built as a statically linked stand-alone executable,<br>
+  rather than as a shared object that is dynamically linked with the<br>
+  core.  The "valgrind" program invokes the appropriate tool depending<br>
+  on the --tool option.  This slightly increases the amount of disk<br>
+  space used by Valgrind, but it greatly simplified many things and<br>
+  removed Valgrind's dependence on glibc.<br>
+<br>
+Please note that Addrcheck and Helgrind are still not working.  Work<br>
+is underway to reinstate them (or equivalents).  We apologise for the<br>
+inconvenience.<br>
+<br>
+Other user-visible changes:<br>
+<br>
+- The --weird-hacks option has been renamed --sim-hints.<br>
+<br>
+- The --time-stamp option no longer gives an absolute date and time.<br>
+  It now prints the time elapsed since the program began.<br>
+<br>
+- It should build with gcc-2.96.<br>
+<br>
+- Valgrind can now run itself (see README_DEVELOPERS for how).<br>
+  This is not much use to you, but it means the developers can now<br>
+  profile Valgrind using Cachegrind.  As a result a couple of<br>
+  performance bad cases have been fixed.<br>
+<br>
+- The XML output format has changed slightly.  See<br>
+  docs/internals/xml-output.txt.<br>
+<br>
+- Core dumping has been reinstated (it was disabled in 3.0.0 and 3.0.1).<br>
+  If your program crashes while running under Valgrind, a core file with<br>
+  the name "vgcore.&lt;pid&gt;" will be created (if your settings allow core<br>
+  file creation).  Note that the floating point information is not all<br>
+  there.  If Valgrind itself crashes, the OS will create a normal core<br>
+  file.<br>
+<br>
+The following are some user-visible changes that occurred in earlier<br>
+versions that may not have been announced, or were announced but not<br>
+widely noticed.  So we're mentioning them now.<br>
+<br>
+- The --tool flag is optional once again;  if you omit it, Memcheck<br>
+  is run by default.<br>
+<br>
+- The --num-callers flag now has a default value of 12.  It was<br>
+  previously 4.<br>
+<br>
+- The --xml=yes flag causes Valgrind's output to be produced in XML<br>
+  format.  This is designed to make it easy for other programs to<br>
+  consume Valgrind's output.  The format is described in the file<br>
+  docs/internals/xml-format.txt.<br>
+<br>
+- The --gen-suppressions flag supports an "all" value that causes every<br>
+  suppression to be printed without asking.<br>
+<br>
+- The --log-file option no longer puts "pid" in the filename, eg. the<br>
+  old name "foo.pid12345" is now "foo.12345".<br>
+<br>
+- There are several graphical front-ends for Valgrind, such as Valkyrie,<br>
+  Alleyoop and Valgui.  See http://www.valgrind.org/downloads/guis.html<br>
+  for a list.<br>
+<br>
+BUGS FIXED:<br>
+<br>
+109861  amd64 hangs at startup<br>
+110301  ditto<br>
+111554  valgrind crashes with Cannot allocate memory<br>
+111809  Memcheck tool doesn't start java<br>
+111901  cross-platform run of cachegrind fails on opteron<br>
+113468  (vgPlain_mprotect_range): Assertion 'r != -1' failed.<br>
+ 92071  Reading debugging info uses too much memory<br>
+109744  memcheck loses track of mmap from direct ld-linux.so.2<br>
+110183  tail of page with _end<br>
+ 82301  FV memory layout too rigid<br>
+ 98278  Infinite recursion possible when allocating memory<br>
+108994  Valgrind runs out of memory due to 133x overhead<br>
+115643  valgrind cannot allocate memory<br>
+105974  vg_hashtable.c static hash table<br>
+109323  ppc32: dispatch.S uses Altivec insn, which doesn't work on POWER. <br>
+109345  ptrace_setregs not yet implemented for ppc<br>
+110831  Would like to be able to run against both 32 and 64 bit <br>
+        binaries on AMD64<br>
+110829  == 110831<br>
+111781  compile of valgrind-3.0.0 fails on my linux (gcc 2.X prob)<br>
+112670  Cachegrind: cg_main.c:486 (handleOneStatement ...<br>
+112941  vex x86: 0xD9 0xF4 (fxtract)<br>
+110201  == 112941<br>
+113015  vex amd64-&gt;IR: 0xE3 0x14 0x48 0x83 (jrcxz)<br>
+113126  Crash with binaries built with -gstabs+/-ggdb<br>
+104065  == 113126<br>
+115741  == 113126<br>
+113403  Partial SSE3 support on x86<br>
+113541  vex: Grp5(x86) (alt encoding inc/dec) case 1<br>
+113642  valgrind crashes when trying to read debug information<br>
+113810  vex x86-&gt;IR: 66 0F F6 (66 + PSADBW == SSE PSADBW)<br>
+113796  read() and write() do not work if buffer is in shared memory<br>
+113851  vex x86-&gt;IR: (pmaddwd): 0x66 0xF 0xF5 0xC7<br>
+114366  vex amd64 cannnot handle __asm__( "fninit" )<br>
+114412  vex amd64-&gt;IR: 0xF 0xAD 0xC2 0xD3 (128-bit shift, shrdq?)<br>
+114455  vex amd64-&gt;IR: 0xF 0xAC 0xD0 0x1 (also shrdq)<br>
+115590: amd64-&gt;IR: 0x67 0xE3 0x9 0xEB (address size override)<br>
+115953  valgrind svn r5042 does not build with parallel make (-j3)<br>
+116057  maximum instruction size - VG_MAX_INSTR_SZB too small?<br>
+116483  shmat failes with invalid argument<br>
+102202  valgrind crashes when realloc'ing until out of memory<br>
+109487  == 102202<br>
+110536  == 102202<br>
+112687  == 102202<br>
+111724  vex amd64-&gt;IR: 0x41 0xF 0xAB (more BT{,S,R,C} fun n games)<br>
+111748  vex amd64-&gt;IR: 0xDD 0xE2 (fucom)<br>
+111785  make fails if CC contains spaces<br>
+111829  vex x86-&gt;IR: sbb AL, Ib<br>
+111851  vex x86-&gt;IR: 0x9F 0x89 (lahf/sahf)<br>
+112031  iopl on AMD64 and README_MISSING_SYSCALL_OR_IOCTL update<br>
+112152  code generation for Xin_MFence on x86 with SSE0 subarch<br>
+112167  == 112152<br>
+112789  == 112152<br>
+112199  naked ar tool is used in vex makefile<br>
+112501  vex x86-&gt;IR: movq (0xF 0x7F 0xC1 0xF) (mmx MOVQ)<br>
+113583  == 112501<br>
+112538  memalign crash<br>
+113190  Broken links in docs/html/<br>
+113230  Valgrind sys_pipe on x86-64 wrongly thinks file descriptors<br>
+        should be 64bit<br>
+113996  vex amd64-&gt;IR: fucomp (0xDD 0xE9)<br>
+114196  vex x86-&gt;IR: out %eax,(%dx) (0xEF 0xC9 0xC3 0x90)<br>
+114289  Memcheck fails to intercept malloc when used in an uclibc environment<br>
+114756  mbind syscall support<br>
+114757  Valgrind dies with assertion: Assertion 'noLargerThan &gt; 0' failed<br>
+114563  stack tracking module not informed when valgrind switches threads<br>
+114564  clone() and stacks<br>
+114565  == 114564<br>
+115496  glibc crashes trying to use sysinfo page<br>
+116200  enable fsetxattr, fgetxattr, and fremovexattr for amd64<br>
+<br>
+(3.1.0RC1: 20 November 2005, vex r1466, valgrind r5224).<br>
+(3.1.0:    26 November 2005, vex r1471, valgrind r5235).<br>
+<br>
+<br>
 Release 3.0.1 (29 August 2005)<br>
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~<br>
 3.0.1 fixes a bunch of bugs reported in 3.0.0.  There is no new<br>
@@ -75,10 +245,10 @@ n-i-bz  minor umount/fcntl wrapper fixes<br>
 101204  noisy warning<br>
 111513  Illegal opcode for SSE instruction (x86 movups)<br>
 111555  VEX/Makefile: CC is set to gcc<br>
-n-i-bz  Fix XML bugs in FAQ  <br>
+n-i-bz  Fix XML bugs in FAQ<br>
 <br>
-(3.0.1: 29 August 05, <br>
-        vex/branches/VEX_3_0_BRANCH r1367, <br>
+(3.0.1: 29 August 05,<br>
+        vex/branches/VEX_3_0_BRANCH r1367,<br>
         valgrind/branches/VALGRIND_3_0_BRANCH r4574).<br>
 <br>
 <br>

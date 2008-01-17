@@ -131,12 +131,6 @@ void LibVEX_Init (
    vassert(vcon->guest_chase_thresh >= 0);
    vassert(vcon->guest_chase_thresh < vcon->guest_max_insns);
 
-   /* All the guest state structs must have an 8-aligned size. */
-   vassert(0 == sizeof(VexGuestX86State)   % 8);
-   vassert(0 == sizeof(VexGuestAMD64State) % 8);
-   vassert(0 == sizeof(VexGuestPPC32State) % 8);
-   vassert(0 == sizeof(VexGuestARMState)   % 8);
-
    /* Check that Vex has been built with sizes of basic types as
       stated in priv/libvex_basictypes.h.  Failure of any of these is
       a serious configuration error and should be corrected
@@ -185,8 +179,13 @@ VexTranslateResult LibVEX_Translate (
    VexArch      arch_host,
    VexArchInfo* archinfo_host,
    /* IN: the block to translate, and its guest address. */
+   /* where are the actual bytes in the host's address space? */
    UChar*  guest_bytes,
+   /* where do the bytes came from in the guest's aspace? */
    Addr64  guest_bytes_addr,
+   /* what guest entry point address do they correspond to? */
+   Addr64  guest_bytes_addr_noredir,
+   /* Is it OK to chase into this guest address? */
    Bool    (*chase_into_ok) ( Addr64 ),
    /* OUT: which bits of guest code actually got translated */
    VexGuestExtents* guest_extents,
@@ -197,8 +196,10 @@ VexTranslateResult LibVEX_Translate (
    Int*    host_bytes_used,
    /* IN: optionally, two instrumentation functions. */
    IRBB*   (*instrument1) ( IRBB*, VexGuestLayout*, 
+                            Addr64, VexGuestExtents*, 
                             IRType gWordTy, IRType hWordTy ),
    IRBB*   (*instrument2) ( IRBB*, VexGuestLayout*, 
+                            Addr64, VexGuestExtents*,
                             IRType gWordTy, IRType hWordTy ),
    Bool    cleanup_after_instrumentation,
    /* IN: should this translation be self-checking? */
@@ -262,8 +263,8 @@ VexTranslateResult LibVEX_Translate (
    vex_traceflags = traceflags;
 
    vassert(vex_initdone);
-   vexClearTEMP();
-
+   vexSetAllocModeTEMP_and_clear();
+   vexAllocSanityCheck();
 
    /* First off, check that the guest and host insn sets
       are supported. */
@@ -320,8 +321,9 @@ VexTranslateResult LibVEX_Translate (
          emit        = (Int(*)(UChar*,Int,HInstr*)) emit_PPC32Instr;
          host_is_bigendian = True;
          host_word_type    = Ity_I32;
-         vassert(archinfo_guest->subarch == VexSubArchPPC32_noAV
-                 || archinfo_guest->subarch == VexSubArchPPC32_AV);
+         vassert(archinfo_guest->subarch == VexSubArchPPC32_I
+                 || archinfo_guest->subarch == VexSubArchPPC32_FI
+                 || archinfo_guest->subarch == VexSubArchPPC32_VFI);
          break;
 
       default:
@@ -343,6 +345,7 @@ VexTranslateResult LibVEX_Translate (
          vassert(archinfo_guest->subarch == VexSubArchX86_sse0
                  || archinfo_guest->subarch == VexSubArchX86_sse1
                  || archinfo_guest->subarch == VexSubArchX86_sse2);
+         vassert(0 == sizeof(VexGuestX86State) % 8);
          vassert(sizeof( ((VexGuestX86State*)0)->guest_TISTART ) == 4);
          vassert(sizeof( ((VexGuestX86State*)0)->guest_TILEN ) == 4);
          break;
@@ -357,6 +360,7 @@ VexTranslateResult LibVEX_Translate (
          offB_TISTART     = offsetof(VexGuestAMD64State,guest_TISTART);
          offB_TILEN       = offsetof(VexGuestAMD64State,guest_TILEN);
          vassert(archinfo_guest->subarch == VexSubArch_NONE);
+         vassert(0 == sizeof(VexGuestAMD64State) % 8);
          vassert(sizeof( ((VexGuestAMD64State*)0)->guest_TISTART ) == 8);
          vassert(sizeof( ((VexGuestAMD64State*)0)->guest_TILEN ) == 8);
          break;
@@ -382,8 +386,10 @@ VexTranslateResult LibVEX_Translate (
          guest_layout     = &ppc32Guest_layout;
          offB_TISTART     = offsetof(VexGuestPPC32State,guest_TISTART);
          offB_TILEN       = offsetof(VexGuestPPC32State,guest_TILEN);
-         vassert(archinfo_guest->subarch == VexSubArchPPC32_noAV
-                 || archinfo_guest->subarch == VexSubArchPPC32_AV);
+         vassert(archinfo_guest->subarch == VexSubArchPPC32_I
+                 || archinfo_guest->subarch == VexSubArchPPC32_FI
+                 || archinfo_guest->subarch == VexSubArchPPC32_VFI);
+         vassert(0 == sizeof(VexGuestPPC32State) % 8);
          vassert(sizeof( ((VexGuestPPC32State*)0)->guest_TISTART ) == 4);
          vassert(sizeof( ((VexGuestPPC32State*)0)->guest_TILEN ) == 4);
          break;
@@ -399,6 +405,8 @@ VexTranslateResult LibVEX_Translate (
          flavour of the same architecture, which is pretty strange. */
       vassert(archinfo_guest->subarch == archinfo_host->subarch);
    }
+
+   vexAllocSanityCheck();
 
    if (vex_traceflags & VEX_TRACE_FE)
       vex_printf("\n------------------------" 
@@ -417,9 +425,11 @@ VexTranslateResult LibVEX_Translate (
                      offB_TISTART,
                      offB_TILEN );
 
+   vexAllocSanityCheck();
+
    if (irbb == NULL) {
       /* Access failure. */
-      vexClearTEMP();
+      vexSetAllocModeTEMP_and_clear();
       vex_traceflags = 0;
       return VexTransAccessFail;
    }
@@ -449,6 +459,8 @@ VexTranslateResult LibVEX_Translate (
    sanityCheckIRBB( irbb, "initial IR", 
                     False/*can be non-flat*/, guest_word_type );
 
+   vexAllocSanityCheck();
+
    /* Clean it up, hopefully a lot. */
    irbb = do_iropt_BB ( irbb, specHelper, preciseMemExnsFn, 
                               guest_bytes_addr );
@@ -463,13 +475,19 @@ VexTranslateResult LibVEX_Translate (
       vex_printf("\n");
    }
 
+   vexAllocSanityCheck();
+
    /* Get the thing instrumented. */
    if (instrument1)
       irbb = (*instrument1)(irbb, guest_layout, 
-                                  guest_word_type, host_word_type);
+                            guest_bytes_addr_noredir, guest_extents,
+                            guest_word_type, host_word_type);
+   vexAllocSanityCheck();
+
    if (instrument2)
       irbb = (*instrument2)(irbb, guest_layout,
-                                  guest_word_type, host_word_type);
+                            guest_bytes_addr_noredir, guest_extents,
+                            guest_word_type, host_word_type);
       
    if (vex_traceflags & VEX_TRACE_INST) {
       vex_printf("\n------------------------" 
@@ -492,6 +510,8 @@ VexTranslateResult LibVEX_Translate (
                        True/*must be flat*/, guest_word_type );
    }
 
+   vexAllocSanityCheck();
+
    if (vex_traceflags & VEX_TRACE_OPT2) {
       vex_printf("\n------------------------" 
                    " After post-instr IR optimisation "
@@ -503,6 +523,8 @@ VexTranslateResult LibVEX_Translate (
    /* Turn it into virtual-registerised code. */
    do_deadcode_BB( irbb );
    do_treebuild_BB( irbb );
+
+   vexAllocSanityCheck();
 
    if (vex_traceflags & VEX_TRACE_TREES) {
       vex_printf("\n------------------------" 
@@ -523,6 +545,8 @@ VexTranslateResult LibVEX_Translate (
 
    vcode = iselBB ( irbb, archinfo_host );
 
+   vexAllocSanityCheck();
+
    if (vex_traceflags & VEX_TRACE_VCODE)
       vex_printf("\n");
 
@@ -541,6 +565,8 @@ VexTranslateResult LibVEX_Translate (
                                   isMove, getRegUsage, mapRegs, 
                                   genSpill, genReload, guest_sizeB,
                                   ppInstr, ppReg );
+
+   vexAllocSanityCheck();
 
    if (vex_traceflags & VEX_TRACE_RCODE) {
       vex_printf("\n------------------------" 
@@ -581,7 +607,7 @@ VexTranslateResult LibVEX_Translate (
          vex_printf("\n\n");
       }
       if (out_used + j > host_bytes_size) {
-         vexClearTEMP();
+         vexSetAllocModeTEMP_and_clear();
          vex_traceflags = 0;
          return VexTransOutputFull;
       }
@@ -593,7 +619,9 @@ VexTranslateResult LibVEX_Translate (
    }
    *host_bytes_used = out_used;
 
-   vexClearTEMP();
+   vexAllocSanityCheck();
+
+   vexSetAllocModeTEMP_and_clear();
 
    vex_traceflags = 0;
    return VexTransOK;
@@ -649,8 +677,9 @@ const HChar* LibVEX_ppVexSubArch ( VexSubArch subarch )
       case VexSubArchX86_sse1:   return "x86-sse1";
       case VexSubArchX86_sse2:   return "x86-sse2";
       case VexSubArchARM_v4:     return "arm-v4";
-      case VexSubArchPPC32_noAV: return "ppc32-noAltivec";
-      case VexSubArchPPC32_AV:   return "ppc32-Altivec";
+      case VexSubArchPPC32_I:    return "ppc32-int-only";
+      case VexSubArchPPC32_FI:   return "ppc32-int-and-fp";
+      case VexSubArchPPC32_VFI:  return "ppc32-int-fp-and-AV";
       default:                   return "VexSubArch???";
    }
 }

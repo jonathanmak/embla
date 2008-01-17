@@ -9,12 +9,21 @@
 #define OFFSET_x86_EIP  60
 
 #define OFFSET_amd64_RAX   0
-#define OFFSET_amd64_RDI  56
-#define OFFSET_amd64_RSI  48
+#define OFFSET_amd64_RBX  24
+#define OFFSET_amd64_RCX   8
 #define OFFSET_amd64_RDX  16
+#define OFFSET_amd64_RSI  48
+#define OFFSET_amd64_RDI  56
+#define OFFSET_amd64_RSP  32
+#define OFFSET_amd64_RBP  40
 #define OFFSET_amd64_R8   64
 #define OFFSET_amd64_R9   72
 #define OFFSET_amd64_R10  80
+#define OFFSET_amd64_R11  88
+#define OFFSET_amd64_R12  96
+#define OFFSET_amd64_R13 104
+#define OFFSET_amd64_R14 112
+#define OFFSET_amd64_R15 120
 #define OFFSET_amd64_RIP 168
 
 #define OFFSET_ppc32_GPR0        0

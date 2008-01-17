@@ -90,6 +90,15 @@
    happen.  Programs that set it to 1 and then rely on the resulting
    SIGBUSs to inform them of misaligned accesses will not work.
 
+   Implementation sysenter is necessarily partial.  sysenter is a kind
+   of system call entry.  When doing a sysenter, the return address is
+   not known -- that is something that is beyond Vex's knowledge.  So
+   the generated IR forces a return to the scheduler, which can do
+   what it likes to simulate the systemter, but it MUST set this
+   thread's guest_EIP field with the continuation address before
+   resuming execution.  If that doesn't happen, the thread will jump
+   to address zero, which is probably fatal.
+
    This module uses global variables and so is not MT-safe (if that
    should ever become relevant).
 
@@ -216,6 +225,8 @@ static IRBB* irbb;
 
 #define OFFB_EMWARN    offsetof(VexGuestX86State,guest_EMWARN)
 
+#define OFFB_TISTART   offsetof(VexGuestX86State,guest_TISTART)
+#define OFFB_TILEN     offsetof(VexGuestX86State,guest_TILEN)
 
 /*------------------------------------------------------------*/
 /*--- Helper bits and pieces for deconstructing the        ---*/
@@ -1967,6 +1978,10 @@ UInt dis_op_imm_A ( Int    size,
       helper_ADC( size, dst1, dst0, src );
    }
    else
+   if (op8 == Iop_Sub8 && carrying) {
+      helper_SBB( size, dst1, dst0, src );
+   }
+   else
       vpanic("dis_op_imm_A(x86,guest)");
 
    if (keep)
@@ -2738,16 +2753,22 @@ UInt dis_Grp5 ( UChar sorb, Int sz, Int delta, DisResult* dres )
    if (epartIsReg(modrm)) {
       assign(t1, getIReg(sz,eregOfRM(modrm)));
       switch (gregOfRM(modrm)) {
-//--          case 0: /* INC */
-//--             uInstr1(cb, INC, sz, TempReg, t1);
-//--             setFlagsFromUOpcode(cb, INC);
-//--             uInstr2(cb, PUT, sz, TempReg, t1, ArchReg, eregOfRM(modrm));
-//--             break;
-//--          case 1: /* DEC */
-//--             uInstr1(cb, DEC, sz, TempReg, t1);
-//--             setFlagsFromUOpcode(cb, DEC);
-//--             uInstr2(cb, PUT, sz, TempReg, t1, ArchReg, eregOfRM(modrm));
-//--             break;
+         case 0: /* INC */ 
+            vassert(sz == 2 || sz == 4);
+            t2 = newTemp(ty);
+            assign(t2, binop(mkSizedOp(ty,Iop_Add8),
+                             mkexpr(t1), mkU(ty,1)));
+            setFlags_INC_DEC( True, t2, ty );
+            putIReg(sz,eregOfRM(modrm),mkexpr(t2));
+            break;
+         case 1: /* DEC */ 
+            vassert(sz == 2 || sz == 4);
+            t2 = newTemp(ty);
+            assign(t2, binop(mkSizedOp(ty,Iop_Sub8),
+                             mkexpr(t1), mkU(ty,1)));
+            setFlags_INC_DEC( False, t2, ty );
+            putIReg(sz,eregOfRM(modrm),mkexpr(t2));
+            break;
          case 2: /* call Ev */
             vassert(sz == 4);
             t2 = newTemp(Ity_I32);
@@ -3854,6 +3875,38 @@ UInt dis_FPU ( Bool* decode_ok, UChar sorb, Int delta )
                fp_pop();
                break;
 
+            case 0xF4: {
+               IRTemp argF = newTemp(Ity_F64);
+               IRTemp sigF = newTemp(Ity_F64);
+               IRTemp expF = newTemp(Ity_F64);
+               IRTemp argI = newTemp(Ity_I64);
+               IRTemp sigI = newTemp(Ity_I64);
+               IRTemp expI = newTemp(Ity_I64);
+               DIP("fxtract\n");
+               assign( argF, get_ST(0) );
+               assign( argI, unop(Iop_ReinterpF64asI64, mkexpr(argF)));
+               assign( sigI, 
+                       mkIRExprCCall(Ity_I64, 0/*regparms*/, 
+                                     "x86g_calculate_FXTRACT", 
+                                     &x86g_calculate_FXTRACT, 
+                                     mkIRExprVec_2( mkexpr(argI), 
+                                                    mkU32(0)/*sig*/ )) );
+               assign( expI, 
+                       mkIRExprCCall(Ity_I64, 0/*regparms*/, 
+                                     "x86g_calculate_FXTRACT", 
+                                     &x86g_calculate_FXTRACT, 
+                                     mkIRExprVec_2( mkexpr(argI), 
+                                                    mkU32(1)/*exp*/ )) );
+               assign( sigF, unop(Iop_ReinterpI64asF64, mkexpr(sigI)) );
+               assign( expF, unop(Iop_ReinterpI64asF64, mkexpr(expI)) );
+               /* exponent */
+               put_ST_UNCHECKED(0, mkexpr(expF) );
+               fp_push();
+               /* significand */
+               put_ST(0, mkexpr(sigF) );
+               break;
+            }
+
             case 0xF5: { /* FPREM1 -- IEEE compliant */
                IRTemp a1 = newTemp(Ity_F64);
                IRTemp a2 = newTemp(Ity_F64);
@@ -4145,7 +4198,8 @@ UInt dis_FPU ( Bool* decode_ok, UChar sorb, Int delta )
                IRDirty* d = unsafeIRDirty_1_N ( 
                                val, 
                                0/*regparms*/, 
-                               "x86g_loadF80le", &x86g_loadF80le, 
+                               "x86g_dirtyhelper_loadF80le", 
+                               &x86g_dirtyhelper_loadF80le, 
                                args 
                             );
                /* declare that we're reading memory */
@@ -4170,7 +4224,8 @@ UInt dis_FPU ( Bool* decode_ok, UChar sorb, Int delta )
 
                IRDirty* d = unsafeIRDirty_0_N ( 
                                0/*regparms*/, 
-                               "x86g_storeF80le", &x86g_storeF80le,
+                               "x86g_dirtyhelper_storeF80le", 
+                               &x86g_dirtyhelper_storeF80le,
                                args 
                             );
                /* declare we're writing memory */
@@ -5287,9 +5342,10 @@ UInt dis_MMX ( Bool* decode_ok, UChar sorb, Int sz, Int delta )
             goto mmx_decode_failure;
          modrm = getIByte(delta);
          if (epartIsReg(modrm)) {
-            /* Fall through.  The assembler doesn't appear to generate
-               these. */
-            goto mmx_decode_failure;
+            delta++;
+            putMMXReg( eregOfRM(modrm), getMMXReg(gregOfRM(modrm)) );
+            DIP("movq %s, %s\n", 
+                nameMMXReg(gregOfRM(modrm)), nameMMXReg(eregOfRM(modrm)));
          } else {
             IRTemp addr = disAMode( &len, sorb, delta, dis_buf );
             delta += len;
@@ -5930,26 +5986,30 @@ void codegen_SAHF ( void )
 }
 
 
-//-- static 
-//-- void codegen_LAHF ( UCodeBlock* cb )
-//-- {
-//--    Int t = newTemp(cb);
-//-- 
-//--    /* Pushed arg is ignored, it just provides somewhere to put the
-//--       return value. */
-//--    uInstr2(cb, GET,   4, ArchReg, R_EAX, TempReg, t);
-//--    uInstr0(cb, CALLM_S, 0);
-//--    uInstr1(cb, PUSH,  4, TempReg, t);
-//--    uInstr1(cb, CALLM, 0, Lit16,   VGOFF_(helper_LAHF));
-//--    uFlagsRWU(cb, FlagsSZACP, FlagsEmpty, FlagsEmpty);
-//--    uInstr1(cb, POP,   4, TempReg, t);
-//--    uInstr0(cb, CALLM_E, 0);
-//-- 
-//--    /* At this point, the %ah sub-register in %eax has been updated,
-//--       the rest is the same, so do a PUT of the whole thing. */
-//--    uInstr2(cb, PUT,   4,  TempReg, t,   ArchReg, R_EAX);
-//-- }
-//-- 
+static 
+void codegen_LAHF ( void  )
+{
+   /* AH <- EFLAGS(SF:ZF:0:AF:0:PF:1:CF) */
+   IRExpr* eax_with_hole;
+   IRExpr* new_byte;
+   IRExpr* new_eax;
+   UInt    mask_SZACP = X86G_CC_MASK_S|X86G_CC_MASK_Z|X86G_CC_MASK_A
+                        |X86G_CC_MASK_C|X86G_CC_MASK_P;
+
+   IRTemp  flags = newTemp(Ity_I32);
+   assign( flags, mk_x86g_calculate_eflags_all() );
+
+   eax_with_hole 
+      = binop(Iop_And32, getIReg(4, R_EAX), mkU32(0xFFFF00FF));
+   new_byte 
+      = binop(Iop_Or32, binop(Iop_And32, mkexpr(flags), mkU32(mask_SZACP)),
+                        mkU32(1<<1));
+   new_eax 
+      = binop(Iop_Or32, eax_with_hole,
+                        binop(Iop_Shl32, new_byte, mkU8(8)));
+   putIReg(4, R_EAX, new_eax);
+}
+
 
 static
 UInt dis_cmpxchg_G_E ( UChar       sorb,
@@ -7004,8 +7064,9 @@ DisResult disInstr_X86_WRK (
       delta++;
    }
 
-   /* Detect operand-size overrides. */
-   if (getIByte(delta) == 0x66) { sz = 2; delta++; };
+   /* Detect operand-size overrides.  It is possible for more than one
+      0x66 to appear. */
+   while (getIByte(delta) == 0x66) { sz = 2; delta++; };
 
    /* segment override prefixes come after the operand-size override,
       it seems */
@@ -7908,8 +7969,7 @@ DisResult disInstr_X86_WRK (
 
    /* ***--- this is an MMX class insn introduced in SSE1 ---*** */
    /* 0F F6 = PSADBW -- sum of 8Ux8 absolute differences */
-   if (insn[0] == 0x0F && insn[1] == 0xF6) {
-      vassert(sz == 4);
+   if (sz == 4 && insn[0] == 0x0F && insn[1] == 0xF6) {
       do_MMX_preamble();
       delta = dis_MMXop_regmem_to_reg ( 
                  sorb, delta+2, insn[1], "psadbw", False );
@@ -9540,6 +9600,53 @@ DisResult disInstr_X86_WRK (
       goto decode_success;
    }
 
+   /* 66 0F F5 = PMADDWD -- Multiply and add packed integers from
+      E(xmm or mem) to G(xmm) */
+   if (sz == 2 && insn[0] == 0x0F && insn[1] == 0xF5) {
+      IRTemp s1V  = newTemp(Ity_V128);
+      IRTemp s2V  = newTemp(Ity_V128);
+      IRTemp dV   = newTemp(Ity_V128);
+      IRTemp s1Hi = newTemp(Ity_I64);
+      IRTemp s1Lo = newTemp(Ity_I64);
+      IRTemp s2Hi = newTemp(Ity_I64);
+      IRTemp s2Lo = newTemp(Ity_I64);
+      IRTemp dHi  = newTemp(Ity_I64);
+      IRTemp dLo  = newTemp(Ity_I64);
+      modrm = insn[2];
+      if (epartIsReg(modrm)) {
+         assign( s1V, getXMMReg(eregOfRM(modrm)) );
+         delta += 2+1;
+         DIP("pmaddwd %s,%s\n", nameXMMReg(eregOfRM(modrm)),
+                                nameXMMReg(gregOfRM(modrm)));
+      } else {
+         addr = disAMode ( &alen, sorb, delta+2, dis_buf );
+         assign( s1V, loadLE(Ity_V128, mkexpr(addr)) );
+         delta += 2+alen;
+         DIP("pmaddwd %s,%s\n", dis_buf,
+                                nameXMMReg(gregOfRM(modrm)));
+      }
+      assign( s2V, getXMMReg(gregOfRM(modrm)) );
+      assign( s1Hi, unop(Iop_V128HIto64, mkexpr(s1V)) );
+      assign( s1Lo, unop(Iop_V128to64,   mkexpr(s1V)) );
+      assign( s2Hi, unop(Iop_V128HIto64, mkexpr(s2V)) );
+      assign( s2Lo, unop(Iop_V128to64,   mkexpr(s2V)) );
+      assign( dHi, mkIRExprCCall(
+                      Ity_I64, 0/*regparms*/,
+                      "x86g_calculate_mmx_pmaddwd", 
+                      &x86g_calculate_mmx_pmaddwd,
+                      mkIRExprVec_2( mkexpr(s1Hi), mkexpr(s2Hi))
+                   ));
+      assign( dLo, mkIRExprCCall(
+                      Ity_I64, 0/*regparms*/,
+                      "x86g_calculate_mmx_pmaddwd", 
+                      &x86g_calculate_mmx_pmaddwd,
+                      mkIRExprVec_2( mkexpr(s1Lo), mkexpr(s2Lo))
+                   ));
+      assign( dV, binop(Iop_64HLtoV128, mkexpr(dHi), mkexpr(dLo))) ;
+      putXMMReg(gregOfRM(modrm), mkexpr(dV));
+      goto decode_success;
+   }
+
    /* 66 0F EE = PMAXSW -- 16x8 signed max */
    if (sz == 2 && insn[0] == 0x0F && insn[1] == 0xEE) {
       delta = dis_SSEint_E_to_G( sorb, delta+2, 
@@ -9691,6 +9798,53 @@ DisResult disInstr_X86_WRK (
    /* 66 0F EB = POR */
    if (sz == 2 && insn[0] == 0x0F && insn[1] == 0xEB) {
       delta = dis_SSE_E_to_G_all( sorb, delta+2, "por", Iop_OrV128 );
+      goto decode_success;
+   }
+
+   /* 66 0F F6 = PSADBW -- 2 x (8x8 -> 48 zeroes ++ u16) Sum Abs Diffs
+      from E(xmm or mem) to G(xmm) */
+   if (sz == 2 && insn[0] == 0x0F && insn[1] == 0xF6) {
+      IRTemp s1V  = newTemp(Ity_V128);
+      IRTemp s2V  = newTemp(Ity_V128);
+      IRTemp dV   = newTemp(Ity_V128);
+      IRTemp s1Hi = newTemp(Ity_I64);
+      IRTemp s1Lo = newTemp(Ity_I64);
+      IRTemp s2Hi = newTemp(Ity_I64);
+      IRTemp s2Lo = newTemp(Ity_I64);
+      IRTemp dHi  = newTemp(Ity_I64);
+      IRTemp dLo  = newTemp(Ity_I64);
+      modrm = insn[2];
+      if (epartIsReg(modrm)) {
+         assign( s1V, getXMMReg(eregOfRM(modrm)) );
+         delta += 2+1;
+         DIP("psadbw %s,%s\n", nameXMMReg(eregOfRM(modrm)),
+                               nameXMMReg(gregOfRM(modrm)));
+      } else {
+         addr = disAMode ( &alen, sorb, delta+2, dis_buf );
+         assign( s1V, loadLE(Ity_V128, mkexpr(addr)) );
+         delta += 2+alen;
+         DIP("psadbw %s,%s\n", dis_buf,
+                               nameXMMReg(gregOfRM(modrm)));
+      }
+      assign( s2V, getXMMReg(gregOfRM(modrm)) );
+      assign( s1Hi, unop(Iop_V128HIto64, mkexpr(s1V)) );
+      assign( s1Lo, unop(Iop_V128to64,   mkexpr(s1V)) );
+      assign( s2Hi, unop(Iop_V128HIto64, mkexpr(s2V)) );
+      assign( s2Lo, unop(Iop_V128to64,   mkexpr(s2V)) );
+      assign( dHi, mkIRExprCCall(
+                      Ity_I64, 0/*regparms*/,
+                      "x86g_calculate_mmx_psadbw", 
+                      &x86g_calculate_mmx_psadbw,
+                      mkIRExprVec_2( mkexpr(s1Hi), mkexpr(s2Hi))
+                   ));
+      assign( dLo, mkIRExprCCall(
+                      Ity_I64, 0/*regparms*/,
+                      "x86g_calculate_mmx_psadbw", 
+                      &x86g_calculate_mmx_psadbw,
+                      mkIRExprVec_2( mkexpr(s1Lo), mkexpr(s2Lo))
+                   ));
+      assign( dV, binop(Iop_64HLtoV128, mkexpr(dHi), mkexpr(dLo))) ;
+      putXMMReg(gregOfRM(modrm), mkexpr(dV));
       goto decode_success;
    }
 
@@ -10187,7 +10341,6 @@ DisResult disInstr_X86_WRK (
       goto decode_success;
    }
 
-
 //--    /* FXSAVE/FXRSTOR m32 -- load/store the FPU/MMX/SSE state. */
 //--    if (insn[0] == 0x0F && insn[1] == 0xAE 
 //--        && (!epartIsReg(insn[2]))
@@ -10204,27 +10357,126 @@ DisResult disInstr_X86_WRK (
 //--       DIP("fx%s %s\n", store ? "save" : "rstor", dis_buf );
 //--       goto decode_success;
 //--    }
-//-- 
-//--    /* CLFLUSH -- flush cache line */
-//--    if (insn[0] == 0x0F && insn[1] == 0xAE
-//--        && (!epartIsReg(insn[2]))
-//--        && (gregOfRM(insn[2]) == 7))
-//--    {
-//--       vg_assert(sz == 4);
-//--       pair = disAMode ( cb, sorb, eip+2, dis_buf );
-//--       t1   = LOW24(pair);
-//--       eip += 2+HI8(pair);
-//--       uInstr3(cb, SSE2a_MemRd, 0,  /* ignore sz for internal ops */
-//--                   Lit16, (((UShort)0x0F) << 8) | (UShort)0xAE,
-//--                   Lit16, (UShort)insn[2],
-//--                   TempReg, t1 );
-//--       DIP("clflush %s\n", dis_buf);
-//--       goto decode_success;
-//--    }
 
+   /* 0F AE /7 = CLFLUSH -- flush cache line */
+   if (sz == 4 && insn[0] == 0x0F && insn[1] == 0xAE
+       && !epartIsReg(insn[2]) && gregOfRM(insn[2]) == 7) {
+
+      /* This is something of a hack.  We need to know the size of the
+         cache line containing addr.  Since we don't (easily), assume
+         256 on the basis that no real cache would have a line that
+         big.  It's safe to invalidate more stuff than we need, just
+         inefficient. */
+      UInt lineszB = 256;
+
+      addr = disAMode ( &alen, sorb, delta+2, dis_buf );
+      delta += 2+alen;
+
+      /* Round addr down to the start of the containing block. */
+      stmt( IRStmt_Put(
+               OFFB_TISTART,
+               binop( Iop_And32, 
+                      mkexpr(addr), 
+                      mkU32( ~(lineszB-1) ))) );
+
+      stmt( IRStmt_Put(OFFB_TILEN, mkU32(lineszB) ) );
+
+      irbb->jumpkind = Ijk_TInval;
+      irbb->next     = mkU32(guest_EIP_bbstart+delta);
+      dres.whatNext  = Dis_StopHere;
+
+      DIP("clflush %s\n", dis_buf);
+      goto decode_success;
+   }
 
    /* ---------------------------------------------------- */
-   /* --- end of the SSE/SSE2 decoder.                 --- */
+   /* --- end of the SSE2 decoder.                     --- */
+   /* ---------------------------------------------------- */
+
+   /* ---------------------------------------------------- */
+   /* --- start of the SSE3 decoder.                   --- */
+   /* ---------------------------------------------------- */
+
+   /* Skip parts of the decoder which don't apply given the stated
+      guest subarchitecture. */
+   if (archinfo->subarch == VexSubArchX86_sse0 
+       || archinfo->subarch == VexSubArchX86_sse1
+       /* || archinfo->subarch == VexSubArchX86_sse2 */)
+      goto after_sse_decoders;
+
+   insn = (UChar*)&guest_code[delta];
+
+   /* F3 0F 12 = MOVSLDUP -- move from E (mem or xmm) to G (xmm),
+      duplicating some lanes (2:2:0:0). */
+   /* F3 0F 16 = MOVSHDUP -- move from E (mem or xmm) to G (xmm),
+      duplicating some lanes (3:3:1:1). */
+   if (sz == 4 && insn[0] == 0xF3 && insn[1] == 0x0F 
+       && (insn[2] == 0x12 || insn[2] == 0x16)) {
+      IRTemp s3, s2, s1, s0;
+      IRTemp sV  = newTemp(Ity_V128);
+      Bool   isH = insn[2] == 0x16;
+      s3 = s2 = s1 = s0 = IRTemp_INVALID;
+
+      modrm = insn[3];
+      if (epartIsReg(modrm)) {
+         assign( sV, getXMMReg( eregOfRM(modrm)) );
+         DIP("movs%cdup %s,%s\n", isH ? 'h' : 'l',
+                                  nameXMMReg(eregOfRM(modrm)),
+                                  nameXMMReg(gregOfRM(modrm)));
+         delta += 3+1;
+      } else {
+         addr = disAMode ( &alen, sorb, delta+3, dis_buf );
+         assign( sV, loadLE(Ity_V128, mkexpr(addr)) );
+         DIP("movs%cdup %s,%s\n", isH ? 'h' : 'l',
+	     dis_buf,
+             nameXMMReg(gregOfRM(modrm)));
+         delta += 3+alen;
+      }
+
+      breakup128to32s( sV, &s3, &s2, &s1, &s0 );
+      putXMMReg( gregOfRM(modrm), 
+                 isH ? mk128from32s( s3, s3, s1, s1 )
+                     : mk128from32s( s2, s2, s0, s0 ) );
+      goto decode_success;
+   }
+
+   /* F2 0F D0 = ADDSUBPS -- 32x4 +/-/+/- from E (mem or xmm) to G (xmm). */
+   if (sz == 4 && insn[0] == 0xF2 && insn[1] == 0x0F && insn[2] == 0xD0) {
+      IRTemp a3, a2, a1, a0, s3, s2, s1, s0;
+      IRTemp eV   = newTemp(Ity_V128);
+      IRTemp gV   = newTemp(Ity_V128);
+      IRTemp addV = newTemp(Ity_V128);
+      IRTemp subV = newTemp(Ity_V128);
+      a3 = a2 = a1 = a0 = s3 = s2 = s1 = s0 = IRTemp_INVALID;
+
+      modrm = insn[3];
+      if (epartIsReg(modrm)) {
+         assign( eV, getXMMReg( eregOfRM(modrm)) );
+         DIP("addsubps %s,%s\n", nameXMMReg(eregOfRM(modrm)),
+                                 nameXMMReg(gregOfRM(modrm)));
+         delta += 3+1;
+      } else {
+         addr = disAMode ( &alen, sorb, delta+3, dis_buf );
+         assign( eV, loadLE(Ity_V128, mkexpr(addr)) );
+         DIP("addsubps %s,%s\n", dis_buf,
+                                 nameXMMReg(gregOfRM(modrm)));
+         delta += 3+alen;
+      }
+
+      assign( gV, getXMMReg(gregOfRM(modrm)) );
+
+      assign( addV, binop(Iop_Add32Fx4, mkexpr(gV), mkexpr(eV)) );
+      assign( subV, binop(Iop_Sub32Fx4, mkexpr(gV), mkexpr(eV)) );
+
+      breakup128to32s( addV, &a3, &a2, &a1, &a0 );
+      breakup128to32s( subV, &s3, &s2, &s1, &s0 );
+
+      putXMMReg( gregOfRM(modrm), mk128from32s( a3, s2, a1, s0 ));
+      goto decode_success;
+   }
+
+   /* ---------------------------------------------------- */
+   /* --- end of the SSE3 decoder.                     --- */
    /* ---------------------------------------------------- */
 
    after_sse_decoders:
@@ -10410,11 +10662,11 @@ DisResult disInstr_X86_WRK (
       DIP("sahf\n");
       break;
 
-//--    case 0x9F: /* LAHF */
-//--       codegen_LAHF ( cb );
-//--       DIP("lahf\n");
-//--       break;
-//-- 
+   case 0x9F: /* LAHF */
+      codegen_LAHF();
+      DIP("lahf\n");
+      break;
+
    case 0x9B: /* FWAIT */
       /* ignore? */
       DIP("fwait\n");
@@ -10486,7 +10738,7 @@ DisResult disInstr_X86_WRK (
       /* It's important that all ArchRegs carry their up-to-date value
          at this point.  So we declare an end-of-block here, which
          forces any TempRegs caching ArchRegs to be flushed. */
-      jmp_lit(Ijk_Syscall,((Addr32)guest_EIP_bbstart)+delta);
+      jmp_lit(Ijk_Sys_int128,((Addr32)guest_EIP_bbstart)+delta);
       dres.whatNext = Dis_StopHere;
       DIP("int $0x80\n");
       break;
@@ -10767,13 +11019,13 @@ DisResult disInstr_X86_WRK (
       delta = dis_op_imm_A( sz, True, Iop_Add8, True, delta, "adc" );
       break;
 
-//--    case 0x1C: /* SBB Ib, AL */
-//--       delta = dis_op_imm_A( 1, SBB, True, delta, "sbb" );
-//--       break;
-//--    case 0x1D: /* SBB Iv, eAX */
-//--       delta = dis_op_imm_A( sz, SBB, True, delta, "sbb" );
-//--       break;
-//-- 
+   case 0x1C: /* SBB Ib, AL */
+      delta = dis_op_imm_A( 1, True, Iop_Sub8, True, delta, "sbb" );
+      break;
+   case 0x1D: /* SBB Iv, eAX */
+      delta = dis_op_imm_A( sz, True, Iop_Sub8, True, delta, "sbb" );
+      break;
+
    case 0x24: /* AND Ib, AL */
       delta = dis_op_imm_A(  1, False, Iop_And8, True, delta, "and" );
       break;
@@ -10824,17 +11076,17 @@ DisResult disInstr_X86_WRK (
    case 0x0B: /* OR Ev,Gv */
       delta = dis_op2_E_G ( sorb, False, Iop_Or8, True, sz, delta, "or" );
       break;
-//-- 
-//--    case 0x12: /* ADC Eb,Gb */
-//--       delta = dis_op2_E_G ( sorb, True, ADC, True, 1, delta, "adc" );
-//--       break;
+
+   case 0x12: /* ADC Eb,Gb */
+      delta = dis_op2_E_G ( sorb, True, Iop_Add8, True, 1, delta, "adc" );
+      break;
    case 0x13: /* ADC Ev,Gv */
       delta = dis_op2_E_G ( sorb, True, Iop_Add8, True, sz, delta, "adc" );
       break;
 
-//--    case 0x1A: /* SBB Eb,Gb */
-//--       delta = dis_op2_E_G ( sorb, True, SBB, True, 1, delta, "sbb" );
-//--       break;
+   case 0x1A: /* SBB Eb,Gb */
+      delta = dis_op2_E_G ( sorb, True, Iop_Sub8, True, 1, delta, "sbb" );
+      break;
    case 0x1B: /* SBB Ev,Gv */
       delta = dis_op2_E_G ( sorb, True, Iop_Sub8, True, sz, delta, "sbb" );
       break;
@@ -11451,78 +11703,102 @@ DisResult disInstr_X86_WRK (
 //-- 
 //--       DIP("xlat%c [ebx]\n", nameISize(sz));
 //--       break;
-//-- 
-//--    /* ------------------------ IN / OUT ----------------------- */
-//-- 
-//--    case 0xE4: /* IN ib, %al        */
-//--    case 0xE5: /* IN ib, %{e}ax     */
-//--    case 0xEC: /* IN (%dx),%al      */
-//--    case 0xED: /* IN (%dx),%{e}ax   */
-//--       t1 = newTemp(cb);
-//--       t2 = newTemp(cb);
-//--       t3 = newTemp(cb);
-//-- 
-//--       uInstr0(cb, CALLM_S, 0);
-//--       /* operand size? */
-//--       uInstr2(cb, MOV,   4, Literal, 0, TempReg, t1);
-//--       uLiteral(cb, ( opc == 0xE4 || opc == 0xEC ) ? 1 : sz);
-//--       uInstr1(cb, PUSH,  4, TempReg, t1);
-//--       /* port number ? */
-//--       if ( opc == 0xE4 || opc == 0xE5 ) {
-//--          abyte = getUChar(eip); eip++;
-//--          uInstr2(cb, MOV,   4, Literal, 0, TempReg, t2);
-//--          uLiteral(cb, abyte);
-//--       }
-//--       else
-//--          uInstr2(cb, GET,   4, ArchReg, R_EDX, TempReg, t2);
-//-- 
-//--       uInstr1(cb, PUSH,  4, TempReg, t2);
-//--       uInstr1(cb, CALLM, 0, Lit16,   VGOFF_(helper_IN));
-//--       uFlagsRWU(cb, FlagsEmpty, FlagsEmpty, FlagsEmpty);
-//--       uInstr1(cb, POP,   4, TempReg, t2);
-//--       uInstr1(cb, CLEAR, 0, Lit16,   4);
-//--       uInstr0(cb, CALLM_E, 0);
-//--       uInstr2(cb, PUT,   4, TempReg, t2, ArchReg, R_EAX);
-//--       if ( opc == 0xE4 || opc == 0xE5 ) {
-//--          DIP("in 0x%x, %%eax/%%ax/%%al\n", getUChar(eip-1) );
-//--       } else {
-//--          DIP("in (%%dx), %%eax/%%ax/%%al\n");
-//--       }
-//--       break;
-//--    case 0xE6: /* OUT %al,ib       */
-//--    case 0xE7: /* OUT %{e}ax,ib    */
-//--    case 0xEE: /* OUT %al,(%dx)    */
-//--    case 0xEF: /* OUT %{e}ax,(%dx) */
-//--       t1 = newTemp(cb);
-//--       t2 = newTemp(cb);
-//--       t3 = newTemp(cb);
-//-- 
-//--       uInstr0(cb, CALLM_S, 0);
-//--       /* operand size? */
-//--       uInstr2(cb, MOV,   4, Literal, 0, TempReg, t1);
-//--       uLiteral(cb, ( opc == 0xE6 || opc == 0xEE ) ? 1 : sz);
-//--       uInstr1(cb, PUSH,  4, TempReg, t1);
-//--       /* port number ? */
-//--       if ( opc == 0xE6 || opc == 0xE7 ) {
-//--          abyte = getUChar(eip); eip++;
-//--          uInstr2(cb, MOV,   4, Literal, 0, TempReg, t2);
-//--          uLiteral(cb, abyte);
-//--       }
-//--       else
-//--          uInstr2(cb, GET,   4, ArchReg, R_EDX, TempReg, t2);
-//--       uInstr1(cb, PUSH,  4, TempReg, t2);
-//--       uInstr2(cb, GET,   4, ArchReg, R_EAX, TempReg, t3);
-//--       uInstr1(cb, PUSH,  4, TempReg, t3);
-//--       uInstr1(cb, CALLM, 0, Lit16,   VGOFF_(helper_OUT));
-//--       uFlagsRWU(cb, FlagsEmpty, FlagsEmpty, FlagsEmpty);
-//--       uInstr1(cb, CLEAR,  0, Lit16,  12);
-//--       uInstr0(cb, CALLM_E, 0);
-//--       if ( opc == 0xE4 || opc == 0xE5 ) {
-//--          DIP("out %%eax/%%ax/%%al, 0x%x\n", getUChar(eip-1) );
-//--       } else {
-//--          DIP("out %%eax/%%ax/%%al, (%%dx)\n");
-//--       }
-//--       break;
+
+   /* ------------------------ IN / OUT ----------------------- */
+
+   case 0xE4: /* IN imm8, AL */
+      sz = 1; 
+      t1 = newTemp(Ity_I32);
+      abyte = getIByte(delta); delta++;
+      assign(t1, mkU32( abyte & 0xFF ));
+      DIP("in%c $%d,%s\n", nameISize(sz), (Int)abyte, nameIReg(sz,R_EAX));
+      goto do_IN;
+   case 0xE5: /* IN imm8, eAX */
+      vassert(sz == 2 || sz == 4);
+      t1 = newTemp(Ity_I32);
+      abyte = getIByte(delta); delta++;
+      assign(t1, mkU32( abyte & 0xFF ));
+      DIP("in%c $%d,%s\n", nameISize(sz), (Int)abyte, nameIReg(sz,R_EAX));
+      goto do_IN;
+   case 0xEC: /* IN %DX, AL */
+      sz = 1; 
+      t1 = newTemp(Ity_I32);
+      assign(t1, unop(Iop_16Uto32, getIReg(2, R_EDX)));
+      DIP("in%c %s,%s\n", nameISize(sz), nameIReg(2,R_EDX), 
+                                         nameIReg(sz,R_EAX));
+      goto do_IN;
+   case 0xED: /* IN %DX, eAX */
+      vassert(sz == 2 || sz == 4);
+      t1 = newTemp(Ity_I32);
+      assign(t1, unop(Iop_16Uto32, getIReg(2, R_EDX)));
+      DIP("in%c %s,%s\n", nameISize(sz), nameIReg(2,R_EDX), 
+                                         nameIReg(sz,R_EAX));
+      goto do_IN;
+   do_IN: {
+      /* At this point, sz indicates the width, and t1 is a 32-bit
+         value giving port number. */
+      IRDirty* d;
+      vassert(sz == 1 || sz == 2 || sz == 4);
+      ty = szToITy(sz);
+      t2 = newTemp(Ity_I32);
+      d = unsafeIRDirty_1_N( 
+             t2,
+             0/*regparms*/, 
+             "x86g_dirtyhelper_IN", 
+             &x86g_dirtyhelper_IN,
+             mkIRExprVec_2( mkexpr(t1), mkU32(sz) )
+          );
+      /* do the call, dumping the result in t2. */
+      stmt( IRStmt_Dirty(d) );
+      putIReg(sz, R_EAX, narrowTo( ty, mkexpr(t2) ) );
+      break;
+   }
+
+   case 0xE6: /* OUT AL, imm8 */
+      sz = 1;
+      t1 = newTemp(Ity_I32);
+      abyte = getIByte(delta); delta++;
+      assign( t1, mkU32( abyte & 0xFF ) );
+      DIP("out%c %s,$%d\n", nameISize(sz), nameIReg(sz,R_EAX), (Int)abyte);
+      goto do_OUT;
+   case 0xE7: /* OUT eAX, imm8 */
+      vassert(sz == 2 || sz == 4);
+      t1 = newTemp(Ity_I32);
+      abyte = getIByte(delta); delta++;
+      assign( t1, mkU32( abyte & 0xFF ) );
+      DIP("out%c %s,$%d\n", nameISize(sz), nameIReg(sz,R_EAX), (Int)abyte);
+      goto do_OUT;
+   case 0xEE: /* OUT AL, %DX */
+      sz = 1;
+      t1 = newTemp(Ity_I32);
+      assign( t1, unop(Iop_16Uto32, getIReg(2, R_EDX)) );
+      DIP("out%c %s,%s\n", nameISize(sz), nameIReg(sz,R_EAX),
+                                          nameIReg(2,R_EDX));
+      goto do_OUT;
+   case 0xEF: /* OUT eAX, %DX */
+      vassert(sz == 2 || sz == 4);
+      t1 = newTemp(Ity_I32);
+      assign( t1, unop(Iop_16Uto32, getIReg(2, R_EDX)) );
+      DIP("out%c %s,%s\n", nameISize(sz), nameIReg(sz,R_EAX),
+                                          nameIReg(2,R_EDX));
+      goto do_OUT;
+   do_OUT: {
+      /* At this point, sz indicates the width, and t1 is a 32-bit
+         value giving port number. */
+      IRDirty* d;
+      vassert(sz == 1 || sz == 2 || sz == 4);
+      ty = szToITy(sz);
+      d = unsafeIRDirty_0_N( 
+             0/*regparms*/, 
+             "x86g_dirtyhelper_OUT", 
+             &x86g_dirtyhelper_OUT,
+             mkIRExprVec_3( mkexpr(t1),
+                            widenUto32( getIReg(sz, R_EAX) ), 
+                            mkU32(sz) )
+          );
+      stmt( IRStmt_Dirty(d) );
+      break;
+   }
 
    /* ------------------------ (Grp1 extensions) ---------- */
 
@@ -11972,12 +12248,12 @@ DisResult disInstr_X86_WRK (
                             &x86g_dirtyhelper_RDTSC, 
                             args 
                          );
-          /* execute the dirty call, dumping the result in val. */
-          stmt( IRStmt_Dirty(d) );
-          putIReg(4, R_EDX, unop(Iop_64HIto32, mkexpr(val)));
-          putIReg(4, R_EAX, unop(Iop_64to32, mkexpr(val)));
-          DIP("rdtsc\n");
-          break;
+         /* execute the dirty call, dumping the result in val. */
+         stmt( IRStmt_Dirty(d) );
+         putIReg(4, R_EDX, unop(Iop_64HIto32, mkexpr(val)));
+         putIReg(4, R_EAX, unop(Iop_64to32, mkexpr(val)));
+         DIP("rdtsc\n");
+         break;
       }
 
       /* =-=-=-=-=-=-=-=-=- PUSH/POP Sreg =-=-=-=-=-=-=-=-=-= */
@@ -12059,6 +12335,26 @@ DisResult disInstr_X86_WRK (
                     sorb, delta, modrm, sz, 
                     getIReg(1,R_ECX), False, /* not literal */
                     "%cl", False );
+         break;
+
+      /* =-=-=-=-=-=-=-=-=- SYSENTER -=-=-=-=-=-=-=-=-=-= */
+
+      case 0x34:
+         /* Simple implementation needing a long explaination.
+
+            sysenter is a kind of syscall entry.  The key thing here
+            is that the return address is not known -- that is
+            something that is beyond Vex's knowledge.  So this IR
+            forces a return to the scheduler, which can do what it
+            likes to simulate the systenter, but it MUST set this
+            thread's guest_EIP field with the continuation address
+            before resuming execution.  If that doesn't happen, the
+            thread will jump to address zero, which is probably
+            fatal. 
+         */ 
+         jmp_lit(Ijk_Sys_sysenter, 0/*bogus next EIP value*/);
+         dres.whatNext = Dis_StopHere;
+         DIP("sysenter");
          break;
 
       /* =-=-=-=-=-=-=-=-=- XADD -=-=-=-=-=-=-=-=-=-= */

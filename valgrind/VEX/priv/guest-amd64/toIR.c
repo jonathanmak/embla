@@ -93,6 +93,35 @@
 //..    should ever become relevant).
 */
 
+/* Notes re address size overrides (0x67).
+
+   According to the AMD documentation (24594 Rev 3.09, Sept 2003,
+   "AMD64 Architecture Programmer's Manual Volume 3: General-Purpose
+   and System Instructions"), Section 1.2.3 ("Address-Size Override
+   Prefix"):
+
+   0x67 applies to all explicit memory references, causing the top
+   32 bits of the effective address to become zero.
+
+   0x67 has no effect on stack references (push/pop); these always
+   use a 64-bit address.
+
+   0x67 changes the interpretation of instructions which implicitly
+   reference RCX/RSI/RDI, so that in fact ECX/ESI/EDI are used
+   instead.  These are:
+
+      cmp{s,sb,sw,sd,sq}
+      in{s,sb,sw,sd}
+      jcxz, jecxz, jrcxz
+      lod{s,sb,sw,sd,sq}
+      loop{,e,bz,be,z}
+      mov{s,sb,sw,sd,sq}
+      out{s,sb,sw,sd}
+      rep{,e,ne,nz}
+      sca{s,sb,sw,sd,sq}
+      sto{s,sb,sw,sd,sq}
+      xlat{,b} */
+
 /* Translates AMD64 code to IR. */
 
 #include "libvex_basictypes.h"
@@ -1900,15 +1929,18 @@ HChar* sorbTxt ( Prefix pfx )
 
 /* 'virtual' is an IRExpr* holding a virtual address.  Convert it to a
    linear address by adding any required segment override as indicated
-   by sorb. */
+   by sorb, and also dealing with any address size override
+   present. */
 static
-IRExpr* handleSegOverride ( Prefix pfx, IRExpr* virtual )
+IRExpr* handleAddrOverrides ( Prefix pfx, IRExpr* virtual )
 {
+   /* --- segment overrides --- */
+
    if (pfx & PFX_FS) {
       /* Note that this is a linux-kernel specific hack that relies
          on the assumption that %fs is always zero. */
       /* return virtual + guest_FS_ZERO. */
-      return binop(Iop_Add64, virtual, IRExpr_Get(OFFB_FS_ZERO, Ity_I64));
+      virtual = binop(Iop_Add64, virtual, IRExpr_Get(OFFB_FS_ZERO, Ity_I64));
    }
 
    if (pfx & PFX_GS) {
@@ -1916,6 +1948,11 @@ IRExpr* handleSegOverride ( Prefix pfx, IRExpr* virtual )
    }
 
    /* cs, ds, es and ss are simply ignored in 64-bit mode. */
+
+   /* --- address size override --- */
+   if (haveASO(pfx))
+      virtual = unop(Iop_32Uto64, unop(Iop_64to32, virtual));
+
    return virtual;
 }
 
@@ -1933,7 +1970,7 @@ IRExpr* handleSegOverride ( Prefix pfx, IRExpr* virtual )
 //..       case 0x26: sreg = R_ES; break;
 //..       case 0x64: sreg = R_FS; break;
 //..       case 0x65: sreg = R_GS; break;
-//..       default: vpanic("handleSegOverride(x86,guest)");
+//..       default: vpanic("handleAddrOverrides(x86,guest)");
 //..    }
 //.. 
 //..    hWordTy = sizeof(HWord)==4 ? Ity_I32 : Ity_I64;
@@ -2033,7 +2070,7 @@ IRTemp disAMode ( Int* len, Prefix pfx, Long delta,
            DIS(buf, "%s(%s)", sorbTxt(pfx), nameIRegRexB(8,pfx,rm));
            *len = 1;
            return disAMode_copy2tmp(
-                  handleSegOverride(pfx, getIRegRexB(8,pfx,rm)));
+                  handleAddrOverrides(pfx, getIRegRexB(8,pfx,rm)));
          }
 
       /* REX.B==0: d8(%rax) ... d8(%rdi), not including d8(%rsp) 
@@ -2050,7 +2087,7 @@ IRTemp disAMode ( Int* len, Prefix pfx, Long delta,
            }
            *len = 2;
            return disAMode_copy2tmp(
-                  handleSegOverride(pfx,
+                  handleAddrOverrides(pfx,
                      binop(Iop_Add64,getIRegRexB(8,pfx,rm),mkU64(d))));
          }
 
@@ -2064,7 +2101,7 @@ IRTemp disAMode ( Int* len, Prefix pfx, Long delta,
            DIS(buf, "%s%lld(%s)", sorbTxt(pfx), d, nameIRegRexB(8,pfx,rm));
            *len = 5;
            return disAMode_copy2tmp(
-                  handleSegOverride(pfx,
+                  handleAddrOverrides(pfx,
                      binop(Iop_Add64,getIRegRexB(8,pfx,rm),mkU64(d))));
          }
 
@@ -2089,7 +2126,7 @@ IRTemp disAMode ( Int* len, Prefix pfx, Long delta,
            guest_RIP_next_assumed = guest_RIP_bbstart 
                                     + delta+4 + extra_bytes;
            return disAMode_copy2tmp( 
-                     handleSegOverride(pfx, 
+                     handleAddrOverrides(pfx, 
                         binop(Iop_Add64, mkU64(guest_RIP_next_assumed), 
                                          mkU64(d))));
          }
@@ -2133,7 +2170,7 @@ IRTemp disAMode ( Int* len, Prefix pfx, Long delta,
             *len = 2;
             return
                disAMode_copy2tmp( 
-               handleSegOverride(pfx,
+               handleAddrOverrides(pfx,
                   binop(Iop_Add64, 
                         getIRegRexB(8,pfx,base_r),
                         binop(Iop_Shl64, getIReg64rexX(pfx,index_r),
@@ -2147,7 +2184,7 @@ IRTemp disAMode ( Int* len, Prefix pfx, Long delta,
             *len = 6;
             return
                disAMode_copy2tmp(
-               handleSegOverride(pfx, 
+               handleAddrOverrides(pfx, 
                   binop(Iop_Add64,
                         binop(Iop_Shl64, getIReg64rexX(pfx,index_r), 
                                          mkU8(scale)),
@@ -2158,7 +2195,7 @@ IRTemp disAMode ( Int* len, Prefix pfx, Long delta,
             DIS(buf, "%s(%s)", sorbTxt(pfx), nameIRegRexB(8,pfx,base_r));
             *len = 2;
             return disAMode_copy2tmp(
-                   handleSegOverride(pfx, getIRegRexB(8,pfx,base_r)));
+                   handleAddrOverrides(pfx, getIRegRexB(8,pfx,base_r)));
          }
 
          if (index_is_SP && base_is_BPor13) {
@@ -2166,7 +2203,7 @@ IRTemp disAMode ( Int* len, Prefix pfx, Long delta,
             DIS(buf, "%s%lld", sorbTxt(pfx), d);
             *len = 6;
             return disAMode_copy2tmp(
-                   handleSegOverride(pfx, mkU64(d)));
+                   handleAddrOverrides(pfx, mkU64(d)));
          }
 
          vassert(0);
@@ -2193,7 +2230,7 @@ IRTemp disAMode ( Int* len, Prefix pfx, Long delta,
                                    d, nameIRegRexB(8,pfx,base_r));
             *len = 3;
             return disAMode_copy2tmp(
-                   handleSegOverride(pfx, 
+                   handleAddrOverrides(pfx, 
                       binop(Iop_Add64, getIRegRexB(8,pfx,base_r), mkU64(d)) ));
          } else {
             if (scale == 0) {
@@ -2208,7 +2245,7 @@ IRTemp disAMode ( Int* len, Prefix pfx, Long delta,
             *len = 3;
             return 
                 disAMode_copy2tmp(
-                handleSegOverride(pfx,
+                handleAddrOverrides(pfx,
                   binop(Iop_Add64,
                         binop(Iop_Add64, 
                               getIRegRexB(8,pfx,base_r), 
@@ -2240,7 +2277,7 @@ IRTemp disAMode ( Int* len, Prefix pfx, Long delta,
                                    d, nameIRegRexB(8,pfx,base_r));
             *len = 6;
             return disAMode_copy2tmp(
-                   handleSegOverride(pfx, 
+                   handleAddrOverrides(pfx, 
                       binop(Iop_Add64, getIRegRexB(8,pfx,base_r), mkU64(d)) ));
          } else {
             if (scale == 0) {
@@ -2255,7 +2292,7 @@ IRTemp disAMode ( Int* len, Prefix pfx, Long delta,
             *len = 6;
             return 
                 disAMode_copy2tmp(
-                handleSegOverride(pfx,
+                handleAddrOverrides(pfx,
                   binop(Iop_Add64,
                         binop(Iop_Add64, 
                               getIRegRexB(8,pfx,base_r), 
@@ -4977,7 +5014,8 @@ ULong dis_FPU ( /*OUT*/Bool* decode_ok,
                IRDirty* d = unsafeIRDirty_1_N ( 
                                val, 
                                0/*regparms*/, 
-                               "amd64g_loadF80le", &amd64g_loadF80le, 
+                               "amd64g_dirtyhelper_loadF80le", 
+                               &amd64g_dirtyhelper_loadF80le, 
                                args 
                             );
                /* declare that we're reading memory */
@@ -5004,7 +5042,8 @@ ULong dis_FPU ( /*OUT*/Bool* decode_ok,
 
                IRDirty* d = unsafeIRDirty_0_N ( 
                                0/*regparms*/, 
-                               "amd64g_storeF80le", &amd64g_storeF80le,
+                               "amd64g_dirtyhelper_storeF80le", 
+                               &amd64g_dirtyhelper_storeF80le,
                                args 
                             );
                /* declare we're writing memory */
@@ -5073,45 +5112,45 @@ ULong dis_FPU ( /*OUT*/Bool* decode_ok,
                DIP("fnclex\n");
                break;
 
-//..             case 0xE3: {
-//..                /* Uses dirty helper: 
-//..                      void x86g_do_FINIT ( VexGuestX86State* ) */
-//..                IRDirty* d  = unsafeIRDirty_0_N ( 
-//..                                 0/*regparms*/, 
-//..                                 "x86g_dirtyhelper_FINIT", 
-//..                                 &x86g_dirtyhelper_FINIT,
-//..                                 mkIRExprVec_0()
-//..                              );
-//..                d->needsBBP = True;
-//.. 
-//..                /* declare we're writing guest state */
-//..                d->nFxState = 5;
-//.. 
-//..                d->fxState[0].fx     = Ifx_Write;
-//..                d->fxState[0].offset = OFFB_FTOP;
-//..                d->fxState[0].size   = sizeof(UInt);
-//.. 
-//..                d->fxState[1].fx     = Ifx_Write;
-//..                d->fxState[1].offset = OFFB_FPREGS;
-//..                d->fxState[1].size   = 8 * sizeof(ULong);
-//.. 
-//..                d->fxState[2].fx     = Ifx_Write;
-//..                d->fxState[2].offset = OFFB_FPTAGS;
-//..                d->fxState[2].size   = 8 * sizeof(UChar);
-//.. 
-//..                d->fxState[3].fx     = Ifx_Write;
-//..                d->fxState[3].offset = OFFB_FPROUND;
-//..                d->fxState[3].size   = sizeof(UInt);
-//.. 
-//..                d->fxState[4].fx     = Ifx_Write;
-//..                d->fxState[4].offset = OFFB_FC3210;
-//..                d->fxState[4].size   = sizeof(UInt);
-//.. 
-//..                stmt( IRStmt_Dirty(d) );
-//.. 
-//..                DIP("fninit\n");
-//..                break;
-//..             }
+            case 0xE3: {
+               /* Uses dirty helper: 
+                     void amd64g_do_FINIT ( VexGuestAMD64State* ) */
+               IRDirty* d  = unsafeIRDirty_0_N ( 
+                                0/*regparms*/, 
+                                "amd64g_dirtyhelper_FINIT", 
+                                &amd64g_dirtyhelper_FINIT,
+                                mkIRExprVec_0()
+                             );
+               d->needsBBP = True;
+
+               /* declare we're writing guest state */
+               d->nFxState = 5;
+
+               d->fxState[0].fx     = Ifx_Write;
+               d->fxState[0].offset = OFFB_FTOP;
+               d->fxState[0].size   = sizeof(UInt);
+
+               d->fxState[1].fx     = Ifx_Write;
+               d->fxState[1].offset = OFFB_FPREGS;
+               d->fxState[1].size   = 8 * sizeof(ULong);
+
+               d->fxState[2].fx     = Ifx_Write;
+               d->fxState[2].offset = OFFB_FPTAGS;
+               d->fxState[2].size   = 8 * sizeof(UChar);
+
+               d->fxState[3].fx     = Ifx_Write;
+               d->fxState[3].offset = OFFB_FPROUND;
+               d->fxState[3].size   = sizeof(ULong);
+
+               d->fxState[4].fx     = Ifx_Write;
+               d->fxState[4].offset = OFFB_FC3210;
+               d->fxState[4].size   = sizeof(ULong);
+
+               stmt( IRStmt_Dirty(d) );
+
+               DIP("fninit\n");
+               break;
+            }
 
             case 0xE8 ... 0xEF: /* FUCOMI %st(0),%st(?) */
                fp_do_ucomi_ST0_STi( (UInt)modrm - 0xE8, False );
@@ -5385,7 +5424,7 @@ ULong dis_FPU ( /*OUT*/Bool* decode_ok,
 
             case 0xD0 ... 0xD7: /* FST %st(0),%st(?) */
                r_dst = (UInt)modrm - 0xD0;
-               DIP("fst %%st(0),%%st(%d)\n", r_dst);
+               DIP("fst %%st(0),%%st(%u)\n", r_dst);
                /* P4 manual says: "If the destination operand is a
                   non-empty register, the invalid-operation exception
                   is not generated.  Hence put_ST_UNCHECKED. */
@@ -5402,32 +5441,34 @@ ULong dis_FPU ( /*OUT*/Bool* decode_ok,
                fp_pop();
                break;
 
-//..             case 0xE0 ... 0xE7: /* FUCOM %st(0),%st(?) */
-//..                r_dst = (UInt)modrm - 0xE0;
-//..                DIP("fucom %%st(0),%%st(%d)\n", r_dst);
-//..                /* This forces C1 to zero, which isn't right. */
-//..                put_C3210( 
-//..                    binop( Iop_And32,
-//..                           binop(Iop_Shl32, 
-//..                                 binop(Iop_CmpF64, get_ST(0), get_ST(r_dst)),
-//..                                 mkU8(8)),
-//..                           mkU32(0x4500)
-//..                    ));
-//..                break;
-//.. 
-//..             case 0xE8 ... 0xEF: /* FUCOMP %st(0),%st(?) */
-//..                r_dst = (UInt)modrm - 0xE8;
-//..                DIP("fucomp %%st(0),%%st(%d)\n", r_dst);
-//..                /* This forces C1 to zero, which isn't right. */
-//..                put_C3210( 
-//..                    binop( Iop_And32,
-//..                           binop(Iop_Shl32, 
-//..                                 binop(Iop_CmpF64, get_ST(0), get_ST(r_dst)),
-//..                                 mkU8(8)),
-//..                           mkU32(0x4500)
-//..                    ));
-//..                fp_pop();
-//..                break;
+            case 0xE0 ... 0xE7: /* FUCOM %st(0),%st(?) */
+               r_dst = (UInt)modrm - 0xE0;
+               DIP("fucom %%st(0),%%st(%u)\n", r_dst);
+               /* This forces C1 to zero, which isn't right. */
+               put_C3210(
+                   unop(Iop_32Uto64, 
+                   binop( Iop_And32,
+                          binop(Iop_Shl32, 
+                                binop(Iop_CmpF64, get_ST(0), get_ST(r_dst)),
+                                mkU8(8)),
+                          mkU32(0x4500)
+                   )));
+               break;
+
+            case 0xE8 ... 0xEF: /* FUCOMP %st(0),%st(?) */
+               r_dst = (UInt)modrm - 0xE8;
+               DIP("fucomp %%st(0),%%st(%u)\n", r_dst);
+               /* This forces C1 to zero, which isn't right. */
+               put_C3210( 
+                   unop(Iop_32Uto64, 
+                   binop( Iop_And32,
+                          binop(Iop_Shl32, 
+                                binop(Iop_CmpF64, get_ST(0), get_ST(r_dst)),
+                                mkU8(8)),
+                          mkU32(0x4500)
+                   )));
+               fp_pop();
+               break;
 
             default:
                goto decode_fail;
@@ -6356,128 +6397,219 @@ ULong dis_MMX ( Bool* decode_ok, Prefix pfx, Int sz, Long delta )
 }
 
 
-//.. /*------------------------------------------------------------*/
-//.. /*--- More misc arithmetic and other obscure insns.        ---*/
-//.. /*------------------------------------------------------------*/
-//.. 
-//.. /* Double length left and right shifts.  Apparently only required in
-//..    v-size (no b- variant). */
-//.. static
-//.. UInt dis_SHLRD_Gv_Ev ( UChar sorb,
-//..                        Long delta, UChar modrm,
-//..                        Int sz,
-//..                        IRExpr* shift_amt,
-//..                        Bool amt_is_literal,
-//..                        Char* shift_amt_txt,
-//..                        Bool left_shift )
-//.. {
-//..    /* shift_amt :: Ity_I8 is the amount to shift.  shift_amt_txt is used
-//..       for printing it.   And eip on entry points at the modrm byte. */
-//..    Int len;
-//..    HChar dis_buf[50];
-//.. 
-//..    IRType ty       = szToITy(sz);
-//..    IRTemp gsrc     = newTemp(ty);
-//..    IRTemp esrc     = newTemp(ty);
-//..    IRTemp addr     = IRTemp_INVALID;
-//..    IRTemp tmpSH    = newTemp(Ity_I8);
-//..    IRTemp tmpL     = IRTemp_INVALID;
-//..    IRTemp tmpRes   = IRTemp_INVALID;
-//..    IRTemp tmpSubSh = IRTemp_INVALID;
-//..    IROp   mkpair;
-//..    IROp   getres;
-//..    IROp   shift;
-//..    IRExpr* mask = NULL;
-//.. 
-//..    vassert(sz == 2 || sz == 4);
-//.. 
-//..    /* The E-part is the destination; this is shifted.  The G-part
-//..       supplies bits to be shifted into the E-part, but is not
-//..       changed.  
-//.. 
-//..       If shifting left, form a double-length word with E at the top
-//..       and G at the bottom, and shift this left.  The result is then in
-//..       the high part.
-//.. 
-//..       If shifting right, form a double-length word with G at the top
-//..       and E at the bottom, and shift this right.  The result is then
-//..       at the bottom.  */
-//.. 
-//..    /* Fetch the operands. */
-//.. 
-//..    assign( gsrc, getIReg(sz, gregOfRM(modrm)) );
-//.. 
-//..    if (epartIsReg(modrm)) {
-//..       delta++;
-//..       assign( esrc, getIReg(sz, eregOfRM(modrm)) );
-//..       DIP("sh%cd%c %s, %s, %s\n",
-//..           ( left_shift ? 'l' : 'r' ), nameISize(sz), 
-//..           shift_amt_txt,
-//..           nameIReg(sz, gregOfRM(modrm)), nameIReg(sz, eregOfRM(modrm)));
-//..    } else {
-//..       addr = disAMode ( &len, sorb, delta, dis_buf );
-//..       delta += len;
-//..       assign( esrc, loadLE(ty, mkexpr(addr)) );
-//..       DIP("sh%cd%c %s, %s, %s\n", 
-//..           ( left_shift ? 'l' : 'r' ), nameISize(sz), 
-//..           shift_amt_txt,
-//..           nameIReg(sz, gregOfRM(modrm)), dis_buf);
-//..    }
-//.. 
-//..    /* Round up the relevant primops. */
-//.. 
-//..    if (sz == 4) {
-//..       tmpL     = newTemp(Ity_I64);
-//..       tmpRes   = newTemp(Ity_I32);
-//..       tmpSubSh = newTemp(Ity_I32);
-//..       mkpair   = Iop_32HLto64;
-//..       getres   = left_shift ? Iop_64HIto32 : Iop_64to32;
-//..       shift    = left_shift ? Iop_Shl64 : Iop_Shr64;
-//..       mask     = mkU8(31);
-//..    } else {
-//..       /* sz == 2 */
-//..       tmpL     = newTemp(Ity_I32);
-//..       tmpRes   = newTemp(Ity_I16);
-//..       tmpSubSh = newTemp(Ity_I16);
-//..       mkpair   = Iop_16HLto32;
-//..       getres   = left_shift ? Iop_32HIto16 : Iop_32to16;
-//..       shift    = left_shift ? Iop_Shl32 : Iop_Shr32;
-//..       mask     = mkU8(15);
-//..    }
-//.. 
-//..    /* Do the shift, calculate the subshift value, and set 
-//..       the flag thunk. */
-//.. 
-//..    assign( tmpSH, binop(Iop_And8, shift_amt, mask) );
-//.. 
-//..    if (left_shift)
-//..       assign( tmpL, binop(mkpair, mkexpr(esrc), mkexpr(gsrc)) );
-//..    else
-//..       assign( tmpL, binop(mkpair, mkexpr(gsrc), mkexpr(esrc)) );
-//.. 
-//..    assign( tmpRes, unop(getres, binop(shift, mkexpr(tmpL), mkexpr(tmpSH)) ) );
-//..    assign( tmpSubSh, 
-//..            unop(getres, 
-//..                 binop(shift, 
-//..                       mkexpr(tmpL), 
-//..                       binop(Iop_And8, 
-//..                             binop(Iop_Sub8, mkexpr(tmpSH), mkU8(1) ),
-//..                             mask))) );
-//.. 
-//..    setFlags_DEP1_DEP2_shift ( left_shift ? Iop_Shl32 : Iop_Sar32,
-//..                               tmpRes, tmpSubSh, ty, tmpSH );
-//.. 
-//..    /* Put result back. */
-//.. 
-//..    if (epartIsReg(modrm)) {
-//..       putIReg(sz, eregOfRM(modrm), mkexpr(tmpRes));
-//..    } else {
-//..       storeLE( mkexpr(addr), mkexpr(tmpRes) );
-//..    }
-//.. 
-//..    if (amt_is_literal) delta++;
-//..    return delta;
-//.. }
+/*------------------------------------------------------------*/
+/*--- More misc arithmetic and other obscure insns.        ---*/
+/*------------------------------------------------------------*/
+
+/* Generate base << amt with vacated places filled with stuff
+   from xtra.  amt guaranteed in 0 .. 63. */
+static 
+IRExpr* shiftL64_with_extras ( IRTemp base, IRTemp xtra, IRTemp amt )
+{
+   /* if   amt == 0 
+      then base
+      else (base << amt) | (xtra >>u (64-amt))
+   */
+   return
+      IRExpr_Mux0X( 
+         mkexpr(amt), 
+         mkexpr(base),
+         binop(Iop_Or64, 
+               binop(Iop_Shl64, mkexpr(base), mkexpr(amt)),
+               binop(Iop_Shr64, mkexpr(xtra), 
+                                binop(Iop_Sub8, mkU8(64), mkexpr(amt)))
+         )
+      );
+}
+
+/* Generate base >>u amt with vacated places filled with stuff
+   from xtra.  amt guaranteed in 0 .. 63. */
+static 
+IRExpr* shiftR64_with_extras ( IRTemp xtra, IRTemp base, IRTemp amt )
+{
+   /* if   amt == 0 
+      then base
+      else (base >>u amt) | (xtra << (64-amt))
+   */
+   return
+      IRExpr_Mux0X( 
+         mkexpr(amt), 
+         mkexpr(base),
+         binop(Iop_Or64, 
+               binop(Iop_Shr64, mkexpr(base), mkexpr(amt)),
+               binop(Iop_Shl64, mkexpr(xtra), 
+                                binop(Iop_Sub8, mkU8(64), mkexpr(amt)))
+         )
+      );
+}
+
+/* Double length left and right shifts.  Apparently only required in
+   v-size (no b- variant). */
+static
+ULong dis_SHLRD_Gv_Ev ( Prefix pfx,
+                        Long delta, UChar modrm,
+                        Int sz,
+                        IRExpr* shift_amt,
+                        Bool amt_is_literal,
+                        HChar* shift_amt_txt,
+                        Bool left_shift )
+{
+   /* shift_amt :: Ity_I8 is the amount to shift.  shift_amt_txt is used
+      for printing it.   And eip on entry points at the modrm byte. */
+   Int len;
+   HChar dis_buf[50];
+
+   IRType ty     = szToITy(sz);
+   IRTemp gsrc   = newTemp(ty);
+   IRTemp esrc   = newTemp(ty);
+   IRTemp addr   = IRTemp_INVALID;
+   IRTemp tmpSH  = newTemp(Ity_I8);
+   IRTemp tmpSS  = newTemp(Ity_I8);
+   IRTemp tmp64  = IRTemp_INVALID;
+   IRTemp res64  = IRTemp_INVALID;
+   IRTemp rss64  = IRTemp_INVALID;
+   IRTemp resTy  = IRTemp_INVALID;
+   IRTemp rssTy  = IRTemp_INVALID;
+   Int    mask   = sz==8 ? 63 : 31;
+
+   vassert(sz == 2 || sz == 4 || sz == 8);
+
+   /* The E-part is the destination; this is shifted.  The G-part
+      supplies bits to be shifted into the E-part, but is not
+      changed.  
+
+      If shifting left, form a double-length word with E at the top
+      and G at the bottom, and shift this left.  The result is then in
+      the high part.
+
+      If shifting right, form a double-length word with G at the top
+      and E at the bottom, and shift this right.  The result is then
+      at the bottom.  */
+
+   /* Fetch the operands. */
+
+   assign( gsrc, getIRegG(sz, pfx, modrm) );
+
+   if (epartIsReg(modrm)) {
+      delta++;
+      assign( esrc, getIRegE(sz, pfx, modrm) );
+      DIP("sh%cd%c %s, %s, %s\n",
+          ( left_shift ? 'l' : 'r' ), nameISize(sz), 
+          shift_amt_txt,
+          nameIRegG(sz, pfx, modrm), nameIRegE(sz, pfx, modrm));
+   } else {
+      addr = disAMode ( &len, pfx, delta, dis_buf, 
+                        /* # bytes following amode */
+                        amt_is_literal ? 1 : 0 );
+      delta += len;
+      assign( esrc, loadLE(ty, mkexpr(addr)) );
+      DIP("sh%cd%c %s, %s, %s\n", 
+          ( left_shift ? 'l' : 'r' ), nameISize(sz), 
+          shift_amt_txt,
+          nameIRegG(sz, pfx, modrm), dis_buf);
+   }
+
+   /* Calculate the masked shift amount (tmpSH), the masked subshift
+      amount (tmpSS), the shifted value (res64) and the subshifted
+      value (rss64). */
+
+   assign( tmpSH, binop(Iop_And8, shift_amt, mkU8(mask)) );
+   assign( tmpSS, binop(Iop_And8, 
+                        binop(Iop_Sub8, mkexpr(tmpSH), mkU8(1) ),
+                        mkU8(mask)));
+
+   tmp64 = newTemp(Ity_I64);
+   res64 = newTemp(Ity_I64);
+   rss64 = newTemp(Ity_I64);
+
+   if (sz == 2 || sz == 4) {
+
+      /* G is xtra; E is data */
+      /* what a freaking nightmare: */
+      if (sz == 4 && left_shift) {
+         assign( tmp64, binop(Iop_32HLto64, mkexpr(esrc), mkexpr(gsrc)) );
+         assign( res64, 
+                 binop(Iop_Shr64, 
+                       binop(Iop_Shl64, mkexpr(tmp64), mkexpr(tmpSH)),
+                       mkU8(32)) );
+         assign( rss64, 
+                 binop(Iop_Shr64, 
+                       binop(Iop_Shl64, mkexpr(tmp64), mkexpr(tmpSS)),
+                       mkU8(32)) );
+      }
+      else
+      if (sz == 4 && !left_shift) {
+         assign( tmp64, binop(Iop_32HLto64, mkexpr(gsrc), mkexpr(esrc)) );
+         assign( res64, binop(Iop_Shr64, mkexpr(tmp64), mkexpr(tmpSH)) );
+         assign( rss64, binop(Iop_Shr64, mkexpr(tmp64), mkexpr(tmpSS)) );
+      }
+      else
+      if (sz == 2 && left_shift) {
+         assign( tmp64,
+                 binop(Iop_32HLto64,
+                       binop(Iop_16HLto32, mkexpr(esrc), mkexpr(gsrc)),
+                       binop(Iop_16HLto32, mkexpr(gsrc), mkexpr(gsrc))
+         ));
+	 /* result formed by shifting [esrc'gsrc'gsrc'gsrc] */
+         assign( res64, 
+                 binop(Iop_Shr64, 
+                       binop(Iop_Shl64, mkexpr(tmp64), mkexpr(tmpSH)),
+                       mkU8(48)) );
+         /* subshift formed by shifting [esrc'0000'0000'0000] */
+         assign( rss64, 
+                 binop(Iop_Shr64, 
+                       binop(Iop_Shl64, 
+                             binop(Iop_Shl64, unop(Iop_16Uto64, mkexpr(esrc)),
+                                              mkU8(48)),
+                             mkexpr(tmpSS)),
+                       mkU8(48)) );
+      }
+      else
+      if (sz == 2 && !left_shift) {
+         assign( tmp64,
+                 binop(Iop_32HLto64,
+                       binop(Iop_16HLto32, mkexpr(gsrc), mkexpr(gsrc)),
+                       binop(Iop_16HLto32, mkexpr(gsrc), mkexpr(esrc))
+         ));
+         /* result formed by shifting [gsrc'gsrc'gsrc'esrc] */
+         assign( res64, binop(Iop_Shr64, mkexpr(tmp64), mkexpr(tmpSH)) );
+         /* subshift formed by shifting [0000'0000'0000'esrc] */
+         assign( rss64, binop(Iop_Shr64, 
+                              unop(Iop_16Uto64, mkexpr(esrc)), 
+                              mkexpr(tmpSS)) );
+      }
+
+   } else {
+
+      vassert(sz == 8);
+      if (left_shift) {
+         assign( res64, shiftL64_with_extras( esrc, gsrc, tmpSH ));
+         assign( rss64, shiftL64_with_extras( esrc, gsrc, tmpSS ));
+      } else {
+         assign( res64, shiftR64_with_extras( gsrc, esrc, tmpSH ));
+         assign( rss64, shiftR64_with_extras( gsrc, esrc, tmpSS ));
+      }
+
+   }
+
+   resTy = newTemp(ty);
+   rssTy = newTemp(ty);
+   assign( resTy, narrowTo(ty, mkexpr(res64)) );
+   assign( rssTy, narrowTo(ty, mkexpr(rss64)) );
+
+   /* Put result back and write the flags thunk. */
+   setFlags_DEP1_DEP2_shift ( left_shift ? Iop_Shl64 : Iop_Sar64,
+                              resTy, rssTy, ty, tmpSH );
+
+   if (epartIsReg(modrm)) {
+      putIRegE(sz, pfx, modrm, mkexpr(resTy));
+   } else {
+      storeLE( mkexpr(addr), mkexpr(resTy) );
+   }
+
+   if (amt_is_literal) delta++;
+   return delta;
+}
 
 
 /* Handle BT/BTS/BTR/BTC Gv, Ev.  Apparently b-size is not
@@ -7867,10 +7999,8 @@ DisResult disInstr_AMD64_WRK (
    }
 
    not_a_prefix:
-   /* Dump invalid combinations */
-   if (pfx & PFX_ASO) 
-      goto decode_failure; /* don't support address-size override */
 
+   /* Dump invalid combinations */
    n = 0;
    if (pfx & PFX_F2) n++;
    if (pfx & PFX_F3) n++;
@@ -7886,6 +8016,9 @@ DisResult disInstr_AMD64_WRK (
    if (pfx & PFX_SS) n++;
    if (n > 1) 
       goto decode_failure; /* multiple seg overrides == illegal */
+
+   if (pfx & PFX_GS)
+      goto decode_failure; /* legal, but unsupported right now */
 
    /* Set up sz. */
    sz = 4;
@@ -9774,15 +9907,17 @@ DisResult disInstr_AMD64_WRK (
    }
 
    /* 66 0F 29 = MOVAPD -- move from G (xmm) to E (mem or xmm). */
-   if (have66noF2noF3(pfx) && insn[0] == 0x0F && insn[1] == 0x29) {
+   /* 66 0F 11 = MOVUPD -- move from G (xmm) to E (mem or xmm). */
+   if (have66noF2noF3(pfx) && insn[0] == 0x0F 
+       && (insn[1] == 0x29 || insn[1] == 0x11)) {
       modrm = getUChar(delta+2);
       if (epartIsReg(modrm)) {
          /* fall through; awaiting test case */
       } else {
          addr = disAMode ( &alen, pfx, delta+2, dis_buf, 0 );
          storeLE( mkexpr(addr), getXMMReg(gregOfRexRM(pfx,modrm)) );
-         DIP("movapd %s,%s\n", nameXMMReg(gregOfRexRM(pfx,modrm)),
-                               dis_buf );
+         DIP("mov[ua]pd %s,%s\n", nameXMMReg(gregOfRexRM(pfx,modrm)),
+                                  dis_buf );
          delta += 2+alen;
          goto decode_success;
       }
@@ -11511,6 +11646,27 @@ DisResult disInstr_AMD64_WRK (
          goto decode_failure;
       }
 
+   /* ------------------------ INT ------------------------ */
+
+   case 0xCD: { /* INT imm8 */
+      IRJumpKind jk = Ijk_Boring;
+      if (have66orF2orF3(pfx)) goto decode_failure;
+      d64 = getUChar(delta); delta++;
+      switch (d64) {
+         case 32: jk = Ijk_Sys_int32; break;
+         default: goto decode_failure;
+      }
+      guest_RIP_next_mustcheck = True;
+      guest_RIP_next_assumed = guest_RIP_bbstart + delta;
+      jmp_lit(jk, guest_RIP_next_assumed);
+      /* It's important that all ArchRegs carry their up-to-date value
+         at this point.  So we declare an end-of-block here, which
+         forces any TempRegs caching ArchRegs to be flushed. */
+      dres.whatNext = Dis_StopHere;
+      DIP("int $0x%02x\n", (UInt)d64);
+      break;
+   }
+
    /* ------------------------ Jcond, byte offset --------- */
 
    case 0xEB: /* Jb (jump, byte offset) */
@@ -11571,23 +11727,31 @@ DisResult disInstr_AMD64_WRK (
       DIP("j%s-8 0x%llx\n", name_AMD64Condcode(opc - 0x70), d64);
       break;
 
-//..    case 0xE3: /* JECXZ or perhaps JCXZ, depending on OSO ?  Intel
-//..                  manual says it depends on address size override,
-//..                  which doesn't sound right to me. */
-//..       vassert(sz==4); /* possibly also OK for sz==2 */
-//..       d32 = (((Addr32)guest_eip_bbstart)+delta+1) + getSDisp8(delta);
-//..       delta++;
-//..       ty = szToITy(sz);
-//..       stmt( IRStmt_Exit(
-//..                binop(mkSizedOp(ty,Iop_CmpEQ8),
-//..                      getIReg(sz,R_ECX),
-//..                      mkU(ty,0)),
-//..             Ijk_Boring,
-//..             IRConst_U32(d32)) 
-//..           );
-//.. 
-//..       DIP("j%sz 0x%x\n", nameIReg(sz, R_ECX), d32);
-//..       break;
+   case 0xE3: 
+      /* JRCXZ or JECXZ, depending address size override. */
+      if (have66orF2orF3(pfx)) goto decode_failure;
+      d64 = (guest_RIP_bbstart+delta+1) + getSDisp8(delta); 
+      delta++;
+      if (haveASO(pfx)) {
+         /* 32-bit */
+         stmt( IRStmt_Exit( binop(Iop_CmpEQ64, 
+                            unop(Iop_32Uto64, getIReg32(R_RCX)), 
+                            mkU64(0)),
+               Ijk_Boring,
+               IRConst_U64(d64)) 
+             );
+         DIP("jecxz 0x%llx\n", d64);
+      } else {
+         /* 64-bit */
+         stmt( IRStmt_Exit( binop(Iop_CmpEQ64, 
+                                  getIReg64(R_RCX), 
+                                  mkU64(0)),
+               Ijk_Boring,
+               IRConst_U64(d64)) 
+             );
+         DIP("jrcxz 0x%llx\n", d64);
+      }
+      break;
 
    case 0xE0: /* LOOPNE disp8: decrement count, jump if count != 0 && ZF==0 */
    case 0xE1: /* LOOPE  disp8: decrement count, jump if count != 0 && ZF==1 */
@@ -11705,7 +11869,7 @@ DisResult disInstr_AMD64_WRK (
       delta += 8;
       ty = szToITy(sz);
       addr = newTemp(Ity_I64);
-      assign( addr, handleSegOverride(pfx, mkU64(d64)) );
+      assign( addr, handleAddrOverrides(pfx, mkU64(d64)) );
       putIRegRAX(sz, loadLE( ty, mkexpr(addr) ));
       DIP("mov%c %s0x%llx, %s\n", nameISize(sz), 
                                   sorbTxt(pfx), d64,
@@ -11723,7 +11887,7 @@ DisResult disInstr_AMD64_WRK (
       delta += 8;
       ty = szToITy(sz);
       addr = newTemp(Ity_I64);
-      assign( addr, handleSegOverride(pfx, mkU64(d64)) );
+      assign( addr, handleAddrOverrides(pfx, mkU64(d64)) );
       storeLE( mkexpr(addr), getIRegRAX(sz) );
       DIP("mov%c %s, %s0x%llx\n", nameISize(sz), nameIRegRAX(sz),
                                   sorbTxt(pfx), d64);
@@ -12452,6 +12616,8 @@ DisResult disInstr_AMD64_WRK (
    case 0xAE:
    case 0xAF:
       /* F2 AE/AF: repne scasb/repne scas{w,l,q} */
+      if (haveASO(pfx)) 
+         goto decode_failure;
       if (haveF2(pfx) && !haveF3(pfx)) {
          if (opc == 0xAE)
             sz = 1;
@@ -12474,6 +12640,8 @@ DisResult disInstr_AMD64_WRK (
    case 0xA6:
    case 0xA7:
       /* F3 A6/A7: repe cmps/rep cmps{w,l,q} */
+      if (haveASO(pfx)) 
+         goto decode_failure;
       if (haveF3(pfx) && !haveF2(pfx)) {
          if (opc == 0xA6)
             sz = 1;
@@ -12489,6 +12657,8 @@ DisResult disInstr_AMD64_WRK (
    case 0xAA:
    case 0xAB:
       /* F3 AA/AB: rep stosb/rep stos{w,l,q} */
+      if (haveASO(pfx)) 
+         goto decode_failure;
       if (haveF3(pfx) && !haveF2(pfx)) {
          if (opc == 0xAA)
             sz = 1;
@@ -12511,6 +12681,8 @@ DisResult disInstr_AMD64_WRK (
    case 0xA4:
    case 0xA5:
       /* F3 A4: rep movsb */
+      if (haveASO(pfx)) 
+         goto decode_failure;
       if (haveF3(pfx) && !haveF2(pfx)) {
          if (opc == 0xA4)
             sz = 1;
@@ -12602,7 +12774,7 @@ DisResult disInstr_AMD64_WRK (
 //.. //--    case 0xD7: /* XLAT */
 //.. //--       t1 = newTemp(cb); t2 = newTemp(cb);
 //.. //--       uInstr2(cb, GET, sz, ArchReg, R_EBX, TempReg, t1); /* get eBX */
-//.. //--       handleSegOverride( cb, sorb, t1 );               /* make t1 DS:eBX */
+//.. //--       handleAddrOverrides( cb, sorb, t1 );               /* make t1 DS:eBX */
 //.. //--       uInstr2(cb, GET, 1, ArchReg, R_AL, TempReg, t2); /* get AL */
 //.. //--       /* Widen %AL to 32 bits, so it's all defined when we add it. */
 //.. //--       uInstr1(cb, WIDEN, 4, TempReg, t2);
@@ -12908,27 +13080,27 @@ DisResult disInstr_AMD64_WRK (
 
       /* =-=-=-=-=-=-=-=-=- BT/BTS/BTR/BTC =-=-=-=-=-=-= */
 
-      /* All of these are possible at sizes 2, 4 and 8, but until size
-         2 and 4 test cases show up, only handle size 8. */
+      /* All of these are possible at sizes 2, 4 and 8, but until a
+         size 2 test case shows up, only handle sizes 4 and 8. */
 
       case 0xA3: /* BT Gv,Ev */
          if (haveF2orF3(pfx)) goto decode_failure;
-         if (sz != 8) goto decode_failure;
+         if (sz != 8 && sz != 4) goto decode_failure;
          delta = dis_bt_G_E ( pfx, sz, delta, BtOpNone );
          break;
       case 0xB3: /* BTR Gv,Ev */
          if (haveF2orF3(pfx)) goto decode_failure;
-         if (sz != 8) goto decode_failure;
+         if (sz != 8 && sz != 4) goto decode_failure;
          delta = dis_bt_G_E ( pfx, sz, delta, BtOpReset );
          break;
       case 0xAB: /* BTS Gv,Ev */
          if (haveF2orF3(pfx)) goto decode_failure;
-         if (sz != 8) goto decode_failure;
+         if (sz != 8 && sz != 4) goto decode_failure;
          delta = dis_bt_G_E ( pfx, sz, delta, BtOpSet );
          break;
       case 0xBB: /* BTC Gv,Ev */
          if (haveF2orF3(pfx)) goto decode_failure;
-         if (sz != 8) goto decode_failure;
+         if (sz != 8 && sz != 4) goto decode_failure;
          delta = dis_bt_G_E ( pfx, sz, delta, BtOpComp );
          break;
 
@@ -13175,8 +13347,8 @@ DisResult disInstr_AMD64_WRK (
          }
          break;
 
-//..       /* =-=-=-=-=-=-=-=-=- SHLD/SHRD -=-=-=-=-=-=-=-=-= */
-//.. 
+      /* =-=-=-=-=-=-=-=-=- SHLD/SHRD -=-=-=-=-=-=-=-=-= */
+
 //..       case 0xA4: /* SHLDv imm8,Gv,Ev */
 //..          modrm = getUChar(delta);
 //..          d32   = delta + lengthAMode(delta);
@@ -13186,30 +13358,30 @@ DisResult disInstr_AMD64_WRK (
 //..                   mkU8(getUChar(d32)), True, /* literal */
 //..                   dis_buf, True );
 //..          break;
-//..       case 0xA5: /* SHLDv %cl,Gv,Ev */
-//..          modrm = getUChar(delta);
-//..          delta = dis_SHLRD_Gv_Ev ( 
-//..                     sorb, delta, modrm, sz,
-//..                     getIReg(1,R_ECX), False, /* not literal */
-//..                     "%cl", True );
-//..          break;
-//.. 
-//..       case 0xAC: /* SHRDv imm8,Gv,Ev */
-//..          modrm = getUChar(delta);
-//..          d32   = delta + lengthAMode(delta);
-//..          vex_sprintf(dis_buf, "$%d", delta);
-//..          delta = dis_SHLRD_Gv_Ev ( 
-//..                     sorb, delta, modrm, sz, 
-//..                     mkU8(getUChar(d32)), True, /* literal */
-//..                     dis_buf, False );
-//..          break;
-//..       case 0xAD: /* SHRDv %cl,Gv,Ev */
-//..          modrm = getUChar(delta);
-//..          delta = dis_SHLRD_Gv_Ev ( 
-//..                     sorb, delta, modrm, sz, 
-//..                     getIReg(1,R_ECX), False, /* not literal */
-//..                     "%cl", False );
-//..          break;
+      case 0xA5: /* SHLDv %cl,Gv,Ev */
+         modrm = getUChar(delta);
+         delta = dis_SHLRD_Gv_Ev ( 
+                    pfx, delta, modrm, sz,
+                    getIRegCL(), False, /* not literal */
+                    "%cl", True /* left */ );
+         break;
+
+      case 0xAC: /* SHRDv imm8,Gv,Ev */
+         modrm = getUChar(delta);
+         d64   = delta + lengthAMode(pfx, delta);
+         vex_sprintf(dis_buf, "$%d", (Int)getUChar(d64));
+         delta = dis_SHLRD_Gv_Ev ( 
+                    pfx, delta, modrm, sz, 
+                    mkU8(getUChar(d64)), True, /* literal */
+                    dis_buf, False /* right */ );
+         break;
+      case 0xAD: /* SHRDv %cl,Gv,Ev */
+         modrm = getUChar(delta);
+         delta = dis_SHLRD_Gv_Ev ( 
+                    pfx, delta, modrm, sz, 
+                    getIRegCL(), False, /* not literal */
+                    "%cl", False /* right */);
+         break;
 
       /* =-=-=-=-=-=-=-=-=- SYSCALL -=-=-=-=-=-=-=-=-=-= */
       case 0x05: /* SYSCALL */
@@ -13219,10 +13391,10 @@ DisResult disInstr_AMD64_WRK (
          /* It's important that all guest state is up-to-date
             at this point.  So we declare an end-of-block here, which
             forces any cached guest state to be flushed. */
-        jmp_lit(Ijk_Syscall, guest_RIP_next_assumed);
-        dres.whatNext = Dis_StopHere;
-        DIP("syscall\n");
-        break;
+         jmp_lit(Ijk_Sys_syscall, guest_RIP_next_assumed);
+         dres.whatNext = Dis_StopHere;
+         DIP("syscall\n");
+         break;
 
       /* =-=-=-=-=-=-=-=-=- XADD -=-=-=-=-=-=-=-=-=-= */
 

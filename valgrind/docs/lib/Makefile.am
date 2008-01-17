@@ -1,6 +1,6 @@
-EXTRA_DIST = \
-	vg-common.xsl \
-	vg-fo.xsl \
+EXTRA_DIST =        \
+	vg-fo.xsl         \
 	vg-html-chunk.xsl \
-	vg-html-single.xsl \
+	vg-faq2txt.xsl    \
+	line-wrap.xsl     \
 	vg_basic.css

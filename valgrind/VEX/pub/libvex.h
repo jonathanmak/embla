@@ -78,8 +78,9 @@ typedef
       VexSubArchX86_sse1,     /* SSE1 support (Pentium III) */
       VexSubArchX86_sse2,     /* SSE2 support (Pentium 4) */
       VexSubArchARM_v4,       /* ARM version 4 */
-      VexSubArchPPC32_noAV,   /* 32-bit PowerPC, no Altivec */
-      VexSubArchPPC32_AV      /* 32-bit PowerPC with Altivec */
+      VexSubArchPPC32_I,      /* 32-bit PowerPC, no FP, no Altivec */
+      VexSubArchPPC32_FI,     /* 32-bit PowerPC, with FP but no Altivec */
+      VexSubArchPPC32_VFI     /* 32-bit PowerPC, with FP and Altivec */
    }
    VexSubArch;
 
@@ -167,7 +168,30 @@ extern const HChar* LibVEX_Version ( void );
    LibVEX_Translate.  The storage allocated will only stay alive until
    translation of the current basic block is complete.
  */
-extern void* LibVEX_Alloc ( Int nbytes );
+extern HChar* private_LibVEX_alloc_first;
+extern HChar* private_LibVEX_alloc_curr;
+extern HChar* private_LibVEX_alloc_last;
+extern void   private_LibVEX_alloc_OOM(void) __attribute__((noreturn));
+
+static inline void* LibVEX_Alloc ( Int nbytes )
+{
+#if 0
+  /* Nasty debugging hack, do not use. */
+  return malloc(nbytes);
+#else
+   HChar* curr;
+   HChar* next;
+   Int    ALIGN;
+   ALIGN  = sizeof(void*)-1;
+   nbytes = (nbytes + ALIGN) & ~ALIGN;
+   curr   = private_LibVEX_alloc_curr;
+   next   = curr + nbytes;
+   if (next >= private_LibVEX_alloc_last)
+      private_LibVEX_alloc_OOM();
+   private_LibVEX_alloc_curr = next;
+   return curr;
+#endif
+}
 
 /* Show Vex allocation statistics. */
 extern void LibVEX_ShowAllocStats ( void );
@@ -275,14 +299,20 @@ typedef
 
 extern 
 VexTranslateResult LibVEX_Translate (
+
    /* The instruction sets we are translating from and to. */
    VexArch      arch_guest,
    VexArchInfo* archinfo_guest,
    VexArch      arch_host,
    VexArchInfo* archinfo_host,
    /* IN: the block to translate, and its guest address. */
+   /* where are the actual bytes in the host's address space? */
    UChar*  guest_bytes,
+   /* where do the bytes came from in the guest's aspace? */
    Addr64  guest_bytes_addr,
+   /* what guest entry point address do they correspond to? */
+   Addr64  guest_bytes_addr_noredir,
+   /* Is it OK to chase into this guest address? */
    Bool    (*chase_into_ok) ( Addr64 ),
    /* OUT: which bits of guest code actually got translated */
    VexGuestExtents* guest_extents,
@@ -293,8 +323,10 @@ VexTranslateResult LibVEX_Translate (
    Int*    host_bytes_used,
    /* IN: optionally, two instrumentation functions. */
    IRBB*   (*instrument1) ( IRBB*, VexGuestLayout*, 
+                            Addr64, VexGuestExtents*,
                             IRType gWordTy, IRType hWordTy ),
    IRBB*   (*instrument2) ( IRBB*, VexGuestLayout*, 
+                            Addr64, VexGuestExtents*,
                             IRType gWordTy, IRType hWordTy ),
    Bool    cleanup_after_instrumentation,
    /* IN: should this translation be self-checking? */
