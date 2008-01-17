@@ -6,7 +6,7 @@
  <!ENTITY % vg-entities SYSTEM "vg-entities.xml"> %vg-entities;
 ]>
 
-<set lang="en" id="index">
+<set id="index" lang="en">
 
   <setinfo>
     <title>Valgrind Documentation</title>
@@ -14,7 +14,7 @@
     <copyright>
       <year>&vg-lifespan;</year>
       <holder>
-       <link linkend="dist.authors" endterm="dist.authors.title"></link>
+        <link linkend="dist.authors" endterm="dist.authors.title"></link>
       </holder>
     </copyright>
 

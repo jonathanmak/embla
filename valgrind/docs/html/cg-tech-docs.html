@@ -1,12 +1,12 @@
-<html>
+<html xmlns:cf="http://docbook.sourceforge.net/xmlns/chunkfast/1.0">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
 <title>2. How Cachegrind works</title>
 <link rel="stylesheet" href="vg_basic.css" type="text/css">
-<meta name="generator" content="DocBook XSL Stylesheets V1.65.1">
-<link rel="home" href="index.html" title="Valgrind Documentation">
+<meta name="generator" content="DocBook XSL Stylesheets V1.69.0">
+<link rel="start" href="index.html" title="Valgrind Documentation">
 <link rel="up" href="tech-docs.html" title="Valgrind Technical Documentation">
-<link rel="previous" href="mc-tech-docs.html" title="1. The Design and Implementation of Valgrind">
+<link rel="prev" href="mc-tech-docs.html" title="1. The Design and Implementation of Valgrind">
 <link rel="next" href="writing-tools.html" title="3. Writing a New Valgrind Tool">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -18,11 +18,8 @@
 <td width="22px" align="center" valign="middle"><a accesskey="n" href="writing-tools.html"><img src="images/next.png" width="18" height="21" border="0" alt="Next"></a></td>
 </tr></table></div>
 <div class="chapter" lang="en">
-<div class="titlepage">
-<div><div><h2 class="title">
-<a name="cg-tech-docs"></a>2. How Cachegrind works</h2></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h2 class="title">
+<a name="cg-tech-docs"></a>2. How Cachegrind works</h2></div></div></div>
 <div class="toc">
 <p><b>Table of Contents</b></p>
 <dl>
@@ -39,11 +36,8 @@
 </dl>
 </div>
 <div class="sect1" lang="en">
-<div class="titlepage">
-<div><div><h2 class="title" style="clear: both">
-<a name="cg-tech-docs.profiling"></a>2.1. Cache profiling</h2></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="cg-tech-docs.profiling"></a>2.1. Cache profiling</h2></div></div></div>
 <p>[Note: this document is now very old, and a lot of its contents are out
 of date, and misleading.]</p>
 <p>Valgrind is a very nice platform for doing cache profiling
@@ -51,29 +45,26 @@ and other kinds of simulation, because it converts horrible x86
 instructions into nice clean RISC-like UCode.  For example, for
 cache profiling we are interested in instructions that read and
 write memory; in UCode there are only four instructions that do
-this: <tt class="computeroutput">LOAD</tt>,
-<tt class="computeroutput">STORE</tt>,
-<tt class="computeroutput">FPU_R</tt> and
-<tt class="computeroutput">FPU_W</tt>.  By contrast, because of
+this: <code class="computeroutput">LOAD</code>,
+<code class="computeroutput">STORE</code>,
+<code class="computeroutput">FPU_R</code> and
+<code class="computeroutput">FPU_W</code>.  By contrast, because of
 the x86 addressing modes, almost every instruction can read or
 write memory.</p>
 <p>Most of the cache profiling machinery is in the file
-<tt class="filename">vg_cachesim.c</tt>.</p>
+<code class="filename">vg_cachesim.c</code>.</p>
 <p>These notes are a somewhat haphazard guide to how
 Valgrind's cache profiling works.</p>
 </div>
 <div class="sect1" lang="en">
-<div class="titlepage">
-<div><div><h2 class="title" style="clear: both">
-<a name="cg-tech-docs.costcentres"></a>2.2. Cost centres</h2></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="cg-tech-docs.costcentres"></a>2.2. Cost centres</h2></div></div></div>
 <p>Valgrind gathers cache profiling about every instruction
-executed, individually.  Each instruction has a <span><b class="command">cost
-centre</b></span> associated with it.  There are two kinds of cost
+executed, individually.  Each instruction has a <span><strong class="command">cost
+centre</strong></span> associated with it.  There are two kinds of cost
 centre: one for instructions that don't reference memory
-(<tt class="computeroutput">iCC</tt>), and one for instructions
-that do (<tt class="computeroutput">idCC</tt>):</p>
+(<code class="computeroutput">iCC</code>), and one for instructions
+that do (<code class="computeroutput">idCC</code>):</p>
 <pre class="programlisting">
 typedef struct _CC {
   ULong a;
@@ -102,32 +93,32 @@ typedef struct _idCC {
   CC I; 
   CC D; 
 } idCC; </pre>
-<p>Each <tt class="computeroutput">CC</tt> has three fields
-<tt class="computeroutput">a</tt>,
-<tt class="computeroutput">m1</tt>,
-<tt class="computeroutput">m2</tt> for recording references,
+<p>Each <code class="computeroutput">CC</code> has three fields
+<code class="computeroutput">a</code>,
+<code class="computeroutput">m1</code>,
+<code class="computeroutput">m2</code> for recording references,
 level 1 misses and level 2 misses.  Each of these is a 64-bit
-<tt class="computeroutput">ULong</tt> -- the numbers can get
+<code class="computeroutput">ULong</code> -- the numbers can get
 very large, ie. greater than 4.2 billion allowed by a 32-bit
 unsigned int.</p>
-<p>A <tt class="computeroutput">iCC</tt> has one
-<tt class="computeroutput">CC</tt> for instruction cache
-accesses.  A <tt class="computeroutput">idCC</tt> has two, one
+<p>A <code class="computeroutput">iCC</code> has one
+<code class="computeroutput">CC</code> for instruction cache
+accesses.  A <code class="computeroutput">idCC</code> has two, one
 for instruction cache accesses, and one for data cache
 accesses.</p>
-<p>The <tt class="computeroutput">iCC</tt> and
-<tt class="computeroutput">dCC</tt> structs also store
+<p>The <code class="computeroutput">iCC</code> and
+<code class="computeroutput">dCC</code> structs also store
 unchanging information about the instruction:</p>
 <div class="itemizedlist"><ul type="disc">
 <li><p>An instruction-type identification tag (explained
     below)</p></li>
 <li><p>Instruction size</p></li>
 <li><p>Data reference size
-    (<tt class="computeroutput">idCC</tt> only)</p></li>
+    (<code class="computeroutput">idCC</code> only)</p></li>
 <li><p>Instruction address</p></li>
 </ul></div>
 <p>Note that data address is not one of the fields for
-<tt class="computeroutput">idCC</tt>.  This is because for many
+<code class="computeroutput">idCC</code>.  This is because for many
 memory-referencing instructions the data address can change each
 time it's executed (eg. if it uses register-offset addressing).
 We have to give this item to the cache simulation in a different
@@ -136,7 +127,7 @@ instructions do always reference the same address, but we don't
 try to treat them specialy in order to keep things simple.</p>
 <p>Also note that there is only room for recording info about
 one data cache access in an
-<tt class="computeroutput">idCC</tt>.  So what about
+<code class="computeroutput">idCC</code>.  So what about
 instructions that do a read then a write, such as:</p>
 <pre class="programlisting">
 inc %(esi)</pre>
@@ -152,11 +143,8 @@ implementation -- instructions that read and write memory can be
 treated like instructions that read memory.</p>
 </div>
 <div class="sect1" lang="en">
-<div class="titlepage">
-<div><div><h2 class="title" style="clear: both">
-<a name="cg-tech-docs.ccstore"></a>2.3. Storing cost-centres</h2></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="cg-tech-docs.ccstore"></a>2.3. Storing cost-centres</h2></div></div></div>
 <p>Cost centres are stored in a way that makes them very cheap
 to lookup, which is important since one is looked up for every
 original x86 instruction executed.</p>
@@ -184,19 +172,19 @@ INCEIPo   $7</pre>
 requires a preliminary pass to count how many x86 instructions
 were in the basic block, and their types (and thus sizes).  UCode
 translations for single x86 instructions are delimited by the
-<tt class="computeroutput">INCEIPo</tt> instruction, the
+<code class="computeroutput">INCEIPo</code> instruction, the
 argument of which gives the byte size of the instruction (note
 that lazy INCEIP updating is turned off to allow this).</p>
 <p>We can tell if an x86 instruction references memory by
-looking for <tt class="computeroutput">LDL</tt> and
-<tt class="computeroutput">STL</tt> UCode instructions, and thus
+looking for <code class="computeroutput">LDL</code> and
+<code class="computeroutput">STL</code> UCode instructions, and thus
 what kind of cost centre is required.  From this we can determine
 how many cost centres we need for the basic block, and their
 sizes.  We can then allocate them in a single array.</p>
 <p>Consider the example code above.  After the preliminary
 pass, we know we need two cost centres, one
-<tt class="computeroutput">iCC</tt> and one
-<tt class="computeroutput">dCC</tt>.  So we allocate an array to
+<code class="computeroutput">iCC</code> and one
+<code class="computeroutput">dCC</code>.  So we allocate an array to
 store these which looks like this:</p>
 <pre class="programlisting">
 |(uninit)|      tag         (1 byte)
@@ -227,11 +215,8 @@ This makes it easy to dump the information quickly to file at the
 end.</p>
 </div>
 <div class="sect1" lang="en">
-<div class="titlepage">
-<div><div><h2 class="title" style="clear: both">
-<a name="cg-tech-docs.instrum"></a>2.4. Instrumentation</h2></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="cg-tech-docs.instrum"></a>2.4. Instrumentation</h2></div></div></div>
 <p>The instrumentation pass has two main jobs:</p>
 <div class="orderedlist"><ol type="1">
 <li><p>Fill in the gaps in the allocated cost centres.</p></li>
@@ -266,7 +251,7 @@ centre are filled in, for example:</p>
 re-translated; see <a href="cg-tech-docs.html#cg-tech-docs.retranslations">Handling basic block retranslations</a> for
 more information.)</p>
 <p>GCC inserts padding before the
-<tt class="computeroutput">instr_size</tt> field so that it is
+<code class="computeroutput">instr_size</code> field so that it is
 word aligned.</p>
 <p>The instrumentation added to call the cache simulation
 function looks like this (instrumentation is indented to
@@ -303,8 +288,8 @@ STL       t18, (t14)
   POPL      %eax
 INCEIPo   $7</pre>
 <p>Consider the first instruction's UCode.  Each call is
-surrounded by three <tt class="computeroutput">PUSHL</tt> and
-<tt class="computeroutput">POPL</tt> instructions to save and
+surrounded by three <code class="computeroutput">PUSHL</code> and
+<code class="computeroutput">POPL</code> instructions to save and
 restore the caller-save registers.  Then the address of the
 instruction's cost centre is pushed onto the stack, to be the
 first argument to the cache simulation function.  The address is
@@ -313,18 +298,18 @@ through the cost centre array.  This means the cost centre lookup
 for each instruction is almost free (just the cost of pushing an
 argument for a function call).  Then the call to the cache
 simulation function for non-memory-reference instructions is made
-(note that the <tt class="computeroutput">CALLMo</tt>
+(note that the <code class="computeroutput">CALLMo</code>
 UInstruction takes an offset into a table of predefined
 functions; it is not an absolute address), and the single
-argument is <tt class="computeroutput">CLEAR</tt>ed from the
+argument is <code class="computeroutput">CLEAR</code>ed from the
 stack.</p>
 <p>The second instruction's UCode is similar.  The only
 difference is that, as mentioned before, we have to pass the
 address of the data item referenced to the cache simulation
-function too.  This explains the <tt class="computeroutput">MOVL t14,
-t42</tt> and <tt class="computeroutput">PUSHL
-t42</tt> UInstructions.  (Note that the seemingly
-redundant <tt class="computeroutput">MOV</tt>ing will probably
+function too.  This explains the <code class="computeroutput">MOVL t14,
+t42</code> and <code class="computeroutput">PUSHL
+t42</code> UInstructions.  (Note that the seemingly
+redundant <code class="computeroutput">MOV</code>ing will probably
 be optimised away during register allocation.)</p>
 <p>Note that instead of storing unchanging information about
 each instruction (instruction size, data size, etc) in its cost
@@ -337,11 +322,8 @@ cache more quickly, requiring more translations for large
 programs and slowing them down more.</p>
 </div>
 <div class="sect1" lang="en">
-<div class="titlepage">
-<div><div><h2 class="title" style="clear: both">
-<a name="cg-tech-docs.retranslations"></a>2.5. Handling basic block retranslations</h2></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="cg-tech-docs.retranslations"></a>2.5. Handling basic block retranslations</h2></div></div></div>
 <p>The above description ignores one complication.  Valgrind
 has a limited size cache for basic block translations; if it
 fills up, old translations are discarded.  If a discarded basic
@@ -357,31 +339,25 @@ allocation and initialisation steps, but still do the UCode
 instrumentation step.</p>
 </div>
 <div class="sect1" lang="en">
-<div class="titlepage">
-<div><div><h2 class="title" style="clear: both">
-<a name="cg-tech-docs.cachesim"></a>2.6. The cache simulation</h2></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="cg-tech-docs.cachesim"></a>2.6. The cache simulation</h2></div></div></div>
 <p>The cache simulation is fairly straightforward.  It just
 tracks which memory blocks are in the cache at the moment (it
 doesn't track the contents, since that is irrelevant).</p>
 <p>The interface to the simulation is quite clean.  The
 functions called from the UCode contain calls to the simulation
 functions in the files
-<tt class="filename">vg_cachesim_{I1,D1,L2}.c</tt>; these calls are
+<code class="filename">vg_cachesim_{I1,D1,L2}.c</code>; these calls are
 inlined so that only one function call is done per simulated x86
-instruction.  The file <tt class="filename">vg_cachesim.c</tt> simply
-<tt class="computeroutput">#include</tt>s the three files
+instruction.  The file <code class="filename">vg_cachesim.c</code> simply
+<code class="computeroutput">#include</code>s the three files
 containing the simulation, which makes plugging in new cache
 simulations is very easy -- you just replace the three files and
 recompile.</p>
 </div>
 <div class="sect1" lang="en">
-<div class="titlepage">
-<div><div><h2 class="title" style="clear: both">
-<a name="cg-tech-docs.output"></a>2.7. Output</h2></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="cg-tech-docs.output"></a>2.7. Output</h2></div></div></div>
 <p>Output is fairly straightforward, basically printing the
 cost centre for every instruction, grouped by files and
 functions.  Total counts (eg. total cache accesses, total L1
@@ -403,17 +379,17 @@ summary_line ::= "summary:" ws? (count ws)+
 count        ::= num | "."</pre>
 <p>Where:</p>
 <div class="itemizedlist"><ul type="disc">
-<li><p><tt class="computeroutput">non_nl_string</tt> is any
+<li><p><code class="computeroutput">non_nl_string</code> is any
     string not containing a newline.</p></li>
-<li><p><tt class="computeroutput">cmd</tt> is a command line
+<li><p><code class="computeroutput">cmd</code> is a command line
     invocation.</p></li>
-<li><p><tt class="computeroutput">filename</tt> and
-    <tt class="computeroutput">fn_name</tt> can be anything.</p></li>
-<li><p><tt class="computeroutput">num</tt> and
-    <tt class="computeroutput">line_num</tt> are decimal
+<li><p><code class="computeroutput">filename</code> and
+    <code class="computeroutput">fn_name</code> can be anything.</p></li>
+<li><p><code class="computeroutput">num</code> and
+    <code class="computeroutput">line_num</code> are decimal
     numbers.</p></li>
-<li><p><tt class="computeroutput">ws</tt> is whitespace.</p></li>
-<li><p><tt class="computeroutput">nl</tt> is a newline.</p></li>
+<li><p><code class="computeroutput">ws</code> is whitespace.</p></li>
+<li><p><code class="computeroutput">nl</code> is a newline.</p></li>
 </ul></div>
 <p>The contents of the "desc:" lines is printed out at the top
 of the summary.  This is a generic way of providing simulation
@@ -423,38 +399,35 @@ cache simulation.</p>
 write misses for an instruction that doesn't write to
 memory.</p>
 <p>The number of counts in each
-<tt class="computeroutput">line</tt> and the
-<tt class="computeroutput">summary_line</tt> should not exceed
+<code class="computeroutput">line</code> and the
+<code class="computeroutput">summary_line</code> should not exceed
 the number of events in the
-<tt class="computeroutput">event_line</tt>.  If the number in
-each <tt class="computeroutput">line</tt> is less, cg_annotate
+<code class="computeroutput">event_line</code>.  If the number in
+each <code class="computeroutput">line</code> is less, cg_annotate
 treats those missing as though they were a "." entry.</p>
-<p>A <tt class="computeroutput">file_line</tt> changes the
-current file name.  A <tt class="computeroutput">fn_line</tt>
+<p>A <code class="computeroutput">file_line</code> changes the
+current file name.  A <code class="computeroutput">fn_line</code>
 changes the current function name.  A
-<tt class="computeroutput">count_line</tt> contains counts that
+<code class="computeroutput">count_line</code> contains counts that
 pertain to the current filename/fn_name.  A "fn="
-<tt class="computeroutput">file_line</tt> and a
-<tt class="computeroutput">fn_line</tt> must appear before any
-<tt class="computeroutput">count_line</tt>s to give the context
-of the first <tt class="computeroutput">count_line</tt>s.</p>
-<p>Each <tt class="computeroutput">file_line</tt> should be
+<code class="computeroutput">file_line</code> and a
+<code class="computeroutput">fn_line</code> must appear before any
+<code class="computeroutput">count_line</code>s to give the context
+of the first <code class="computeroutput">count_line</code>s.</p>
+<p>Each <code class="computeroutput">file_line</code> should be
 immediately followed by a
-<tt class="computeroutput">fn_line</tt>.  "fi="
-<tt class="computeroutput">file_lines</tt> are used to switch
+<code class="computeroutput">fn_line</code>.  "fi="
+<code class="computeroutput">file_lines</code> are used to switch
 filenames for inlined functions; "fe="
-<tt class="computeroutput">file_lines</tt> are similar, but are
+<code class="computeroutput">file_lines</code> are similar, but are
 put at the end of a basic block in which the file name hasn't
 been switched back to the original file name.  (fi and fe lines
 behave the same, they are only distinguished to help
 debugging.)</p>
 </div>
 <div class="sect1" lang="en">
-<div class="titlepage">
-<div><div><h2 class="title" style="clear: both">
-<a name="cg-tech-docs.summary"></a>2.8. Summary of performance features</h2></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="cg-tech-docs.summary"></a>2.8. Summary of performance features</h2></div></div></div>
 <p>Quite a lot of work has gone into making the profiling as
 fast as possible.  This is a summary of the important
 features:</p>
@@ -470,28 +443,22 @@ features:</p>
     and minimising UCode instrumentation bloat.</p></li>
 <li><p>Summary counts are calculated at the end, rather than
     during execution.</p></li>
-<li><p>The <tt class="computeroutput">cachegrind.out</tt>
+<li><p>The <code class="computeroutput">cachegrind.out</code>
     output files can contain huge amounts of information; file
     format was carefully chosen to minimise file sizes.</p></li>
 </ul></div>
 </div>
 <div class="sect1" lang="en">
-<div class="titlepage">
-<div><div><h2 class="title" style="clear: both">
-<a name="cg-tech-docs.annotate"></a>2.9. Annotation</h2></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="cg-tech-docs.annotate"></a>2.9. Annotation</h2></div></div></div>
 <p>Annotation is done by cg_annotate.  It is a fairly
 straightforward Perl script that slurps up all the cost centres,
 and then runs through all the chosen source files, printing out
 cost centres with them.  It too has been carefully optimised.</p>
 </div>
 <div class="sect1" lang="en">
-<div class="titlepage">
-<div><div><h2 class="title" style="clear: both">
-<a name="cg-tech-docs.extensions"></a>2.10. Similar work, extensions</h2></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="cg-tech-docs.extensions"></a>2.10. Similar work, extensions</h2></div></div></div>
 <p>It would be relatively straightforward to do other
 simulations and obtain line-by-line information about interesting
 events.  A good example would be branch prediction -- all
@@ -503,7 +470,7 @@ file format is such that it is not specific to the cache
 simulation, but could be used for any kind of line-by-line
 information.  The only part of cg_annotate that is specific to
 the cache simulation is the name of the input file
-(<tt class="computeroutput">cachegrind.out</tt>), although it
+(<code class="computeroutput">cachegrind.out</code>), although it
 would be very simple to add an option to control this.</p>
 </div>
 </div>

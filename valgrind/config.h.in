@@ -1,5 +1,8 @@
 /* config.h.in.  Generated from configure.in by autoheader.  */
 
+/* configured to run as an inner Valgrind */
+#undef ENABLE_INNER
+
 /* path to GDB */
 #undef GDB_PATH
 
@@ -41,9 +44,6 @@
 
 /* Define to 1 if you have the <mqueue.h> header file. */
 #undef HAVE_MQUEUE_H
-
-/* can create position-independent executables */
-#undef HAVE_PIE
 
 /* Define to 1 if you have the `semtimedop' function. */
 #undef HAVE_SEMTIMEDOP

@@ -216,6 +216,8 @@ struct vki_sigcontext {
 #define VKI_PROT_WRITE	0x2		/* page can be written */
 #define VKI_PROT_EXEC	0x4		/* page can be executed */
 #define VKI_PROT_NONE	0x0		/* page can not be accessed */
+#define VKI_PROT_GROWSDOWN	0x01000000	/* mprotect flag: extend change to start of growsdown vma */
+#define VKI_PROT_GROWSUP	0x02000000	/* mprotect flag: extend change to end of growsup vma */
 
 #define VKI_MAP_SHARED	0x01		/* Share changes */
 #define VKI_MAP_PRIVATE	0x02		/* Changes are private */
@@ -229,6 +231,7 @@ struct vki_sigcontext {
 
 #define VKI_O_RDONLY	     00
 #define VKI_O_WRONLY	     01
+#define VKI_O_RDWR	     02
 #define VKI_O_CREAT	   0100	/* not fcntl */
 #define VKI_O_EXCL	   0200	/* not fcntl */
 #define VKI_O_TRUNC	  01000	/* not fcntl */
@@ -478,6 +481,8 @@ typedef unsigned long vki_elf_greg_t;
 
 #define VKI_ELF_NGREG (sizeof (struct vki_user_regs_struct) / sizeof(vki_elf_greg_t))
 typedef vki_elf_greg_t vki_elf_gregset_t[VKI_ELF_NGREG];
+
+typedef struct vki_user_i387_struct vki_elf_fpregset_t;
 
 //----------------------------------------------------------------------
 // From linux-2.6.9/include/asm-x86_64/ucontext.h

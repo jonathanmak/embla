@@ -70,9 +70,10 @@ SysRes VG_(mk_SysRes_amd64_linux) ( Word val ) {
 }
 
 /* PPC uses the CR7.SO bit to flag an error (CR0 in IBM-speke) */
-SysRes VG_(mk_SysRes_ppc32_linux) ( UInt val, UInt errflag ) {
+/* Note this must be in the bottom bit of the second arg */
+SysRes VG_(mk_SysRes_ppc32_linux) ( UInt val, UInt cr0so ) {
    SysRes res;
-   res.isError = errflag != 0;
+   res.isError = (cr0so & 1) != 0;
    res.val     = val;
    return res;
 }
@@ -105,12 +106,13 @@ SysRes VG_(mk_SysRes_Success) ( UWord val ) {
    clobbers, so we preserve all the callee-save regs (%esi, %edi, %ebx,
    %ebp).
 */
-static UWord do_syscall_WRK (
+extern UWord do_syscall_WRK (
           UWord syscall_no, 
           UWord a1, UWord a2, UWord a3,
           UWord a4, UWord a5, UWord a6
        );
 asm(
+".text\n"
 "do_syscall_WRK:\n"
 "	push	%esi\n"
 "	push	%edi\n"
@@ -129,6 +131,7 @@ asm(
 "	popl	%edi\n"
 "	popl	%esi\n"
 "	ret\n"
+".previous\n"
 );
 #elif defined(VGP_amd64_linux)
 /* Incoming args (syscall number + up to 6 args) come in %rdi, %rsi,
@@ -143,12 +146,13 @@ asm(
    no matter, they are caller-save (the syscall clobbers no callee-save
    regs, so we don't have to do any register saving/restoring).
 */
-static UWord do_syscall_WRK (
+extern UWord do_syscall_WRK (
           UWord syscall_no, 
           UWord a1, UWord a2, UWord a3,
           UWord a4, UWord a5, UWord a6
        );
 asm(
+".text\n"
 "do_syscall_WRK:\n"
         /* Convert function calling convention --> syscall calling
            convention */
@@ -161,24 +165,27 @@ asm(
 "	movq    8(%rsp), %r9\n"	 /* last arg from stack */
 "	syscall\n"
 "	ret\n"
+".previous\n"
 );
 #elif defined(VGP_ppc32_linux)
-/* Incoming args (syscall number + up to 6 args) come in %r0, %r3:%r8
+/* Incoming args (syscall number + up to 6 args) come in %r3:%r9.
 
    The syscall number goes in %r0.  The args are passed to the syscall in
    the regs %r3:%r8, i.e. the kernel's syscall calling convention.
 
    The %cr0.so bit flags an error.
-   We return the syscall return value in %r3, and the %cr in %r4.
+   We return the syscall return value in %r3, and the %cr0.so in 
+   the lowest bit of %r4.
    We return a ULong, of which %r3 is the high word, and %r4 the low.
    No callee-save regs are clobbered, so no saving/restoring is needed.
 */
-static ULong do_syscall_WRK (
+extern ULong do_syscall_WRK (
           UWord syscall_no, 
           UWord a1, UWord a2, UWord a3,
           UWord a4, UWord a5, UWord a6
        );
 asm(
+".text\n"
 "do_syscall_WRK:\n"
 "        mr      0,3\n"
 "        mr      3,4\n"
@@ -191,6 +198,7 @@ asm(
 "        mfcr    4\n"           /* %cr -> low word of return var          */
 "        rlwinm  4,4,4,31,31\n" /* rotate flag bit so to lsb, and mask it */
 "        blr\n"                 /* and return                             */
+".previous\n"
 );
 #else
 #  error Unknown platform
@@ -208,12 +216,43 @@ SysRes VG_(do_syscall) ( UWord sysno, UWord a1, UWord a2, UWord a3,
 #elif defined(VGP_ppc32_linux)
   ULong ret     = do_syscall_WRK(sysno,a1,a2,a3,a4,a5,a6);
   UInt  val     = (UInt)(ret>>32);
-  UInt  errflag = (UInt)(ret);
-  return VG_(mk_SysRes_ppc32_linux)( val, errflag );
+  UInt  cr0so   = (UInt)(ret);
+  return VG_(mk_SysRes_ppc32_linux)( val, cr0so );
 #else
 #  error Unknown platform
 #endif
 }
+
+/* ---------------------------------------------------------------------
+   Names of errors.
+   ------------------------------------------------------------------ */
+
+/* Return a string which gives the name of an error value.  Note,
+   unlike the standard C syserror fn, the returned string is not
+   malloc-allocated or writable -- treat it as a constant. 
+   TODO: implement this properly. */
+
+const HChar* VG_(strerror) ( UWord errnum )
+{
+   switch (errnum) {
+      case VKI_EPERM:       return "Operation not permitted";
+      case VKI_ENOENT:      return "No such file or directory";
+      case VKI_ESRCH:       return "No such process";
+      case VKI_EINTR:       return "Interrupted system call";
+      case VKI_EBADF:       return "Bad file number";
+      case VKI_EAGAIN:      return "Try again";
+      case VKI_ENOMEM:      return "Out of memory";
+      case VKI_EACCES:      return "Permission denied";
+      case VKI_EFAULT:      return "Bad address";
+      case VKI_EEXIST:      return "File exists";
+      case VKI_EINVAL:      return "Invalid argument";
+      case VKI_EMFILE:      return "Too many open files";
+      case VKI_ENOSYS:      return "Function not implemented";
+      case VKI_ERESTARTSYS: return "ERESTARTSYS";
+      default:              return "VG_(strerror): unknown error";
+   }
+}
+
 
 /*--------------------------------------------------------------------*/
 /*--- end                                                        ---*/

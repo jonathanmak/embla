@@ -119,6 +119,9 @@ extern ULong x86g_check_ldmxcsr ( UInt mxcsr );
 
 extern UInt  x86g_create_mxcsr ( UInt sseround );
 
+extern ULong x86g_calculate_FXTRACT ( ULong arg, UInt getExp );
+
+
 /* Translate a guest virtual_addr into a guest linear address by
    consulting the supplied LDT/GDT structures.  Their representation
    must be as specified in pub/libvex_guest_x86.h.  To indicate a
@@ -137,9 +140,9 @@ extern UInt  x86g_calculate_sse_pmovmskb ( ULong w64hi, ULong w64lo );
 
 /* --- DIRTY HELPERS --- */
 
-extern ULong x86g_loadF80le  ( UInt );
+extern ULong x86g_dirtyhelper_loadF80le  ( UInt );
 
-extern void  x86g_storeF80le ( UInt, ULong );
+extern void  x86g_dirtyhelper_storeF80le ( UInt, ULong );
 
 extern void  x86g_dirtyhelper_CPUID_sse0 ( VexGuestX86State* );
 extern void  x86g_dirtyhelper_CPUID_sse1 ( VexGuestX86State* );
@@ -152,6 +155,10 @@ extern void  x86g_dirtyhelper_FSAVE  ( VexGuestX86State*, HWord );
 extern void  x86g_dirtyhelper_FSTENV ( VexGuestX86State*, HWord );
 
 extern ULong x86g_dirtyhelper_RDTSC ( void );
+
+extern UInt x86g_dirtyhelper_IN  ( UInt portno, UInt sz/*1,2 or 4*/ );
+extern void x86g_dirtyhelper_OUT ( UInt portno, UInt data, 
+                                   UInt sz/*1,2 or 4*/ );
 
 extern VexEmWarn
             x86g_dirtyhelper_FRSTOR ( VexGuestX86State*, HWord );

@@ -1,13 +1,13 @@
-<html>
+<html xmlns:cf="http://docbook.sourceforge.net/xmlns/chunkfast/1.0">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
 <title>3. Writing a New Valgrind Tool</title>
 <link rel="stylesheet" href="vg_basic.css" type="text/css">
-<meta name="generator" content="DocBook XSL Stylesheets V1.65.1">
-<link rel="home" href="index.html" title="Valgrind Documentation">
+<meta name="generator" content="DocBook XSL Stylesheets V1.69.0">
+<link rel="start" href="index.html" title="Valgrind Documentation">
 <link rel="up" href="tech-docs.html" title="Valgrind Technical Documentation">
-<link rel="previous" href="cg-tech-docs.html" title="2. How Cachegrind works">
-<link rel="next" href="dist.html" title="Distribution Documents">
+<link rel="prev" href="cg-tech-docs.html" title="2. How Cachegrind works">
+<link rel="next" href="dist.html" title="Valgrind Distribution Documents">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
 <div><table class="nav" width="100%" cellspacing="3" cellpadding="3" border="0" summary="Navigation header"><tr>
@@ -18,11 +18,8 @@
 <td width="22px" align="center" valign="middle"><a accesskey="n" href="dist.html"><img src="images/next.png" width="18" height="21" border="0" alt="Next"></a></td>
 </tr></table></div>
 <div class="chapter" lang="en">
-<div class="titlepage">
-<div><div><h2 class="title">
-<a name="writing-tools"></a>3. Writing a New Valgrind Tool</h2></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h2 class="title">
+<a name="writing-tools"></a>3. Writing a New Valgrind Tool</h2></div></div></div>
 <div class="toc">
 <p><b>Table of Contents</b></p>
 <dl>
@@ -59,17 +56,11 @@
 </dl>
 </div>
 <div class="sect1" lang="en">
-<div class="titlepage">
-<div><div><h2 class="title" style="clear: both">
-<a name="writing-tools.intro"></a>3.1. Introduction</h2></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="writing-tools.intro"></a>3.1. Introduction</h2></div></div></div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.supexec"></a>3.1.1. Supervised Execution</h3></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.supexec"></a>3.1.1. Supervised Execution</h3></div></div></div>
 <p>Valgrind provides a generic infrastructure for supervising
 the execution of programs.  This is done by providing a way to
 instrument programs in very precise ways, making it relatively
@@ -78,37 +69,29 @@ profiling.</p>
 <p>Although writing a tool is not easy, and requires learning
 quite a few things about Valgrind, it is much easier than
 instrumenting a program from scratch yourself.</p>
-<p>[Nb: What follows is slightly out of date.  In particular,
-there are various references to a file include/tool.h which has been
-split into a number of header files in include/.]</p>
+<p>[Nb: What follows is slightly out of date.]</p>
 </div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.tools"></a>3.1.2. Tools</h3></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.tools"></a>3.1.2. Tools</h3></div></div></div>
 <p>The key idea behind Valgrind's architecture is the division
 between its "core" and "tools".</p>
 <p>The core provides the common low-level infrastructure to
-support program instrumentation, including the x86-to-x86 JIT
+support program instrumentation, including the JIT
 compiler, low-level memory manager, signal handling and a
 scheduler (for pthreads).  It also provides certain services that
 are useful to some but not all tools, such as support for error
 recording and suppression.</p>
 <p>But the core leaves certain operations undefined, which
 must be filled by tools.  Most notably, tools define how program
-code should be instrumented.  They can also define certain
-variables to indicate to the core that they would like to use
+code should be instrumented.  They can also call certain
+functions to indicate to the core that they would like to use
 certain services, or be notified when certain interesting events
 occur.  But the core takes care of all the hard work.</p>
 </div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.execspaces"></a>3.1.3. Execution Spaces</h3></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.execspaces"></a>3.1.3. Execution Spaces</h3></div></div></div>
 <p>An important concept to understand before writing a tool is
 that there are three spaces in which program code executes:</p>
 <div class="orderedlist"><ol type="1">
@@ -127,14 +110,14 @@ that there are three spaces in which program code executes:</p>
    takes place entirely within Valgrind's core.  This includes:</p>
 <div class="itemizedlist"><ul type="disc">
 <li><p>Dynamic memory management 
-      (<tt class="computeroutput">malloc()</tt> etc.)</p></li>
-<li><p>Pthread operations and scheduling</p></li>
+      (<code class="computeroutput">malloc()</code> etc.)</p></li>
+<li><p>Thread scheduling</p></li>
 <li><p>Signal handling</p></li>
 </ul></div>
 <p>A tool has no control over these operations; it never
    "sees" the code doing this work and thus cannot instrument it.
    However, the core provides hooks so a tool can be notified
-   when certain interesting events happen, for example when when
+   when certain interesting events happen, for example when
    dynamic memory is allocated or freed, the stack pointer is
    changed, or a pthread mutex is locked, etc.</p>
 <p>Note that these hooks only notify tools of events
@@ -164,40 +147,34 @@ that there are three spaces in which program code executes:</p>
 </div>
 </div>
 <div class="sect1" lang="en">
-<div class="titlepage">
-<div><div><h2 class="title" style="clear: both">
-<a name="writing-tools.writingatool"></a>3.2. Writing a Tool</h2></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="writing-tools.writingatool"></a>3.2. Writing a Tool</h2></div></div></div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.whywriteatool"></a>3.2.1. Why write a tool?</h3></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.whywriteatool"></a>3.2.1. Why write a tool?</h3></div></div></div>
 <p>Before you write a tool, you should have some idea of what
 it should do.  What is it you want to know about your programs of
 interest?  Consider some existing tools:</p>
 <div class="itemizedlist"><ul type="disc">
-<li><p><span><b class="command">memcheck</b></span>: among other things, performs
+<li><p><span><strong class="command">memcheck</strong></span>: among other things, performs
   fine-grained validity and addressibility checks of every memory
   reference performed by the program.</p></li>
-<li><p><span><b class="command">addrcheck</b></span>: performs lighterweight
+<li><p><span><strong class="command">addrcheck</strong></span>: performs lighterweight
   addressibility checks of every memory reference performed by
   the program.</p></li>
-<li><p><span><b class="command">cachegrind</b></span>: tracks every instruction
+<li><p><span><strong class="command">cachegrind</strong></span>: tracks every instruction
   and memory reference to simulate instruction and data caches,
   tracking cache accesses and misses that occur on every line in
   the program.</p></li>
-<li><p><span><b class="command">helgrind</b></span>: tracks every memory access
+<li><p><span><strong class="command">helgrind</strong></span>: tracks every memory access
   and mutex lock/unlock to determine if a program contains any
   data races.</p></li>
-<li><p><span><b class="command">lackey</b></span>: does simple counting of
+<li><p><span><strong class="command">lackey</strong></span>: does simple counting of
   various things: the number of calls to a particular function
-  (<tt class="computeroutput">_dl_runtime_resolve()</tt>); the
-  number of basic blocks, x86 instruction, UCode instructions
+  (<code class="computeroutput">_dl_runtime_resolve()</code>); the
+  number of basic blocks, guest instructions, VEX instructions
   executed; the number of branches executed and the proportion of
-  those which were taken.</p></li>
+  them which were taken.</p></li>
 </ul></div>
 <p>These examples give a reasonable idea of what kinds of
 things Valgrind can be used for.  The instrumentation can range
@@ -206,21 +183,18 @@ particular function is called) to very intrusive (e.g.
 memcheck's memory checking).</p>
 </div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.suggestedtools"></a>3.2.2. Suggested tools</h3></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.suggestedtools"></a>3.2.2. Suggested tools</h3></div></div></div>
 <p>Here is a list of ideas we have had for tools that should
 not be too hard to implement.</p>
 <div class="itemizedlist"><ul type="disc">
 <li>
-<p><span><b class="command">branch profiler</b></span>: A machine's branch
+<p><span><strong class="command">branch profiler</strong></span>: A machine's branch
   prediction hardware could be simulated, and each branch
   annotated with the number of predicted and mispredicted
   branches.  Would be implemented quite similarly to Cachegrind,
   and could reuse the
-  <tt class="computeroutput">cg_annotate</tt> script to annotate
+  <code class="computeroutput">cg_annotate</code> script to annotate
   source code.</p>
 <p>The biggest difficulty with this is the simulation; the
   chip-makers are very cagey about how their chips do branch
@@ -228,14 +202,14 @@ not be too hard to implement.</p>
   algorithms could still give good information.</p>
 </li>
 <li>
-<p><span><b class="command">coverage tool</b></span>: Cachegrind can already
+<p><span><strong class="command">coverage tool</strong></span>: Cachegrind can already
   be used for doing test coverage, but it's massive overkill to
   use it just for that.</p>
 <p>It would be easy to write a coverage tool that records
   how many times each basic block was recorded.  Again, the
-  <tt class="computeroutput">cg_annotate</tt> script could be
+  <code class="computeroutput">cg_annotate</code> script could be
   used for annotating source code with the gathered information.
-  Although, <tt class="computeroutput">cg_annotate</tt> is only
+  Although, <code class="computeroutput">cg_annotate</code> is only
   designed for working with single program runs.  It could be
   extended relatively easily to deal with multiple runs of a
   program, so that the coverage of a whole test suite could be
@@ -248,7 +222,7 @@ not be too hard to implement.</p>
   annotating.</p>
 </li>
 <li>
-<p><span><b class="command">run-time type checking</b></span>: A nice example
+<p><span><strong class="command">run-time type checking</strong></span>: A nice example
   of a dynamic checker is given in this paper:</p>
 <div class="address"><p>Debugging via Run-Time Type Checking<br>
   Alexey Loginov, Suan Hsi Yong, Susan Horwitz and Thomas Reps<br>
@@ -280,96 +254,78 @@ not be too hard to implement.</p>
 other tools.</p>
 </div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.howtoolswork"></a>3.2.3. How tools work</h3></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.howtoolswork"></a>3.2.3. How tools work</h3></div></div></div>
 <p>Tools must define various functions for instrumenting
-programs that are called by Valgrind's core, yet they must be
-implemented in such a way that they can be written and compiled
-without touching Valgrind's core.  This is important, because one
-of our aims is to allow people to write and distribute their own
-tools that can be plugged into Valgrind's core easily.</p>
-<p>This is achieved by packaging each tool into a separate
-shared object which is then loaded ahead of the core shared
-object <tt class="computeroutput">valgrind.so</tt>, using the
-dynamic linker's <tt class="computeroutput">LD_PRELOAD</tt>
-variable.  Any functions defined in the tool that share the name
-with a function defined in core (such as the instrumentation
-function <tt class="computeroutput">instrument()</tt>)
-override the core's definition.  Thus the core can call the
-necessary tool functions.</p>
-<p>This magic is all done for you; the shared object used is
-chosen with the <tt class="computeroutput">--tool</tt> option to
-the <tt class="computeroutput">valgrind</tt> startup script.
-The default tool used is
-<tt class="computeroutput">memcheck</tt>, Valgrind's original
-memory checker.</p>
+programs that are called by Valgrind's core. They are then linked
+against the coregrind library
+(<code class="computeroutput">libcoregrind.a</code>) that valgrind
+provides as well as the VEX library
+(<code class="computeroutput">libvex.a</code>) that also comes with
+valgrind and provides the JIT engine.</p>
+<p>Each tool is linked as a statically linked program and placed
+in the valgrind library directory from where valgrind will load it
+automatically when the <code class="computeroutput">--tool</code> option
+is used to select it.</p>
 </div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.gettingcode"></a>3.2.4. Getting the code</h3></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.gettingcode"></a>3.2.4. Getting the code</h3></div></div></div>
 <p>To write your own tool, you'll need the Valgrind source code.
 A normal source distribution should do, although you might want to
 check out the latest code from the Subversion repository.  See the
-information about how to do so at <a href="http://www.valgrind.org/" target="_top">the
+information about how to do so at
+<a href="http://www.valgrind.org/downloads/repository.html" target="_top">the
 Valgrind website</a>.</p>
 </div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.gettingstarted"></a>3.2.5. Getting started</h3></div></div>
-<div></div>
-</div>
-<p>Valgrind uses GNU <tt class="computeroutput">automake</tt>
-and <tt class="computeroutput">autoconf</tt> for the creation of
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.gettingstarted"></a>3.2.5. Getting started</h3></div></div></div>
+<p>Valgrind uses GNU <code class="computeroutput">automake</code>
+and <code class="computeroutput">autoconf</code> for the creation of
 Makefiles and configuration.  But don't worry, these instructions
 should be enough to get you started even if you know nothing
 about those tools.</p>
 <p>In what follows, all filenames are relative to Valgrind's
-top-level directory <tt class="computeroutput">valgrind/</tt>.</p>
+top-level directory <code class="computeroutput">valgrind/</code>.</p>
 <div class="orderedlist"><ol type="1">
 <li><p>Choose a name for the tool, and an abbreviation that can
   be used as a short prefix.  We'll use
-  <tt class="computeroutput">foobar</tt> and
-  <tt class="computeroutput">fb</tt> as an example.</p></li>
+  <code class="computeroutput">foobar</code> and
+  <code class="computeroutput">fb</code> as an example.</p></li>
 <li><p>Make a new directory
-  <tt class="computeroutput">foobar/</tt> which will hold the
+  <code class="computeroutput">foobar/</code> which will hold the
   tool.</p></li>
-<li><p>Copy <tt class="computeroutput">none/Makefile.am</tt>
-  into <tt class="computeroutput">foobar/</tt>.  Edit it by
+<li><p>Copy <code class="computeroutput">none/Makefile.am</code>
+  into <code class="computeroutput">foobar/</code>.  Edit it by
   replacing all occurrences of the string
-  <tt class="computeroutput">"none"</tt> with
-  <tt class="computeroutput">"foobar"</tt> and the one
-  occurrence of the string <tt class="computeroutput">"nl_"</tt>
-  with <tt class="computeroutput">"fb_"</tt>.  It might be worth
+  <code class="computeroutput">"none"</code> with
+  <code class="computeroutput">"foobar"</code> and the one
+  occurrence of the string <code class="computeroutput">"nl_"</code>
+  with <code class="computeroutput">"fb_"</code>.  It might be worth
   trying to understand this file, at least a little; you might
   have to do more complicated things with it later on.  In
   particular, the name of the
-  <tt class="computeroutput">vgtool_foobar_so_SOURCES</tt>
-  variable determines the name of the tool's shared object, which
+  <code class="computeroutput">foobar_SOURCES</code>
+  variable determines the name of the tool, which
   determines what name must be passed to the
-  <tt class="computeroutput">--tool</tt> option to use the
+  <code class="computeroutput">--tool</code> option to use the
   tool.</p></li>
-<li><p>Copy <tt class="filename">none/nl_main.c</tt> into
-  <tt class="computeroutput">foobar/</tt>, renaming it as
-  <tt class="filename">fb_main.c</tt>.  Edit it by changing the lines
-  in <tt class="computeroutput">pre_clo_init()</tt> to
+<li><p>Copy <code class="filename">none/nl_main.c</code> into
+  <code class="computeroutput">foobar/</code>, renaming it as
+  <code class="filename">fb_main.c</code>.  Edit it by changing the lines
+  in <code class="computeroutput">pre_clo_init()</code> to
   something appropriate for the tool.  These fields are used in
   the startup message, except for
-  <tt class="computeroutput">bug_reports_to</tt> which is used
+  <code class="computeroutput">bug_reports_to</code> which is used
   if a tool assertion fails.</p></li>
-<li><p>Edit <tt class="computeroutput">Makefile.am</tt>,
+<li><p>Edit <code class="computeroutput">Makefile.am</code>,
    adding the new directory
-   <tt class="computeroutput">foobar</tt> to the
-   <tt class="computeroutput">SUBDIRS</tt> variable.</p></li>
-<li><p>Edit <tt class="computeroutput">configure.in</tt>,
-   adding <tt class="computeroutput">foobar/Makefile</tt> to the
-   <tt class="computeroutput">AC_OUTPUT</tt> list.</p></li>
+   <code class="computeroutput">foobar</code> to the
+   <code class="computeroutput">SUBDIRS</code> variable.</p></li>
+<li><p>Edit <code class="computeroutput">configure.in</code>,
+   adding <code class="computeroutput">foobar/Makefile</code> to the
+   <code class="computeroutput">AC_OUTPUT</code> list.</p></li>
 <li>
 <p>Run:</p>
 <pre class="programlisting">
@@ -377,17 +333,16 @@ top-level directory <tt class="computeroutput">valgrind/</tt>.</p>
   ./configure --prefix=`pwd`/inst
   make install</pre>
 <p>It should automake, configure and compile without
-   errors, putting copies of the tool's shared object
-   <tt class="computeroutput">vgtool_foobar.so</tt> in
-   <tt class="computeroutput">foobar/</tt> and
-   <tt class="computeroutput">inst/lib/valgrind/</tt>.</p>
+   errors, putting copies of the tool in
+   <code class="computeroutput">foobar/</code> and
+   <code class="computeroutput">inst/lib/valgrind/</code>.</p>
 </li>
 <li>
 <p>You can test it with a command like:</p>
 <pre class="programlisting">
   inst/bin/valgrind --tool=foobar date</pre>
 <p>(almost any program should work;
-   <tt class="computeroutput">date</tt> is just an example).
+   <code class="computeroutput">date</code> is just an example).
    The output should be something like this:</p>
 <pre class="programlisting">
   ==738== foobar-0.0.1, a foobarring tool for x86-linux.
@@ -404,17 +359,14 @@ top-level directory <tt class="computeroutput">valgrind/</tt>.</p>
 </ol></div>
 <p>These steps don't have to be followed exactly - you can
 choose different names for your source files, and use a different
-<tt class="computeroutput">--prefix</tt> for
-<tt class="computeroutput">./configure</tt>.</p>
+<code class="computeroutput">--prefix</code> for
+<code class="computeroutput">./configure</code>.</p>
 <p>Now that we've setup, built and tested the simplest
 possible tool, onto the interesting stuff...</p>
 </div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.writingcode"></a>3.2.6. Writing the code</h3></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.writingcode"></a>3.2.6. Writing the code</h3></div></div></div>
 <p>A tool must define at least these four functions:</p>
 <pre class="programlisting">
   pre_clo_init()
@@ -422,154 +374,126 @@ possible tool, onto the interesting stuff...</p>
   instrument()
   fini()</pre>
 <p>Also, it must use the macro
-<tt class="computeroutput">VG_DETERMINE_INTERFACE_VERSION</tt>
+<code class="computeroutput">VG_DETERMINE_INTERFACE_VERSION</code>
 exactly once in its source code.  If it doesn't, you will get a
 link error involving
-<tt class="computeroutput">VG_(tool_interface_version)</tt>.
+<code class="computeroutput">VG_(tool_interface_version)</code>.
 This macro is used to ensure the core/tool interface used by the
 core and a plugged-in tool are binary compatible.</p>
 <p>In addition, if a tool wants to use some of the optional
 services provided by the core, it may have to define other
-functions.</p>
+functions and tell the code about them.</p>
 </div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.init"></a>3.2.7. Initialisation</h3></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.init"></a>3.2.7. Initialisation</h3></div></div></div>
 <p>Most of the initialisation should be done in
-<tt class="computeroutput">pre_clo_init()</tt>.  Only use
-<tt class="computeroutput">post_clo_init()</tt> if a tool
+<code class="computeroutput">pre_clo_init()</code>.  Only use
+<code class="computeroutput">post_clo_init()</code> if a tool
 provides command line options and must do some initialisation
 after option processing takes place
-(<tt class="computeroutput">"clo"</tt> stands for "command line
+(<code class="computeroutput">"clo"</code> stands for "command line
 options").</p>
 <p>First of all, various "details" need to be set for a tool,
 using the functions
-<tt class="computeroutput">VG_(details_*)()</tt>.  Some are all
+<code class="computeroutput">VG_(details_*)()</code>.  Some are all
 compulsory, some aren't.  Some are used when constructing the
 startup message,
-<tt class="computeroutput">detail_bug_reports_to</tt> is used if
-<tt class="computeroutput">VG_(tool_panic)()</tt> is ever
+<code class="computeroutput">detail_bug_reports_to</code> is used if
+<code class="computeroutput">VG_(tool_panic)()</code> is ever
 called, or a tool assertion fails.  Others have other uses.</p>
 <p>Second, various "needs" can be set for a tool, using the
-functions <tt class="computeroutput">VG_(needs_*)()</tt>.  They
+functions <code class="computeroutput">VG_(needs_*)()</code>.  They
 are mostly booleans, and can be left untouched (they default to
-<tt class="computeroutput">False</tt>).  They determine whether
+<code class="computeroutput">False</code>).  They determine whether
 a tool can do various things such as: record, report and suppress
 errors; process command line options; wrap system calls; record
 extra information about malloc'd blocks, etc.</p>
 <p>For example, if a tool wants the core's help in recording
-and reporting errors, it must set the
-<tt class="computeroutput">tool_errors</tt> need to
-<tt class="computeroutput">True</tt>, and then provide
-definitions of six functions for comparing errors, printing out
+and reporting errors, it must call
+<code class="computeroutput">VG_(needs_tool_errors)</code> and provide
+definitions of eight functions for comparing errors, printing out
 errors, reading suppressions from a suppressions file, etc.
 While writing these functions requires some work, it's much less
 than doing error handling from scratch because the core is doing
-most of the work.  See the type
-<tt class="computeroutput">VgNeeds</tt> in
-<tt class="filename">include/tool.h</tt> for full details of all
+most of the work.  See the function
+<code class="computeroutput">VG_(needs_tool_errors)</code> in
+<code class="filename">include/pub_tool_tooliface.h</code> for full details of all
 the needs.</p>
 <p>Third, the tool can indicate which events in core it wants
 to be notified about, using the functions
-<tt class="computeroutput">VG_(track_*)()</tt>.  These include
+<code class="computeroutput">VG_(track_*)()</code>.  These include
 things such as blocks of memory being malloc'd, the stack pointer
 changing, a mutex being locked, etc.  If a tool wants to know
-about this, it should set the relevant pointer in the structure
-to point to a function, which will be called when that event
-happens.</p>
+about this, it should provide a pointer to a function, which will
+be called when that event happens.</p>
 <p>For example, if the tool want to be notified when a new
 block of memory is malloc'd, it should call
-<tt class="computeroutput">VG_(track_new_mem_heap)()</tt> with
+<code class="computeroutput">VG_(track_new_mem_heap)()</code> with
 an appropriate function pointer, and the assigned function will
 be called each time this happens.</p>
 <p>More information about "details", "needs" and "trackable
 events" can be found in
-<tt class="filename">include/tool.h</tt>.</p>
+<code class="filename">include/pub_tool_tooliface.h</code>.</p>
 </div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.instr"></a>3.2.8. Instrumentation</h3></div></div>
-<div></div>
-</div>
-<p><tt class="computeroutput">instrument()</tt> is the
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.instr"></a>3.2.8. Instrumentation</h3></div></div></div>
+<p><code class="computeroutput">instrument()</code> is the
 interesting one.  It allows you to instrument
-<span class="emphasis"><em>UCode</em></span>, which is Valgrind's RISC-like
-intermediate language.  UCode is described in 
+<span class="emphasis"><em>VEX IR</em></span>, which is Valgrind's RISC-like
+intermediate language.  VEX IR is described in 
 <a href="mc-tech-docs.html#mc-tech-docs.ucode">Introduction to UCode</a>.</p>
-<p>The easiest way to instrument UCode is to insert calls to C
+<p>The easiest way to instrument VEX IR is to insert calls to C
 functions when interesting things happen.  See the tool "Lackey"
-(<tt class="filename">lackey/lk_main.c</tt>) for a simple example of
-this, or Cachegrind (<tt class="filename">cachegrind/cg_main.c</tt>)
+(<code class="filename">lackey/lk_main.c</code>) for a simple example of
+this, or Cachegrind (<code class="filename">cachegrind/cg_main.c</code>)
 for a more complex example.</p>
-<p>A much more complicated way to instrument UCode, albeit one
-that might result in faster instrumented programs, is to extend
-UCode with new UCode instructions.  This is recommended for
-advanced Valgrind hackers only!  See Memcheck for an example.</p>
 </div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.fini"></a>3.2.9. Finalisation</h3></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.fini"></a>3.2.9. Finalisation</h3></div></div></div>
 <p>This is where you can present the final results, such as a
 summary of the information collected.  Any log files should be
 written out at this point.</p>
 </div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.otherinfo"></a>3.2.10. Other Important Information</h3></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.otherinfo"></a>3.2.10. Other Important Information</h3></div></div></div>
 <p>Please note that the core/tool split infrastructure is
 quite complex and not brilliantly documented.  Here are some
 important points, but there are undoubtedly many others that I
 should note but haven't thought of.</p>
-<p>The file <tt class="filename">include/tool.h</tt> contains
+<p>The files <code class="filename">include/pub_tool_*.h</code> contain
 all the types, macros, functions, etc. that a tool should
-(hopefully) need, and is the only <tt class="filename">.h</tt> file a
-tool should need to
-<tt class="computeroutput">#include</tt>.</p>
-<p>In particular, you probably shouldn't use anything from the
+(hopefully) need, and are the only <code class="filename">.h</code> files
+a tool should need to
+<code class="computeroutput">#include</code>.</p>
+<p>In particular, you can't use anything from the
 C library (there are deep reasons for this, trust us).  Valgrind
 provides an implementation of a reasonable subset of the C
 library, details of which are in
-<tt class="filename">tool.h</tt>.</p>
+<code class="filename">pub_tool_libc*.h</code>.</p>
 <p>Similarly, when writing a tool, you shouldn't need to look
 at any of the code in Valgrind's core.  Although it might be
 useful sometimes to help understand something.</p>
-<p><tt class="filename">tool.h</tt> has a reasonable amount of
-documentation in it that should hopefully be enough to get you
-going.  But ultimately, the tools distributed (Memcheck,
+<p>The <code class="filename">pub_tool_*.h</code> files have a reasonable
+amount of documentation in it that should hopefully be enough to get
+you going.  But ultimately, the tools distributed (Memcheck,
 Addrcheck, Cachegrind, Lackey, etc.) are probably the best
 documentation of all, for the moment.</p>
-<p>Note that the <tt class="computeroutput">VG_</tt> and
-<tt class="computeroutput">TL_</tt> macros are used heavily.
-These just prepend longer strings in front of names to avoid
-potential namespace clashes.  We strongly recommend using the
-<tt class="computeroutput">TL_</tt> macro for any global
-functions and variables in your tool, or writing a similar
-macro.</p>
+<p>Note that the <code class="computeroutput">VG_</code> macro is used
+heavily.  This just prepends a longer string in front of names to
+avoid potential namespace clashes.</p>
 </div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.advice"></a>3.2.11. Words of Advice</h3></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.advice"></a>3.2.11. Words of Advice</h3></div></div></div>
 <p>Writing and debugging tools is not trivial.  Here are some
 suggestions for solving common problems.</p>
 <div class="sect3" lang="en">
-<div class="titlepage">
-<div><div><h4 class="title">
-<a name="writing-tools.segfaults"></a>3.2.11.1. Segmentation Faults</h4></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h4 class="title">
+<a name="writing-tools.segfaults"></a>3.2.11.1. Segmentation Faults</h4></div></div></div>
 <p>If you are getting segmentation faults in C functions used
 by your tool, the usual GDB command:</p>
 <pre class="screen">
@@ -577,19 +501,16 @@ by your tool, the usual GDB command:</p>
 <p>usually gives the location of the segmentation fault.</p>
 </div>
 <div class="sect3" lang="en">
-<div class="titlepage">
-<div><div><h4 class="title">
-<a name="writing-tools.debugfns"></a>3.2.11.2. Debugging C functions</h4></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h4 class="title">
+<a name="writing-tools.debugfns"></a>3.2.11.2. Debugging C functions</h4></div></div></div>
 <p>If you want to debug C functions used by your tool, you can
 attach GDB to Valgrind with some effort:</p>
 <div class="orderedlist"><ol type="1">
 <li>
 <p>Enable the following code in
-  <tt class="filename">coregrind/vg_main.c</tt> by changing
-  <tt class="computeroutput">if (0)</tt> 
-  into <tt class="computeroutput">if (1)</tt>:
+  <code class="filename">coregrind/vg_main.c</code> by changing
+  <code class="computeroutput">if (0)</code> 
+  into <code class="computeroutput">if (1)</code>:
 </p>
 <pre class="programlisting">
   /* Hook to delay things long enough so we can get the pid and
@@ -618,80 +539,62 @@ attach GDB to Valgrind with some effort:</p>
 </ol></div>
 <p>GDB may be able to give you useful information.  Note that
 by default most of the system is built with
-<tt class="computeroutput">-fomit-frame-pointer</tt>, and you'll
+<code class="computeroutput">-fomit-frame-pointer</code>, and you'll
 need to get rid of this to extract useful tracebacks from GDB.</p>
 </div>
 <div class="sect3" lang="en">
-<div class="titlepage">
-<div><div><h4 class="title">
-<a name="writing-tools.ucode-probs"></a>3.2.11.3. UCode Instrumentation Problems</h4></div></div>
-<div></div>
-</div>
-<p>If you are having problems with your UCode instrumentation,
+<div class="titlepage"><div><div><h4 class="title">
+<a name="writing-tools.ucode-probs"></a>3.2.11.3. UCode Instrumentation Problems</h4></div></div></div>
+<p>If you are having problems with your VEX UIR instrumentation,
 it's likely that GDB won't be able to help at all.  In this case,
-Valgrind's <tt class="computeroutput">--trace-codegen</tt>
+Valgrind's <code class="computeroutput">--trace-flags</code>
 option is invaluable for observing the results of
 instrumentation.</p>
 </div>
 <div class="sect3" lang="en">
-<div class="titlepage">
-<div><div><h4 class="title">
-<a name="writing-tools.misc"></a>3.2.11.4. Miscellaneous</h4></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h4 class="title">
+<a name="writing-tools.misc"></a>3.2.11.4. Miscellaneous</h4></div></div></div>
 <p>If you just want to know whether a program point has been
-reached, using the <tt class="computeroutput">OINK</tt> macro
-(in <tt class="filename">include/tool.h</tt>) can be easier than
-using GDB.</p>
+reached, using the <code class="computeroutput">OINK</code> macro
+(in <code class="filename">include/pub_tool_libcprint.h</code>) can be easier
+than using GDB.</p>
 <p>The other debugging command line options can be useful too
-(run <tt class="computeroutput">valgrind -h</tt> for the
+(run <code class="computeroutput">valgrind --help-debug</code> for the
 list).</p>
 </div>
 </div>
 </div>
 <div class="sect1" lang="en">
-<div class="titlepage">
-<div><div><h2 class="title" style="clear: both">
-<a name="writing-tools.advtopics"></a>3.3. Advanced Topics</h2></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="writing-tools.advtopics"></a>3.3. Advanced Topics</h2></div></div></div>
 <p>Once a tool becomes more complicated, there are some extra
 things you may want/need to do.</p>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.suppressions"></a>3.3.1. Suppressions</h3></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.suppressions"></a>3.3.1. Suppressions</h3></div></div></div>
 <p>If your tool reports errors and you want to suppress some
 common ones, you can add suppressions to the suppression files.
 The relevant files are
-<tt class="computeroutput">valgrind/*.supp</tt>; the final
+<code class="computeroutput">valgrind/*.supp</code>; the final
 suppression file is aggregated from these files by combining the
-relevant <tt class="computeroutput">.supp</tt> files depending
+relevant <code class="computeroutput">.supp</code> files depending
 on the versions of linux, X and glibc on a system.</p>
 <p>Suppression types have the form
-<tt class="computeroutput">tool_name:suppression_name</tt>.  The
-<tt class="computeroutput">tool_name</tt> here is the name you
+<code class="computeroutput">tool_name:suppression_name</code>.  The
+<code class="computeroutput">tool_name</code> here is the name you
 specify for the tool during initialisation with
-<tt class="computeroutput">VG_(details_name)()</tt>.</p>
+<code class="computeroutput">VG_(details_name)()</code>.</p>
 </div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.docs"></a>3.3.2. Documentation</h3></div></div>
-<div></div>
-</div>
-<p>As of version 3.0.1, Valgrind documentation has
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.docs"></a>3.3.2. Documentation</h3></div></div></div>
+<p>As of version 3.1.0, Valgrind documentation has
 been converted to XML. Why? 
 See <a href="http://www.ucc.ie/xml/" target="_top">The XML FAQ</a>.
 </p>
 <div class="sect3" lang="en">
-<div class="titlepage">
-<div><div><h4 class="title">
-<a name="writing-tools.xml"></a>3.3.2.1. The XML Toolchain</h4></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h4 class="title">
+<a name="writing-tools.xml"></a>3.3.2.1. The XML Toolchain</h4></div></div></div>
 <p>If you are feeling conscientious and want to write some
 documentation for your tool, please use XML.  The Valgrind
 Docs use the following toolchain and versions:</p>
@@ -702,55 +605,52 @@ Docs use the following toolchain and versions:</p>
  pdftops:   version 3.00
  DocBook:   version 4.2
 </pre>
-<p><span><b class="command">Latency:</b></span> you should note that latency is
+<p><span><strong class="command">Latency:</strong></span> you should note that latency is
 a big problem: DocBook is constantly being updated, but the tools
 tend to lag behind somewhat.  It is important that the versions
 get on with each other, so if you decide to upgrade something,
 then you need to ascertain whether things still work nicely -
 this *cannot* be assumed.</p>
-<p><span><b class="command">Stylesheets:</b></span> The Valgrind docs use
+<p><span><strong class="command">Stylesheets:</strong></span> The Valgrind docs use
 various custom stylesheet layers, all of which are in
-<tt class="computeroutput">valgrind/docs/lib/</tt>. You
+<code class="computeroutput">valgrind/docs/lib/</code>. You
 shouldn't need to modify these in any way.</p>
-<p><span><b class="command">Catalogs:</b></span> Assuming that you have the
+<p><span><strong class="command">Catalogs:</strong></span> Assuming that you have the
 various tools listed above installed, you will probably need to
 modify
-<tt class="computeroutput">valgrind/docs/lib/vg-catalog.xml</tt>
+<code class="computeroutput">valgrind/docs/lib/vg-catalog.xml</code>
 so that the parser can find your DocBook installation. Catalogs
 provide a mapping from generic addresses to specific local
 directories on a given machine.  Just add another
-<tt class="computeroutput">group</tt> to this file, reflecting
+<code class="computeroutput">group</code> to this file, reflecting
 your local installation.</p>
 </div>
 <div class="sect3" lang="en">
-<div class="titlepage">
-<div><div><h4 class="title">
-<a name="writing-tools.writing"></a>3.3.2.2. Writing the Documentation</h4></div></div>
-<div></div>
-</div>
-<p>Follow these steps (using <tt class="computeroutput">foobar</tt>
+<div class="titlepage"><div><div><h4 class="title">
+<a name="writing-tools.writing"></a>3.3.2.2. Writing the Documentation</h4></div></div></div>
+<p>Follow these steps (using <code class="computeroutput">foobar</code>
 as the example tool name again):</p>
 <div class="orderedlist"><ol type="1">
 <li><p>Make a directory
-  <tt class="computeroutput">valgrind/foobar/docs/</tt>.</p></li>
+  <code class="computeroutput">valgrind/foobar/docs/</code>.</p></li>
 <li>
 <p>Copy the XML documentation file for the tool Nulgrind from
-  <tt class="computeroutput">valgrind/none/docs/nl-manual.xml</tt>
-  to <tt class="computeroutput">foobar/docs/</tt>, and rename it
+  <code class="computeroutput">valgrind/none/docs/nl-manual.xml</code>
+  to <code class="computeroutput">foobar/docs/</code>, and rename it
   to
-  <tt class="computeroutput">foobar/docs/fb-manual.xml</tt>.</p>
-<p><span><b class="command">Note</b></span>: there is a *really stupid* tetex
+  <code class="computeroutput">foobar/docs/fb-manual.xml</code>.</p>
+<p><span><strong class="command">Note</strong></span>: there is a *really stupid* tetex
   bug with underscores in filenames, so don't use '_'.</p>
 </li>
 <li><p>Write the documentation. There are some helpful bits and
   pieces on using xml markup in
-  <tt class="filename">valgrind/docs/xml/xml_help.txt</tt>.</p></li>
+  <code class="filename">valgrind/docs/xml/xml_help.txt</code>.</p></li>
 <li><p>Include it in the User Manual by adding the relevant entry must
-  be added to <tt class="filename">valgrind/docs/xml/manual.xml</tt>.  Copy
+  be added to <code class="filename">valgrind/docs/xml/manual.xml</code>.  Copy
   and edit an existing entry.</p></li>
 <li>
-<p>Validate <tt class="computeroutput">foobar/docs/fb-manual.xml</tt>
-  using the following command from within <tt class="filename">valgrind/docs/</tt>:
+<p>Validate <code class="computeroutput">foobar/docs/fb-manual.xml</code>
+  using the following command from within <code class="filename">valgrind/docs/</code>:
   </p>
 <pre class="screen">
 % make valid
@@ -762,81 +662,75 @@ attribute base of element chapter
 </pre>
 <p>Ignore (only) these -- they're not important.</p>
 <p>Because the xml toolchain is fragile, it is important to
-  ensure that <tt class="filename">fb-manual.xml</tt> won't
+  ensure that <code class="filename">fb-manual.xml</code> won't
   break the documentation set build.  Note that just because an
   xml file happily transforms to html does not necessarily mean
   the same holds true for pdf/ps.</p>
 </li>
 <li>
 <p>You can (re-)generate the HTML docs
-  while you are writing <tt class="filename">fb-manual.xml</tt> to help
+  while you are writing <code class="filename">fb-manual.xml</code> to help
   you see how it's looking.  The generated files end up in
-  <tt class="filename">valgrind/docs/html/</tt>.  Use the following
-  command, within <tt class="filename">valgrind/docs/</tt>:</p>
+  <code class="filename">valgrind/docs/html/</code>.  Use the following
+  command, within <code class="filename">valgrind/docs/</code>:</p>
 <pre class="screen">
 % make html-docs
 </pre>
 </li>
 <li>
 <p>When you have finished, also generate pdf and ps output
-  to check all is well, from within <tt class="filename">valgrind/docs/</tt>:
+  to check all is well, from within <code class="filename">valgrind/docs/</code>:
   </p>
 <pre class="screen">
 % make print-docs
 </pre>
-<p>Check the output <tt class="filename">.pdf</tt> and
-   <tt class="filename">.ps</tt> files in
-   <tt class="computeroutput">valgrind/docs/print/</tt>. 
+<p>Check the output <code class="filename">.pdf</code> and
+   <code class="filename">.ps</code> files in
+   <code class="computeroutput">valgrind/docs/print/</code>. 
    </p>
 </li>
 </ol></div>
 </div>
 </div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.regtests"></a>3.3.3. Regression Tests</h3></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.regtests"></a>3.3.3. Regression Tests</h3></div></div></div>
 <p>Valgrind has some support for regression tests.  If you
 want to write regression tests for your tool:</p>
 <div class="orderedlist"><ol type="1">
 <li><p>Make a directory
-  <tt class="computeroutput">foobar/tests/</tt>.</p></li>
-<li><p>Edit <tt class="computeroutput">foobar/Makefile.am</tt>,
-  adding <tt class="computeroutput">tests</tt> to the
-  <tt class="computeroutput">SUBDIRS</tt> variable.</p></li>
-<li><p>Edit <tt class="computeroutput">configure.in</tt>,
-  adding <tt class="computeroutput">foobar/tests/Makefile</tt>
-  to the <tt class="computeroutput">AC_OUTPUT</tt> list.</p></li>
+  <code class="computeroutput">foobar/tests/</code>.</p></li>
+<li><p>Edit <code class="computeroutput">foobar/Makefile.am</code>,
+  adding <code class="computeroutput">tests</code> to the
+  <code class="computeroutput">SUBDIRS</code> variable.</p></li>
+<li><p>Edit <code class="computeroutput">configure.in</code>,
+  adding <code class="computeroutput">foobar/tests/Makefile</code>
+  to the <code class="computeroutput">AC_OUTPUT</code> list.</p></li>
 <li><p>Write
-  <tt class="computeroutput">foobar/tests/Makefile.am</tt>.  Use
-  <tt class="computeroutput">memcheck/tests/Makefile.am</tt> as
+  <code class="computeroutput">foobar/tests/Makefile.am</code>.  Use
+  <code class="computeroutput">memcheck/tests/Makefile.am</code> as
   an example.</p></li>
-<li><p>Write the tests, <tt class="computeroutput">.vgtest</tt>
+<li><p>Write the tests, <code class="computeroutput">.vgtest</code>
   test description files,
-  <tt class="computeroutput">.stdout.exp</tt> and
-  <tt class="computeroutput">.stderr.exp</tt> expected output
+  <code class="computeroutput">.stdout.exp</code> and
+  <code class="computeroutput">.stderr.exp</code> expected output
   files.  (Note that Valgrind's output goes to stderr.)  Some
   details on writing and running tests are given in the comments
   at the top of the testing script
-  <tt class="computeroutput">tests/vg_regtest</tt>.</p></li>
+  <code class="computeroutput">tests/vg_regtest</code>.</p></li>
 <li><p>Write a filter for stderr results
-  <tt class="computeroutput">foobar/tests/filter_stderr</tt>.
+  <code class="computeroutput">foobar/tests/filter_stderr</code>.
   It can call the existing filters in
-  <tt class="computeroutput">tests/</tt>.  See
-  <tt class="computeroutput">memcheck/tests/filter_stderr</tt>
+  <code class="computeroutput">tests/</code>.  See
+  <code class="computeroutput">memcheck/tests/filter_stderr</code>
   for an example; in particular note the
-  <tt class="computeroutput">$dir</tt> trick that ensures the
+  <code class="computeroutput">$dir</code> trick that ensures the
   filter works correctly from any directory.</p></li>
 </ol></div>
 </div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.profiling"></a>3.3.4. Profiling</h3></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.profiling"></a>3.3.4. Profiling</h3></div></div></div>
 <p>Nb: as of 25-Mar-2005, the profiling is broken, and has been
 for a long time...</p>
 <p>To do simple tick-based profiling of a tool, include the
@@ -844,46 +738,40 @@ line:</p>
 <pre class="programlisting">
   #include "vg_profile.c"</pre>
 <p>in the tool somewhere, and rebuild (you may have to
-<tt class="computeroutput">make clean</tt> first).  Then run
-Valgrind with the <tt class="computeroutput">--profile=yes</tt>
+<code class="computeroutput">make clean</code> first).  Then run
+Valgrind with the <code class="computeroutput">--profile=yes</code>
 option.</p>
 <p>The profiler is stack-based; you can register a profiling
 event with
-<tt class="computeroutput">VG_(register_profile_event)()</tt>
-and then use the <tt class="computeroutput">VGP_PUSHCC</tt> and
-<tt class="computeroutput">VGP_POPCC</tt> macros to record time
+<code class="computeroutput">VG_(register_profile_event)()</code>
+and then use the <code class="computeroutput">VGP_PUSHCC</code> and
+<code class="computeroutput">VGP_POPCC</code> macros to record time
 spent doing certain things.  New profiling event numbers must not
 overlap with the core profiling event numbers.  See
-<tt class="filename">include/tool.h</tt> for details and Memcheck
-for an example.</p>
+<code class="filename">include/pub_tool_profile.h</code> for details and
+Memcheck for an example.</p>
 </div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.mkhackery"></a>3.3.5. Other Makefile Hackery</h3></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.mkhackery"></a>3.3.5. Other Makefile Hackery</h3></div></div></div>
 <p>If you add any directories under
-<tt class="computeroutput">valgrind/foobar/</tt>, you will need
-to add an appropriate <tt class="filename">Makefile.am</tt> to it, and
+<code class="computeroutput">valgrind/foobar/</code>, you will need
+to add an appropriate <code class="filename">Makefile.am</code> to it, and
 add a corresponding entry to the
-<tt class="computeroutput">AC_OUTPUT</tt> list in
-<tt class="filename">valgrind/configure.in</tt>.</p>
+<code class="computeroutput">AC_OUTPUT</code> list in
+<code class="filename">valgrind/configure.in</code>.</p>
 <p>If you add any scripts to your tool (see Cachegrind for an
 example) you need to add them to the
-<tt class="computeroutput">bin_SCRIPTS</tt> variable in
-<tt class="filename">valgrind/foobar/Makefile.am</tt>.</p>
+<code class="computeroutput">bin_SCRIPTS</code> variable in
+<code class="filename">valgrind/foobar/Makefile.am</code>.</p>
 </div>
 <div class="sect2" lang="en">
-<div class="titlepage">
-<div><div><h3 class="title">
-<a name="writing-tools.ifacever"></a>3.3.6. Core/tool Interface Versions</h3></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h3 class="title">
+<a name="writing-tools.ifacever"></a>3.3.6. Core/tool Interface Versions</h3></div></div></div>
 <p>In order to allow for the core/tool interface to evolve
 over time, Valgrind uses a basic interface versioning system.
 All a tool has to do is use the
-<tt class="computeroutput">VG_DETERMINE_INTERFACE_VERSION</tt>
+<code class="computeroutput">VG_DETERMINE_INTERFACE_VERSION</code>
 macro exactly once in its code.  If not, a link error will occur
 when the tool is built.</p>
 <p>The interface version number has the form X.Y.  Changes in
@@ -901,11 +789,8 @@ the interface.</p>
 </div>
 </div>
 <div class="sect1" lang="en">
-<div class="titlepage">
-<div><div><h2 class="title" style="clear: both">
-<a name="writing-tools.finalwords"></a>3.4. Final Words</h2></div></div>
-<div></div>
-</div>
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="writing-tools.finalwords"></a>3.4. Final Words</h2></div></div></div>
 <p>This whole core/tool business is under active development,
 although it's slowly maturing.</p>
 <p>The first consequence of this is that the core/tool
@@ -942,7 +827,7 @@ your feedback about it:</p>
 <td rowspan="2" width="40%" align="left">
 <a accesskey="p" href="cg-tech-docs.html">&lt;&lt; 2. How Cachegrind works</a> </td>
 <td width="20%" align="center"><a accesskey="u" href="tech-docs.html">Up</a></td>
-<td rowspan="2" width="40%" align="right"> <a accesskey="n" href="dist.html">Distribution Documents &gt;&gt;</a>
+<td rowspan="2" width="40%" align="right"> <a accesskey="n" href="dist.html">Valgrind Distribution Documents &gt;&gt;</a>
 </td>
 </tr>
 <tr><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td></tr>
