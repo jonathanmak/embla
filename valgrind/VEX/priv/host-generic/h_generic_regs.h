@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2005 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -87,10 +87,17 @@ typedef UInt HReg;
    available on any specific host.  For example on x86, the available
    classes are: Int32, Flt64, Vec128 only.
 
-   IMPORTANT NOTE: Vec128 is the only >= 128-bit-sized class, and
-   reg_alloc2.c handles it specially when assigning spill slots.  If
-   you add another 128-bit or larger regclass, you must remember to
-   update reg_alloc2.c accordingly.
+   IMPORTANT NOTE: reg_alloc2.c needs how much space is needed to spill
+   each class of register.  It has the following knowledge hardwired in:
+
+      HRcInt32     32 bits
+      HRcInt64     64 bits
+      HRcFlt64     80 bits (on x86 these are spilled by fstpt/fldt)
+      HRcVec64     64 bits
+      HRcVec128    128 bits
+
+   If you add another regclass, you must remember to update
+   reg_alloc2.c accordingly.
 */
 typedef
    enum { 
@@ -188,7 +195,7 @@ extern void addHRegUse ( HRegUsage*, HRegMode, HReg );
    This is precisely the behaviour that the register allocator needs
    to impose its decisions on the instructions it processes.  */
 
-#define N_HREG_REMAP 4
+#define N_HREG_REMAP 5
 
 typedef
    struct {
@@ -253,20 +260,24 @@ HInstrArray* doRegisterAllocation (
    Bool (*isMove) (HInstr*, HReg*, HReg*),
 
    /* Get info about register usage in this insn. */
-   void (*getRegUsage) (HRegUsage*, HInstr*),
+   void (*getRegUsage) (HRegUsage*, HInstr*, Bool),
 
    /* Apply a reg-reg mapping to an insn. */
-   void (*mapRegs) (HRegRemap*, HInstr*),
+   void (*mapRegs) (HRegRemap*, HInstr*, Bool),
 
    /* Return an insn to spill/restore a real reg to a spill slot
-      offset. */
-   HInstr* (*genSpill) ( HReg, Int ),
-   HInstr* (*genReload) ( HReg, Int ),
+      offset.  And optionally a function to do direct reloads. */
+   HInstr* (*genSpill) ( HReg, Int, Bool ),
+   HInstr* (*genReload) ( HReg, Int, Bool ),
+   HInstr* (*directReload) ( HInstr*, HReg, Short ),
    Int     guest_sizeB,
 
    /* For debug printing only. */
-   void (*ppInstr) ( HInstr* ),
-   void (*ppReg) ( HReg )
+   void (*ppInstr) ( HInstr*, Bool ),
+   void (*ppReg) ( HReg ),
+
+   /* 32/64bit mode */
+   Bool mode64
 );
 
 

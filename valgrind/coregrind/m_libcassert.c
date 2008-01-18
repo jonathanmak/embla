@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward 
+   Copyright (C) 2000-2007 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -29,6 +29,8 @@
 */
 
 #include "pub_core_basics.h"
+#include "pub_core_vki.h"
+#include "pub_core_vkiscnums.h"
 #include "pub_core_threadstate.h"
 #include "pub_core_libcbase.h"
 #include "pub_core_libcassert.h"
@@ -38,7 +40,6 @@
 #include "pub_core_syscall.h"
 #include "pub_core_tooliface.h"     // For VG_(details).{name,bug_reports_to}
 #include "pub_core_options.h"       // For VG_(clo_xml)
-#include "vki_unistd.h"
 
 /* ---------------------------------------------------------------------
    Assertery.
@@ -61,11 +62,25 @@
           : "=r" (pc),\
             "=r" (sp),\
             "=r" (fp));
-#elif defined(VGP_ppc32_linux)
+#elif defined(VGP_ppc32_linux) || defined(VGP_ppc32_aix5)
 #  define GET_REAL_PC_SP_AND_FP(pc, sp, fp)                   \
       asm("mflr 0;"                   /* r0 = lr */           \
           "bl m_libcassert_get_ip;"   /* lr = pc */           \
           "m_libcassert_get_ip:\n"                            \
+          "mflr %0;"                \
+          "mtlr 0;"                   /* restore lr */        \
+          "mr %1,1;"                \
+          "mr %2,1;"                \
+          : "=r" (pc),              \
+            "=r" (sp),              \
+            "=r" (fp)               \
+          : /* reads none */        \
+          : "r0" /* trashed */ );
+#elif defined(VGP_ppc64_linux) || defined(VGP_ppc64_aix5)
+#  define GET_REAL_PC_SP_AND_FP(pc, sp, fp)                   \
+      asm("mflr 0;"                   /* r0 = lr */           \
+          "bl .m_libcassert_get_ip;"  /* lr = pc */           \
+          ".m_libcassert_get_ip:\n"                           \
           "mflr %0;"                \
           "mtlr 0;"                   /* restore lr */        \
           "mr %1,1;"                \
@@ -84,7 +99,9 @@
 /* Pull down the entire world */
 void VG_(exit)( Int status )
 {
+#  if defined(VGO_linux)
    (void)VG_(do_syscall1)(__NR_exit_group, status );
+#  endif
    (void)VG_(do_syscall1)(__NR_exit, status );
    /* Why are we still alive here? */
    /*NOTREACHED*/
@@ -93,7 +110,7 @@ void VG_(exit)( Int status )
 }
 
 // Print the scheduler status.
-static void pp_sched_status ( void )
+void VG_(show_sched_status) ( void )
 {
    Int i; 
    VG_(printf)("\nsched status:\n"); 
@@ -113,7 +130,8 @@ static void report_and_quit ( const Char* report,
 {
    Addr stacktop;
    Addr ips[BACKTRACE_DEPTH];
-   ThreadState *tst = VG_(get_ThreadState)( VG_(get_lwp_tid)(VG_(gettid)()) );
+   ThreadState *tst 
+      = VG_(get_ThreadState)( VG_(lwpid_to_vgtid)( VG_(gettid)() ) );
  
    // If necessary, fake up an ExeContext which is of our actual real CPU
    // state.  Could cause problems if we got the panic/exception within the
@@ -124,14 +142,11 @@ static void report_and_quit ( const Char* report,
  
    stacktop = tst->os_state.valgrind_stack_init_SP;
  
-   VG_(get_StackTrace2)(ips, BACKTRACE_DEPTH, ip, sp, fp, lr, sp, stacktop);
+   VG_(get_StackTrace2)(0/*tid is unknown*/, 
+                        ips, BACKTRACE_DEPTH, ip, sp, fp, lr, sp, stacktop);
    VG_(pp_StackTrace)  (ips, BACKTRACE_DEPTH);
  
-   // Don't print this, as it's not terribly interesting and avoids a
-   // dependence on m_scheduler/, which would be crazy.
-   //VG_(printf)("\nBasic block ctr is approximately %llu\n", VG_(bbs_done) );
- 
-   pp_sched_status();
+   VG_(show_sched_status)();
    VG_(printf)("\n");
    VG_(printf)("Note: see also the FAQ.txt in the source distribution.\n");
    VG_(printf)("It contains workarounds to several common problems.\n");
@@ -153,7 +168,7 @@ void VG_(assert_fail) ( Bool isCore, const Char* expr, const Char* file,
 
    static Bool entered = False;
    if (entered) 
-     VG_(exit)(2);
+      VG_(exit)(2);
    entered = True;
 
    va_start(vargs, format);
@@ -174,7 +189,7 @@ void VG_(assert_fail) ( Bool isCore, const Char* expr, const Char* file,
    // Treat vg_assert2(0, "foo") specially, as a panicky abort
    if (VG_STREQ(expr, "0")) {
       VG_(printf)("\n%s: %s:%d (%s): the 'impossible' happened.\n",
-                  component, file, line, fn, expr );
+                  component, file, line, fn );
    } else {
       VG_(printf)("\n%s: %s:%d (%s): Assertion '%s' failed.\n",
                   component, file, line, fn, expr );
@@ -235,7 +250,7 @@ void VG_(unimplemented) ( Char* msg )
       "Valgrind has to exit now.  Sorry.  Bye!");
    VG_(message)(Vg_UserMsg,
       "");
-   pp_sched_status();
+   VG_(show_sched_status)();
    VG_(exit)(1);
 }
 

@@ -5,15 +5,21 @@
 
 #include "valgrind.h"
 
-#define STACK_SIZE 4096
+#define STACK_SIZE (10 * 4096)
 
 // This test is checking the libc context calls (setcontext, etc.) and
 // checks that Valgrind notices their stack changes properly.
 
-struct ucontext ctx1, ctx2, oldc;
+#if defined(_AIX)
+typedef  ucontext_t  mycontext;
+#else /* linux */
+typedef  struct ucontext  mycontext;
+#endif
+
+mycontext ctx1, ctx2, oldc;
 int count;
 
-void hello(struct ucontext *newc)
+void hello(mycontext *newc)
 {
     printf("hello, world: %d\n", count);
     if (count++ == 2)
@@ -21,13 +27,14 @@ void hello(struct ucontext *newc)
     setcontext(newc);
 }
 
-int init_context(struct ucontext *uc)
+int init_context(mycontext *uc)
 {
     void *stack;
     int ret;
 
     if (getcontext(uc) == -1) {
-        perror("getcontext");
+        //perror("getcontext");
+        printf("getcontext() doesn't seem to work\n");
         exit(1);
     }
 

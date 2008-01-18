@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward 
+   Copyright (C) 2000-2007 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -29,6 +29,7 @@
 */
 
 #include "pub_core_basics.h"
+#include "pub_core_vki.h"
 #include "pub_core_threadstate.h"
 #include "pub_core_debuginfo.h"
 #include "pub_core_aspacemgr.h"     // For VG_(is_addressable)()
@@ -37,8 +38,9 @@
 #include "pub_core_libcprint.h"
 #include "pub_core_machine.h"
 #include "pub_core_options.h"
-#include "pub_core_profile.h"
 #include "pub_core_stacktrace.h"
+#include "pub_core_xarray.h"
+#include "pub_core_clientstate.h"   // VG_(client__dl_sysinfo_int80)
 #include "pub_core_trampoline.h"
 
 /*------------------------------------------------------------*/
@@ -49,30 +51,38 @@
    IPs into 'ips'.  In order to be thread-safe, we pass in the
    thread's IP SP, FP if that's meaningful, and LR if that's
    meaningful.  Returns number of IPs put in 'ips'.
+
+   If you know what the thread ID for this stack is, send that as the
+   first parameter, else send zero.  This helps generate better stack
+   traces on ppc64-linux and has no effect on other platforms.
 */
-UInt VG_(get_StackTrace2) ( Addr* ips, UInt n_ips, 
+UInt VG_(get_StackTrace2) ( ThreadId tid_if_known,
+                            Addr* ips, UInt n_ips, 
                             Addr ip, Addr sp, Addr fp, Addr lr,
                             Addr fp_min, Addr fp_max_orig )
 {
-#if defined(VGP_ppc32_linux)
-   Bool  lr_is_first_RA = False; /* ppc only */
-#endif
+#  if defined(VGP_ppc32_linux) || defined(VGP_ppc64_linux) \
+                               || defined(VGP_ppc32_aix5) \
+                               || defined(VGP_ppc64_aix5)
+   Bool  lr_is_first_RA = False;
+#  endif
+#  if defined(VGP_ppc64_linux) || defined(VGP_ppc64_aix5) \
+                               || defined(VGP_ppc32_aix5)
+   Word redir_stack_size = 0;
+   Word redirs_used      = 0;
+#  endif
+
    Bool  debug = False;
    Int   i;
    Addr  fp_max;
    UInt  n_found = 0;
 
-   VGP_PUSHCC(VgpExeContext);
-
    vg_assert(sizeof(Addr) == sizeof(UWord));
    vg_assert(sizeof(Addr) == sizeof(void*));
 
    /* Snaffle IPs from the client's stack into ips[0 .. n_ips-1],
-      putting zeroes in when the trail goes cold, which we guess to be
+      stopping when the trail goes cold, which we guess to be
       when FP is not a reasonable stack location. */
-
-   for (i = 0; i < n_ips; i++)
-      ips[i] = 0;
 
    // JRS 2002-sep-17: hack, to round up fp_max to the end of the
    // current page, at least.  Dunno if it helps.
@@ -93,13 +103,13 @@ UInt VG_(get_StackTrace2) ( Addr* ips, UInt n_ips,
          don't bomb out either.  Needed to make John Regehr's
          user-space threads package work. JRS 20021001 */
       ips[0] = ip;
-      VGP_POPCC(VgpExeContext);
       return 1;
    } 
 
    /* Otherwise unwind the stack in a platform-specific way.  Trying
-      to merge the x86, amd64 and ppc32 logic into a single piece of
-      code is just too confusing and difficult to performance-tune.  */
+      to merge the x86, amd64, ppc32 and ppc64 logic into a single
+      piece of code is just too confusing and difficult to
+      performance-tune.  */
 
 #  if defined(VGP_x86_linux)
 
@@ -148,17 +158,17 @@ UInt VG_(get_StackTrace2) ( Addr* ips, UInt n_ips,
          fp = (((UWord*)fp)[0]);
          ips[i++] = ip;
          if (debug)
-            VG_(printf)("     ipsF[%d]=%08p\n", i-1, ips[i-1]);
+            VG_(printf)("     ipsF[%d]=0x%08lx\n", i-1, ips[i-1]);
          ip = ip - 1;
          continue;
       }
 
-      /* That didn't work out, so see if there is any CFI info to hand
+      /* That didn't work out, so see if there is any CF info to hand
          which can be used. */
-      if ( VG_(use_CFI_info)( &ip, &sp, &fp, fp_min, fp_max ) ) {
+      if ( VG_(use_CF_info)( &ip, &sp, &fp, fp_min, fp_max ) ) {
          ips[i++] = ip;
          if (debug)
-            VG_(printf)("     ipsC[%d]=%08p\n", i-1, ips[i-1]);
+            VG_(printf)("     ipsC[%d]=0x%08lx\n", i-1, ips[i-1]);
          ip = ip - 1;
          continue;
       }
@@ -201,7 +211,7 @@ UInt VG_(get_StackTrace2) ( Addr* ips, UInt n_ips,
 
       /* First off, see if there is any CFI info to hand which can
          be used. */
-      if ( VG_(use_CFI_info)( &ip, &sp, &fp, fp_min, fp_max ) ) {
+      if ( VG_(use_CF_info)( &ip, &sp, &fp, fp_min, fp_max ) ) {
          ips[i++] = ip;
          if (debug)
             VG_(printf)("     ipsC[%d]=%08p\n", i-1, ips[i-1]);
@@ -209,7 +219,7 @@ UInt VG_(get_StackTrace2) ( Addr* ips, UInt n_ips,
          continue;
       }
 
-      /* If VG_(use_CFI_info) fails, it won't modify ip/sp/fp, so
+      /* If VG_(use_CF_info) fails, it won't modify ip/sp/fp, so
          we can safely try the old-fashioned method. */
       /* This bit is supposed to deal with frames resulting from
          functions which begin "pushq %rbp ; movq %rsp, %rbp".
@@ -230,17 +240,71 @@ UInt VG_(get_StackTrace2) ( Addr* ips, UInt n_ips,
          continue;
       }
 
-      /* No luck there.  We have to give up. */
+      /* Last-ditch hack (evidently GDB does something similar).  We
+         are in the middle of nowhere and we have a nonsense value for
+         the frame pointer.  If the stack pointer is still valid,
+         assume that what it points at is a return address.  Yes,
+         desperate measures.  Could do better here:
+         - check that the supposed return address is in
+           an executable page
+         - check that the supposed return address is just after a call insn
+         - given those two checks, don't just consider *sp as the return 
+           address; instead scan a likely section of stack (eg sp .. sp+256)
+           and use suitable values found there.
+      */
+      if (fp_min <= sp && sp < fp_max) {
+         ip = ((UWord*)sp)[0];
+         ips[i++] = ip;
+         if (debug)
+            VG_(printf)("     ipsH[%d]=%08p\n", i-1, ips[i-1]);
+         ip = ip - 1;
+         sp += 8;
+         continue;
+      }
+
+      /* No luck at all.  We have to give up. */
       break;
    }
 
-#  elif defined(VGP_ppc32_linux)
+#  elif defined(VGP_ppc32_linux) || defined(VGP_ppc64_linux) \
+        || defined(VGP_ppc32_aix5) || defined(VGP_ppc64_aix5)
 
-   /*--------------------- ppc32 ---------------------*/
+   /*--------------------- ppc32/64 ---------------------*/
 
    /* fp is %r1.  ip is %cia.  Note, ppc uses r1 as both the stack and
       frame pointers. */
 
+#  if defined(VGP_ppc64_linux) || defined(VGP_ppc64_aix5)
+   redir_stack_size = VEX_GUEST_PPC64_REDIR_STACK_SIZE;
+   redirs_used      = 0;
+#  elif defined(VGP_ppc32_aix5)
+   redir_stack_size = VEX_GUEST_PPC32_REDIR_STACK_SIZE;
+   redirs_used      = 0;
+#  endif
+
+#  if defined(VG_PLAT_USES_PPCTOC)
+   /* Deal with bogus LR values caused by function
+      interception/wrapping on ppc-TOC platforms; see comment on
+      similar code a few lines further down. */
+   if (ULong_to_Ptr(lr) == (void*)&VG_(ppctoc_magic_redirect_return_stub)
+       && VG_(is_valid_tid)(tid_if_known)) {
+      Word hsp = VG_(threads)[tid_if_known].arch.vex.guest_REDIR_SP;
+      redirs_used++;
+      if (hsp >= 1 && hsp < redir_stack_size)
+         lr = VG_(threads)[tid_if_known]
+                 .arch.vex.guest_REDIR_STACK[hsp-1];
+   }
+#  endif
+
+   /* We have to determine whether or not LR currently holds this fn
+      (call it F)'s return address.  It might not if F has previously
+      called some other function, hence overwriting LR with a pointer
+      to some part of F.  Hence if LR and IP point to the same
+      function then we conclude LR does not hold this function's
+      return address; instead the LR at entry must have been saved in
+      the stack by F's prologue and so we must get it from there
+      instead.  Note all this guff only applies to the innermost
+      frame. */
    lr_is_first_RA = False;
    {
 #     define M_VG_ERRTXT 1000
@@ -255,12 +319,22 @@ UInt VG_(get_StackTrace2) ( Addr* ips, UInt n_ips,
    ips[0] = ip;
    i = 1;
 
-   if (fp_min <= fp && fp < fp_max-4+1) {
+   if (fp_min <= fp && fp < fp_max-VG_WORDSIZE+1) {
 
       /* initial FP is sane; keep going */
       fp = (((UWord*)fp)[0]);
 
       while (True) {
+
+        /* On ppc64-linux (ppc64-elf, really), and on AIX, the lr save
+           slot is 2 words back from sp, whereas on ppc32-elf(?) it's
+           only one word back. */
+#        if defined(VGP_ppc64_linux) \
+            || defined(VGP_ppc32_aix5) || defined(VGP_ppc64_aix5)
+         const Int lr_offset = 2;
+#        else
+         const Int lr_offset = 1;
+#        endif
 
          if (i >= n_ips)
             break;
@@ -273,7 +347,29 @@ UInt VG_(get_StackTrace2) ( Addr* ips, UInt n_ips,
             if (i == 1 && lr_is_first_RA)
                ip = lr;
             else
-               ip = (((UWord*)fp)[1]);
+               ip = (((UWord*)fp)[lr_offset]);
+
+#           if defined(VG_PLAT_USES_PPCTOC)
+            /* Nasty hack to do with function replacement/wrapping on
+               ppc64-linux/ppc64-aix/ppc32-aix.  If LR points to our
+               magic return stub, then we are in a wrapped or
+               intercepted function, in which LR has been messed with.
+               The original LR will have been pushed onto the thread's
+               hidden REDIR stack one down from the top (top element
+               is the saved R2) and so we should restore the value
+               from there instead.  Since nested redirections can and
+               do happen, we keep track of the number of nested LRs
+               used by the unwinding so far with 'redirs_used'. */
+            if (ip == (Addr)&VG_(ppctoc_magic_redirect_return_stub)
+                && VG_(is_valid_tid)(tid_if_known)) {
+               Word hsp = VG_(threads)[tid_if_known].arch.vex.guest_REDIR_SP;
+               hsp -= 2 * redirs_used;
+               redirs_used ++;
+               if (hsp >= 1 && hsp < redir_stack_size)
+                  ip = VG_(threads)[tid_if_known]
+                          .arch.vex.guest_REDIR_STACK[hsp-1];
+            }
+#           endif
 
             fp = (((UWord*)fp)[0]);
             ips[i++] = ip;
@@ -292,11 +388,11 @@ UInt VG_(get_StackTrace2) ( Addr* ips, UInt n_ips,
 #  endif
 
    n_found = i;
-   VGP_POPCC(VgpExeContext);
    return n_found;
 }
 
-UInt VG_(get_StackTrace) ( ThreadId tid, StackTrace ips, UInt n_ips )
+UInt VG_(get_StackTrace) ( ThreadId tid, StackTrace ips, UInt n_ips, 
+                           Word first_ip_delta )
 {
    /* thread in thread table */
    Addr ip                 = VG_(get_IP)(tid);
@@ -306,27 +402,42 @@ UInt VG_(get_StackTrace) ( ThreadId tid, StackTrace ips, UInt n_ips )
    Addr stack_highest_word = VG_(threads)[tid].client_stack_highest_word;
 
 #  if defined(VGP_x86_linux)
-   /* Nasty little hack to deal with sysinfo syscalls - if libc is
-      using the sysinfo page for syscalls (the TLS version does), then
-      ip will always appear to be in that page when doing a syscall,
-      not the actual libc function doing the syscall.  This check sees
-      if IP is within the syscall code, and pops the return address
-      off the stack so that ip is placed within the library function
-      calling the syscall.  This makes stack backtraces much more
-      useful.  */
-   if (ip >= (Addr)&VG_(trampoline_stuff_start) 
-       && ip < (Addr)&VG_(trampoline_stuff_end)
+   /* Nasty little hack to deal with syscalls - if libc is using its
+      _dl_sysinfo_int80 function for syscalls (the TLS version does),
+      then ip will always appear to be in that function when doing a
+      syscall, not the actual libc function doing the syscall.  This
+      check sees if IP is within that function, and pops the return
+      address off the stack so that ip is placed within the library
+      function calling the syscall.  This makes stack backtraces much
+      more useful.
+
+      The function is assumed to look like this (from glibc-2.3.6 sources):
+         _dl_sysinfo_int80:
+            int $0x80
+            ret
+      That is 3 (2+1) bytes long.  We could be more thorough and check
+      the 3 bytes of the function are as expected, but I can't be
+      bothered.
+   */
+   if (VG_(client__dl_sysinfo_int80) != 0 /* we know its address */
+       && ip >= VG_(client__dl_sysinfo_int80)
+       && ip < VG_(client__dl_sysinfo_int80)+3
        && VG_(am_is_valid_for_client)(sp, sizeof(Addr), VKI_PROT_READ)) {
       ip = *(Addr *)sp;
       sp += sizeof(Addr);
    }
 #  endif
 
+   /* Take into account the first_ip_delta. */
+   vg_assert( sizeof(Addr) == sizeof(Word) );
+   ip += first_ip_delta;
+
    if (0)
-      VG_(printf)("tid %d: stack_highest=%p ip=%p sp=%p fp=%p\n",
+      VG_(printf)("tid %d: stack_highest=0x%08lx ip=0x%08lx sp=0x%08lx fp=0x%08lx\n",
 		  tid, stack_highest_word, ip, sp, fp);
 
-   return VG_(get_StackTrace2)(ips, n_ips, ip, sp, fp, lr, sp, stack_highest_word);
+   return VG_(get_StackTrace2)(tid, ips, n_ips, ip, sp, fp, lr, sp, 
+                                    stack_highest_word);
 }
 
 static void printIpDesc(UInt n, Addr ip)
@@ -362,8 +473,9 @@ void VG_(pp_StackTrace) ( StackTrace ips, UInt n_ips )
 void VG_(get_and_pp_StackTrace) ( ThreadId tid, UInt n_ips )
 {
    Addr ips[n_ips];
-   VG_(get_StackTrace)(tid, ips, n_ips);
-   VG_(pp_StackTrace) (     ips, n_ips);
+   UInt n_ips_obtained = VG_(get_StackTrace)(tid, ips, n_ips,
+                                             0/*first_ip_delta*/);
+   VG_(pp_StackTrace)(ips, n_ips_obtained);
 }
 
 
@@ -391,8 +503,8 @@ void VG_(apply_StackTrace)( void(*action)(UInt n, Addr ip),
          mybuf[MYBUF_LEN-1] = 0; // paranoia
          if ( VG_STREQ("main", mybuf)
 #             if defined(VGO_linux)
-              || VG_STREQ("__libc_start_main", mybuf)  // glibc glibness
-              || VG_STREQ("generic_start_main", mybuf) // Yellow Dog doggedness
+              || VG_STREQ("__libc_start_main", mybuf)   // glibc glibness
+              || VG_STREQ("generic_start_main", mybuf)  // Yellow Dog doggedness
 #             endif
             )
             main_done = True;

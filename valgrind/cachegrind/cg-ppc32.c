@@ -1,13 +1,13 @@
 
 /*--------------------------------------------------------------------*/
-/*--- PPC32-specific definitions.                 ppc32/cg-ppc32.c ---*/
+/*--- PPC32-specific definitions.                       cg-ppc32.c ---*/
 /*--------------------------------------------------------------------*/
 
 /*
    This file is part of Cachegrind, a Valgrind tool for cache
    profiling programs.
 
-   Copyright (C) 2005 Nicholas Nethercote
+   Copyright (C) 2005-2007 Nicholas Nethercote
       njn@valgrind.org
 
    This program is free software; you can redistribute it and/or
@@ -49,6 +49,10 @@ void VG_(configure_caches)(cache_t* I1c, cache_t* D1c, cache_t* L2c,
    // not important) in the regression test suite without filtering the
    // x86/AMD64 one (which we want to see if it ever occurs in the
    // regression test suite).
+   //
+   // If you change this message, please update
+   // cachegrind/tests/filter_stderr!
+   //
    if (!all_caches_clo_defined) {
       VG_(message)(Vg_DebugMsg, 
                    "Warning: Cannot auto-detect cache config on PPC32, using one "

@@ -1,8 +1,8 @@
 # This contains a match against a "???" entry
 {
    <insert a suppression name here>
-   Memcheck:Addr1
+   Memcheck:Jump
    obj:*
-   fun:__libc_start_main
+   fun:(below main)
 }
 

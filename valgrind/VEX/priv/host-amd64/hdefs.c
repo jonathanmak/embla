@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2005 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -168,7 +168,7 @@ void getAllocableRegs_AMD64 ( Int* nregs, HReg** arr )
    (*arr)[ 5] = hregAMD64_XMM9();
 #endif
 #if 1
-   *nregs = 19;
+   *nregs = 20;
    *arr = LibVEX_Alloc(*nregs * sizeof(HReg));
    (*arr)[ 0] = hregAMD64_RSI();
    (*arr)[ 1] = hregAMD64_RDI();
@@ -190,7 +190,7 @@ void getAllocableRegs_AMD64 ( Int* nregs, HReg** arr )
    (*arr)[16] = hregAMD64_XMM10();
    (*arr)[17] = hregAMD64_XMM11();
    (*arr)[18] = hregAMD64_XMM12();
-
+   (*arr)[19] = hregAMD64_R10();
 #endif
 }
 
@@ -548,7 +548,7 @@ HChar* showA87FpOp ( A87FpOp op ) {
       case Afp_ATAN:   return "atan";
       case Afp_YL2X:   return "yl2x";
       case Afp_YL2XP1: return "yl2xp1";
-//..       case Xfp_PREM:   return "prem";
+      case Afp_PREM:   return "prem";
 //..       case Xfp_PREM1:  return "prem1";
       case Afp_SQRT:   return "sqrt";
 //..       case Xfp_ABS:    return "abs";
@@ -681,6 +681,13 @@ AMD64Instr* AMD64Instr_Unary64 ( AMD64UnaryOp op, HReg dst ) {
    i->tag             = Ain_Unary64;
    i->Ain.Unary64.op  = op;
    i->Ain.Unary64.dst = dst;
+   return i;
+}
+AMD64Instr* AMD64Instr_Lea64 ( AMD64AMode* am, HReg dst ) {
+   AMD64Instr* i      = LibVEX_Alloc(sizeof(AMD64Instr));
+   i->tag             = Ain_Lea64;
+   i->Ain.Lea64.am    = am;
+   i->Ain.Lea64.dst   = dst;
    return i;
 }
 AMD64Instr* AMD64Instr_MulL ( Bool syned, AMD64RM* src ) {
@@ -817,6 +824,13 @@ AMD64Instr* AMD64Instr_A87LdCW ( AMD64AMode* addr )
    AMD64Instr* i       = LibVEX_Alloc(sizeof(AMD64Instr));
    i->tag              = Ain_A87LdCW;
    i->Ain.A87LdCW.addr = addr;
+   return i;
+}
+AMD64Instr* AMD64Instr_A87StSW ( AMD64AMode* addr )
+{
+   AMD64Instr* i       = LibVEX_Alloc(sizeof(AMD64Instr));
+   i->tag              = Ain_A87StSW;
+   i->Ain.A87StSW.addr = addr;
    return i;
 }
 
@@ -1019,8 +1033,9 @@ AMD64Instr* AMD64Instr_SseShuf ( Int order, HReg src, HReg dst ) {
    return i;
 }
 
-void ppAMD64Instr ( AMD64Instr* i ) 
+void ppAMD64Instr ( AMD64Instr* i, Bool mode64 ) 
 {
+   vassert(mode64 == True);
    switch (i->tag) {
       case Ain_Imm64: 
          vex_printf("movabsq $0x%llx,", i->Ain.Imm64.imm64);
@@ -1053,6 +1068,12 @@ void ppAMD64Instr ( AMD64Instr* i )
       case Ain_Unary64:
          vex_printf("%sq ", showAMD64UnaryOp(i->Ain.Unary64.op));
          ppHRegAMD64(i->Ain.Unary64.dst);
+         return;
+      case Ain_Lea64:
+         vex_printf("leaq ");
+         ppAMD64AMode(i->Ain.Lea64.am);
+         vex_printf(",");
+         ppHRegAMD64(i->Ain.Lea64.dst);
          return;
       case Ain_MulL:
          vex_printf("%cmulq ", i->Ain.MulL.syned ? 's' : 'u');
@@ -1090,14 +1111,16 @@ void ppAMD64Instr ( AMD64Instr* i )
             vex_printf("if (%%rflags.%s) { ", 
                        showAMD64CondCode(i->Ain.Goto.cond));
          }
-         if (i->Ain.Goto.jk != Ijk_Boring) {
+         if (i->Ain.Goto.jk != Ijk_Boring
+             && i->Ain.Goto.jk != Ijk_Call
+             && i->Ain.Goto.jk != Ijk_Ret) {
             vex_printf("movl $");
             ppIRJumpKind(i->Ain.Goto.jk);
             vex_printf(",%%ebp ; ");
          }
          vex_printf("movq ");
          ppAMD64RI(i->Ain.Goto.dst);
-         vex_printf(",%%rax ; ret");
+         vex_printf(",%%rax ; movabsq $dispatcher_addr,%%rdx ; jmp *%%rdx");
          if (i->Ain.Goto.cond != Acc_ALWAYS) {
             vex_printf(" }");
          }
@@ -1152,18 +1175,22 @@ void ppAMD64Instr ( AMD64Instr* i )
          vex_printf("mfence" );
          return;
       case Ain_A87Free:
-         vex_printf("ffree %%st(7..%d)\n", 7 - i->Ain.A87Free.nregs );
+         vex_printf("ffree %%st(7..%d)", 8 - i->Ain.A87Free.nregs );
          break;
       case Ain_A87PushPop:
          vex_printf(i->Ain.A87PushPop.isPush ? "fldl " : "fstpl ");
          ppAMD64AMode(i->Ain.A87PushPop.addr);
          break;
       case Ain_A87FpOp:
-         vex_printf("f%s\n", showA87FpOp(i->Ain.A87FpOp.op));
+         vex_printf("f%s", showA87FpOp(i->Ain.A87FpOp.op));
          break;
       case Ain_A87LdCW:
          vex_printf("fldcw ");
          ppAMD64AMode(i->Ain.A87LdCW.addr);
+         break;
+      case Ain_A87StSW:
+         vex_printf("fstsw ");
+         ppAMD64AMode(i->Ain.A87StSW.addr);
          break;
 //..       case Xin_FpUnary:
 //..          vex_printf("g%sD ", showAMD64FpOp(i->Xin.FpUnary.op));
@@ -1335,9 +1362,10 @@ void ppAMD64Instr ( AMD64Instr* i )
 
 /* --------- Helpers for register allocation. --------- */
 
-void getRegUsage_AMD64Instr ( HRegUsage* u, AMD64Instr* i )
+void getRegUsage_AMD64Instr ( HRegUsage* u, AMD64Instr* i, Bool mode64 )
 {
    Bool unary;
+   vassert(mode64 == True);
    initHRegUsage(u);
    switch (i->tag) {
       case Ain_Imm64:
@@ -1369,6 +1397,10 @@ void getRegUsage_AMD64Instr ( HRegUsage* u, AMD64Instr* i )
          return;
       case Ain_Unary64:
          addHRegUse(u, HRmModify, i->Ain.Unary64.dst);
+         return;
+      case Ain_Lea64:
+         addRegUsage_AMD64AMode(u, i->Ain.Lea64.am);
+         addHRegUse(u, HRmWrite, i->Ain.Lea64.dst);
          return;
       case Ain_MulL:
          addRegUsage_AMD64RM(u, i->Ain.MulL.src, HRmRead);
@@ -1445,8 +1477,13 @@ void getRegUsage_AMD64Instr ( HRegUsage* u, AMD64Instr* i )
          return;
       case Ain_Goto:
          addRegUsage_AMD64RI(u, i->Ain.Goto.dst);
-         addHRegUse(u, HRmWrite, hregAMD64_RAX());
-         if (i->Ain.Goto.jk != Ijk_Boring)
+         addHRegUse(u, HRmWrite, hregAMD64_RAX()); /* used for next guest addr */
+         addHRegUse(u, HRmWrite, hregAMD64_RDX()); /* used for dispatcher addr */
+         if (i->Ain.Goto.jk != Ijk_Boring
+             && i->Ain.Goto.jk != Ijk_Call
+             && i->Ain.Goto.jk != Ijk_Ret)
+            /* note, this is irrelevant since rbp is not actually
+               available to the allocator.  But still .. */
             addHRegUse(u, HRmWrite, hregAMD64_RBP());
          return;
       case Ain_CMov64:
@@ -1483,6 +1520,9 @@ void getRegUsage_AMD64Instr ( HRegUsage* u, AMD64Instr* i )
          return;
       case Ain_A87LdCW:
          addRegUsage_AMD64AMode(u, i->Ain.A87LdCW.addr);
+         return;
+      case Ain_A87StSW:
+         addRegUsage_AMD64AMode(u, i->Ain.A87StSW.addr);
          return;
 //..       case Xin_FpUnary:
 //..          addHRegUse(u, HRmRead, i->Xin.FpUnary.src);
@@ -1607,7 +1647,7 @@ void getRegUsage_AMD64Instr ( HRegUsage* u, AMD64Instr* i )
          addHRegUse(u, HRmWrite, i->Ain.SseShuf.dst);
          return;
       default:
-         ppAMD64Instr(i);
+         ppAMD64Instr(i, mode64);
          vpanic("getRegUsage_AMD64Instr");
    }
 }
@@ -1618,8 +1658,9 @@ static inline void mapReg(HRegRemap* m, HReg* r)
    *r = lookupHRegRemap(m, *r);
 }
 
-void mapRegs_AMD64Instr ( HRegRemap* m, AMD64Instr* i )
+void mapRegs_AMD64Instr ( HRegRemap* m, AMD64Instr* i, Bool mode64 )
 {
+   vassert(mode64 == True);
    switch (i->tag) {
       case Ain_Imm64:
          mapReg(m, &i->Ain.Imm64.dst);
@@ -1640,6 +1681,10 @@ void mapRegs_AMD64Instr ( HRegRemap* m, AMD64Instr* i )
          return;
       case Ain_Unary64:
          mapReg(m, &i->Ain.Unary64.dst);
+         return;
+      case Ain_Lea64:
+         mapRegs_AMD64AMode(m, i->Ain.Lea64.am);
+         mapReg(m, &i->Ain.Lea64.dst);
          return;
       case Ain_MulL:
          mapRegs_AMD64RM(m, i->Ain.MulL.src);
@@ -1693,6 +1738,9 @@ void mapRegs_AMD64Instr ( HRegRemap* m, AMD64Instr* i )
          return;
       case Ain_A87LdCW:
          mapRegs_AMD64AMode(m, i->Ain.A87LdCW.addr);
+         return;
+      case Ain_A87StSW:
+         mapRegs_AMD64AMode(m, i->Ain.A87StSW.addr);
          return;
 //..       case Xin_FpUnary:
 //..          mapReg(m, &i->Xin.FpUnary.src);
@@ -1781,7 +1829,7 @@ void mapRegs_AMD64Instr ( HRegRemap* m, AMD64Instr* i )
          mapReg(m, &i->Ain.SseShuf.dst);
          return;
       default:
-         ppAMD64Instr(i);
+         ppAMD64Instr(i, mode64);
          vpanic("mapRegs_AMD64Instr");
    }
 }
@@ -1818,11 +1866,12 @@ Bool isMove_AMD64Instr ( AMD64Instr* i, HReg* src, HReg* dst )
    register allocator.  Note it's critical these don't write the
    condition codes. */
 
-AMD64Instr* genSpill_AMD64 ( HReg rreg, Int offsetB )
+AMD64Instr* genSpill_AMD64 ( HReg rreg, Int offsetB, Bool mode64 )
 {
    AMD64AMode* am;
    vassert(offsetB >= 0);
    vassert(!hregIsVirtual(rreg));
+   vassert(mode64 == True);
    am = AMD64AMode_IR(offsetB, hregAMD64_RBP());
 
    switch (hregClass(rreg)) {
@@ -1836,11 +1885,12 @@ AMD64Instr* genSpill_AMD64 ( HReg rreg, Int offsetB )
    }
 }
 
-AMD64Instr* genReload_AMD64 ( HReg rreg, Int offsetB )
+AMD64Instr* genReload_AMD64 ( HReg rreg, Int offsetB, Bool mode64 )
 {
    AMD64AMode* am;
    vassert(offsetB >= 0);
    vassert(!hregIsVirtual(rreg));
+   vassert(mode64 == True);
    am = AMD64AMode_IR(offsetB, hregAMD64_RBP());
    switch (hregClass(rreg)) {
       case HRcInt64:
@@ -1940,6 +1990,17 @@ static Bool fits8bits ( UInt w32 )
 {
    Int i32 = (Int)w32;
    return toBool(i32 == ((i32 << 24) >> 24));
+}
+/* Can the lower 32 bits be signedly widened to produce the whole
+   64-bit value?  In other words, are the top 33 bits either all 0 or
+   all 1 ? */
+static Bool fitsIn32Bits ( ULong x )
+{
+   Long y0 = (Long)x;
+   Long y1 = y0;
+   y1 <<= 32;
+   y1 >>=/*s*/ 32;
+   return toBool(x == y1);
 }
 
 
@@ -2195,7 +2256,8 @@ static UChar* do_ffree_st ( UChar* p, Int n )
    Note that buf is not the insn's final place, and therefore it is
    imperative to emit position-independent code. */
 
-Int emit_AMD64Instr ( UChar* buf, Int nbuf, AMD64Instr* i )
+Int emit_AMD64Instr ( UChar* buf, Int nbuf, AMD64Instr* i, 
+                      Bool mode64, void* dispatch )
 {
    UInt /*irno,*/ opc, opc_rr, subopc_imm, opc_imma, opc_cl, opc_imm, subopc;
    UInt   xtra;
@@ -2205,13 +2267,14 @@ Int emit_AMD64Instr ( UChar* buf, Int nbuf, AMD64Instr* i )
    UChar* ptmp;
    Int    j;
    vassert(nbuf >= 32);
+   vassert(mode64 == True);
 
    /* Wrap an integer as a int register, for use assembling
       GrpN insns, in which the greg field is used as a sub-opcode
       and does not really contain a register. */
 #  define fake(_n) mkHReg((_n), HRcInt64, False)
 
-   /* vex_printf("asm  "); ppAMD64Instr(i); vex_printf("\n"); */
+   /* vex_printf("asm  "); ppAMD64Instr(i, mode64); vex_printf("\n"); */
 
    switch (i->tag) {
 
@@ -2442,6 +2505,12 @@ Int emit_AMD64Instr ( UChar* buf, Int nbuf, AMD64Instr* i )
       }
       break;
 
+   case Ain_Lea64:
+      *p++ = rexAMode_M(i->Ain.Lea64.dst, i->Ain.Lea64.am);
+      *p++ = 0x8D;
+      p = doAMode_M(p, i->Ain.Lea64.dst, i->Ain.Lea64.am);
+      goto done;
+
    case Ain_MulL:
       subopc = i->Ain.MulL.syned ? 5 : 4;
       switch (i->Ain.MulL.src->tag)  {
@@ -2543,25 +2612,36 @@ Int emit_AMD64Instr ( UChar* buf, Int nbuf, AMD64Instr* i )
             goto bad;
       }
 
-   case Ain_Call:
+   case Ain_Call: {
       /* As per detailed comment for Ain_Call in
          getRegUsage_AMD64Instr above, %r11 is used as an address
          temporary. */
       /* jump over the following two insns if the condition does not
          hold */
+      Bool shortImm = fitsIn32Bits(i->Ain.Call.target);
       if (i->Ain.Call.cond != Acc_ALWAYS) {
          *p++ = toUChar(0x70 + (0xF & (i->Ain.Call.cond ^ 1)));
-         *p++ = 13; /* 13 bytes in the next two insns */
+         *p++ = shortImm ? 10 : 13;
+         /* 10 or 13 bytes in the next two insns */
       }
-      /* movabsq $target, %r11 */
-      *p++ = 0x49;
-      *p++ = 0xBB;
-      p = emit64(p, i->Ain.Call.target);
-      /* call *%r11 */
+      if (shortImm) {
+         /* 7 bytes: movl sign-extend(imm32), %r11 */
+         *p++ = 0x49;
+         *p++ = 0xC7;
+         *p++ = 0xC3;
+         p = emit32(p, (UInt)i->Ain.Call.target);
+      } else {
+         /* 10 bytes: movabsq $target, %r11 */
+         *p++ = 0x49;
+         *p++ = 0xBB;
+         p = emit64(p, i->Ain.Call.target);
+      }
+      /* 3 bytes: call *%r11 */
       *p++ = 0x41;
       *p++ = 0xFF;
       *p++ = 0xD3;
       goto done;
+   }
 
    case Ain_Goto:
       /* Use ptmp for backpatching conditional jumps. */
@@ -2606,6 +2686,12 @@ Int emit_AMD64Instr ( UChar* buf, Int nbuf, AMD64Instr* i )
          case Ijk_TInval:
             *p++ = 0xBD;
             p = emit32(p, VEX_TRC_JMP_TINVAL); break;
+         case Ijk_NoRedir:
+            *p++ = 0xBD;
+            p = emit32(p, VEX_TRC_JMP_NOREDIR); break;
+         case Ijk_SigTRAP:
+            *p++ = 0xBD;
+            p = emit32(p, VEX_TRC_JMP_SIGTRAP); break;
          case Ijk_Ret:
          case Ijk_Call:
          case Ijk_Boring:
@@ -2632,13 +2718,32 @@ Int emit_AMD64Instr ( UChar* buf, Int nbuf, AMD64Instr* i )
          }
       }
 
-      /* ret */
-      *p++ = 0xC3;
+      /* Get the dispatcher address into %rdx.  This has to happen
+         after the load of %rax since %rdx might be carrying the value
+         destined for %rax immediately prior to this Ain_Goto. */
+      vassert(sizeof(ULong) == sizeof(void*));
+      vassert(dispatch != NULL);
+
+      if (fitsIn32Bits(Ptr_to_ULong(dispatch))) {
+         /* movl sign-extend(imm32), %rdx */
+         *p++ = 0x48;
+         *p++ = 0xC7;
+         *p++ = 0xC2;
+         p = emit32(p, (UInt)Ptr_to_ULong(dispatch));
+      } else {
+         /* movabsq $imm64, %rdx */
+         *p++ = 0x48;
+         *p++ = 0xBA;
+         p = emit64(p, Ptr_to_ULong(dispatch));
+      }
+      /* jmp *%rdx */
+      *p++ = 0xFF;
+      *p++ = 0xE2;
 
       /* Fix up the conditional jump, if there was one. */
       if (i->Ain.Goto.cond != Acc_ALWAYS) {
          Int delta = p - ptmp;
-         vassert(delta > 0 && delta < 20);
+         vassert(delta > 0 && delta < 30);
          *ptmp = toUChar(delta-1);
       }
       goto done;
@@ -2776,6 +2881,7 @@ Int emit_AMD64Instr ( UChar* buf, Int nbuf, AMD64Instr* i )
          case Afp_ATAN:   *p++ = 0xD9; *p++ = 0xF3; break;
          case Afp_YL2X:   *p++ = 0xD9; *p++ = 0xF1; break;
          case Afp_YL2XP1: *p++ = 0xD9; *p++ = 0xF9; break;
+         case Afp_PREM:   *p++ = 0xD9; *p++ = 0xF8; break;
          default: goto bad;
       }
       goto done;
@@ -2785,6 +2891,13 @@ Int emit_AMD64Instr ( UChar* buf, Int nbuf, AMD64Instr* i )
                 rexAMode_M(fake(5), i->Ain.A87LdCW.addr) );
       *p++ = 0xD9;
       p = doAMode_M(p, fake(5)/*subopcode*/, i->Ain.A87LdCW.addr);
+      goto done;
+
+   case Ain_A87StSW:
+      *p++ = clearWBit(
+                rexAMode_M(fake(7), i->Ain.A87StSW.addr) );
+      *p++ = 0xDD;
+      p = doAMode_M(p, fake(7)/*subopcode*/, i->Ain.A87StSW.addr);
       goto done;
 
    case Ain_Store:
@@ -3337,7 +3450,7 @@ Int emit_AMD64Instr ( UChar* buf, Int nbuf, AMD64Instr* i )
    }
 
   bad:
-   ppAMD64Instr(i);
+   ppAMD64Instr(i, mode64);
    vpanic("emit_AMD64Instr");
    /*NOTREACHED*/
    

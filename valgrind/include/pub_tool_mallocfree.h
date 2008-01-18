@@ -8,7 +8,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward
+   Copyright (C) 2000-2007 Julian Seward
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -33,11 +33,17 @@
 #define __PUB_TOOL_MALLOCFREE_H
 
 // These can be for allocating memory used by tools.
+// Nb: the allocators *always succeed* -- they never return NULL (Valgrind
+// will abort if they can't allocate the memory).
 extern void* VG_(malloc)         ( SizeT nbytes );
 extern void  VG_(free)           ( void* p );
 extern void* VG_(calloc)         ( SizeT n, SizeT bytes_per_elem );
 extern void* VG_(realloc)        ( void* p, SizeT size );
 extern Char* VG_(strdup)         ( const Char* s );
+
+// Returns the usable size of a heap-block.  It's the asked-for size plus
+// possibly some more due to rounding up.
+extern SizeT VG_(malloc_usable_size)( void* p );
 
 // TODO: move somewhere else
 // Call here to bomb the system when out of memory (mmap anon fails)

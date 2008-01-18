@@ -34,7 +34,7 @@ Run with flag --xml=yes.  That`s all.  Note however several
 caveats.
 
 * At the present time only Memcheck is supported.  The scheme extends
-  easily enough to cover Addrcheck and Helgrind if needed.
+  easily enough to cover Helgrind if needed.
 
 * When XML output is selected, various other settings are made.
   This is in order that the output format is more controlled.
@@ -154,6 +154,8 @@ following in sequence:
 
   That is, both the name of the environment variable and its value
   are given.
+  [update:  as of v3.3.0, this is not present, as the --log-file-qualifier
+  option has been removed, replaced by the %q format specifier in --log-file.]
 
 * OPTIONALLY, if --xml-user-comment=STRING was given:
 

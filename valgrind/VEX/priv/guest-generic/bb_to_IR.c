@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2005 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -56,12 +56,16 @@
 __attribute((regparm(2)))
 static UInt genericg_compute_adler32 ( HWord addr, HWord len );
 
+/* Small helpers */
+static Bool const_False ( void* callback_opaque, Addr64 a ) { 
+   return False; 
+}
 
 /* Disassemble a complete basic block, starting at guest_IP_start, 
-   returning a new IRBB.  The disassembler may chase across basic
+   returning a new IRSB.  The disassembler may chase across basic
    block boundaries if it wishes and if chase_into_ok allows it.
    The precise guest address ranges from which code has been taken
-   are written into vge.  guest_IP_start is taken to be the IP in
+   are written into vge.  guest_IP_bbstart is taken to be the IP in
    the guest's address space corresponding to the instruction at
    &guest_code[0].  
 
@@ -71,22 +75,36 @@ static UInt genericg_compute_adler32 ( HWord addr, HWord len );
    do_self_check indicates that the caller needs a self-checking
    translation.
 
+   preamble_function is a callback which allows the caller to add
+   its own IR preamble (following the self-check, if any).  May be
+   NULL.  If non-NULL, the IRSB under construction is handed to 
+   this function, which presumably adds IR statements to it.  The
+   callback may optionally complete the block and direct bb_to_IR
+   not to disassemble any instructions into it; this is indicated
+   by the callback returning True.
+
    offB_TIADDR and offB_TILEN are the offsets of guest_TIADDR and
    guest_TILEN.  Since this routine has to work for any guest state,
    without knowing what it is, those offsets have to passed in.
+
+   callback_opaque is a caller-supplied pointer to data which the
+   callbacks may want to see.  Vex has no idea what it is.
+   (In fact it's a VgInstrumentClosure.)
 */
 
-static Bool const_False ( Addr64 a ) { return False; }
-
-IRBB* bb_to_IR ( /*OUT*/VexGuestExtents* vge,
+IRSB* bb_to_IR ( /*OUT*/VexGuestExtents* vge,
+                 /*IN*/ void*            callback_opaque,
                  /*IN*/ DisOneInstrFn    dis_instr_fn,
                  /*IN*/ UChar*           guest_code,
                  /*IN*/ Addr64           guest_IP_bbstart,
-                 /*IN*/ Bool             (*chase_into_ok)(Addr64),
+                 /*IN*/ Bool             (*chase_into_ok)(void*,Addr64),
                  /*IN*/ Bool             host_bigendian,
+                 /*IN*/ VexArch          arch_guest,
                  /*IN*/ VexArchInfo*     archinfo_guest,
+                 /*IN*/ VexAbiInfo*      abiinfo_both,
                  /*IN*/ IRType           guest_word_type,
                  /*IN*/ Bool             do_self_check,
+                 /*IN*/ Bool             (*preamble_function)(void*,IRSB*),
                  /*IN*/ Int              offB_TISTART,
                  /*IN*/ Int              offB_TILEN )
 {
@@ -98,10 +116,11 @@ IRBB* bb_to_IR ( /*OUT*/VexGuestExtents* vge,
    static Int n_resteers = 0;
    Int        d_resteers = 0;
    Int        selfcheck_idx = 0;
-   IRBB*      irbb;
+   IRSB*      irsb;
    Addr64     guest_IP_curr_instr;
+   IRConst*   guest_IP_bbstart_IRConst = NULL;
 
-   Bool (*resteerOKfn)(Addr64) = NULL;
+   Bool (*resteerOKfn)(void*,Addr64) = NULL;
 
    debug_print = toBool(vex_traceflags & VEX_TRACE_FE);
 
@@ -123,24 +142,47 @@ IRBB* bb_to_IR ( /*OUT*/VexGuestExtents* vge,
    vge->base[0] = guest_IP_bbstart;
    vge->len[0]  = 0;
 
-   /* And a new IR BB to dump the result into. */
-   irbb = emptyIRBB();
+   /* And a new IR superblock to dump the result into. */
+   irsb = emptyIRSB();
 
    /* Delta keeps track of how far along the guest_code array we have
       so far gone. */
    delta    = 0;
    n_instrs = 0;
 
-   /* If asked to make a self-checking translation, leave a 5 spaces
+   /* Guest addresses as IRConsts.  Used in the two self-checks
+      generated. */
+   if (do_self_check) {
+      guest_IP_bbstart_IRConst
+         = guest_word_type==Ity_I32 
+              ? IRConst_U32(toUInt(guest_IP_bbstart))
+              : IRConst_U64(guest_IP_bbstart);
+   }
+
+   /* If asked to make a self-checking translation, leave 5 spaces
       in which to put the check statements.  We'll fill them in later
       when we know the length and adler32 of the area to check. */
    if (do_self_check) {
-      selfcheck_idx = irbb->stmts_used;
-      addStmtToIRBB( irbb, IRStmt_NoOp() );
-      addStmtToIRBB( irbb, IRStmt_NoOp() );
-      addStmtToIRBB( irbb, IRStmt_NoOp() );
-      addStmtToIRBB( irbb, IRStmt_NoOp() );
-      addStmtToIRBB( irbb, IRStmt_NoOp() );
+      selfcheck_idx = irsb->stmts_used;
+      addStmtToIRSB( irsb, IRStmt_NoOp() );
+      addStmtToIRSB( irsb, IRStmt_NoOp() );
+      addStmtToIRSB( irsb, IRStmt_NoOp() );
+      addStmtToIRSB( irsb, IRStmt_NoOp() );
+      addStmtToIRSB( irsb, IRStmt_NoOp() );
+   }
+
+   /* If the caller supplied a function to add its own preamble, use
+      it now. */
+   if (preamble_function) {
+      Bool stopNow = preamble_function( callback_opaque, irsb );
+      if (stopNow) {
+         /* The callback has completed the IR block without any guest
+            insns being disassembled into it, so just return it at
+            this point, even if a self-check was requested - as there
+            is nothing to self-check.  The five self-check no-ops will
+            still be in place, but they are harmless. */
+         return irsb;
+      }
    }
 
    /* Process instructions. */
@@ -169,41 +211,44 @@ IRBB* bb_to_IR ( /*OUT*/VexGuestExtents* vge,
          with. */
       guest_IP_curr_instr = guest_IP_bbstart + delta;
 
-      /* This is the irbb statement array index of the first stmt in
+      /* This is the irsb statement array index of the first stmt in
          this insn.  That will always be the instruction-mark
          descriptor. */
-      first_stmt_idx = irbb->stmts_used;
+      first_stmt_idx = irsb->stmts_used;
 
       /* Add an instruction-mark statement.  We won't know until after
          disassembling the instruction how long it instruction is, so
          just put in a zero length and we'll fix it up later. */
-      addStmtToIRBB( irbb, IRStmt_IMark( guest_IP_curr_instr, 0 ));
+      addStmtToIRSB( irsb, IRStmt_IMark( guest_IP_curr_instr, 0 ));
 
       /* for the first insn, the dispatch loop will have set
          %IP, but for all the others we have to do it ourselves. */
       need_to_put_IP = toBool(n_instrs > 0);
 
       /* Finally, actually disassemble an instruction. */
-      dres = dis_instr_fn ( irbb,
+      dres = dis_instr_fn ( irsb,
                             need_to_put_IP,
                             resteerOKfn,
+                            callback_opaque,
                             guest_code,
                             delta,
                             guest_IP_curr_instr,
+                            arch_guest,
                             archinfo_guest,
+                            abiinfo_both,
                             host_bigendian );
 
       /* stay sane ... */
       vassert(dres.whatNext == Dis_StopHere
               || dres.whatNext == Dis_Continue
               || dres.whatNext == Dis_Resteer);
-      vassert(dres.len >= 0 && dres.len <= 18);
+      vassert(dres.len >= 0 && dres.len <= 20);
       if (dres.whatNext != Dis_Resteer)
          vassert(dres.continueAt == 0);
 
       /* Fill in the insn-mark length field. */
-      vassert(first_stmt_idx >= 0 && first_stmt_idx < irbb->stmts_used);
-      imark = irbb->stmts[first_stmt_idx];
+      vassert(first_stmt_idx >= 0 && first_stmt_idx < irsb->stmts_used);
+      imark = irsb->stmts[first_stmt_idx];
       vassert(imark);
       vassert(imark->tag == Ist_IMark);
       vassert(imark->Ist.IMark.len == 0);
@@ -211,23 +256,23 @@ IRBB* bb_to_IR ( /*OUT*/VexGuestExtents* vge,
 
       /* Print the resulting IR, if needed. */
       if (vex_traceflags & VEX_TRACE_FE) {
-         for (i = first_stmt_idx; i < irbb->stmts_used; i++) {
+         for (i = first_stmt_idx; i < irsb->stmts_used; i++) {
             vex_printf("              ");
-            ppIRStmt(irbb->stmts[i]);
+            ppIRStmt(irsb->stmts[i]);
             vex_printf("\n");
          }
       }
 
       /* If dis_instr_fn terminated the BB at this point, check it
-	 also filled in the irbb->next field. */
+	 also filled in the irsb->next field. */
       if (dres.whatNext == Dis_StopHere) {
-         vassert(irbb->next != NULL);
+         vassert(irsb->next != NULL);
          if (debug_print) {
             vex_printf("              ");
             vex_printf( "goto {");
-            ppIRJumpKind(irbb->jumpkind);
+            ppIRJumpKind(irsb->jumpkind);
             vex_printf( "} ");
-            ppIRExpr( irbb->next );
+            ppIRExpr( irsb->next );
             vex_printf( "\n");
          }
       }
@@ -249,12 +294,12 @@ IRBB* bb_to_IR ( /*OUT*/VexGuestExtents* vge,
 
       switch (dres.whatNext) {
          case Dis_Continue:
-            vassert(irbb->next == NULL);
+            vassert(irsb->next == NULL);
             if (n_instrs < vex_control.guest_max_insns) {
                /* keep going */
             } else {
                /* We have to stop. */
-               irbb->next 
+               irsb->next 
                   = IRExpr_Const(
                        guest_word_type == Ity_I32
                           ? IRConst_U32(toUInt(guest_IP_bbstart+delta))
@@ -264,18 +309,18 @@ IRBB* bb_to_IR ( /*OUT*/VexGuestExtents* vge,
             }
             break;
          case Dis_StopHere:
-            vassert(irbb->next != NULL);
+            vassert(irsb->next != NULL);
             goto done;
          case Dis_Resteer:
             /* Check that we actually allowed a resteer .. */
             vassert(resteerOK);
-            vassert(irbb->next == NULL);
+            vassert(irsb->next == NULL);
             /* figure out a new delta to continue at. */
-            vassert(resteerOKfn(dres.continueAt));
+            vassert(resteerOKfn(callback_opaque,dres.continueAt));
             delta = dres.continueAt - guest_IP_bbstart;
             /* we now have to start a new extent slot. */
-	    vge->n_used++;
-	    vassert(vge->n_used <= 3);
+            vge->n_used++;
+            vassert(vge->n_used <= 3);
             vge->base[vge->n_used-1] = dres.continueAt;
             vge->len[vge->n_used-1] = 0;
             n_resteers++;
@@ -298,8 +343,8 @@ IRBB* bb_to_IR ( /*OUT*/VexGuestExtents* vge,
    if (do_self_check) {
 
       UInt     len2check, adler32;
-      IRConst* guest_IP_bbstart_IRConst;
       IRTemp   tistart_tmp, tilen_tmp;
+      HWord    p_adler_helper;
 
       vassert(vge->n_used == 1);
       len2check = vge->len[0];
@@ -308,35 +353,34 @@ IRBB* bb_to_IR ( /*OUT*/VexGuestExtents* vge,
 
      adler32 = genericg_compute_adler32( (HWord)guest_code, len2check );
 
-     guest_IP_bbstart_IRConst
-        = guest_word_type==Ity_I32 
-             ? IRConst_U32(toUInt(guest_IP_bbstart))
-             : IRConst_U64(guest_IP_bbstart);
-
      /* Set TISTART and TILEN.  These will describe to the despatcher
         the area of guest code to invalidate should we exit with a
         self-check failure. */
 
-     tistart_tmp = newIRTemp(irbb->tyenv, guest_word_type);
-     tilen_tmp   = newIRTemp(irbb->tyenv, guest_word_type);
+     tistart_tmp = newIRTemp(irsb->tyenv, guest_word_type);
+     tilen_tmp   = newIRTemp(irsb->tyenv, guest_word_type);
 
-     irbb->stmts[selfcheck_idx+0]
-        = IRStmt_Tmp(tistart_tmp, IRExpr_Const(guest_IP_bbstart_IRConst) );
+     irsb->stmts[selfcheck_idx+0]
+        = IRStmt_WrTmp(tistart_tmp, IRExpr_Const(guest_IP_bbstart_IRConst) );
 
-     irbb->stmts[selfcheck_idx+1]
-        = IRStmt_Tmp(tilen_tmp,
-                     guest_word_type==Ity_I32 
-                        ? IRExpr_Const(IRConst_U32(len2check)) 
-                        : IRExpr_Const(IRConst_U64(len2check))
+     irsb->stmts[selfcheck_idx+1]
+        = IRStmt_WrTmp(tilen_tmp,
+                       guest_word_type==Ity_I32 
+                          ? IRExpr_Const(IRConst_U32(len2check)) 
+                          : IRExpr_Const(IRConst_U64(len2check))
           );
 
-     irbb->stmts[selfcheck_idx+2]
-        = IRStmt_Put( offB_TISTART, IRExpr_Tmp(tistart_tmp) );
+     irsb->stmts[selfcheck_idx+2]
+        = IRStmt_Put( offB_TISTART, IRExpr_RdTmp(tistart_tmp) );
 
-     irbb->stmts[selfcheck_idx+3]
-        = IRStmt_Put( offB_TILEN, IRExpr_Tmp(tilen_tmp) );
+     irsb->stmts[selfcheck_idx+3]
+        = IRStmt_Put( offB_TILEN, IRExpr_RdTmp(tilen_tmp) );
 
-     irbb->stmts[selfcheck_idx+4]
+     p_adler_helper = abiinfo_both->host_ppc_calls_use_fndescrs
+                      ? ((HWord*)(&genericg_compute_adler32))[0]
+                      : (HWord)&genericg_compute_adler32;
+
+     irsb->stmts[selfcheck_idx+4]
         = IRStmt_Exit( 
              IRExpr_Binop( 
                 Iop_CmpNE32, 
@@ -344,7 +388,7 @@ IRBB* bb_to_IR ( /*OUT*/VexGuestExtents* vge,
                    Ity_I32, 
                    2/*regparms*/, 
                    "genericg_compute_adler32",
-                   &genericg_compute_adler32,
+                   (void*)p_adler_helper,
                    mkIRExprVec_2( 
                       mkIRExpr_HWord( (HWord)guest_code ), 
                       mkIRExpr_HWord( (HWord)len2check )
@@ -357,7 +401,7 @@ IRBB* bb_to_IR ( /*OUT*/VexGuestExtents* vge,
           );
    }
 
-   return irbb;
+   return irsb;
 }
 
 

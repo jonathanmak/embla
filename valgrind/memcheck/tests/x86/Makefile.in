@@ -37,9 +37,13 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-check_PROGRAMS = scalar_exit_group$(EXEEXT) scalar_fork$(EXEEXT) \
+check_PROGRAMS = bug133694$(EXEEXT) bug152022$(EXEEXT) \
+	espindola2$(EXEEXT) int3-x86$(EXEEXT) \
+	scalar_exit_group$(EXEEXT) scalar_fork$(EXEEXT) \
 	scalar_supp$(EXEEXT) scalar_vfork$(EXEEXT) fpeflags$(EXEEXT) \
-	pushfpopf$(EXEEXT) scalar$(EXEEXT) tronical$(EXEEXT)
+	pushfpopf$(EXEEXT) pushpopmem$(EXEEXT) scalar$(EXEEXT) \
+	sse_memory$(EXEEXT) tronical$(EXEEXT) more_x86_fp$(EXEEXT) \
+	fprem$(EXEEXT) xor-undef-x86$(EXEEXT)
 subdir = memcheck/tests/x86
 DIST_COMMON = $(noinst_HEADERS) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in
@@ -50,12 +54,33 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
+bug133694_SOURCES = bug133694.c
+bug133694_OBJECTS = bug133694.$(OBJEXT)
+bug133694_LDADD = $(LDADD)
+bug152022_SOURCES = bug152022.c
+bug152022_OBJECTS = bug152022.$(OBJEXT)
+bug152022_LDADD = $(LDADD)
+espindola2_SOURCES = espindola2.c
+espindola2_OBJECTS = espindola2.$(OBJEXT)
+espindola2_LDADD = $(LDADD)
 fpeflags_SOURCES = fpeflags.c
 fpeflags_OBJECTS = fpeflags-fpeflags.$(OBJEXT)
 fpeflags_LDADD = $(LDADD)
+fprem_SOURCES = fprem.c
+fprem_OBJECTS = fprem.$(OBJEXT)
+fprem_LDADD = $(LDADD)
+int3_x86_SOURCES = int3-x86.c
+int3_x86_OBJECTS = int3-x86.$(OBJEXT)
+int3_x86_LDADD = $(LDADD)
+more_x86_fp_SOURCES = more_x86_fp.c
+more_x86_fp_OBJECTS = more_x86_fp.$(OBJEXT)
+more_x86_fp_DEPENDENCIES =
 am_pushfpopf_OBJECTS = pushfpopf_c.$(OBJEXT) pushfpopf_s.$(OBJEXT)
 pushfpopf_OBJECTS = $(am_pushfpopf_OBJECTS)
 pushfpopf_LDADD = $(LDADD)
+pushpopmem_SOURCES = pushpopmem.c
+pushpopmem_OBJECTS = pushpopmem.$(OBJEXT)
+pushpopmem_LDADD = $(LDADD)
 scalar_SOURCES = scalar.c
 scalar_OBJECTS = scalar.$(OBJEXT)
 scalar_LDADD = $(LDADD)
@@ -71,9 +96,15 @@ scalar_supp_LDADD = $(LDADD)
 scalar_vfork_SOURCES = scalar_vfork.c
 scalar_vfork_OBJECTS = scalar_vfork.$(OBJEXT)
 scalar_vfork_LDADD = $(LDADD)
+sse_memory_SOURCES = sse_memory.c
+sse_memory_OBJECTS = sse_memory.$(OBJEXT)
+sse_memory_LDADD = $(LDADD)
 am_tronical_OBJECTS = tronical.$(OBJEXT)
 tronical_OBJECTS = $(am_tronical_OBJECTS)
 tronical_LDADD = $(LDADD)
+xor_undef_x86_SOURCES = xor-undef-x86.c
+xor_undef_x86_OBJECTS = xor-undef-x86.$(OBJEXT)
+xor_undef_x86_LDADD = $(LDADD)
 SCRIPTS = $(noinst_SCRIPTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
@@ -83,11 +114,16 @@ COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 CCLD = $(CC)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = fpeflags.c $(pushfpopf_SOURCES) scalar.c scalar_exit_group.c \
-	scalar_fork.c scalar_supp.c scalar_vfork.c $(tronical_SOURCES)
-DIST_SOURCES = fpeflags.c $(pushfpopf_SOURCES) scalar.c \
-	scalar_exit_group.c scalar_fork.c scalar_supp.c scalar_vfork.c \
-	$(tronical_SOURCES)
+SOURCES = bug133694.c bug152022.c espindola2.c fpeflags.c fprem.c \
+	int3-x86.c more_x86_fp.c $(pushfpopf_SOURCES) pushpopmem.c \
+	scalar.c scalar_exit_group.c scalar_fork.c scalar_supp.c \
+	scalar_vfork.c sse_memory.c $(tronical_SOURCES) \
+	xor-undef-x86.c
+DIST_SOURCES = bug133694.c bug152022.c espindola2.c fpeflags.c fprem.c \
+	int3-x86.c more_x86_fp.c $(pushfpopf_SOURCES) pushpopmem.c \
+	scalar.c scalar_exit_group.c scalar_fork.c scalar_supp.c \
+	scalar_vfork.c sse_memory.c $(tronical_SOURCES) \
+	xor-undef-x86.c
 HEADERS = $(noinst_HEADERS)
 ETAGS = etags
 CTAGS = ctags
@@ -100,6 +136,12 @@ AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+BUILD_MPIWRAP_PRI_FALSE = @BUILD_MPIWRAP_PRI_FALSE@
+BUILD_MPIWRAP_PRI_TRUE = @BUILD_MPIWRAP_PRI_TRUE@
+BUILD_MPIWRAP_SEC_FALSE = @BUILD_MPIWRAP_SEC_FALSE@
+BUILD_MPIWRAP_SEC_TRUE = @BUILD_MPIWRAP_SEC_TRUE@
+BUILD_SSE3_TESTS_FALSE = @BUILD_SSE3_TESTS_FALSE@
+BUILD_SSE3_TESTS_TRUE = @BUILD_SSE3_TESTS_TRUE@
 CC = @CC@
 CCAS = @CCAS@
 CCASFLAGS = @CCASFLAGS@
@@ -120,9 +162,14 @@ ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
+FLAG_FNO_STACK_PROTECTOR = @FLAG_FNO_STACK_PROTECTOR@
 FLAG_M32 = @FLAG_M32@
+FLAG_M64 = @FLAG_M64@
+FLAG_MAIX32 = @FLAG_MAIX32@
+FLAG_MAIX64 = @FLAG_MAIX64@
 FLAG_MMMX = @FLAG_MMMX@
 FLAG_MSSE = @FLAG_MSSE@
+FLAG_WDECL_AFTER_STMT = @FLAG_WDECL_AFTER_STMT@
 GDB = @GDB@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -137,6 +184,7 @@ MAINT = @MAINT@
 MAINTAINER_MODE_FALSE = @MAINTAINER_MODE_FALSE@
 MAINTAINER_MODE_TRUE = @MAINTAINER_MODE_TRUE@
 MAKEINFO = @MAKEINFO@
+MPI_CC = @MPI_CC@
 OBJEXT = @OBJEXT@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
@@ -154,19 +202,29 @@ STRIP = @STRIP@
 VALT_LOAD_ADDRESS = @VALT_LOAD_ADDRESS@
 VERSION = @VERSION@
 VEX_DIR = @VEX_DIR@
-VG_AMD64_LINUX_FALSE = @VG_AMD64_LINUX_FALSE@
-VG_AMD64_LINUX_TRUE = @VG_AMD64_LINUX_TRUE@
+VGO_AIX5_FALSE = @VGO_AIX5_FALSE@
+VGO_AIX5_TRUE = @VGO_AIX5_TRUE@
+VGO_LINUX_FALSE = @VGO_LINUX_FALSE@
+VGO_LINUX_TRUE = @VGO_LINUX_TRUE@
+VGP_AMD64_LINUX_FALSE = @VGP_AMD64_LINUX_FALSE@
+VGP_AMD64_LINUX_TRUE = @VGP_AMD64_LINUX_TRUE@
+VGP_HAVE_SECONDARY_FALSE = @VGP_HAVE_SECONDARY_FALSE@
+VGP_HAVE_SECONDARY_TRUE = @VGP_HAVE_SECONDARY_TRUE@
+VGP_PPC32_AIX5_FALSE = @VGP_PPC32_AIX5_FALSE@
+VGP_PPC32_AIX5_TRUE = @VGP_PPC32_AIX5_TRUE@
+VGP_PPC32_LINUX_FALSE = @VGP_PPC32_LINUX_FALSE@
+VGP_PPC32_LINUX_TRUE = @VGP_PPC32_LINUX_TRUE@
+VGP_PPC64_AIX5_FALSE = @VGP_PPC64_AIX5_FALSE@
+VGP_PPC64_AIX5_TRUE = @VGP_PPC64_AIX5_TRUE@
+VGP_PPC64_LINUX_FALSE = @VGP_PPC64_LINUX_FALSE@
+VGP_PPC64_LINUX_TRUE = @VGP_PPC64_LINUX_TRUE@
+VGP_X86_LINUX_FALSE = @VGP_X86_LINUX_FALSE@
+VGP_X86_LINUX_TRUE = @VGP_X86_LINUX_TRUE@
 VG_ARCH = @VG_ARCH@
 VG_ARCH_ALL = @VG_ARCH_ALL@
-VG_MAKE_PLATFORM = @VG_MAKE_PLATFORM@
 VG_OS = @VG_OS@
-VG_OS_ALL = @VG_OS_ALL@
-VG_PLATFORM = @VG_PLATFORM@
-VG_PLATFORM_ALL = @VG_PLATFORM_ALL@
-VG_PPC32_LINUX_FALSE = @VG_PPC32_LINUX_FALSE@
-VG_PPC32_LINUX_TRUE = @VG_PPC32_LINUX_TRUE@
-VG_X86_LINUX_FALSE = @VG_X86_LINUX_FALSE@
-VG_X86_LINUX_TRUE = @VG_X86_LINUX_TRUE@
+VG_PLATFORM_PRI = @VG_PLATFORM_PRI@
+VG_PLATFORM_SEC = @VG_PLATFORM_SEC@
 ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_RANLIB = @ac_ct_RANLIB@
@@ -212,11 +270,16 @@ noinst_SCRIPTS = filter_stderr filter_pushfpopf filter_tronical
 noinst_HEADERS = scalar.h
 INSN_TESTS = insn_basic insn_fpu insn_cmov insn_mmx insn_mmxext insn_sse insn_sse2
 EXTRA_DIST = $(noinst_SCRIPTS) \
+	bug133694.vgtest bug133694.stderr.exp bug133694.stdout.exp \
+	bug152022.vgtest bug152022.stderr.exp bug152022.stdout.exp \
+	espindola2.vgtest espindola2.stderr.exp \
 	fpeflags.stderr.exp fpeflags.vgtest \
 	$(addsuffix .stderr.exp,$(INSN_TESTS)) \
 	$(addsuffix .stdout.exp,$(INSN_TESTS)) \
 	$(addsuffix .vgtest,$(INSN_TESTS)) \
+	int3-x86.vgtest int3-x86.stderr.exp int3-x86.stdout.exp \
 	pushfpopf.stderr.exp pushfpopf.stdout.exp pushfpopf.vgtest \
+	pushpopmem.stderr.exp pushpopmem.stdout.exp pushpopmem.vgtest \
 	scalar.stderr.exp scalar.stderr.exp2 scalar.vgtest \
 	scalar_fork.stderr.exp scalar_fork.vgtest \
 	scalar_exit_group.stderr.exp scalar_exit_group.stderr.exp2 \
@@ -224,10 +287,18 @@ EXTRA_DIST = $(noinst_SCRIPTS) \
 	scalar_supp.stderr.exp scalar_supp.stderr.exp2 \
 	scalar_supp.vgtest scalar_supp.supp \
 	scalar_vfork.stderr.exp scalar_vfork.vgtest \
-	tronical.stderr.exp tronical.vgtest
+	sse1_memory.stderr.exp sse1_memory.stdout.exp sse1_memory.vgtest \
+	sse2_memory.stderr.exp sse2_memory.stdout.exp sse2_memory.vgtest \
+	tronical.stderr.exp tronical.vgtest \
+	more_x86_fp.stderr.exp more_x86_fp.stdout.exp more_x86_fp.vgtest \
+	fprem.stderr.exp fprem.stdout.exp fprem.vgtest \
+	xor-undef-x86.stderr.exp xor-undef-x86.stdout.exp \
+	xor-undef-x86.vgtest
 
 AM_CPPFLAGS = -I$(top_srcdir)/include
-AM_CFLAGS = $(WERROR) @FLAG_M32@ -Winline -Wall -Wshadow -g 
+AM_CFLAGS = $(WERROR) @FLAG_M32@ -Winline -Wall -Wshadow -g \
+		$(FLAG_MMMX) $(FLAG_MSSE)
+
 AM_CXXFLAGS = $(AM_CFLAGS)
 AM_CCASFLAGS = @FLAG_M32@
 
@@ -235,6 +306,7 @@ AM_CCASFLAGS = @FLAG_M32@
 fpeflags_CFLAGS = $(AM_CFLAGS) -march=i686
 pushfpopf_SOURCES = pushfpopf_c.c pushfpopf_s.s
 tronical_SOURCES = tronical.S
+more_x86_fp_LDADD = -lm
 all: all-am
 
 .SUFFIXES:
@@ -271,12 +343,33 @@ $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 
 clean-checkPROGRAMS:
 	-test -z "$(check_PROGRAMS)" || rm -f $(check_PROGRAMS)
+bug133694$(EXEEXT): $(bug133694_OBJECTS) $(bug133694_DEPENDENCIES) 
+	@rm -f bug133694$(EXEEXT)
+	$(LINK) $(bug133694_LDFLAGS) $(bug133694_OBJECTS) $(bug133694_LDADD) $(LIBS)
+bug152022$(EXEEXT): $(bug152022_OBJECTS) $(bug152022_DEPENDENCIES) 
+	@rm -f bug152022$(EXEEXT)
+	$(LINK) $(bug152022_LDFLAGS) $(bug152022_OBJECTS) $(bug152022_LDADD) $(LIBS)
+espindola2$(EXEEXT): $(espindola2_OBJECTS) $(espindola2_DEPENDENCIES) 
+	@rm -f espindola2$(EXEEXT)
+	$(LINK) $(espindola2_LDFLAGS) $(espindola2_OBJECTS) $(espindola2_LDADD) $(LIBS)
 fpeflags$(EXEEXT): $(fpeflags_OBJECTS) $(fpeflags_DEPENDENCIES) 
 	@rm -f fpeflags$(EXEEXT)
 	$(LINK) $(fpeflags_LDFLAGS) $(fpeflags_OBJECTS) $(fpeflags_LDADD) $(LIBS)
+fprem$(EXEEXT): $(fprem_OBJECTS) $(fprem_DEPENDENCIES) 
+	@rm -f fprem$(EXEEXT)
+	$(LINK) $(fprem_LDFLAGS) $(fprem_OBJECTS) $(fprem_LDADD) $(LIBS)
+int3-x86$(EXEEXT): $(int3_x86_OBJECTS) $(int3_x86_DEPENDENCIES) 
+	@rm -f int3-x86$(EXEEXT)
+	$(LINK) $(int3_x86_LDFLAGS) $(int3_x86_OBJECTS) $(int3_x86_LDADD) $(LIBS)
+more_x86_fp$(EXEEXT): $(more_x86_fp_OBJECTS) $(more_x86_fp_DEPENDENCIES) 
+	@rm -f more_x86_fp$(EXEEXT)
+	$(LINK) $(more_x86_fp_LDFLAGS) $(more_x86_fp_OBJECTS) $(more_x86_fp_LDADD) $(LIBS)
 pushfpopf$(EXEEXT): $(pushfpopf_OBJECTS) $(pushfpopf_DEPENDENCIES) 
 	@rm -f pushfpopf$(EXEEXT)
 	$(LINK) $(pushfpopf_LDFLAGS) $(pushfpopf_OBJECTS) $(pushfpopf_LDADD) $(LIBS)
+pushpopmem$(EXEEXT): $(pushpopmem_OBJECTS) $(pushpopmem_DEPENDENCIES) 
+	@rm -f pushpopmem$(EXEEXT)
+	$(LINK) $(pushpopmem_LDFLAGS) $(pushpopmem_OBJECTS) $(pushpopmem_LDADD) $(LIBS)
 scalar$(EXEEXT): $(scalar_OBJECTS) $(scalar_DEPENDENCIES) 
 	@rm -f scalar$(EXEEXT)
 	$(LINK) $(scalar_LDFLAGS) $(scalar_OBJECTS) $(scalar_LDADD) $(LIBS)
@@ -292,9 +385,15 @@ scalar_supp$(EXEEXT): $(scalar_supp_OBJECTS) $(scalar_supp_DEPENDENCIES)
 scalar_vfork$(EXEEXT): $(scalar_vfork_OBJECTS) $(scalar_vfork_DEPENDENCIES) 
 	@rm -f scalar_vfork$(EXEEXT)
 	$(LINK) $(scalar_vfork_LDFLAGS) $(scalar_vfork_OBJECTS) $(scalar_vfork_LDADD) $(LIBS)
+sse_memory$(EXEEXT): $(sse_memory_OBJECTS) $(sse_memory_DEPENDENCIES) 
+	@rm -f sse_memory$(EXEEXT)
+	$(LINK) $(sse_memory_LDFLAGS) $(sse_memory_OBJECTS) $(sse_memory_LDADD) $(LIBS)
 tronical$(EXEEXT): $(tronical_OBJECTS) $(tronical_DEPENDENCIES) 
 	@rm -f tronical$(EXEEXT)
 	$(LINK) $(tronical_LDFLAGS) $(tronical_OBJECTS) $(tronical_LDADD) $(LIBS)
+xor-undef-x86$(EXEEXT): $(xor_undef_x86_OBJECTS) $(xor_undef_x86_DEPENDENCIES) 
+	@rm -f xor-undef-x86$(EXEEXT)
+	$(LINK) $(xor_undef_x86_LDFLAGS) $(xor_undef_x86_OBJECTS) $(xor_undef_x86_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -302,13 +401,22 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bug133694.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bug152022.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/espindola2.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fpeflags-fpeflags.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fprem.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/int3-x86.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/more_x86_fp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pushfpopf_c.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pushpopmem.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scalar.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scalar_exit_group.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scalar_fork.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scalar_supp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scalar_vfork.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sse_memory.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xor-undef-x86.Po@am__quote@
 
 .S.o:
 	$(CCASCOMPILE) -c $<

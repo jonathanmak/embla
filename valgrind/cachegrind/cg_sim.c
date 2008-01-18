@@ -7,7 +7,7 @@
    This file is part of Cachegrind, a Valgrind tool for cache
    profiling programs.
 
-   Copyright (C) 2002-2005 Nicholas Nethercote
+   Copyright (C) 2002-2007 Nicholas Nethercote
       njn@valgrind.org
 
    This program is free software; you can redistribute it and/or
@@ -80,21 +80,6 @@ static void cachesim_initcache(cache_t config, cache_t2* c)
       c->tags[i] = 0;
 }
 
-#if 0
-static void print_cache(cache_t2* c)
-{
-   UInt set, way, i;
-
-   /* Note initialisation and update of 'i'. */
-   for (i = 0, set = 0; set < c->sets; set++) {
-      for (way = 0; way < c->assoc; way++, i++) {
-         VG_(printf)("%16lx ", c->tags[i]);
-      }
-      VG_(printf)("\n");
-   }
-}
-#endif 
-
 /* This is done as a macro rather than by passing in the cache_t2 as an 
  * arg because it slows things down by a small amount (3-5%) due to all 
  * that extra indirection. */
@@ -114,9 +99,10 @@ __attribute__((always_inline))                                              \
 static __inline__                                                           \
 void cachesim_##L##_doref(Addr a, UChar size, ULong* m1, ULong *m2)         \
 {                                                                           \
-   register UInt  set1 = ( a         >> L.line_size_bits) & (L.sets_min_1); \
-   register UInt  set2 = ((a+size-1) >> L.line_size_bits) & (L.sets_min_1); \
-   register UWord tag  = a >> L.tag_shift;                                  \
+   UInt  set1 = ( a         >> L.line_size_bits) & (L.sets_min_1);          \
+   UInt  set2 = ((a+size-1) >> L.line_size_bits) & (L.sets_min_1);          \
+   UWord tag  = a >> L.tag_shift;                                           \
+   UWord tag2;                                                              \
    Int i, j;                                                                \
    Bool is_miss = False;                                                    \
    UWord* set;                                                              \
@@ -176,28 +162,29 @@ void cachesim_##L##_doref(Addr a, UChar size, ULong* m1, ULong *m2)         \
       is_miss = True;                                                       \
 block2:                                                                     \
       set = &(L.tags[set2 << L.assoc_bits]);                                \
-      if (tag == set[0]) {                                                  \
+      tag2 = (a+size-1) >> L.tag_shift;                                     \
+      if (tag2 == set[0]) {                                                 \
          goto miss_treatment;                                               \
       }                                                                     \
       for (i = 1; i < L.assoc; i++) {                                       \
-         if (tag == set[i]) {                                               \
+         if (tag2 == set[i]) {                                              \
             for (j = i; j > 0; j--) {                                       \
                set[j] = set[j - 1];                                         \
             }                                                               \
-            set[0] = tag;                                                   \
+            set[0] = tag2;                                                  \
             goto miss_treatment;                                            \
          }                                                                  \
       }                                                                     \
       for (j = L.assoc - 1; j > 0; j--) {                                   \
          set[j] = set[j - 1];                                               \
       }                                                                     \
-      set[0] = tag;                                                         \
+      set[0] = tag2;                                                        \
       is_miss = True;                                                       \
 miss_treatment:                                                             \
       if (is_miss) { MISS_TREATMENT; }                                      \
                                                                             \
    } else {                                                                 \
-       VG_(printf)("addr: %x  size: %u  sets: %d %d", a, size, set1, set2); \
+       VG_(printf)("addr: %lx  size: %u  sets: %d %d", a, size, set1, set2);\
        VG_(tool_panic)("item straddles more than two cache sets");          \
    }                                                                        \
    return;                                                                  \

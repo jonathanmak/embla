@@ -8,7 +8,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Nicholas Nethercote
+   Copyright (C) 2000-2007 Nicholas Nethercote
       njn@valgrind.org
 
    This program is free software; you can redistribute it and/or
@@ -40,8 +40,8 @@ VgToolInterface VG_(tdict);
 
 void VG_(basic_tool_funcs)(
    void(*post_clo_init)(void),
-   IRBB*(*instrument)(IRBB*, VexGuestLayout*, 
-                      Addr64, VexGuestExtents*, IRType, IRType ),
+   IRSB*(*instrument)(VgCallbackClosure*, IRSB*, 
+                      VexGuestLayout*, VexGuestExtents*, IRType, IRType),
    void(*fini)(Int)
 )
 {
@@ -86,13 +86,15 @@ VgNeeds VG_(needs) = {
    .core_errors          = False,
    .tool_errors          = False,
    .libc_freeres         = False,
-   .basic_block_discards = False,
+   .superblock_discards  = False,
    .command_line_options = False,
    .client_requests      = False,
    .syscall_wrapper      = False,
    .sanity_checks        = False,
    .data_syms	         = False,
    .malloc_replacement   = False,
+   .xml_output           = False,
+   .final_IR_tidy_pass   = False
 };
 
 /* static */
@@ -111,11 +113,15 @@ Bool VG_(sanity_check_needs)(Char** failmsg)
    CHECK_NOT(VG_(details).copyright_author, NULL);
    CHECK_NOT(VG_(details).bug_reports_to,   NULL);
 
-   if ( (VG_(tdict).track_new_mem_stack_4  ||
-         VG_(tdict).track_new_mem_stack_8  ||
-         VG_(tdict).track_new_mem_stack_12 ||
-         VG_(tdict).track_new_mem_stack_16 ||
-         VG_(tdict).track_new_mem_stack_32 ) &&
+   if ( (VG_(tdict).track_new_mem_stack_4   ||
+         VG_(tdict).track_new_mem_stack_8   ||
+         VG_(tdict).track_new_mem_stack_12  ||
+         VG_(tdict).track_new_mem_stack_16  ||
+         VG_(tdict).track_new_mem_stack_32  ||
+         VG_(tdict).track_new_mem_stack_112 ||
+         VG_(tdict).track_new_mem_stack_128 ||
+         VG_(tdict).track_new_mem_stack_144 ||
+         VG_(tdict).track_new_mem_stack_160 ) &&
        ! VG_(tdict).track_new_mem_stack) 
    {
       *failmsg = "Tool error: one of the specialised 'new_mem_stack_n'\n"
@@ -124,11 +130,15 @@ Bool VG_(sanity_check_needs)(Char** failmsg)
       return False;
    }
 
-   if ( (VG_(tdict).track_die_mem_stack_4  ||
-         VG_(tdict).track_die_mem_stack_8  ||
-         VG_(tdict).track_die_mem_stack_12 ||
-         VG_(tdict).track_die_mem_stack_16 ||
-         VG_(tdict).track_die_mem_stack_32 ) &&
+   if ( (VG_(tdict).track_die_mem_stack_4   ||
+         VG_(tdict).track_die_mem_stack_8   ||
+         VG_(tdict).track_die_mem_stack_12  ||
+         VG_(tdict).track_die_mem_stack_16  ||
+         VG_(tdict).track_die_mem_stack_32  ||
+         VG_(tdict).track_die_mem_stack_112 ||
+         VG_(tdict).track_die_mem_stack_128 ||
+         VG_(tdict).track_die_mem_stack_144 ||
+         VG_(tdict).track_die_mem_stack_160 ) &&
        ! VG_(tdict).track_die_mem_stack) 
    {
       *failmsg = "Tool error: one of the specialised 'die_mem_stack_n'\n"
@@ -153,18 +163,20 @@ Bool VG_(sanity_check_needs)(Char** failmsg)
 NEEDS(libc_freeres)
 NEEDS(core_errors)
 NEEDS(data_syms)
+NEEDS(xml_output)
 
-void VG_(needs_basic_block_discards)(
+void VG_(needs_superblock_discards)(
    void (*discard)(Addr64, VexGuestExtents)
 )
 {
-   VG_(needs).basic_block_discards = True;
-   VG_(tdict).tool_discard_basic_block_info = discard;
+   VG_(needs).superblock_discards = True;
+   VG_(tdict).tool_discard_superblock_info = discard;
 }
 
 void VG_(needs_tool_errors)(
    Bool (*eq)         (VgRes, Error*, Error*),
    void (*pp)         (Error*),
+   Bool show_TIDs,
    UInt (*update)     (Error*),
    Bool (*recog)      (Char*, Supp*),
    Bool (*read_extra) (Int, Char*, Int, Supp*),
@@ -176,6 +188,7 @@ void VG_(needs_tool_errors)(
    VG_(needs).tool_errors = True;
    VG_(tdict).tool_eq_Error                     = eq;
    VG_(tdict).tool_pp_Error                     = pp;
+   VG_(tdict).tool_show_ThreadIDs_for_errors    = show_TIDs;
    VG_(tdict).tool_update_extra                 = update;
    VG_(tdict).tool_recognised_suppression       = recog;
    VG_(tdict).tool_read_extra_suppression_info  = read_extra;
@@ -250,6 +263,13 @@ void VG_(needs_malloc_replacement)(
    VG_(tdict).tool_client_redzone_szB   = client_malloc_redzone_szB;
 }
 
+void VG_(needs_final_IR_tidy_pass)( 
+   IRSB*(*final_tidy)(IRSB*)
+)
+{
+   VG_(needs).final_IR_tidy_pass = True;
+   VG_(tdict).tool_final_IR_tidy_pass = final_tidy;
+}
 
 /*--------------------------------------------------------------------*/
 /* Tracked events */
@@ -282,6 +302,10 @@ DEF2(track_new_mem_stack_8,      Addr)
 DEF2(track_new_mem_stack_12,     Addr)
 DEF2(track_new_mem_stack_16,     Addr)
 DEF2(track_new_mem_stack_32,     Addr)
+DEF2(track_new_mem_stack_112,    Addr)
+DEF2(track_new_mem_stack_128,    Addr)
+DEF2(track_new_mem_stack_144,    Addr)
+DEF2(track_new_mem_stack_160,    Addr)
 DEF (track_new_mem_stack,        Addr, SizeT)
 
 DEF2(track_die_mem_stack_4,      Addr)
@@ -289,6 +313,10 @@ DEF2(track_die_mem_stack_8,      Addr)
 DEF2(track_die_mem_stack_12,     Addr)
 DEF2(track_die_mem_stack_16,     Addr)
 DEF2(track_die_mem_stack_32,     Addr)
+DEF2(track_die_mem_stack_112,    Addr)
+DEF2(track_die_mem_stack_128,    Addr)
+DEF2(track_die_mem_stack_144,    Addr)
+DEF2(track_die_mem_stack_160,    Addr)
 DEF (track_die_mem_stack,        Addr, SizeT)
 
 DEF(track_ban_mem_stack,         Addr, SizeT)
@@ -303,14 +331,12 @@ DEF(track_post_reg_write,        CorePart, ThreadId,        OffT, SizeT)
 
 DEF(track_post_reg_write_clientcall_return, ThreadId, OffT, SizeT, Addr)
 
-DEF(track_thread_run,            ThreadId)
+DEF(track_start_client_code,     ThreadId, ULong)
+DEF(track_stop_client_code,      ThreadId, ULong)
 
-DEF(track_post_thread_create,    ThreadId, ThreadId)
-DEF(track_post_thread_join,      ThreadId, ThreadId)
-
-DEF(track_pre_mutex_lock,        ThreadId, void*)
-DEF(track_post_mutex_lock,       ThreadId, void*)
-DEF(track_post_mutex_unlock,     ThreadId, void*)
+DEF(track_pre_thread_ll_create,  ThreadId, ThreadId)
+DEF(track_pre_thread_first_insn, ThreadId)
+DEF(track_pre_thread_ll_exit,    ThreadId)
 
 DEF(track_pre_deliver_signal,    ThreadId, Int sigNo, Bool)
 DEF(track_post_deliver_signal,   ThreadId, Int sigNo)

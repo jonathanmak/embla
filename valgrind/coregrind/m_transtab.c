@@ -8,7 +8,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward 
+   Copyright (C) 2000-2007 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -31,7 +31,7 @@
 
 #include "pub_core_basics.h"
 #include "pub_core_debuglog.h"
-#include "pub_core_machine.h"    // ppc32: VG_(cache_line_size_ppc32)
+#include "pub_core_machine.h"    // For VG(machine_get_VexArchInfo)
 #include "pub_core_libcbase.h"
 #include "pub_core_libcassert.h"
 #include "pub_core_libcprint.h"
@@ -84,21 +84,6 @@
 
 /*------------------ TYPES ------------------*/
 
-/* A translation-cache entry is two parts:
-   - The guest address of the first (entry) bb in the translation,
-     as a 64-bit word.
-   - One or more 64-bit words containing the code.
-   It is supposed to be 64-bit aligned.
-*/
-/*
-typedef
-   struct {
-      Addr64 orig_addr;
-      ULong  code[0];
-   }
-   TCEntry;
-*/
-
 /* A translation-table entry.  This indicates precisely which areas of
    guest code are included in the translation, and contains all other
    auxiliary info too.  */
@@ -117,9 +102,10 @@ typedef
          deletion, hence the Deleted state. */
       enum { InUse, Deleted, Empty } status;
 
-      /* Pointer to the corresponding TCEntry (must be in the same
-         sector!) */
-      ULong* tce;
+      /* 64-bit aligned pointer to one or more 64-bit words containing
+         the corresponding host code (must be in the same sector!)
+         This is a pointer into the sector's tc (code) area. */
+      ULong* tcptr;
 
       /* This is the original guest address that purportedly is the
          entry point of the translation.  You might think that .entry
@@ -214,33 +200,48 @@ static Int    youngest_sector = -1;
 static Int    tc_sector_szQ;
 
 
-/* Fast helper for the TC.  A direct-mapped cache which holds a
-   pointer to a TC entry which may or may not be the correct one, but
-   which we hope usually is.  This array is referred to directly from
-   <arch>/dispatch.S.
+/* Fast helper for the TC.  A direct-mapped cache which holds a set of
+   recently used (guest address, host address) pairs.  This array is
+   referred to directly from m_dispatch/dispatch-<platform>.S.
 
-   Entries in tt_fast may point to any valid TC entry, regardless of
+   Entries in tt_fast may refer to any valid TC entry, regardless of
    which sector it's in.  Consequently we must be very careful to
    invalidate this cache when TC entries are changed or disappear.
 
-   A special TCEntry -- bogus_tc_entry -- must be pointed at to cause
-   that cache entry to miss.  This relies on the assumption that no
-   guest code actually has an address of 0x1.
+   A special .guest address - TRANSTAB_BOGUS_GUEST_ADDR -- must be
+   pointed at to cause that cache entry to miss.  This relies on the
+   assumption that no guest code actually has that address, hence a
+   value 0x1 seems good.  m_translate gives the client a synthetic
+   segfault if it tries to execute at this address.
 */
-/*global*/ ULong* VG_(tt_fast)[VG_TT_FAST_SIZE];
-
-static ULong bogus_tc_entry = (Addr64)1;
-
+/*
+typedef
+   struct { 
+      Addr guest;
+      Addr host;
+   }
+   FastCacheEntry;
+*/
+/*global*/ __attribute__((aligned(16)))
+           FastCacheEntry VG_(tt_fast)[VG_TT_FAST_SIZE];
+/*
+#define TRANSTAB_BOGUS_GUEST_ADDR ((Addr)1)
+*/
 
 /* For profiling, we have a parallel array of pointers to .count
    fields in TT entries.  Again, these pointers must be invalidated
    when translations disappear.  A NULL pointer suffices to indicate
    an unused slot.
 
-   tt_fast and tt_fastN change together: if tt_fast[i] points to
-   bogus_tc_entry then the corresponding tt_fastN[i] must be null.  If
-   tt_fast[i] points to some TC entry somewhere, then tt_fastN[i]
-   *must* point to the .count field of the corresponding TT entry.
+   When not profiling (the normal case, VG_(clo_profile_flags) == 0),
+   all tt_fastN entries are set to NULL at startup and never read nor
+   written after that.
+
+   When profiling (VG_(clo_profile_flags) > 0), tt_fast and tt_fastN
+   change together: if tt_fast[i].guest is TRANSTAB_BOGUS_GUEST_ADDR
+   then the corresponding tt_fastN[i] must be null.  If
+   tt_fast[i].guest is any other value, then tt_fastN[i] *must* point
+   to the .count field of the corresponding TT entry.
 
    tt_fast and tt_fastN are referred to from assembly code
    (dispatch.S).
@@ -557,6 +558,10 @@ static Bool sanity_check_eclasses_in_sector ( Sector* sec )
 
 /* Sanity check absolutely everything.  True == check passed. */
 
+/* forwards */
+static Bool sanity_check_redir_tt_tc ( void );
+static Bool sanity_check_fastcache ( void );
+
 static Bool sanity_check_all_sectors ( void )
 {
    Int     sno;
@@ -570,6 +575,10 @@ static Bool sanity_check_all_sectors ( void )
       if (!sane)
          return False;
    }
+   if ( !sanity_check_redir_tt_tc() )
+      return False;
+   if ( !sanity_check_fastcache() )
+      return False;
    return True;
 }
 
@@ -604,14 +613,37 @@ static inline UInt HASH_TT ( Addr64 key )
    return k32 % N_TTES_PER_SECTOR;
 }
 
-static void setFastCacheEntry ( Addr64 key, ULong* tce, UInt* count )
+static void setFastCacheEntry ( Addr64 key, ULong* tcptr, UInt* count )
 {
-   UInt cno = ((UInt)key) & VG_TT_FAST_MASK;
-   VG_(tt_fast)[cno]  = tce;
-   VG_(tt_fastN)[cno] = count;
+   UInt cno = (UInt)VG_TT_FAST_HASH(key);
+   VG_(tt_fast)[cno].guest = (Addr)key;
+   VG_(tt_fast)[cno].host  = (Addr)tcptr;
+   if (VG_(clo_profile_flags) > 0)
+      VG_(tt_fastN)[cno] = count;
    n_fast_updates++;
+   /* This shouldn't fail.  It should be assured by m_translate
+      which should reject any attempt to make translation of code
+      starting at TRANSTAB_BOGUS_GUEST_ADDR. */
+   vg_assert(VG_(tt_fast)[cno].guest != TRANSTAB_BOGUS_GUEST_ADDR);
 }
 
+/* Invalidate the fast cache's counter array, VG_(tt_fastN). */
+static void invalidateFastNCache ( void )
+{
+   UInt j;
+   vg_assert(VG_TT_FAST_SIZE > 0 && (VG_TT_FAST_SIZE % 4) == 0);
+   for (j = 0; j < VG_TT_FAST_SIZE; j += 4) {
+      VG_(tt_fastN)[j+0] = NULL;
+      VG_(tt_fastN)[j+1] = NULL;
+      VG_(tt_fastN)[j+2] = NULL;
+      VG_(tt_fastN)[j+3] = NULL;
+   }
+   vg_assert(j == VG_TT_FAST_SIZE);
+}
+
+/* Invalidate the fast cache VG_(tt_fast).  If profiling, also
+   invalidate the fast cache's counter array VG_(tt_fastN), otherwise
+   don't touch it. */
 static void invalidateFastCache ( void )
 {
    UInt j;
@@ -619,17 +651,41 @@ static void invalidateFastCache ( void )
       bit, at least on ppc32. */
    vg_assert(VG_TT_FAST_SIZE > 0 && (VG_TT_FAST_SIZE % 4) == 0);
    for (j = 0; j < VG_TT_FAST_SIZE; j += 4) {
-      VG_(tt_fast)[j+0]  = &bogus_tc_entry;
-      VG_(tt_fast)[j+1]  = &bogus_tc_entry;
-      VG_(tt_fast)[j+2]  = &bogus_tc_entry;
-      VG_(tt_fast)[j+3]  = &bogus_tc_entry;
-      VG_(tt_fastN)[j+0] = NULL;
-      VG_(tt_fastN)[j+1] = NULL;
-      VG_(tt_fastN)[j+2] = NULL;
-      VG_(tt_fastN)[j+3] = NULL;
+      VG_(tt_fast)[j+0].guest = TRANSTAB_BOGUS_GUEST_ADDR;
+      VG_(tt_fast)[j+1].guest = TRANSTAB_BOGUS_GUEST_ADDR;
+      VG_(tt_fast)[j+2].guest = TRANSTAB_BOGUS_GUEST_ADDR;
+      VG_(tt_fast)[j+3].guest = TRANSTAB_BOGUS_GUEST_ADDR;
    }
+
+   if (VG_(clo_profile_flags) > 0)
+      invalidateFastNCache();
+
    vg_assert(j == VG_TT_FAST_SIZE);
    n_fast_flushes++;
+}
+
+static Bool sanity_check_fastcache ( void )
+{
+   UInt j;
+   if (0) VG_(printf)("sanity check fastcache\n");
+   if (VG_(clo_profile_flags) > 0) {
+      /* profiling */
+      for (j = 0; j < VG_TT_FAST_SIZE; j++) {
+         if (VG_(tt_fastN)[j] == NULL 
+             && VG_(tt_fast)[j].guest != TRANSTAB_BOGUS_GUEST_ADDR)
+            return False;
+         if (VG_(tt_fastN)[j] != NULL 
+             && VG_(tt_fast)[j].guest == TRANSTAB_BOGUS_GUEST_ADDR)
+            return False;
+      }
+   } else {
+      /* not profiling */
+      for (j = 0; j < VG_TT_FAST_SIZE; j++) {
+         if (VG_(tt_fastN)[j] != NULL)
+            return False;
+      }
+   }
+   return True;
 }
 
 static void initialiseSector ( Int sno )
@@ -662,7 +718,7 @@ static void initialiseSector ( Int sno )
                                      8 * tc_sector_szQ );
 	 /*NOTREACHED*/
       }
-      sec->tc = (ULong*)sres.val;
+      sec->tc = (ULong*)sres.res;
 
       sres = VG_(am_mmap_anon_float_valgrind)
                 ( N_TTES_PER_SECTOR * sizeof(TTEntry) );
@@ -671,7 +727,7 @@ static void initialiseSector ( Int sno )
                                      N_TTES_PER_SECTOR * sizeof(TTEntry) );
 	 /*NOTREACHED*/
       }
-      sec->tt = (TTEntry*)sres.val;
+      sec->tt = (TTEntry*)sres.res;
 
       for (i = 0; i < N_TTES_PER_SECTOR; i++) {
          sec->tt[i].status   = Empty;
@@ -696,8 +752,8 @@ static void initialiseSector ( Int sno )
             vg_assert(sec->tt[i].n_tte2ec <= 3);
             n_dump_osize += vge_osize(&sec->tt[i].vge);
             /* Tell the tool too. */
-            if (VG_(needs).basic_block_discards) {
-               VG_TDICT_CALL( tool_discard_basic_block_info,
+            if (VG_(needs).superblock_discards) {
+               VG_TDICT_CALL( tool_discard_superblock_info,
                               sec->tt[i].entry,
                               sec->tt[i].vge );
             }
@@ -734,15 +790,18 @@ static void initialiseSector ( Int sno )
 
 static void invalidate_icache ( void *ptr, Int nbytes )
 {
-#  if defined(VGA_ppc32)
+#  if defined(VGA_ppc32) || defined(VGA_ppc64)
    Addr startaddr = (Addr) ptr;
    Addr endaddr   = startaddr + nbytes;
    Addr cls;
    Addr addr;
    VexArchInfo vai;
 
+   if (nbytes == 0) return;
+   vg_assert(nbytes > 0);
+
    VG_(machine_get_VexArchInfo)( NULL, &vai );
-   cls = vai.ppc32_cache_line_szB;
+   cls = vai.ppc_cache_line_szB;
 
    /* Stay sane .. */
    vg_assert(cls == 32 || cls == 128);
@@ -780,13 +839,15 @@ void VG_(add_to_transtab)( VexGuestExtents* vge,
                            Bool             is_self_checking )
 {
    Int    tcAvailQ, reqdQ, y, i;
-   ULong  *tce, *tce2;
+   ULong  *tcptr, *tcptr2;
    UChar* srcP;
    UChar* dstP;
 
    vg_assert(init_done);
    vg_assert(vge->n_used >= 1 && vge->n_used <= 3);
-   vg_assert(code_len > 0 && code_len < 20000);
+
+   /* 60000: should agree with N_TMPBUF in m_translate.c. */
+   vg_assert(code_len > 0 && code_len < 60000);
 
    if (0)
       VG_(printf)("add_to_transtab(entry = 0x%llx, len = %d)\n",
@@ -805,7 +866,7 @@ void VG_(add_to_transtab)( VexGuestExtents* vge,
       initialiseSector(y);
 
    /* Try putting the translation in this sector. */
-   reqdQ = 1 + ((code_len + 7) >> 3);
+   reqdQ = (code_len + 7) >> 3;
 
    /* Will it fit in tc? */
    tcAvailQ = ((ULong*)(&sectors[y].tc[tc_sector_szQ]))
@@ -845,12 +906,11 @@ void VG_(add_to_transtab)( VexGuestExtents* vge,
    vg_assert(sectors[y].tt_n_inuse >= 0);
  
    /* Copy into tc. */
-   tce = sectors[y].tc_next;
-   vg_assert(tce >= &sectors[y].tc[0]);
-   vg_assert(tce <= &sectors[y].tc[tc_sector_szQ]);
+   tcptr = sectors[y].tc_next;
+   vg_assert(tcptr >= &sectors[y].tc[0]);
+   vg_assert(tcptr <= &sectors[y].tc[tc_sector_szQ]);
 
-   tce[0] = entry;
-   dstP = (UChar*)(&tce[1]);
+   dstP = (UChar*)tcptr;
    srcP = (UChar*)code;
    for (i = 0; i < code_len; i++)
       dstP[i] = srcP[i];
@@ -860,9 +920,9 @@ void VG_(add_to_transtab)( VexGuestExtents* vge,
    invalidate_icache( dstP, code_len );
 
    /* more paranoia */
-   tce2 = sectors[y].tc_next;
-   vg_assert(tce2 >= &sectors[y].tc[0]);
-   vg_assert(tce2 <= &sectors[y].tc[tc_sector_szQ]);
+   tcptr2 = sectors[y].tc_next;
+   vg_assert(tcptr2 >= &sectors[y].tc[0]);
+   vg_assert(tcptr2 <= &sectors[y].tc[tc_sector_szQ]);
 
    /* Find an empty tt slot, and use it.  There must be such a slot
       since tt is never allowed to get completely full. */
@@ -878,14 +938,14 @@ void VG_(add_to_transtab)( VexGuestExtents* vge,
    }
 
    sectors[y].tt[i].status = InUse;
-   sectors[y].tt[i].tce    = tce;
+   sectors[y].tt[i].tcptr  = tcptr;
    sectors[y].tt[i].count  = 0;
    sectors[y].tt[i].weight = 1;
    sectors[y].tt[i].vge    = *vge;
    sectors[y].tt[i].entry  = entry;
 
    /* Update the fast-cache. */
-   setFastCacheEntry( entry, tce, &sectors[y].tt[i].count );
+   setFastCacheEntry( entry, tcptr, &sectors[y].tt[i].count );
 
    /* Note the eclass numbers for this translation. */
    upd_eclasses_after_add( &sectors[y], i );
@@ -927,10 +987,10 @@ Bool VG_(search_transtab) ( /*OUT*/AddrH* result,
             /* found it */
             if (upd_cache)
                setFastCacheEntry( 
-                  guest_addr, sectors[sno].tt[k].tce, 
+                  guest_addr, sectors[sno].tt[k].tcptr, 
                               &sectors[sno].tt[k].count );
             if (result)
-               *result = sizeof(Addr64) + (AddrH)sectors[sno].tt[k].tce;
+               *result = (AddrH)sectors[sno].tt[k].tcptr;
             return True;
          }
          if (sectors[sno].tt[k].status == Empty)
@@ -957,6 +1017,9 @@ Bool VG_(search_transtab) ( /*OUT*/AddrH* result,
 /*-------------------------------------------------------------*/
 /*--- Delete translations.                                  ---*/
 /*-------------------------------------------------------------*/
+
+/* forward */
+static void unredir_discard_translations( Addr64, ULong );
 
 /* Stuff for deleting translations which intersect with a given
    address range.  Unfortunately, to make this run at a reasonable
@@ -1024,8 +1087,8 @@ static void delete_tte ( /*MOD*/Sector* sec, Int tteno )
    n_disc_osize += vge_osize(&tte->vge);
 
    /* Tell the tool too. */
-   if (VG_(needs).basic_block_discards) {
-      VG_TDICT_CALL( tool_discard_basic_block_info,
+   if (VG_(needs).superblock_discards) {
+      VG_TDICT_CALL( tool_discard_superblock_info,
                      tte->entry,
                      tte->vge );
    }
@@ -1179,6 +1242,9 @@ void VG_(discard_translations) ( Addr64 guest_start, ULong range,
    if (anyDeleted)
       invalidateFastCache();
 
+   /* don't forget the no-redir cache */
+   unredir_discard_translations( guest_start, range );
+
    /* Post-deletion sanity check */
    if (VG_(clo_sanity_level >= 4)) {
       Int      i;
@@ -1203,6 +1269,169 @@ void VG_(discard_translations) ( Addr64 guest_start, ULong range,
 
 
 /*------------------------------------------------------------*/
+/*--- AUXILIARY: the unredirected TT/TC                    ---*/
+/*------------------------------------------------------------*/
+
+/* A very simple translation cache which holds a small number of
+   unredirected translations.  This is completely independent of the
+   main tt/tc structures.  When unredir_tc or unredir_tt becomes full,
+   both structures are simply dumped and we start over.
+
+   Since these translations are unredirected, the search key is (by
+   definition) the first address entry in the .vge field. */
+
+/* Sized to hold 500 translations of average size 1000 bytes. */
+
+#define UNREDIR_SZB   1000
+
+#define N_UNREDIR_TT  500
+#define N_UNREDIR_TCQ (N_UNREDIR_TT * UNREDIR_SZB / sizeof(ULong))
+
+typedef
+   struct {
+      VexGuestExtents vge;
+      Addr            hcode;
+      Bool            inUse;
+   }
+   UTCEntry;
+
+/* We just allocate forwards in _tc, never deleting. */
+static ULong    *unredir_tc;
+static Int      unredir_tc_used = N_UNREDIR_TCQ;
+
+/* Slots in _tt can come into use and out again (.inUse).
+   Nevertheless _tt_highwater is maintained so that invalidations
+   don't have to scan all the slots when only a few are in use.
+   _tt_highwater holds the index of the highest ever allocated
+   slot. */
+static UTCEntry unredir_tt[N_UNREDIR_TT];
+static Int      unredir_tt_highwater;
+
+
+static void init_unredir_tt_tc ( void )
+{
+   Int i;
+   if (unredir_tc == NULL) {
+      SysRes sres = VG_(am_mmap_anon_float_valgrind)( N_UNREDIR_TT * UNREDIR_SZB );
+      if (sres.isError) {
+         VG_(out_of_memory_NORETURN)("init_unredir_tt_tc", N_UNREDIR_TT * UNREDIR_SZB);
+         /*NOTREACHED*/
+      }
+      unredir_tc = (ULong *)sres.res;
+   }
+   unredir_tc_used = 0;
+   for (i = 0; i < N_UNREDIR_TT; i++)
+      unredir_tt[i].inUse = False;
+   unredir_tt_highwater = -1;
+}
+
+/* Do a sanity check; return False on failure. */
+static Bool sanity_check_redir_tt_tc ( void )
+{
+   Int i;
+   if (unredir_tt_highwater < -1) return False;
+   if (unredir_tt_highwater >= N_UNREDIR_TT) return False;
+
+   for (i = unredir_tt_highwater+1; i < N_UNREDIR_TT; i++)
+      if (unredir_tt[i].inUse)
+         return False;
+
+   if (unredir_tc_used < 0) return False;
+   if (unredir_tc_used > N_UNREDIR_TCQ) return False;
+
+   return True;
+}
+
+
+/* Add an UNREDIRECTED translation of vge to TT/TC.  The translation
+   is temporarily in code[0 .. code_len-1].
+*/
+void VG_(add_to_unredir_transtab)( VexGuestExtents* vge,
+                                   Addr64           entry,
+                                   AddrH            code,
+                                   UInt             code_len,
+                                   Bool             is_self_checking )
+{
+   Int   i, j, code_szQ;
+   HChar *srcP, *dstP;
+
+   vg_assert(sanity_check_redir_tt_tc());
+
+   /* This is the whole point: it's not redirected! */
+   vg_assert(entry == vge->base[0]);
+
+   /* How many unredir_tt slots are needed */   
+   code_szQ = (code_len + 7) / 8;
+
+   /* Look for an empty unredir_tc slot */
+   for (i = 0; i < N_UNREDIR_TT; i++)
+      if (!unredir_tt[i].inUse)
+         break;
+
+   if (i >= N_UNREDIR_TT || code_szQ > (N_UNREDIR_TCQ - unredir_tc_used)) {
+      /* It's full; dump everything we currently have */
+      init_unredir_tt_tc();
+      i = 0;
+   }
+
+   vg_assert(unredir_tc_used >= 0);
+   vg_assert(unredir_tc_used <= N_UNREDIR_TCQ);
+   vg_assert(code_szQ > 0);
+   vg_assert(code_szQ + unredir_tc_used <= N_UNREDIR_TCQ);
+   vg_assert(i >= 0 && i < N_UNREDIR_TT);
+   vg_assert(unredir_tt[i].inUse == False);
+
+   if (i > unredir_tt_highwater)
+      unredir_tt_highwater = i;
+
+   dstP = (HChar*)&unredir_tc[unredir_tc_used];
+   srcP = (HChar*)code;
+   for (j = 0; j < code_len; j++)
+      dstP[j] = srcP[j];
+
+   invalidate_icache( dstP, code_len );
+
+   unredir_tt[i].inUse = True;
+   unredir_tt[i].vge   = *vge;
+   unredir_tt[i].hcode = (Addr)dstP;
+
+   unredir_tc_used += code_szQ;
+   vg_assert(unredir_tc_used >= 0);
+   vg_assert(unredir_tc_used <= N_UNREDIR_TCQ);
+
+   vg_assert(&dstP[code_len] <= (HChar*)&unredir_tc[unredir_tc_used]);
+}
+
+Bool VG_(search_unredir_transtab) ( /*OUT*/AddrH* result,
+                                    Addr64        guest_addr )
+{
+   Int i;
+   for (i = 0; i < N_UNREDIR_TT; i++) {
+      if (!unredir_tt[i].inUse)
+         continue;
+      if (unredir_tt[i].vge.base[0] == guest_addr) {
+         *result = (AddrH)unredir_tt[i].hcode;
+         return True;
+      }
+   }
+   return False;
+}
+
+static void unredir_discard_translations( Addr64 guest_start, ULong range )
+{
+   Int i;
+
+   vg_assert(sanity_check_redir_tt_tc());
+
+   for (i = 0; i <= unredir_tt_highwater; i++) {
+      if (unredir_tt[i].inUse
+          && overlaps( guest_start, range, &unredir_tt[i].vge))
+         unredir_tt[i].inUse = False;
+   }
+}
+
+
+/*------------------------------------------------------------*/
 /*--- Initialisation.                                      ---*/
 /*------------------------------------------------------------*/
 
@@ -1216,6 +1445,14 @@ void VG_(init_tt_tc) ( void )
    /* Otherwise lots of things go wrong... */
    vg_assert(sizeof(ULong) == 8);
    vg_assert(sizeof(Addr64) == 8);
+   /* check fast cache entries really are 2 words long */
+   vg_assert(sizeof(Addr) == sizeof(void*));
+   vg_assert(sizeof(FastCacheEntry) == 2 * sizeof(Addr));
+   /* check fast cache entries are packed back-to-back with no spaces */
+   vg_assert(sizeof( VG_(tt_fast) ) == VG_TT_FAST_SIZE * sizeof(FastCacheEntry));
+   /* check fast cache is aligned as we requested.  Not fatal if it
+      isn't, but we might as well make sure. */
+   vg_assert(VG_IS_16_ALIGNED( ((Addr) & VG_(tt_fast)[0]) ));
 
    if (VG_(clo_verbosity) > 2)
       VG_(message)(Vg_DebugMsg, 
@@ -1228,7 +1465,7 @@ void VG_(init_tt_tc) ( void )
 
    /* Ensure the calculated value is not way crazy. */
    vg_assert(tc_sector_szQ >= 2 * N_TTES_PER_SECTOR_USABLE);
-   vg_assert(tc_sector_szQ <= 50 * N_TTES_PER_SECTOR_USABLE);
+   vg_assert(tc_sector_szQ <= 80 * N_TTES_PER_SECTOR_USABLE);
 
    /* Initialise the sectors */
    youngest_sector = 0;
@@ -1244,8 +1481,15 @@ void VG_(init_tt_tc) ( void )
       }
    }
 
-   /* and the fast caches. */
+   /* Initialise the fast caches.  If not profiling (the usual case),
+      we have to explicitly invalidate the fastN cache as
+      invalidateFastCache() won't do that for us. */
    invalidateFastCache();
+   if (VG_(clo_profile_flags) == 0)
+      invalidateFastNCache();
+
+   /* and the unredir tt/tc */
+   init_unredir_tt_tc();
 
    if (VG_(clo_verbosity) > 2) {
       VG_(message)(Vg_DebugMsg,
@@ -1295,16 +1539,16 @@ void VG_(print_tt_tc_stats) ( void )
       n_fast_updates, n_fast_flushes );
 
    VG_(message)(Vg_DebugMsg,
-                "translate: new        %,lld "
+                " transtab: new        %,lld "
                 "(%,llu -> %,llu; ratio %,llu:10) [%,llu scs]",
                 n_in_count, n_in_osize, n_in_tsize,
                 safe_idiv(10*n_in_tsize, n_in_osize),
                 n_in_sc_count);
    VG_(message)(Vg_DebugMsg,
-                "translate: dumped     %,llu (%,llu -> ?" "?)",
+                " transtab: dumped     %,llu (%,llu -> ?" "?)",
                 n_dump_count, n_dump_osize );
    VG_(message)(Vg_DebugMsg,
-                "translate: discarded  %,llu (%,llu -> ?" "?)",
+                " transtab: discarded  %,llu (%,llu -> ?" "?)",
                 n_disc_count, n_disc_osize );
 
    if (0) {

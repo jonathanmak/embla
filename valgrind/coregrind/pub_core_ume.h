@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward 
+   Copyright (C) 2000-2007 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -33,40 +33,8 @@
 
 //--------------------------------------------------------------------
 // PURPOSE: This module implements user-mode execve, ie. program loading
-// and exec'ing.  It is shared between stage1 and stage2.
+// and exec'ing.
 //--------------------------------------------------------------------
-
-#include <elf.h>
-#include <sys/types.h>
-
-/*------------------------------------------------------------*/
-/*--- General stuff                                        ---*/
-/*------------------------------------------------------------*/
-
-/* This is only here so it can be shared between stage1 and stage2 */
-
-/* JRS 9 Aug 05: both of these are apparently unused, except by
-   memcheck/tests/vgtest_ume.c. */
-//zz extern
-//zz void VG_(foreach_map)(int (*fn)(char *start, char *end,
-//zz 			        const char *perm, off_t offset,
-//zz 			        int maj, int min, int ino, void* extra),
-//zz                       void* extra);
-//zz 
-//zz /* Jump to 'dst', but first set the stack pointer to 'stack'.  Also,
-//zz    clear all the integer registers before entering 'dst'.  It's
-//zz    important that the stack pointer is set to exactly 'stack' and not
-//zz    (eg) stack - apparently_harmless_looking_small_offset.  Basically
-//zz    because the code at 'dst' might be wanting to scan the area above
-//zz    'stack' (viz, the auxv array), and putting spurious words on the
-//zz    stack confuses it.
-//zz 
-//zz    This is only exported so that vgtest_ume.c can use it.
-//zz */
-//zz extern
-//zz __attribute__((noreturn))
-//zz void VG_(jump_and_switch_stacks) ( Addr stack, Addr dst );
-
 
 /*------------------------------------------------------------*/
 /*--- Loading ELF files                                    ---*/
@@ -74,36 +42,41 @@
 
 // Info needed to load and run a program.  IN/INOUT/OUT refers to the
 // inputs/outputs of do_exec().
-struct exeinfo
-{
-   char** argv;         // IN: the original argv
+typedef
+   struct {
+      HChar** argv;       // IN: the original argv
 
-   Addr exe_base;       // INOUT: lowest (allowed) address of exe
-   Addr exe_end;        // INOUT: highest (allowed) address
+      Addr exe_base;     // INOUT: lowest (allowed) address of exe
+      Addr exe_end;      // INOUT: highest (allowed) address
 
-   Addr phdr;           // OUT: address phdr was mapped at
-   int  phnum;          // OUT: number of phdrs
-   Addr interp_base;    // OUT: where interpreter (ld.so) was mapped
-   Addr entry;          // OUT: entrypoint in main executable
-   Addr init_eip;       // OUT: initial eip
-   Addr brkbase;        // OUT: base address of brk segment
+      Addr phdr;         // OUT: address phdr was mapped at
+      Int  phnum;        // OUT: number of phdrs
+      Addr interp_base;  // OUT: where interpreter (ld.so) was mapped
+      Addr entry;        // OUT: entrypoint in main executable
+      Addr init_ip;      // OUT: address of first instruction to execute
+      Addr brkbase;      // OUT: base address of brk segment
+      Addr init_toc;     // OUT: address of table-of-contents, on
+                         // platforms for which that makes sense
+                         // (ppc64-linux only)
 
-   // These are the extra args added by #! scripts
-   char*  interp_name;  // OUT: the interpreter name
-   char*  interp_args;  // OUT: the args for the interpreter
-};
+      // These are the extra args added by #! scripts
+      HChar*  interp_name;  // OUT: the interpreter name
+      HChar*  interp_args;  // OUT: the args for the interpreter
+   }
+   ExeInfo;
 
 // Do a number of appropriate checks to see if the file looks executable by
 // the kernel: ie. it's a file, it's readable and executable, and it's in
 // either ELF or "#!" format.  On success, 'out_fd' gets the fd of the file
 // if it's non-NULL.  Otherwise the fd is closed.
-extern SysRes VG_(pre_exec_check)(const Char* exe_name, Int* out_fd);
+extern SysRes VG_(pre_exec_check)(const HChar* exe_name, Int* out_fd,
+                                  Bool allow_setuid);
 
 // Does everything short of actually running 'exe': finds the file,
 // checks execute permissions, sets up interpreter if program is a script, 
 // reads headers, maps file into memory, and returns important info about
 // the program.
-extern Int VG_(do_exec)(const char *exe, struct exeinfo *info);
+extern Int VG_(do_exec)(const HChar* exe, ExeInfo* info);
 
 /*------------------------------------------------------------*/
 /*--- Finding and dealing with auxv                        ---*/

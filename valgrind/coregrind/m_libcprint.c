@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward 
+   Copyright (C) 2000-2007 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -29,6 +29,7 @@
 */
 
 #include "pub_core_basics.h"
+#include "pub_core_vki.h"
 #include "pub_core_debuglog.h"
 #include "pub_core_libcbase.h"
 #include "pub_core_libcassert.h"
@@ -52,7 +53,12 @@ Bool VG_(logging_to_socket) = False;
 static void send_bytes_to_logging_sink ( Char* msg, Int nbytes )
 {
    if (!VG_(logging_to_socket)) {
-      VG_(write)( VG_(clo_log_fd), msg, nbytes );
+      /* VG_(clo_log_fd) could have been set to -1 in the various
+         sys-wrappers for sys_fork, if --child-silent-after-fork=yes
+         is in effect.  That is a signal that we should not produce
+         any more output. */
+      if (VG_(clo_log_fd) >= 0)
+         VG_(write)( VG_(clo_log_fd), msg, nbytes );
    } else {
       Int rc = VG_(write_socket)( VG_(clo_log_fd), msg, nbytes );
       if (rc == -1) {
@@ -168,6 +174,8 @@ static void add_to_vg_snprintf_buf ( HChar c, void* p )
       b->buf[b->buf_used++] = c;
       if (b->buf_used < b->buf_size)
          b->buf[b->buf_used] = 0;
+      else
+         b->buf[b->buf_size-1] = 0; /* pre: b->buf_size > 0 */
    } 
 }
 
@@ -213,7 +221,7 @@ void VG_(percentify)(ULong n, ULong m, UInt d, Int n_buf, char buf[])
    if (m == 0) {
       // Have to generate the format string in order to be flexible about
       // the width of the field.
-      VG_(sprintf)(fmt, "%%-%lds", n_buf);
+      VG_(sprintf)(fmt, "%%-%ds", n_buf);
       // fmt is now "%<n_buf>s" where <d> is 1,2,3...
       VG_(sprintf)(buf, fmt, "--%");
       return;

@@ -18,7 +18,6 @@
 #include <string.h>
 #include <sys/resource.h>
 #include <unistd.h>
-#include <sys/syscall.h>
 #include <dlfcn.h>
 
 
@@ -47,7 +46,7 @@ ptiSrSigHandler(int sig, siginfo_t *sip, void *arg)
 {
    //ucontext_t *ucontext = (ucontext_t *)arg;
    
-   int mypos = (int) pthread_getspecific(pKey);
+   long mypos = (long) pthread_getspecific(pKey);
    
    
 //   int threadPos = (int)pthread_getspecific(srThreadKey);
@@ -132,7 +131,12 @@ initSignalling(void)
    sa.sa_flags = SA_RESTART | SA_SIGINFO | SA_ONSTACK;
    sa.sa_sigaction = ptiSrSigHandler;
    sigfillset(&sa.sa_mask);
+
+#  if !defined(_AIX)
+   /* jrs 20060615: is this important?  I don't know. */
    sigdelset(&sa.sa_mask, (__SIGRTMIN+1));
+#  endif
+
    if (sigaction(srSignal, &sa, 0) == -1) {
       perror("sigaction");
       exit(1);
@@ -163,7 +167,11 @@ void* setup_altstack(void) {
 }
 
 void takedown_altstack(void* stack) {
+#  if defined(_AIX)
+   stack_t ss;
+#  else
    struct sigaltstack ss;
+#  endif
    int result;
    
    ss.ss_flags = SS_DISABLE;
@@ -177,8 +185,8 @@ void takedown_altstack(void* stack) {
 }
 
 void *threadfunc(void *arg) {
-   int mypos = (int)arg;
-   int i;
+   long mypos = (long)arg;
+   long i;
    long square = 1;
    void* altstack = setup_altstack();
    
@@ -209,10 +217,10 @@ void *threadfunc(void *arg) {
 int main(int argc, char ** argv) {
   pthread_t threads[THREAD_COUNT];
   pthread_attr_t attr;
-  int result;
-  int i;
-  int iteration;
-  int finished;
+  long result;
+  long i;
+  long iteration;
+  long finished;
 
   initSignalling();
   

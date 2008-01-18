@@ -1,9 +1,9 @@
-<html xmlns:cf="http://docbook.sourceforge.net/xmlns/chunkfast/1.0">
+<html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
 <title>5. README</title>
 <link rel="stylesheet" href="vg_basic.css" type="text/css">
-<meta name="generator" content="DocBook XSL Stylesheets V1.69.0">
+<meta name="generator" content="DocBook XSL Stylesheets V1.69.1">
 <link rel="start" href="index.html" title="Valgrind Documentation">
 <link rel="up" href="dist.html" title="Valgrind Distribution Documents">
 <link rel="prev" href="dist.news.html" title="4. NEWS">
@@ -44,23 +44,29 @@ hours of frustrating bug-hunting, making your programs more stable. You can<br>
 also perform detailed profiling, to speed up and reduce memory use of your<br>
 programs.<br>
 <br>
-The Valgrind distribution currently includes five tools: two memory error<br>
-detectors, a thread error detector, a cache profiler and a heap profiler.<br>
+The Valgrind distribution currently includes five production grade<br>
+tools: a memory error detector, a thread error detector, a cache<br>
+profiler, a call graph profiler and a heap profiler.  Experimental<br>
+tools are also included.  They are distinguished by the "exp-" prefix<br>
+on their names.<br>
 <br>
 To give you an idea of what Valgrind tools do, when a program is run<br>
-under the supervision of the first memory error detector tool, all reads<br>
-and writes of memory are checked, and calls to malloc/new/free/delete<br>
-are intercepted. As a result, it can detect problems such as:<br>
+under the supervision of Memcheck, the memory error detector tool, all<br>
+reads and writes of memory are checked, and calls to malloc/new/free/delete<br>
+are intercepted.  As a result, Memcheck can detect if your program:<br>
 <br>
-   Use of uninitialised memory<br>
-   Reading/writing memory after it has been free'd<br>
-   Reading/writing off the end of malloc'd blocks<br>
-   Reading/writing inappropriate areas on the stack<br>
-   Memory leaks -- where pointers to malloc'd blocks are lost forever<br>
-   Passing of uninitialised and/or unaddressible memory to system calls<br>
-   Mismatched use of malloc/new/new [] vs free/delete/delete []<br>
-   Overlaps of arguments to strcpy() and related functions<br>
-   Some abuses of the POSIX pthread API<br>
+   - Accesses memory it shouldn't (areas not yet allocated, areas that have<br>
+     been freed, areas past the end of heap blocks, inaccessible areas of<br>
+     the stack).<br>
+<br>
+   - Uses uninitialised values in dangerous ways.<br>
+<br>
+   - Leaks memory.<br>
+<br>
+   - Does bad frees of heap blocks (double frees, mismatched frees).<br>
+<br>
+   - Passes overlapping source and destination memory blocks to memcpy() and<br>
+     related functions.<br>
 <br>
 Problems like these can be difficult to find by other means, often<br>
 lying undetected for long periods, then causing occasional,<br>

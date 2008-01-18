@@ -1,27 +1,30 @@
 
-AUTOMAKE_OPTIONS = foreign 1.6 dist-bzip2
+AUTOMAKE_OPTIONS = foreign 1.7 dist-bzip2
 
 include $(top_srcdir)/Makefile.all.am 
 
-## addrcheck must come after memcheck, for mac_*.o
 TOOLS =		memcheck \
 		cachegrind \
+		callgrind \
 		massif \
 		lackey \
-		none
+		none \
+		helgrind
 
-##		addrcheck \
+EXP_TOOLS = 	exp-omega \
+		exp-drd
 
-# Temporary: we want to compile Helgrind, but not regtest it.
-# And we want to include Addrcheck in the distro, but not compile/test it.
 # Put docs last because building the HTML is slow and we want to get
 # everything else working before we try it.
-SUBDIRS = include coregrind . tests auxprogs $(TOOLS) helgrind docs
-DIST_SUBDIRS  = $(SUBDIRS) addrcheck
+SUBDIRS = include coregrind . tests perf auxprogs $(TOOLS) $(EXP_TOOLS) docs
+DIST_SUBDIRS  = $(SUBDIRS)
 
 SUPP_FILES = \
-	glibc-2.2.supp glibc-2.3.supp glibc-2.4.supp \
-	xfree-3.supp xfree-4.supp
+	glibc-2.2.supp glibc-2.3.supp glibc-2.4.supp glibc-2.5.supp \
+	glibc-2.6.supp glibc-2.7.supp aix5libc.supp xfree-3.supp xfree-4.supp \
+	glibc-2.34567-NPTL-helgrind.supp \
+	glibc-2.2-LinuxThreads-helgrind.supp \
+	glibc-2.X-drd.supp
 
 dist_val_DATA = $(SUPP_FILES) default.supp
 
@@ -35,17 +38,29 @@ BUILT_SOURCES  = default.supp valgrind.pc
 CLEANFILES     = 
 DISTCLEANFILES = default.supp
 
-if VG_X86_LINUX
+if VGP_X86_LINUX
 BUILT_SOURCES += valt_load_address_x86_linux.lds
 CLEANFILES += valt_load_address_x86_linux.lds
 endif
-if VG_AMD64_LINUX
+if VGP_AMD64_LINUX
 BUILT_SOURCES += valt_load_address_amd64_linux.lds
 CLEANFILES += valt_load_address_amd64_linux.lds
 endif
-if VG_PPC32_LINUX
+if VGP_PPC32_LINUX
 BUILT_SOURCES += valt_load_address_ppc32_linux.lds
 CLEANFILES += valt_load_address_ppc32_linux.lds
+endif
+if VGP_PPC64_LINUX
+BUILT_SOURCES += valt_load_address_ppc64_linux.lds
+CLEANFILES += valt_load_address_ppc64_linux.lds
+endif
+if VGP_PPC32_AIX5
+# No need to generate valt_load_address*.lds; the final executables
+# can be linked to be at any address.  They will be relocated by
+# AIX kernel when they are loaded.
+endif
+if VGP_PPC64_AIX5
+# Ditto
 endif
 
 default.supp: $(SUPP_FILES)
@@ -53,6 +68,12 @@ default.supp: $(SUPP_FILES)
 ## Preprend @PERL@ because tests/vg_regtest isn't executable
 regtest: check
 	@PERL@ tests/vg_regtest $(TOOLS)
+exp-regtest: check
+	@PERL@ tests/vg_regtest $(EXP_TOOLS)
+
+## Preprend @PERL@ because tests/vg_per isn't executable
+perf: check
+	@PERL@ perf/vg_perf perf
 
 EXTRA_DIST = \
 	ACKNOWLEDGEMENTS \
@@ -62,7 +83,7 @@ EXTRA_DIST = \
 	valgrind.spec.in valgrind.pc.in \
 	Makefile.all.am Makefile.tool.am Makefile.core.am \
 	Makefile.tool-inplace.am \
-	$(VEX_PRIMARY_SOURCES)
+	$(vex_primary_sources)
 
 install-exec-hook:
 	$(mkinstalldirs) $(DESTDIR)$(valdir)
@@ -82,6 +103,7 @@ VEX_PUBLIC_HDRS = \
 	@VEX_DIR@/pub/libvex_guest_amd64.h \
 	@VEX_DIR@/pub/libvex_ir.h \
 	@VEX_DIR@/pub/libvex_guest_ppc32.h \
+	@VEX_DIR@/pub/libvex_guest_ppc64.h \
 	@VEX_DIR@/pub/libvex_basictypes.h \
 	@VEX_DIR@/pub/libvex_guest_offsets.h \
 	@VEX_DIR@/pub/libvex_emwarn.h \
@@ -92,7 +114,9 @@ VEX_PUBLIC_HDRS = \
 
 # These list the bits of vex we need to copy into the tarball
 
-VEX_PRIMARY_SOURCES = \
+vex_primary_sources = \
+	VEX/quote.txt \
+	VEX/newline.txt \
 	VEX/HACKING.README \
 	VEX/LICENSE.README \
 	VEX/LICENSE.GPL \
@@ -101,6 +125,7 @@ VEX_PRIMARY_SOURCES = \
 	VEX/pub/libvex_guest_amd64.h \
 	VEX/pub/libvex_ir.h \
 	VEX/pub/libvex_guest_ppc32.h \
+	VEX/pub/libvex_guest_ppc64.h \
 	VEX/pub/libvex_basictypes.h \
 	VEX/pub/libvex_guest_offsets.h \
 	VEX/pub/libvex_emwarn.h \
@@ -113,9 +138,9 @@ VEX_PRIMARY_SOURCES = \
 	VEX/priv/ir/irdefs.c \
 	VEX/priv/ir/iropt.c \
 	VEX/priv/ir/iropt.h \
-	VEX/priv/host-ppc32/isel.c \
-	VEX/priv/host-ppc32/hdefs.c \
-	VEX/priv/host-ppc32/hdefs.h \
+	VEX/priv/host-ppc/isel.c \
+	VEX/priv/host-ppc/hdefs.c \
+	VEX/priv/host-ppc/hdefs.h \
 	VEX/priv/main/vex_svnversion.h \
 	VEX/priv/main/vex_globals.c \
 	VEX/priv/main/vex_globals.h \
@@ -141,9 +166,9 @@ VEX_PRIMARY_SOURCES = \
 	VEX/priv/guest-amd64/ghelpers.c \
 	VEX/priv/guest-amd64/gdefs.h \
 	VEX/priv/guest-amd64/toIR.c \
-	VEX/priv/guest-ppc32/ghelpers.c \
-	VEX/priv/guest-ppc32/gdefs.h \
-	VEX/priv/guest-ppc32/toIR.c \
+	VEX/priv/guest-ppc/ghelpers.c \
+	VEX/priv/guest-ppc/gdefs.h \
+	VEX/priv/guest-ppc/toIR.c \
 	VEX/priv/host-generic/reg_alloc2.c \
 	VEX/priv/host-generic/h_generic_regs.c \
 	VEX/priv/host-generic/h_generic_regs.h \
@@ -189,7 +214,14 @@ valt_load_address_amd64_linux.lds: Makefile
 	|| rm -f $@
 
 valt_load_address_ppc32_linux.lds: Makefile
-	$(CC) -Wl,--verbose -nostdlib 2>&1 | sed \
+	$(CC) @FLAG_M32@ -Wl,--verbose -nostdlib 2>&1 | sed \
+		-e '1,/^=====\+$$/d' \
+		-e '/^=====\+$$/d' \
+		-e '/\. = 0x[0-9A-Fa-f]\+ + SIZEOF_HEADERS/s/0x[0-9A-Fa-f]\+/valt_load_address/g' > $@ \
+	|| rm -f $@
+
+valt_load_address_ppc64_linux.lds: Makefile
+	$(CC) -m64 -Wl,--verbose -nostdlib 2>&1 | sed \
 		-e '1,/^=====\+$$/d' \
 		-e '/^=====\+$$/d' \
 		-e '/\. = 0x[0-9A-Fa-f]\+ + SIZEOF_HEADERS/s/0x[0-9A-Fa-f]\+/valt_load_address/g' > $@ \

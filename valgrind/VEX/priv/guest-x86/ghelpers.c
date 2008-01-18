@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2005 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -743,6 +743,28 @@ UInt LibVEX_GuestX86_get_eflags ( /*IN*/VexGuestX86State* vex_state )
    return eflags;
 }
 
+/* VISIBLE TO LIBVEX CLIENT */
+void
+LibVEX_GuestX86_put_eflag_c ( UInt new_carry_flag,
+                              /*MOD*/VexGuestX86State* vex_state )
+{
+   UInt oszacp = x86g_calculate_eflags_all_WRK(
+                    vex_state->guest_CC_OP,
+                    vex_state->guest_CC_DEP1,
+                    vex_state->guest_CC_DEP2,
+                    vex_state->guest_CC_NDEP
+                 );
+   if (new_carry_flag & 1) {
+      oszacp |= X86G_CC_MASK_C;
+   } else {
+      oszacp &= ~X86G_CC_MASK_C;
+   }
+   vex_state->guest_CC_OP   = X86G_CC_OP_COPY;
+   vex_state->guest_CC_DEP1 = oszacp;
+   vex_state->guest_CC_DEP2 = 0;
+   vex_state->guest_CC_NDEP = 0;
+}
+
 
 /*---------------------------------------------------------------*/
 /*--- %eflags translation-time function specialisers.         ---*/
@@ -753,7 +775,7 @@ UInt LibVEX_GuestX86_get_eflags ( /*IN*/VexGuestX86State* vex_state )
 /* Used by the optimiser to try specialisations.  Returns an
    equivalent expression, or NULL if none. */
 
-static Bool isU32 ( IRExpr* e, UInt n )
+static inline Bool isU32 ( IRExpr* e, UInt n )
 {
    return 
       toBool( e->tag == Iex_Const
@@ -810,7 +832,6 @@ IRExpr* guest_x86_spechelper ( HChar* function_name,
          return unop(Iop_1Uto32,
                      binop(Iop_CmpEQ32, cc_dep1, cc_dep2));
       }
-
       if (isU32(cc_op, X86G_CC_OP_SUBL) && isU32(cond, X86CondNZ)) {
          /* long sub/cmp, then NZ --> test dst!=src */
          return unop(Iop_1Uto32,
@@ -823,12 +844,29 @@ IRExpr* guest_x86_spechelper ( HChar* function_name,
          return unop(Iop_1Uto32,
                      binop(Iop_CmpLT32S, cc_dep1, cc_dep2));
       }
+      if (isU32(cc_op, X86G_CC_OP_SUBL) && isU32(cond, X86CondNL)) {
+         /* long sub/cmp, then NL (signed greater than or equal) 
+            --> test !(dst <s src) */
+         return binop(Iop_Xor32,
+                      unop(Iop_1Uto32,
+                           binop(Iop_CmpLT32S, cc_dep1, cc_dep2)),
+                      mkU32(1));
+      }
 
       if (isU32(cc_op, X86G_CC_OP_SUBL) && isU32(cond, X86CondLE)) {
          /* long sub/cmp, then LE (signed less than or equal)
             --> test dst <=s src */
          return unop(Iop_1Uto32,
                      binop(Iop_CmpLE32S, cc_dep1, cc_dep2));
+      }
+      if (isU32(cc_op, X86G_CC_OP_SUBL) && isU32(cond, X86CondNLE)) {
+         /* long sub/cmp, then NLE (signed not less than or equal)
+            --> test dst >s src 
+            --> test !(dst <=s src) */
+         return binop(Iop_Xor32,
+                      unop(Iop_1Uto32,
+                           binop(Iop_CmpLE32S, cc_dep1, cc_dep2)),
+                      mkU32(1));
       }
 
       if (isU32(cc_op, X86G_CC_OP_SUBL) && isU32(cond, X86CondBE)) {
@@ -837,6 +875,14 @@ IRExpr* guest_x86_spechelper ( HChar* function_name,
          return unop(Iop_1Uto32,
                      binop(Iop_CmpLE32U, cc_dep1, cc_dep2));
       }
+      if (isU32(cc_op, X86G_CC_OP_SUBL) && isU32(cond, X86CondNBE)) {
+         /* long sub/cmp, then BE (unsigned greater than)
+            --> test !(dst <=u src) */
+         return binop(Iop_Xor32,
+                      unop(Iop_1Uto32,
+                           binop(Iop_CmpLE32U, cc_dep1, cc_dep2)),
+                      mkU32(1));
+      }
 
       if (isU32(cc_op, X86G_CC_OP_SUBL) && isU32(cond, X86CondB)) {
          /* long sub/cmp, then B (unsigned less than)
@@ -844,19 +890,36 @@ IRExpr* guest_x86_spechelper ( HChar* function_name,
          return unop(Iop_1Uto32,
                      binop(Iop_CmpLT32U, cc_dep1, cc_dep2));
       }
+      if (isU32(cc_op, X86G_CC_OP_SUBL) && isU32(cond, X86CondNB)) {
+         /* long sub/cmp, then NB (unsigned greater than or equal)
+            --> test !(dst <u src) */
+         return binop(Iop_Xor32,
+                      unop(Iop_1Uto32,
+                           binop(Iop_CmpLT32U, cc_dep1, cc_dep2)),
+                      mkU32(1));
+      }
 
       if (isU32(cc_op, X86G_CC_OP_SUBL) && isU32(cond, X86CondS)) {
-         /* long sub/cmp, then S --> test (dst-src <s 0) */
+         /* long sub/cmp, then S (negative) --> test (dst-src <s 0) */
          return unop(Iop_1Uto32,
                      binop(Iop_CmpLT32S, 
                            binop(Iop_Sub32, cc_dep1, cc_dep2),
                            mkU32(0)));
       }
+      if (isU32(cc_op, X86G_CC_OP_SUBL) && isU32(cond, X86CondNS)) {
+         /* long sub/cmp, then NS (not negative) --> test !(dst-src <s 0) */
+         return binop(Iop_Xor32,
+                      unop(Iop_1Uto32,
+                           binop(Iop_CmpLT32S, 
+                                 binop(Iop_Sub32, cc_dep1, cc_dep2),
+                                 mkU32(0))),
+                      mkU32(1));
+      }
 
       /*---------------- SUBW ----------------*/
 
       if (isU32(cc_op, X86G_CC_OP_SUBW) && isU32(cond, X86CondZ)) {
-         /* byte sub/cmp, then Z --> test dst==src */
+         /* word sub/cmp, then Z --> test dst==src */
          return unop(Iop_1Uto32,
                      binop(Iop_CmpEQ16, 
                            unop(Iop_32to16,cc_dep1), 
@@ -872,7 +935,6 @@ IRExpr* guest_x86_spechelper ( HChar* function_name,
                            unop(Iop_32to8,cc_dep1), 
                            unop(Iop_32to8,cc_dep2)));
       }
-
       if (isU32(cc_op, X86G_CC_OP_SUBB) && isU32(cond, X86CondNZ)) {
          /* byte sub/cmp, then NZ --> test dst!=src */
          return unop(Iop_1Uto32,
@@ -882,13 +944,28 @@ IRExpr* guest_x86_spechelper ( HChar* function_name,
       }
 
       if (isU32(cc_op, X86G_CC_OP_SUBB) && isU32(cond, X86CondNBE)) {
-         /* long sub/cmp, then NBE (unsigned greater than)
-            --> test src <=u dst */
+         /* byte sub/cmp, then NBE (unsigned greater than)
+            --> test src <u dst */
          /* Note, args are opposite way round from the usual */
          return unop(Iop_1Uto32,
                      binop(Iop_CmpLT32U, 
                            binop(Iop_And32,cc_dep2,mkU32(0xFF)),
 			   binop(Iop_And32,cc_dep1,mkU32(0xFF))));
+      }
+
+      if (isU32(cc_op, X86G_CC_OP_SUBB) && isU32(cond, X86CondS)
+                                        && isU32(cc_dep2, 0)) {
+         /* byte sub/cmp of zero, then S --> test (dst-0 <s 0) 
+                                         --> test dst <s 0
+                                         --> (UInt)dst[7] 
+            This is yet another scheme by which gcc figures out if the
+            top bit of a byte is 1 or 0.  See also LOGICB/CondS below. */
+         /* Note: isU32(cc_dep2, 0) is correct, even though this is
+            for an 8-bit comparison, since the args to the helper
+            function are always U32s. */
+         return binop(Iop_And32,
+                      binop(Iop_Shr32,cc_dep1,mkU8(7)),
+                      mkU32(1));
       }
 
       /*---------------- LOGICL ----------------*/
@@ -897,10 +974,9 @@ IRExpr* guest_x86_spechelper ( HChar* function_name,
          /* long and/or/xor, then Z --> test dst==0 */
          return unop(Iop_1Uto32,binop(Iop_CmpEQ32, cc_dep1, mkU32(0)));
       }
-
-      if (isU32(cc_op, X86G_CC_OP_LOGICL) && isU32(cond, X86CondS)) {
-         /* long and/or/xor, then S --> test dst <s 0 */
-         return unop(Iop_1Uto32,binop(Iop_CmpLT32S, cc_dep1, mkU32(0)));
+      if (isU32(cc_op, X86G_CC_OP_LOGICL) && isU32(cond, X86CondNZ)) {
+         /* long and/or/xor, then NZ --> test dst!=0 */
+         return unop(Iop_1Uto32,binop(Iop_CmpNE32, cc_dep1, mkU32(0)));
       }
 
       if (isU32(cc_op, X86G_CC_OP_LOGICL) && isU32(cond, X86CondLE)) {
@@ -922,13 +998,38 @@ IRExpr* guest_x86_spechelper ( HChar* function_name,
          return unop(Iop_1Uto32,binop(Iop_CmpEQ32, cc_dep1, mkU32(0)));
       }
 
+      if (isU32(cc_op, X86G_CC_OP_LOGICL) && isU32(cond, X86CondS)) {
+         /* see comment below for (LOGICB, CondS) */
+         /* long and/or/xor, then S --> (UInt)result[31] */
+         return binop(Iop_And32,
+                      binop(Iop_Shr32,cc_dep1,mkU8(31)),
+                      mkU32(1));
+      }
+      if (isU32(cc_op, X86G_CC_OP_LOGICL) && isU32(cond, X86CondNS)) {
+         /* see comment below for (LOGICB, CondNS) */
+         /* long and/or/xor, then S --> (UInt) ~ result[31] */
+         return binop(Iop_Xor32,
+                binop(Iop_And32,
+                      binop(Iop_Shr32,cc_dep1,mkU8(31)),
+                      mkU32(1)),
+                mkU32(1));
+      }
+
       /*---------------- LOGICW ----------------*/
 
       if (isU32(cc_op, X86G_CC_OP_LOGICW) && isU32(cond, X86CondZ)) {
-         /* byte and/or/xor, then Z --> test dst==0 */
+         /* word and/or/xor, then Z --> test dst==0 */
          return unop(Iop_1Uto32,
                      binop(Iop_CmpEQ32, binop(Iop_And32,cc_dep1,mkU32(0xFFFF)), 
                                         mkU32(0)));
+      }
+
+      if (isU32(cc_op, X86G_CC_OP_LOGICW) && isU32(cond, X86CondS)) {
+         /* see comment below for (LOGICB, CondS) */
+         /* word and/or/xor, then S --> (UInt)result[15] */
+         return binop(Iop_And32,
+                      binop(Iop_Shr32,cc_dep1,mkU8(15)),
+                      mkU32(1));
       }
 
       /*---------------- LOGICB ----------------*/
@@ -938,6 +1039,36 @@ IRExpr* guest_x86_spechelper ( HChar* function_name,
          return unop(Iop_1Uto32,
                      binop(Iop_CmpEQ32, binop(Iop_And32,cc_dep1,mkU32(255)), 
                                         mkU32(0)));
+      }
+      if (isU32(cc_op, X86G_CC_OP_LOGICB) && isU32(cond, X86CondNZ)) {
+         /* byte and/or/xor, then Z --> test dst!=0 */
+         /* b9ac9:       84 c0                   test   %al,%al
+            b9acb:       75 0d                   jne    b9ada */
+         return unop(Iop_1Uto32,
+                     binop(Iop_CmpNE32, binop(Iop_And32,cc_dep1,mkU32(255)), 
+                                        mkU32(0)));
+      }
+
+      if (isU32(cc_op, X86G_CC_OP_LOGICB) && isU32(cond, X86CondS)) {
+         /* this is an idiom gcc sometimes uses to find out if the top
+            bit of a byte register is set: eg testb %al,%al; js ..
+            Since it just depends on the top bit of the byte, extract
+            that bit and explicitly get rid of all the rest.  This
+            helps memcheck avoid false positives in the case where any
+            of the other bits in the byte are undefined. */
+         /* byte and/or/xor, then S --> (UInt)result[7] */
+         return binop(Iop_And32,
+                      binop(Iop_Shr32,cc_dep1,mkU8(7)),
+                      mkU32(1));
+      }
+      if (isU32(cc_op, X86G_CC_OP_LOGICB) && isU32(cond, X86CondNS)) {
+         /* ditto, for negation-of-S. */
+         /* byte and/or/xor, then S --> (UInt) ~ result[7] */
+         return binop(Iop_Xor32,
+                binop(Iop_And32,
+                      binop(Iop_Shr32,cc_dep1,mkU8(7)),
+                      mkU32(1)),
+                mkU32(1));
       }
 
       /*---------------- DECL ----------------*/
@@ -950,6 +1081,27 @@ IRExpr* guest_x86_spechelper ( HChar* function_name,
       if (isU32(cc_op, X86G_CC_OP_DECL) && isU32(cond, X86CondS)) {
          /* dec L, then S --> compare DST <s 0 */
          return unop(Iop_1Uto32,binop(Iop_CmpLT32S, cc_dep1, mkU32(0)));
+      }
+
+      /*---------------- DECW ----------------*/
+
+      if (isU32(cc_op, X86G_CC_OP_DECW) && isU32(cond, X86CondZ)) {
+         /* dec W, then Z --> test dst == 0 */
+         return unop(Iop_1Uto32,
+                     binop(Iop_CmpEQ32, 
+                           binop(Iop_Shl32,cc_dep1,mkU8(16)), 
+                           mkU32(0)));
+      }
+
+      /*---------------- INCW ----------------*/
+
+      if (isU32(cc_op, X86G_CC_OP_INCW) && isU32(cond, X86CondZ)) {
+         /* This rewrite helps memcheck on 'incw %ax ; je ...'. */
+         /* inc W, then Z --> test dst == 0 */
+         return unop(Iop_1Uto32,
+                     binop(Iop_CmpEQ32, 
+                           binop(Iop_Shl32,cc_dep1,mkU8(16)),
+                           mkU32(0)));
       }
 
       /*---------------- SHRL ----------------*/
@@ -965,10 +1117,10 @@ IRExpr* guest_x86_spechelper ( HChar* function_name,
 
       if (isU32(cc_op, X86G_CC_OP_COPY) && 
           (isU32(cond, X86CondBE) || isU32(cond, X86CondNBE))) {
-         /* COPY, then BE --> extract C and Z from dep1, and test (C
-            or Z == 1). */
-         /* COPY, then NBE --> extract C and Z from dep1, and test (C
-            or Z == 0). */
+         /* COPY, then BE --> extract C and Z from dep1, and test 
+            (C or Z) == 1. */
+         /* COPY, then NBE --> extract C and Z from dep1, and test
+            (C or Z) == 0. */
          UInt nnn = isU32(cond, X86CondBE) ? 1 : 0;
          return
             unop(
@@ -989,8 +1141,8 @@ IRExpr* guest_x86_spechelper ( HChar* function_name,
             );
       }
       
-      if (isU32(cc_op, X86G_CC_OP_COPY) && 
-          (isU32(cond, X86CondB) || isU32(cond, X86CondNB))) {
+      if (isU32(cc_op, X86G_CC_OP_COPY) 
+          && (isU32(cond, X86CondB) || isU32(cond, X86CondNB))) {
          /* COPY, then B --> extract C from dep1, and test (C == 1). */
          /* COPY, then NB --> extract C from dep1, and test (C == 0). */
          UInt nnn = isU32(cond, X86CondB) ? 1 : 0;
@@ -1009,19 +1161,42 @@ IRExpr* guest_x86_spechelper ( HChar* function_name,
             );
       }
 
-      if (isU32(cc_op, X86G_CC_OP_COPY) && isU32(cond, X86CondZ)) {
+      if (isU32(cc_op, X86G_CC_OP_COPY) 
+          && (isU32(cond, X86CondZ) || isU32(cond, X86CondNZ))) {
          /* COPY, then Z --> extract Z from dep1, and test (Z == 1). */
+         /* COPY, then NZ --> extract Z from dep1, and test (Z == 0). */
+         UInt nnn = isU32(cond, X86CondZ) ? 1 : 0;
          return
             unop(
                Iop_1Uto32,
                binop(
-                  Iop_CmpNE32,
+                  Iop_CmpEQ32,
                   binop(
                      Iop_And32,
                      binop(Iop_Shr32, cc_dep1, mkU8(X86G_CC_SHIFT_Z)),
                      mkU32(1)
                   ),
-                  mkU32(0)
+                  mkU32(nnn)
+               )
+            );
+      }
+
+      if (isU32(cc_op, X86G_CC_OP_COPY) 
+          && (isU32(cond, X86CondP) || isU32(cond, X86CondNP))) {
+         /* COPY, then P --> extract P from dep1, and test (P == 1). */
+         /* COPY, then NP --> extract P from dep1, and test (P == 0). */
+         UInt nnn = isU32(cond, X86CondP) ? 1 : 0;
+         return
+            unop(
+               Iop_1Uto32,
+               binop(
+                  Iop_CmpEQ32,
+                  binop(
+                     Iop_And32,
+                     binop(Iop_Shr32, cc_dep1, mkU8(X86G_CC_SHIFT_P)),
+                     mkU32(1)
+                  ),
+                  mkU32(nnn)
                )
             );
       }
@@ -1070,6 +1245,13 @@ IRExpr* guest_x86_spechelper ( HChar* function_name,
                binop(Iop_Shr32, cc_dep1, mkU8(X86G_CC_SHIFT_C)),
                mkU32(1)
             );
+      }
+      if (isU32(cc_op, X86G_CC_OP_ADDL)) {
+         /* C after add denotes sum <u either arg */
+         return unop(Iop_1Uto32,
+                     binop(Iop_CmpLT32U, 
+                           binop(Iop_Add32, cc_dep1, cc_dep2), 
+                           cc_dep1));
       }
 #     if 0
       if (cc_op->tag == Iex_Const) {
@@ -1243,90 +1425,6 @@ void x86g_dirtyhelper_storeF80le ( UInt addrU, ULong f64 )
 }
 
 
-/* CALLED FROM GENERATED CODE: CLEAN HELPER */
-/* Extract the signed significand or exponent component as per
-   fxtract.  Arg and result are doubles travelling under the guise of
-   ULongs.  Returns significand when getExp is zero and exponent
-   otherwise. */
-ULong x86g_calculate_FXTRACT ( ULong arg, UInt getExp )
-{
-   ULong  uSig;
-   Long   sSig;
-   Double dSig, dExp;
-   Int    sExp, i;
-   UInt   sign;
-
-   /*
-    S  7FF    0------0   infinity
-    S  7FF    0X-----X   snan
-    S  7FF    1X-----X   qnan
-   */
-   const ULong posInf  = 0x7FF0000000000000ULL;
-   const ULong negInf  = 0xFFF0000000000000ULL;
-   const ULong nanMask = 0x7FF0000000000000ULL;
-   const ULong qNan    = 0x7FF8000000000000ULL;
-   const ULong posZero = 0x0000000000000000ULL;
-   const ULong negZero = 0x8000000000000000ULL;
-   const ULong bit51   = 1ULL << 51;
-   const ULong bit52   = 1ULL << 52;
-
-   /* Mimic PIII behaviour for special cases. */
-   if (arg == posInf)
-      return getExp ? posInf : posInf;
-   if (arg == negInf)
-      return getExp ? posInf : negInf;
-   if ((arg & nanMask) == nanMask)
-      return qNan;
-   if (arg == posZero)
-      return getExp ? negInf : posZero;
-   if (arg == negZero)
-      return getExp ? negInf : negZero;
-
-   /* Split into sign, exponent and significand. */
-   sign = ((UInt)(arg >> 63)) & 1;
-
-   /* Mask off exponent & sign. uSig is in range 0 .. 2^52-1. */
-   uSig = arg & (bit52 - 1);
-
-   /* Get the exponent. */
-   sExp = ((Int)(arg >> 52)) & 0x7FF;
-
-   /* Deal with denormals: if the exponent is zero, then the
-      significand cannot possibly be zero (negZero/posZero are handled
-      above).  Shift the significand left until bit 51 of it becomes
-      1, and decrease the exponent accordingly.
-   */
-   if (sExp == 0) {
-      for (i = 0; i < 52; i++) {
-         if (uSig & bit51)
-            break;
-         uSig <<= 1;
-         sExp--;
-      }
-      uSig <<= 1;
-   } else {
-      /* Add the implied leading-1 in the significand. */
-      uSig |= bit52;
-   }
-
-   /* Roll in the sign. */
-   sSig = uSig;
-   if (sign) sSig =- sSig;
-
-   /* Convert sig into a double.  This should be an exact conversion.
-      Then divide by 2^52, which should give a value in the range 1.0
-      to 2.0-epsilon, at least for normalised args. */
-   dSig = (Double)sSig;
-   dSig /= 67108864.0; /* 2^26 */
-   dSig /= 67108864.0; /* 2^26 */
-
-   /* Convert exp into a double.  Also an exact conversion. */
-   dExp = (Double)(sExp - 1023);
-
-   return *(ULong*)(getExp ? &dExp : &dSig);
-}
-
-
 /*----------------------------------------------*/
 /*--- The exported fns ..                    ---*/
 /*----------------------------------------------*/
@@ -1442,7 +1540,7 @@ VexEmWarn do_put_x87 ( Bool moveRegs,
 {
    Int        stno, preg;
    UInt       tag;
-   Double*    vexRegs = (Double*)(&vex_state->guest_FPREG[0]);
+   ULong*     vexRegs = (ULong*)(&vex_state->guest_FPREG[0]);
    UChar*     vexTags = (UChar*)(&vex_state->guest_FPTAG[0]);
    Fpu_State* x87     = (Fpu_State*)x87_state;
    UInt       ftop    = (x87->env[FP_ENV_STAT] >> 11) & 7;
@@ -1464,7 +1562,7 @@ VexEmWarn do_put_x87 ( Bool moveRegs,
             of sync, in that it thinks all FP registers are defined by
             this helper, but in reality some have not been updated. */
          if (moveRegs)
-            vexRegs[preg] = 0.0;
+            vexRegs[preg] = 0; /* IEEE754 64-bit zero */
          vexTags[preg] = 0;
       } else {
          /* register is non-empty */
@@ -1502,7 +1600,7 @@ void do_get_x87 ( /*IN*/VexGuestX86State* vex_state,
 {
    Int        i, stno, preg;
    UInt       tagw;
-   Double*    vexRegs = (Double*)(&vex_state->guest_FPREG[0]);
+   ULong*     vexRegs = (ULong*)(&vex_state->guest_FPREG[0]);
    UChar*     vexTags = (UChar*)(&vex_state->guest_FPTAG[0]);
    Fpu_State* x87     = (Fpu_State*)x87_state;
    UInt       ftop    = vex_state->guest_FTOP;
@@ -1774,6 +1872,135 @@ ULong x86g_calculate_RCL ( UInt arg, UInt rot_amt, UInt eflags_in, UInt sz )
    eflags_in |= (cf << X86G_CC_SHIFT_C) | (of << X86G_CC_SHIFT_O);
 
    return (((ULong)eflags_in) << 32) | ((ULong)arg);
+}
+
+
+/* CALLED FROM GENERATED CODE: CLEAN HELPER */
+/* Calculate both flags and value result for DAA/DAS/AAA/AAS.
+   AX value in low half of arg, OSZACP in upper half.
+   See guest-x86/toIR.c usage point for details.
+*/
+static UInt calc_parity_8bit ( UInt w32 ) {
+   UInt i;
+   UInt p = 1;
+   for (i = 0; i < 8; i++)
+      p ^= (1 & (w32 >> i));
+   return p;
+}
+UInt x86g_calculate_daa_das_aaa_aas ( UInt flags_and_AX, UInt opcode )
+{
+   UInt r_AL = (flags_and_AX >> 0) & 0xFF;
+   UInt r_AH = (flags_and_AX >> 8) & 0xFF;
+   UInt r_O  = (flags_and_AX >> (16 + X86G_CC_SHIFT_O)) & 1;
+   UInt r_S  = (flags_and_AX >> (16 + X86G_CC_SHIFT_S)) & 1;
+   UInt r_Z  = (flags_and_AX >> (16 + X86G_CC_SHIFT_Z)) & 1;
+   UInt r_A  = (flags_and_AX >> (16 + X86G_CC_SHIFT_A)) & 1;
+   UInt r_C  = (flags_and_AX >> (16 + X86G_CC_SHIFT_C)) & 1;
+   UInt r_P  = (flags_and_AX >> (16 + X86G_CC_SHIFT_P)) & 1;
+   UInt result = 0;
+
+   switch (opcode) {
+      case 0x27: { /* DAA */
+         UInt old_AL = r_AL;
+         UInt old_C  = r_C;
+         r_C = 0;
+         if ((r_AL & 0xF) > 9 || r_A == 1) {
+            r_AL = r_AL + 6;
+            r_C  = old_C;
+            if (r_AL >= 0x100) r_C = 1;
+            r_A = 1;
+         } else {
+            r_A = 0;
+         }
+         if (old_AL > 0x99 || old_C == 1) {
+            r_AL = r_AL + 0x60;
+            r_C  = 1;
+         } else {
+            r_C = 0;
+         }
+         /* O is undefined.  S Z and P are set according to the
+	    result. */
+         r_AL &= 0xFF;
+         r_O = 0; /* let's say */
+         r_S = (r_AL & 0x80) ? 1 : 0;
+         r_Z = (r_AL == 0) ? 1 : 0;
+         r_P = calc_parity_8bit( r_AL );
+         break;
+      }
+      case 0x2F: { /* DAS */
+         UInt old_AL = r_AL;
+         UInt old_C  = r_C;
+         r_C = 0;
+         if ((r_AL & 0xF) > 9 || r_A == 1) {
+            Bool borrow = r_AL < 6;
+            r_AL = r_AL - 6;
+            r_C  = old_C;
+            if (borrow) r_C = 1;
+            r_A = 1;
+         } else {
+            r_A = 0;
+         }
+         if (old_AL > 0x99 || old_C == 1) {
+            r_AL = r_AL - 0x60;
+            r_C  = 1;
+         } else {
+            /* Intel docs are wrong: r_C = 0; */
+         }
+         /* O is undefined.  S Z and P are set according to the
+	    result. */
+         r_AL &= 0xFF;
+         r_O = 0; /* let's say */
+         r_S = (r_AL & 0x80) ? 1 : 0;
+         r_Z = (r_AL == 0) ? 1 : 0;
+         r_P = calc_parity_8bit( r_AL );
+         break;
+      }
+      case 0x37: { /* AAA */
+         Bool nudge = r_AL > 0xF9;
+         if ((r_AL & 0xF) > 9 || r_A == 1) {
+            r_AL = r_AL + 6;
+            r_AH = r_AH + 1 + (nudge ? 1 : 0);
+            r_A  = 1;
+            r_C  = 1;
+            r_AL = r_AL & 0xF;
+         } else {
+            r_A  = 0;
+            r_C  = 0;
+            r_AL = r_AL & 0xF;
+         }
+         /* O S Z and P are undefined. */
+         r_O = r_S = r_Z = r_P = 0; /* let's say */
+         break;
+      }
+      case 0x3F: { /* AAS */
+         Bool nudge = r_AL < 0x06;
+         if ((r_AL & 0xF) > 9 || r_A == 1) {
+            r_AL = r_AL - 6;
+            r_AH = r_AH - 1 - (nudge ? 1 : 0);
+            r_A  = 1;
+            r_C  = 1;
+            r_AL = r_AL & 0xF;
+         } else {
+            r_A  = 0;
+            r_C  = 0;
+            r_AL = r_AL & 0xF;
+         }
+         /* O S Z and P are undefined. */
+         r_O = r_S = r_Z = r_P = 0; /* let's say */
+         break;
+      }
+      default:
+         vassert(0);
+   }
+   result =   ( (r_O & 1) << (16 + X86G_CC_SHIFT_O) )
+            | ( (r_S & 1) << (16 + X86G_CC_SHIFT_S) )
+            | ( (r_Z & 1) << (16 + X86G_CC_SHIFT_Z) )
+            | ( (r_A & 1) << (16 + X86G_CC_SHIFT_A) )
+            | ( (r_C & 1) << (16 + X86G_CC_SHIFT_C) )
+            | ( (r_P & 1) << (16 + X86G_CC_SHIFT_P) )
+            | ( (r_AH & 0xFF) << 8 )
+            | ( (r_AL & 0xFF) << 0 );
+   return result;
 }
 
 
@@ -2225,6 +2452,8 @@ void LibVEX_GuestX86_initialise ( /*OUT*/VexGuestX86State* vex_state )
    /* SSE2 has a 'clflush' cache-line-invalidator which uses these. */
    vex_state->guest_TISTART = 0;
    vex_state->guest_TILEN   = 0;
+
+   vex_state->guest_NRADDR = 0;
 }
 
 

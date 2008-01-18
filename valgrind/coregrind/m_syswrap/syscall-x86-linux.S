@@ -1,13 +1,13 @@
 
-##--------------------------------------------------------------------##
-##--- Support for doing system calls.          syscall-x86-linux.S ---##
-##--------------------------------------------------------------------##
+/*--------------------------------------------------------------------*/
+/*--- Support for doing system calls.          syscall-x86-linux.S ---*/
+/*--------------------------------------------------------------------*/
 
 /*
   This file is part of Valgrind, a dynamic binary instrumentation
   framework.
 
-  Copyright (C) 2000-2005 Julian Seward 
+  Copyright (C) 2000-2007 Julian Seward 
      jseward@acm.org
 
   This program is free software; you can redistribute it and/or
@@ -29,7 +29,7 @@
 */
 
 #include "pub_core_basics_asm.h"
-#include "vki_unistd.h"
+#include "pub_core_vkiscnums.h"
 #include "libvex_guest_offsets.h"
 		
 	
@@ -51,9 +51,10 @@
 	back to regs->m_eax on completion.
 	
 	Returns 0 if the syscall was successfully called (even if the
-	syscall itself failed), or a -ve error code if one of the
-	sigprocmasks failed (there's no way to determine which one
-	failed).
+	syscall itself failed), or a nonzero error code in the lowest
+        8 bits if one of the sigprocmasks failed (there's no way to
+        determine which one failed).  And there's no obvious way to
+        recover from that either, but nevertheless we want to know.
 
 	VG_(fixup_guest_state_after_syscall_interrupted) does the
 	thread state fixup in the case where we were interrupted by a
@@ -61,7 +62,7 @@
 	
 	Prototype:
 
-	Int ML_(do_syscall_for_client_WRK)(
+	UWord ML_(do_syscall_for_client_WRK)(
 	                          Int syscallno,		// 0
 				  void* guest_state,		// 4
 				  const vki_sigset_t *sysmask,	// 8
@@ -87,14 +88,14 @@ ML_(do_syscall_for_client_WRK):
 	   If eip is in the range [1,2), the syscall hasn't been started yet */
 
 	/* Set the signal mask which should be current during the syscall. */
-	movl	$__NR_rt_sigprocmask, %eax
-	movl	$VKI_SIG_SETMASK, %ebx
+	movl	$ __NR_rt_sigprocmask, %eax
+	movl	$ VKI_SIG_SETMASK, %ebx
 	movl	8+FSZ(%esp), %ecx
 	movl	12+FSZ(%esp), %edx
 	movl	16+FSZ(%esp), %esi
 	int	$0x80
 	testl	%eax, %eax
-	js	5f	/* sigprocmask failed */
+	js	7f	/* sigprocmask failed */
 	
 	movl	 4+FSZ(%esp), %eax	/* eax == ThreadState * */
 
@@ -116,22 +117,35 @@ ML_(do_syscall_for_client_WRK):
 
 4:	/* Re-block signals.  If eip is in [4,5), then the syscall is complete and 
 	   we needn't worry about it. */
-	movl	$__NR_rt_sigprocmask, %eax
-	movl	$VKI_SIG_SETMASK, %ebx
+	movl	$ __NR_rt_sigprocmask, %eax
+	movl	$ VKI_SIG_SETMASK, %ebx
 	movl	12+FSZ(%esp), %ecx
 	xorl	%edx, %edx
 	movl	16+FSZ(%esp), %esi
 	int	$0x80
+	testl	%eax, %eax
+	js	7f	/* sigprocmask failed */
 
 5:	/* now safe from signals */
-		
+	movl	$0, %eax	/* SUCCESS */
 	popl	%ebp
 	popl	%ebx
 	popl	%edi
 	popl	%esi
-#undef FSZ
 	ret
 
+7:	/* failure: return 0x8000 | error code */
+	negl	%eax
+	andl	$0x7FFF, %eax
+	orl	$0x8000, %eax
+	popl	%ebp
+	popl	%ebx
+	popl	%edi
+	popl	%esi
+	ret
+#undef FSZ
+
+	
 .section .rodata
 /* export the ranges so that
    VG_(fixup_guest_state_after_syscall_interrupted) can do the
@@ -152,6 +166,6 @@ ML_(blksys_finished):	.long 5b
 /* Let the linker know we don't need an executable stack */
 .section .note.GNU-stack,"",@progbits
 
-##--------------------------------------------------------------------##
-##--- end                                                          ---##
-##--------------------------------------------------------------------##
+/*--------------------------------------------------------------------*/
+/*--- end                                                          ---*/
+/*--------------------------------------------------------------------*/

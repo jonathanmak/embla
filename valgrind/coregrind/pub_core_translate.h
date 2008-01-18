@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward
+   Copyright (C) 2000-2007 Julian Seward
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -41,7 +41,10 @@ Bool VG_(translate) ( ThreadId tid,
                       Addr64   orig_addr,
                       Bool     debugging_translation,
                       Int      debugging_verbosity,
-                      ULong    bbs_done );
+                      ULong    bbs_done,
+                      Bool     allow_redirection );
+
+extern void VG_(print_translation_stats) ( void );
 
 #endif   // __PUB_CORE_TRANSLATE_H
 

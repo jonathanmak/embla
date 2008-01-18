@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward
+   Copyright (C) 2000-2007 Julian Seward
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -55,6 +55,8 @@
 #  include "libvex_guest_amd64.h"
 #elif defined(VGA_ppc32)
 #  include "libvex_guest_ppc32.h"
+#elif defined(VGA_ppc64)
+#  include "libvex_guest_ppc64.h"
 #else
 #  error Unknown arch
 #endif

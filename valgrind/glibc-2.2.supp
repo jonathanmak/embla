@@ -16,13 +16,12 @@
 #
 # For Memcheck, the supp_kinds are:
 #
-#     Param Value1 Value2 Value4 Value8 Value16
+#     Param Value1 Value2 Value4 Value8 Value16 Jump
 #     Free Addr1 Addr2 Addr4 Addr8 Addr16
 #     Cond (previously known as Value0)
 #
 # and the optional extra info is:
 #     if Param: name of system call param
-#     if Free: name of free-ing fn)
 
 #-------- For SuSE 8.2 (gcc 3.3, glibc 2.3.2)
 {
@@ -77,7 +76,13 @@
    obj:*-2.2.5.so
    obj:*-2.2.5.so
 }
-
+{
+   Red Hat 7.3 #4
+   Memcheck:Cond
+   fun:strlen
+   fun:dl_main
+   fun:_dl_sysdep_start
+}
 
 #-------- SuSE 8.1 stuff (gcc-3.2, glibc-2.2.5 + SuSE's hacks)
 {
@@ -102,13 +107,13 @@
 }
 {
    trecurse/__gconv_release_shlib(Addr4)
-   Addrcheck,Memcheck:Addr4
+   Memcheck:Addr4
    fun:trecurse
    fun:__gconv_release_shlib
 }
 {
    do_release_shlib/trecurse(Addr4)
-   Addrcheck,Memcheck:Addr4
+   Memcheck:Addr4
    fun:do_release_shlib
    fun:trecurse
 }
@@ -146,107 +151,23 @@
 
 {
    __twalk/*(Addr4)
-   Addrcheck,Memcheck:Addr4
+   Memcheck:Addr4
    fun:__twalk
 }
 
 {
    do_release_shlib/__twalk(Addr4)
-   Addrcheck,Memcheck:Addr4
+   Memcheck:Addr4
    fun:do_release_shlib
    fun:__twalk
 }
 
 {
    __libc_freeres/free_mem/free(Free)
-   Addrcheck,Memcheck:Free
+   Memcheck:Free
    fun:free
    fun:free_mem
    fun:__libc_freeres
-}
-
-#-------- Data races
-{
-   _dl_lookup_symbol/fixup/_dl_runtime_resolve
-   Helgrind:Eraser
-   fun:_dl_lookup_symbol
-   fun:fixup
-   fun:_dl_runtime_resolve
-}
-
-{
-   _dl_lookup_symbol_internal/fixup/_dl_runtime_resolve
-   Helgrind:Eraser
-   fun:_dl_lookup_symbol_internal
-   fun:fixup
-   fun:_dl_runtime_resolve
-}
-
-{
-   _dl_lookup_versioned_symbol/fixup/_dl_runtime_resolve
-   Helgrind:Eraser
-   fun:_dl_lookup_versioned_symbol
-   fun:fixup
-   fun:_dl_runtime_resolve
-}
-
-{
-   _dl_lookup_versioned_symbol_internal/fixup/_dl_runtime_resolve
-   Helgrind:Eraser
-   fun:_dl_lookup_versioned_symbol_internal
-   fun:fixup
-   fun:_dl_runtime_resolve
-}
-
-{
-   _dl_fini/exit/__libc_start_main
-   Helgrind:Eraser
-   fun:_dl_fini
-   fun:exit
-   fun:__libc_start_main
-}
-
-{
-   _dl_map_object_deps/dl_open_worker/_dl_catch_error/_dl_open
-   Helgrind:Eraser
-   fun:_dl_map_object_deps
-   fun:dl_open_worker
-   fun:_dl_catch_error
-   fun:_dl_open
-}
-
-{
-   _dl_map_object_deps_internal/dl_open_worker/_dl_catch_error_internal/_dl_open
-   Helgrind:Eraser
-   fun:_dl_map_object_deps_internal
-   fun:dl_open_worker
-   fun:_dl_catch_error_internal
-   fun:_dl_open
-}
-
-#-------- Threading bugs?
-# glibc 'knows' that destroying a locked mutex will unlock it
-{
-   pthread_error/pthread_mutex_destroy/__closedir
-   core:PThread
-   fun:pthread_error
-   fun:pthread_mutex_destroy
-   fun:__closedir
-}
-
-{
-   pthread_error/pthread_mutex_destroy/_IO_default_finish
-   core:PThread
-   fun:pthread_error
-   fun:pthread_mutex_destroy
-   fun:_IO_default_finish*
-}
-
-{
-   pthread_mutex_unlock/_IO_funlockfile
-   core:PThread
-   fun:pthread_mutex_unlock
-   fun:_IO_funlockfile
 }
 
 # even more glibc suppressions ?
@@ -328,13 +249,13 @@
 # two:
 {
    __mpn_construct_double/*(Addr4)
-   Addrcheck,Memcheck:Addr4
+   Memcheck:Addr4
    fun:__mpn_construct_double
    fun:*
 }
 {
    __mpn_construct_double/*(Addr8)
-   Addrcheck,Memcheck:Addr8
+   Memcheck:Addr8
    fun:__mpn_construct_double
    fun:*
 }
@@ -342,13 +263,13 @@
 # More of the same (gcc bug, I'm pretty sure)
 {
    __fabs/*(Addr4)
-   Addrcheck,Memcheck:Addr4
+   Memcheck:Addr4
    fun:__fabs
    fun:*
 }
 {
    __fabs/*(Addr8)
-   Addrcheck,Memcheck:Addr8
+   Memcheck:Addr8
    fun:__fabs
    fun:*
 }
@@ -357,7 +278,7 @@
 # Not sure what this is about ... but anyway
 {
    pthread_sighandler/*(Addr4)
-   Addrcheck,Memcheck:Addr4
+   Memcheck:Addr4
    fun:pthread_sighandler
    fun:*
 }
@@ -432,14 +353,14 @@
 #-------------------
 {
    socketcall.connect(serv_addr)/connect/*
-   Addrcheck,Memcheck:Param
+   Memcheck:Param
    socketcall.connect(serv_addr)
    fun:connect
    fun:*
 }
 {
    socketcall.connect(serv_addr)/libc-2.2.4.so/libc-2.2.4.so
-   Addrcheck,Memcheck:Param
+   Memcheck:Param
    socketcall.connect(serv_addr)
    obj:*libc-2.2.?.so
    obj:*libc-2.2.?.so
@@ -448,7 +369,7 @@
 #----------------------
 {
    write(buf)/write/libX11.so.6.2/libX11.so.6.2(Param)
-   Addrcheck,Memcheck:Param
+   Memcheck:Param
    write(buf)
    fun:write
    obj:/usr/X11R6/lib/libX11.so.6.2
@@ -456,7 +377,7 @@
 }
 {
    write(buf)/libc-2.2.4.so/libX11.so.6.2/libX11.so.6.2(Param)
-   Addrcheck,Memcheck:Param
+   Memcheck:Param
    write(buf)
    obj:*libc-2.2.?.so
    obj:/usr/X11R6/lib/libX11.so.6.2
@@ -473,7 +394,7 @@
 
 {
    writev(vector[...])/__writev/libX11.so.6.2/libX11.so.6.2
-   Addrcheck,Memcheck:Param
+   Memcheck:Param
    writev(vector[...])
    fun:__writev
    obj:/usr/X11R6/lib/libX11.so.6.2

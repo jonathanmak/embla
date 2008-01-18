@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward
+   Copyright (C) 2000-2007 Julian Seward
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -39,20 +39,33 @@
 
 #include "pub_tool_machine.h"
 
-#if defined(VGA_x86)
+#if defined(VGP_x86_linux)
 #  define VG_ELF_DATA2XXX     ELFDATA2LSB
 #  define VG_ELF_MACHINE      EM_386
 #  define VG_ELF_CLASS        ELFCLASS32
-#elif defined(VGA_amd64)
+#  undef  VG_PLAT_USES_PPCTOC
+#elif defined(VGP_amd64_linux)
 #  define VG_ELF_DATA2XXX     ELFDATA2LSB
 #  define VG_ELF_MACHINE      EM_X86_64
 #  define VG_ELF_CLASS        ELFCLASS64
-#elif defined(VGA_ppc32)
+#  undef  VG_PLAT_USES_PPCTOC
+#elif defined(VGP_ppc32_linux)
 #  define VG_ELF_DATA2XXX     ELFDATA2MSB
 #  define VG_ELF_MACHINE      EM_PPC
 #  define VG_ELF_CLASS        ELFCLASS32
+#  undef  VG_PLAT_USES_PPCTOC
+#elif defined(VGP_ppc64_linux)
+#  define VG_ELF_DATA2XXX     ELFDATA2MSB
+#  define VG_ELF_MACHINE      EM_PPC64
+#  define VG_ELF_CLASS        ELFCLASS64
+#  define VG_PLAT_USES_PPCTOC 1
+#elif defined(VGO_aix5)
+#  undef  VG_ELF_DATA2XXX
+#  undef  VG_ELF_MACHINE
+#  undef  VG_ELF_CLASS
+#  define VG_PLAT_USES_PPCTOC 1
 #else
-#  error Unknown arch
+#  error Unknown platform
 #endif
 
 #if defined(VGA_x86)
@@ -64,6 +77,10 @@
 #  define VG_STACK_PTR        guest_RSP
 #  define VG_FRAME_PTR        guest_RBP
 #elif defined(VGA_ppc32)
+#  define VG_INSTR_PTR        guest_CIA
+#  define VG_STACK_PTR        guest_GPR1
+#  define VG_FRAME_PTR        guest_GPR1   // No frame ptr for PPC
+#elif defined(VGA_ppc64)
 #  define VG_INSTR_PTR        guest_CIA
 #  define VG_STACK_PTR        guest_GPR1
 #  define VG_FRAME_PTR        guest_GPR1   // No frame ptr for PPC
@@ -79,7 +96,7 @@
 //-------------------------------------------------------------
 /* Details about the capabilities of the underlying (host) CPU.  These
    details are acquired by (1) enquiring with the CPU at startup, or
-   (2) from the AT_SYSINFO entries the kernel gave us (ppc32 cache
+   (2) from the AT_SYSINFO entries the kernel gave us (ppc cache
    line size).  It's a bit nasty in the sense that there's no obvious
    way to stop uses of some of this info before it's ready to go.
 
@@ -100,6 +117,12 @@
           then safe to use VG_(machine_get_VexArchInfo) 
                        and VG_(machine_ppc32_has_FP)
                        and VG_(machine_ppc32_has_VMX)
+   -------------
+   ppc64: initially:  call VG_(machine_get_hwcaps)
+                      call VG_(machine_ppc64_set_clszB)
+
+          then safe to use VG_(machine_get_VexArchInfo) 
+                       and VG_(machine_ppc64_has_VMX)
 
    VG_(machine_get_hwcaps) may use signals (although it attempts to
    leave signal state unchanged) and therefore should only be
@@ -118,6 +141,10 @@ extern void VG_(machine_get_VexArchInfo)( /*OUT*/VexArch*,
 /* Notify host cpu cache line size, as per above comment. */
 #if defined(VGA_ppc32)
 extern void VG_(machine_ppc32_set_clszB)( Int );
+#endif
+
+#if defined(VGA_ppc64)
+extern void VG_(machine_ppc64_set_clszB)( Int );
 #endif
 
 /* X86: set to 1 if the host is able to do {ld,st}mxcsr (load/store
@@ -139,6 +166,13 @@ extern UInt VG_(machine_ppc32_has_FP);
    change from a 32-bit int. */
 #if defined(VGA_ppc32)
 extern UInt VG_(machine_ppc32_has_VMX);
+#endif
+
+/* PPC64: set to 1 if Altivec instructions are supported in
+   user-space, else 0.  Is referenced from assembly code, so do not
+   change from a 64-bit int. */
+#if defined(VGA_ppc64)
+extern ULong VG_(machine_ppc64_has_VMX);
 #endif
 
 #endif   // __PUB_CORE_MACHINE_H

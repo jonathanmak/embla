@@ -1,9 +1,7 @@
-#! @PERL@ -w
+#! @PERL@
 
 ##--------------------------------------------------------------------##
-##--- The cache simulation framework: instrumentation, recording   ---##
-##--- and results printing.                                        ---##
-##---                                               cg_annotate.in ---##
+##--- Cachegrind's annotator.                       cg_annotate.in ---##
 ##--------------------------------------------------------------------##
 
 #  This file is part of Cachegrind, a Valgrind tool for cache
@@ -30,10 +28,11 @@
 #  The GNU General Public License is contained in the file COPYING.
 
 #----------------------------------------------------------------------------
-# Annotator for cachegrind. 
-#
-# File format is described in /docs/techdocs.html.
-#
+# The file format is simple, basically printing the cost centre for every
+# source line, grouped by files and functions.  The details are in
+# Cachegrind's manual.
+
+#----------------------------------------------------------------------------
 # Performance improvements record, using cachegrind.out for cacheprof, doing no
 # source annotation (irrelevant ones removed):
 #                                                               user time
@@ -57,6 +56,7 @@
 #16. Finding count lengths by int((length-1)/3), not by
 #    commifying (halves the number of commify calls)            1.68s --> 1.47s
 
+use warnings;
 use strict;
 
 #----------------------------------------------------------------------------
@@ -142,7 +142,7 @@ my $version = "@VERSION@";
 
 # Usage message.
 my $usage = <<END
-usage: cg_annotate [options] --<pid> [source-files]
+usage: cg_annotate [options] output-file [source-files]
 
   options for the user, with defaults in [ ], are:
     -h --help             show this message
@@ -158,8 +158,8 @@ usage: cg_annotate [options] --<pid> [source-files]
     -I<d> --include=<d>   add <d> to list of directories to search for 
                           source files
 
-  Cachegrind is Copyright (C) 2002-2005 Nicholas Nethercote.
-  Both are licensed under the GNU General Public License, version 2.
+  cg_annotate is Copyright (C) 2002-2007 Nicholas Nethercote.
+  and licensed under the GNU General Public License, version 2.
   Bug reports, feedback, admiration, abuse, etc, to: njn\@valgrind.org.
                                                 
 END
@@ -187,18 +187,25 @@ sub process_cmd_line()
                 @show_events = split(/,/, $1);
 
             # --sort=A,B,C
+            #   Nb: You can specify thresholds individually, eg.
+            #   --sort=A:99,B:95,C:90.  These will override any --threshold
+            #   argument.
             } elsif ($arg =~ /^--sort=(.*)$/) {
                 @sort_events = split(/,/, $1);
+                my $th_specified = 0;
                 foreach my $i (0 .. scalar @sort_events - 1) {
-                    if ($sort_events[$i] =~#/.*:(\d+)$/) {
-                                            /.*:([\d\.]+)%?$/) {
+                    if ($sort_events[$i] =~ /.*:([\d\.]+)%?$/) {
                         my $th = $1;
                         ($th >= 0 && $th <= 100) or die($usage);
                         $sort_events[$i] =~ s/:.*//;
                         $thresholds[$i] = $th;
+                        $th_specified = 1;
                     } else {
                         $thresholds[$i] = 0;
                     }
+                }
+                if (not $th_specified) {
+                    @thresholds = ();
                 }
 
             # --threshold=X (tolerates a trailing '%')
@@ -229,14 +236,6 @@ sub process_cmd_line()
                 $inc =~ s|/$||;         # trim trailing '/'
                 push(@include_dirs, "$inc/");
 
-            } elsif ($arg =~ /^--(\d+)$/) {
-                my $pid = $1;
-                if (not defined $input_file) {
-                    $input_file = "cachegrind.out.$pid";
-                } else {
-                    die("One cachegrind.out.<pid> file at a time, please\n");
-                }
-
             } else {            # -h and --help fall under this case
                 die($usage);
             }
@@ -244,14 +243,20 @@ sub process_cmd_line()
         # Argument handling -- annotation file checking and selection.
         # Stick filenames into a hash for quick 'n easy lookup throughout.
         } else {
-            my $readable = 0;
-            foreach my $include_dir (@include_dirs) {
-                if (-r $include_dir . $arg) {
-                    $readable = 1;
+            if (not defined $input_file) {
+                # First non-option argument is the output file.
+                $input_file = $arg;
+            } else {
+                # Subsequent non-option arguments are source files.
+                my $readable = 0;
+                foreach my $include_dir (@include_dirs) {
+                    if (-r $include_dir . $arg) {
+                        $readable = 1;
+                    }
                 }
+                $readable or die("File $arg not found in any of: @include_dirs\n");
+                $user_ann_files{$arg} = 1;
             }
-            $readable or die("File $arg not found in any of: @include_dirs\n");
-            $user_ann_files{$arg} = 1;
         }
     }
 
@@ -300,7 +305,8 @@ sub line_to_CC ($)
 
 sub read_input_file() 
 {
-    open(INPUTFILE, "< $input_file") || die "File $input_file not opened\n";
+    open(INPUTFILE, "< $input_file") 
+         || die "Cannot open $input_file for reading\n";
 
     # Read "desc:" lines.
     my $line;
@@ -313,14 +319,14 @@ sub read_input_file()
     }
 
     # Read "cmd:" line (Nb: will already be in $line from "desc:" loop above).
-    ($line =~ s/cmd:\s+//) or die("Line $.: missing command line\n");
+    ($line =~ s/^cmd:\s+//) or die("Line $.: missing command line\n");
     $cmd = $line;
     chomp($cmd);    # Remove newline
 
     # Read "events:" line.  We make a temporary hash in which the Nth event's
     # value is N, which is useful for handling --show/--sort options below.
     $line = <INPUTFILE>;
-    (defined $line && $line =~ s/events:\s+//) 
+    (defined $line && $line =~ s/^events:\s+//) 
         or die("Line $.: missing events line\n");
     @events = split(/\s+/, $line);
     my %events;
@@ -448,6 +454,7 @@ sub print_options ()
     print($fancy);
     print($desc);
     print("Command:          $cmd\n");
+    print("Data file:        $input_file\n");
     print("Events recorded:  @events\n");
     print("Events shown:     @show_events\n");
     print("Event sort order: @sort_events\n");
@@ -722,6 +729,8 @@ sub annotate_ann_files($)
 
         my $opened_file = "";
         my $full_file_name = "";
+        # Nb: include_dirs already includes "", so it works in the case
+        # where the filename has the full path.
         foreach my $include_dir (@include_dirs) {
             my $try_name = $include_dir . $src_file;
             if (open(INPUTFILE, "< $try_name")) {

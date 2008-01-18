@@ -1,9 +1,9 @@
-<html xmlns:cf="http://docbook.sourceforge.net/xmlns/chunkfast/1.0">
+<html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
 <title>2. AUTHORS</title>
 <link rel="stylesheet" href="vg_basic.css" type="text/css">
-<meta name="generator" content="DocBook XSL Stylesheets V1.69.0">
+<meta name="generator" content="DocBook XSL Stylesheets V1.69.1">
 <link rel="start" href="index.html" title="Valgrind Documentation">
 <link rel="up" href="dist.html" title="Valgrind Distribution Documents">
 <link rel="prev" href="dist.acknowledge.html" title="1. ACKNOWLEDGEMENTS">
@@ -25,8 +25,9 @@
 Cerion Armour-Brown worked on PowerPC instruction set support using<br>
 the Vex dynamic-translation framework.<br>
 <br>
-Jeremy Fitzhardinge wrote Helgrind and totally overhauled low-level<br>
-syscall/signal and address space layout stuff, among many other things.<br>
+Jeremy Fitzhardinge wrote Helgrind (in the 2.X line) and totally<br>
+overhauled low-level syscall/signal and address space layout stuff,<br>
+among many other things.<br>
 <br>
 Tom Hughes did a vast number of bug fixes, and helped out with support<br>
 for more recent Linux/glibc versions.<br>
@@ -43,12 +44,14 @@ Dirk Mueller contributed the malloc-free mismatch checking stuff<br>
 and other bits and pieces, and acted as our KDE liaison.<br>
 <br>
 Julian Seward was the original founder, designer and author, created<br>
-the dynamic translation frameworks, wrote Memcheck and Addrcheck, and<br>
-did lots of other things.<br>
+the dynamic translation frameworks, wrote Memcheck and 3.3.X Helgrind,<br>
+and did lots of other things.<br>
 <br>
 Robert Walsh added file descriptor leakage checking, new library<br>
 interception machinery, support for client allocation pools, and minor<br>
 other tweakage.<br>
+<br>
+Josef Weidendorfer wrote Callgrind and the associated KCachegrind GUI.<br>
 <br>
 Frederic Gobry helped with autoconf and automake.<br>
 <br>
@@ -57,6 +60,9 @@ Clifton, for use in Valgrind.<br>
 <br>
 Michael Matz and Simon Hausmann modified the GNU binutils<br>
 demangler(s) for use in Valgrind.<br>
+<br>
+Omega was written by Bryan Meredith and is maintained by Rich Coe.<br>
+DRD was written by and is maintained by Bart Van Assche.<br>
 <br>
 And lots and lots of other people sent bug reports, patches, and very <br>
 helpful feedback.  Thank you all.<br>

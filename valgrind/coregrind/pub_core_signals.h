@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward
+   Copyright (C) 2000-2007 Julian Seward
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -72,6 +72,7 @@ extern void VG_(synth_fault)        (ThreadId tid);
 extern void VG_(synth_fault_mapping)(ThreadId tid, Addr addr);
 extern void VG_(synth_fault_perms)  (ThreadId tid, Addr addr);
 extern void VG_(synth_sigill)       (ThreadId tid, Addr addr);
+extern void VG_(synth_sigtrap)      (ThreadId tid);
 
 /* Extend the stack to cover addr, if possible */
 extern Bool VG_(extend_stack)(Addr addr, UInt maxsize);

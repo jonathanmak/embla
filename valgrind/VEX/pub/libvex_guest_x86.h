@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2005 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -208,18 +208,20 @@ typedef
       /* Emulation warnings */
       UInt   guest_EMWARN;
 
-      /* Translation-invalidation area description.  Not used on x86
-         (there is no invalidate-icache insn), but needed so as to
-         allow users of the library to uniformly assume that the guest
-         state contains these two fields -- otherwise there is
-         compilation breakage.  On x86, these two fields are set to
-         zero by LibVEX_GuestX86_initialise and then should be ignored
-         forever thereafter. */
+      /* For clflush: record start and length of area to invalidate */
       UInt guest_TISTART;
       UInt guest_TILEN;
 
+      /* Used to record the unredirected guest address at the start of
+         a translation whose start has been redirected.  By reading
+         this pseudo-register shortly afterwards, the translation can
+         find out what the corresponding no-redirection address was.
+         Note, this is only set for wrap-style redirects, not for
+         replace-style ones. */
+      UInt guest_NRADDR;
+
       /* Padding to make it have an 8-aligned size */
-      /* UInt   padding; */
+      UInt padding;
    }
    VexGuestX86State;
 
@@ -277,7 +279,12 @@ void LibVEX_GuestX86_initialise ( /*OUT*/VexGuestX86State* vex_state );
 extern 
 UInt LibVEX_GuestX86_get_eflags ( /*IN*/VexGuestX86State* vex_state );
 
-
+/* Set the carry flag in the given state to 'new_carry_flag', which
+   should be zero or one. */
+extern
+void
+LibVEX_GuestX86_put_eflag_c ( UInt new_carry_flag,
+                              /*MOD*/VexGuestX86State* vex_state );
 
 #endif /* ndef __LIBVEX_PUB_GUEST_X86_H */
 
