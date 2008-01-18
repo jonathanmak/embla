@@ -1,4 +1,6 @@
 
+SUBDIRS = vki
+
 incincdir = $(includedir)/valgrind
 
 incinc_HEADERS = \
@@ -6,6 +8,7 @@ incinc_HEADERS = \
 	pub_tool_basics_asm.h 		\
 	pub_tool_aspacemgr.h 		\
 	pub_tool_clientstate.h		\
+	pub_tool_clreq.h		\
 	pub_tool_cpuid.h 		\
 	pub_tool_debuginfo.h 		\
 	pub_tool_errormgr.h 		\
@@ -21,18 +24,13 @@ incinc_HEADERS = \
 	pub_tool_mallocfree.h 		\
 	pub_tool_options.h 		\
 	pub_tool_oset.h 		\
-	pub_tool_profile.h		\
 	pub_tool_redir.h		\
 	pub_tool_replacemalloc.h	\
 	pub_tool_signals.h 		\
 	pub_tool_stacktrace.h 		\
 	pub_tool_threadstate.h 		\
 	pub_tool_tooliface.h 		\
-	valgrind.h 			\
-	vki-linux.h			\
-	vki-amd64-linux.h		\
-	vki-ppc32-linux.h		\
-	vki-x86-linux.h			\
-	vki_posixtypes-amd64-linux.h	\
-	vki_posixtypes-ppc32-linux.h	\
-	vki_posixtypes-x86-linux.h
+	pub_tool_vki.h			\
+	pub_tool_vkiscnums.h		\
+	pub_tool_xarray.h		\
+	valgrind.h

@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward 
+   Copyright (C) 2000-2007 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -29,38 +29,23 @@
 */
 
 #include "pub_core_basics.h"
+#include "pub_core_vki.h"
 #include "pub_core_libcassert.h"
 #include "pub_core_libcbase.h"
 #include "pub_core_libcfile.h"
 #include "pub_core_libcprint.h"
 #include "pub_core_libcproc.h"
 #include "pub_core_mallocfree.h"
+#include "pub_core_xarray.h"
 #include "pub_core_clientstate.h"
-#include "pub_core_commandline.h"
+#include "pub_core_commandline.h" /* self */
 
 
 /* Add a string to an expandable array of strings. */
 
-static void add_string ( XArrayStrings* xa, HChar* str )
+static void add_string ( XArray* /* of HChar* */xa, HChar* str )
 {
-   Int     i;
-   HChar** strs2;
-   vg_assert(xa->used >= 0);
-   vg_assert(xa->size >= 0);
-   vg_assert(xa->used <= xa->size);
-   if (xa->strs == NULL) vg_assert(xa->size == 0);
-
-   if (xa->used == xa->size) {
-      xa->size = xa->size==0 ? 2 : 2*xa->size;
-      strs2 = VG_(malloc)( xa->size * sizeof(HChar*) );
-      for (i = 0; i < xa->used; i++)
-         strs2[i] = xa->strs[i];
-      if (xa->strs) 
-         VG_(free)(xa->strs);
-      xa->strs = strs2;
-   }
-   vg_assert(xa->used < xa->size);
-   xa->strs[xa->used++] = str;
+   (void) VG_(addToXA)( xa, (void*)(&str) );
 }
 
 
@@ -80,16 +65,16 @@ static HChar* read_dot_valgrindrc ( HChar* dir )
                            ( NULL == dir ? "" : dir ) );
    fd = VG_(open)(filename, 0, VKI_S_IRUSR);
    if ( !fd.isError ) {
-      size = VG_(fsize)(fd.val);
+      size = VG_(fsize)(fd.res);
       if (size > 0) {
          f_clo = VG_(malloc)(size+1);
          vg_assert(f_clo);
-         n = VG_(read)(fd.val, f_clo, size);
+         n = VG_(read)(fd.res, f_clo, size);
          if (n == -1) n = 0;
          vg_assert(n >= 0 && n <= size+1);
          f_clo[n] = '\0';
       }
-      VG_(close)(fd.val);
+      VG_(close)(fd.res);
    }
    return f_clo;
 }
@@ -111,7 +96,7 @@ static void add_args_from_string ( HChar* s )
       tmp = cp;
       while ( !VG_(isspace)(*cp) && *cp != 0 ) cp++;
       if ( *cp != 0 ) *cp++ = '\0';       // terminate if not the last
-      add_string( &VG_(args_for_valgrind), tmp );
+      add_string( VG_(args_for_valgrind), tmp );
    }
 }
 
@@ -162,12 +147,25 @@ void VG_(split_up_argv)( Int argc, HChar** argv )
           Bool augment = True;
    static Bool already_called = False;
 
-   XArrayStrings tmp_xarray = {0,0,NULL};
+   XArray* /* of HChar* */ tmp_xarray;
 
    /* This function should be called once, at startup, and then never
       again. */
    vg_assert(!already_called);
    already_called = True;
+
+   tmp_xarray = VG_(newXA)( VG_(malloc), VG_(free), sizeof(HChar*) );
+   vg_assert(tmp_xarray);
+
+   vg_assert( ! VG_(args_for_valgrind) );
+   VG_(args_for_valgrind)
+      = VG_(newXA)( VG_(malloc), VG_(free), sizeof(HChar*) );
+   vg_assert( VG_(args_for_valgrind) );
+
+   vg_assert( ! VG_(args_for_client) );
+   VG_(args_for_client)
+      = VG_(newXA)( VG_(malloc), VG_(free), sizeof(HChar*) );
+   vg_assert( VG_(args_for_client) );
 
    /* Collect up the args-for-V. */
    i = 1; /* skip the exe (stage2) name. */
@@ -181,7 +179,7 @@ void VG_(split_up_argv)( Int argc, HChar** argv )
          augment = False;
       if (argv[i][0] != '-')
 	break;
-      add_string( &tmp_xarray, argv[i] );
+      add_string( tmp_xarray, argv[i] );
    }
 
    /* Should now be looking at the exe name. */
@@ -194,12 +192,8 @@ void VG_(split_up_argv)( Int argc, HChar** argv )
    /* The rest are args for the client. */
    for (; i < argc; i++) {
       vg_assert(argv[i]);
-      add_string( &VG_(args_for_client), argv[i] );
+      add_string( VG_(args_for_client), argv[i] );
    }
-
-   VG_(args_for_valgrind).size = 0;
-   VG_(args_for_valgrind).used = 0;
-   VG_(args_for_valgrind).strs = NULL;
 
    /* Get extra args from ~/.valgrindrc, $VALGRIND_OPTS and
       ./.valgrindrc into VG_(args_for_valgrind). */
@@ -207,9 +201,19 @@ void VG_(split_up_argv)( Int argc, HChar** argv )
       // read_dot_valgrindrc() allocates the return value with
       // VG_(malloc)().  We do not free f1_clo and f2_clo as they get
       // put into VG_(args_for_valgrind) and so must persist.
-      HChar* f1_clo  = read_dot_valgrindrc( VG_(getenv)("HOME") );
+      HChar* home    = VG_(getenv)("HOME");
+      HChar* f1_clo  = home ? read_dot_valgrindrc( home ) : NULL;
       HChar* env_clo = VG_(strdup)( VG_(getenv)(VALGRIND_OPTS) );
-      HChar* f2_clo  = read_dot_valgrindrc(".");
+      HChar* f2_clo  = NULL;
+
+      // Don't read ./.valgrindrc if "." is the same as "$HOME", else its
+      // contents will be applied twice. (bug #142488)
+      if (home) {
+         HChar cwd[VKI_PATH_MAX+1];
+         Bool  cwd_ok = VG_(get_startup_wd)(cwd, VKI_PATH_MAX);
+         f2_clo = ( (cwd_ok && VG_STREQ(home, cwd))
+                       ? NULL : read_dot_valgrindrc(".") );
+      }
 
       if (f1_clo)  add_args_from_string( f1_clo );
       if (env_clo) add_args_from_string( env_clo );
@@ -217,14 +221,15 @@ void VG_(split_up_argv)( Int argc, HChar** argv )
    }
 
    /* .. and record how many extras we got. */
-   VG_(args_for_valgrind_noexecpass) = VG_(args_for_valgrind).used;
+   VG_(args_for_valgrind_noexecpass) 
+      = VG_(sizeXA)( VG_(args_for_valgrind) );
 
    /* Finally, copy tmp_xarray onto the end. */
-   for (i = 0; i < tmp_xarray.used; i++)
-      add_string( &VG_(args_for_valgrind), tmp_xarray.strs[i] );
+   for (i = 0; i < VG_(sizeXA)( tmp_xarray ); i++)
+      add_string( VG_(args_for_valgrind), 
+                  * (HChar**)VG_(indexXA)( tmp_xarray, i ) );
 
-   if (tmp_xarray.strs)
-      VG_(free)(tmp_xarray.strs);
+   VG_(deleteXA)( tmp_xarray );
 }
 
 /*--------------------------------------------------------------------*/

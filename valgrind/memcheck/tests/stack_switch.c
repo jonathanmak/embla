@@ -1,8 +1,18 @@
 #define _XOPEN_SOURCE 600
 #define _BSD_SOURCE
 
-#include <sched.h>
 #include <stdio.h>
+
+#if defined(_AIX)
+int main(int argc, char **argv) 
+{
+  printf("this test is linux-specific\n");
+  return 0;
+}
+
+#else
+
+#include <sched.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -24,6 +34,7 @@ static int thread_main(void *arg)
 
    memset( buffer, 1, sizeof( buffer ) );
 
+   sleep(2); /* ppc64-linux hack */
    return memchr( buffer, 1, sizeof( buffer ) ) == NULL;
 }
 
@@ -33,7 +44,8 @@ int main(int argc, char **argv)
    int stackid;
    pid_t pid;
 
-   if ( ( stack = mmap( NULL, STACK_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0 ) ) == MAP_FAILED )
+   /* "2*" is a ppc64-linux hack */
+   if ( ( stack = mmap( NULL, 2* STACK_SIZE, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0 ) ) == MAP_FAILED )
    {
       perror( "mmap" );
       exit( 1 );
@@ -51,3 +63,5 @@ int main(int argc, char **argv)
 
    exit( 0 );
 }
+
+#endif /* !defined(_AIX) */

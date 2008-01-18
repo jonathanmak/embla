@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2005 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -298,6 +298,11 @@ static inline UChar qnarrow16Uto8 ( UShort xx0 )
 
 /* shifts: we don't care about out-of-range ones, since
    that is dealt with at a higher level. */
+
+static inline UChar sar8 ( UChar v, UInt n )
+{
+   return toUChar(((Char)v) >> n);
+}
 
 static inline UShort shl16 ( UShort v, UInt n )
 {
@@ -865,6 +870,22 @@ ULong h_generic_calc_SarN16x4 ( ULong xx, UInt nn )
              sar16( sel16x4_2(xx), nn ),
              sar16( sel16x4_1(xx), nn ),
              sar16( sel16x4_0(xx), nn )
+          );
+}
+
+ULong h_generic_calc_SarN8x8 ( ULong xx, UInt nn )
+{
+   /* vassert(nn < 8); */
+   nn &= 7;
+   return mk8x8(
+             sar8( sel8x8_7(xx), nn ),
+             sar8( sel8x8_6(xx), nn ),
+             sar8( sel8x8_5(xx), nn ),
+             sar8( sel8x8_4(xx), nn ),
+             sar8( sel8x8_3(xx), nn ),
+             sar8( sel8x8_2(xx), nn ),
+             sar8( sel8x8_1(xx), nn ),
+             sar8( sel8x8_0(xx), nn )
           );
 }
 

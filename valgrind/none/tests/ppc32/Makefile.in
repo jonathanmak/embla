@@ -36,7 +36,11 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-check_PROGRAMS = lsw$(EXEEXT) jm-insns$(EXEEXT) testVMX$(EXEEXT)
+check_PROGRAMS = bug129390-ppc32$(EXEEXT) bug139050-ppc32$(EXEEXT) \
+	ldstrev$(EXEEXT) lsw$(EXEEXT) jm-insns$(EXEEXT) \
+	mftocrf$(EXEEXT) mcrfs$(EXEEXT) round$(EXEEXT) \
+	test_fx$(EXEEXT) test_gx$(EXEEXT) testVMX$(EXEEXT) \
+	twi$(EXEEXT) tw$(EXEEXT) xlc_dbl_u32$(EXEEXT)
 subdir = none/tests/ppc32
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -46,15 +50,48 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
+bug129390_ppc32_SOURCES = bug129390-ppc32.c
+bug129390_ppc32_OBJECTS = bug129390-ppc32.$(OBJEXT)
+bug129390_ppc32_LDADD = $(LDADD)
+bug139050_ppc32_SOURCES = bug139050-ppc32.c
+bug139050_ppc32_OBJECTS = bug139050-ppc32.$(OBJEXT)
+bug139050_ppc32_LDADD = $(LDADD)
 jm_insns_SOURCES = jm-insns.c
 jm_insns_OBJECTS = jm_insns-jm-insns.$(OBJEXT)
 jm_insns_LDADD = $(LDADD)
+ldstrev_SOURCES = ldstrev.c
+ldstrev_OBJECTS = ldstrev.$(OBJEXT)
+ldstrev_LDADD = $(LDADD)
 lsw_SOURCES = lsw.c
 lsw_OBJECTS = lsw.$(OBJEXT)
 lsw_LDADD = $(LDADD)
+mcrfs_SOURCES = mcrfs.c
+mcrfs_OBJECTS = mcrfs.$(OBJEXT)
+mcrfs_LDADD = $(LDADD)
+mftocrf_SOURCES = mftocrf.c
+mftocrf_OBJECTS = mftocrf.$(OBJEXT)
+mftocrf_LDADD = $(LDADD)
+round_SOURCES = round.c
+round_OBJECTS = round.$(OBJEXT)
+round_LDADD = $(LDADD)
 testVMX_SOURCES = testVMX.c
 testVMX_OBJECTS = testVMX-testVMX.$(OBJEXT)
 testVMX_LDADD = $(LDADD)
+test_fx_SOURCES = test_fx.c
+test_fx_OBJECTS = test_fx.$(OBJEXT)
+test_fx_LDADD = $(LDADD)
+test_gx_SOURCES = test_gx.c
+test_gx_OBJECTS = test_gx.$(OBJEXT)
+test_gx_LDADD = $(LDADD)
+tw_SOURCES = tw.c
+tw_OBJECTS = tw.$(OBJEXT)
+tw_LDADD = $(LDADD)
+twi_SOURCES = twi.c
+twi_OBJECTS = twi.$(OBJEXT)
+twi_LDADD = $(LDADD)
+xlc_dbl_u32_SOURCES = xlc_dbl_u32.c
+xlc_dbl_u32_OBJECTS = xlc_dbl_u32.$(OBJEXT)
+xlc_dbl_u32_LDADD = $(LDADD)
 SCRIPTS = $(noinst_SCRIPTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
@@ -63,8 +100,12 @@ COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 CCLD = $(CC)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = jm-insns.c lsw.c testVMX.c
-DIST_SOURCES = jm-insns.c lsw.c testVMX.c
+SOURCES = bug129390-ppc32.c bug139050-ppc32.c jm-insns.c ldstrev.c \
+	lsw.c mcrfs.c mftocrf.c round.c testVMX.c test_fx.c test_gx.c \
+	tw.c twi.c xlc_dbl_u32.c
+DIST_SOURCES = bug129390-ppc32.c bug139050-ppc32.c jm-insns.c \
+	ldstrev.c lsw.c mcrfs.c mftocrf.c round.c testVMX.c test_fx.c \
+	test_gx.c tw.c twi.c xlc_dbl_u32.c
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -76,6 +117,12 @@ AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+BUILD_MPIWRAP_PRI_FALSE = @BUILD_MPIWRAP_PRI_FALSE@
+BUILD_MPIWRAP_PRI_TRUE = @BUILD_MPIWRAP_PRI_TRUE@
+BUILD_MPIWRAP_SEC_FALSE = @BUILD_MPIWRAP_SEC_FALSE@
+BUILD_MPIWRAP_SEC_TRUE = @BUILD_MPIWRAP_SEC_TRUE@
+BUILD_SSE3_TESTS_FALSE = @BUILD_SSE3_TESTS_FALSE@
+BUILD_SSE3_TESTS_TRUE = @BUILD_SSE3_TESTS_TRUE@
 CC = @CC@
 CCAS = @CCAS@
 CCASFLAGS = @CCASFLAGS@
@@ -96,9 +143,14 @@ ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
+FLAG_FNO_STACK_PROTECTOR = @FLAG_FNO_STACK_PROTECTOR@
 FLAG_M32 = @FLAG_M32@
+FLAG_M64 = @FLAG_M64@
+FLAG_MAIX32 = @FLAG_MAIX32@
+FLAG_MAIX64 = @FLAG_MAIX64@
 FLAG_MMMX = @FLAG_MMMX@
 FLAG_MSSE = @FLAG_MSSE@
+FLAG_WDECL_AFTER_STMT = @FLAG_WDECL_AFTER_STMT@
 GDB = @GDB@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -113,6 +165,7 @@ MAINT = @MAINT@
 MAINTAINER_MODE_FALSE = @MAINTAINER_MODE_FALSE@
 MAINTAINER_MODE_TRUE = @MAINTAINER_MODE_TRUE@
 MAKEINFO = @MAKEINFO@
+MPI_CC = @MPI_CC@
 OBJEXT = @OBJEXT@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
@@ -130,19 +183,29 @@ STRIP = @STRIP@
 VALT_LOAD_ADDRESS = @VALT_LOAD_ADDRESS@
 VERSION = @VERSION@
 VEX_DIR = @VEX_DIR@
-VG_AMD64_LINUX_FALSE = @VG_AMD64_LINUX_FALSE@
-VG_AMD64_LINUX_TRUE = @VG_AMD64_LINUX_TRUE@
+VGO_AIX5_FALSE = @VGO_AIX5_FALSE@
+VGO_AIX5_TRUE = @VGO_AIX5_TRUE@
+VGO_LINUX_FALSE = @VGO_LINUX_FALSE@
+VGO_LINUX_TRUE = @VGO_LINUX_TRUE@
+VGP_AMD64_LINUX_FALSE = @VGP_AMD64_LINUX_FALSE@
+VGP_AMD64_LINUX_TRUE = @VGP_AMD64_LINUX_TRUE@
+VGP_HAVE_SECONDARY_FALSE = @VGP_HAVE_SECONDARY_FALSE@
+VGP_HAVE_SECONDARY_TRUE = @VGP_HAVE_SECONDARY_TRUE@
+VGP_PPC32_AIX5_FALSE = @VGP_PPC32_AIX5_FALSE@
+VGP_PPC32_AIX5_TRUE = @VGP_PPC32_AIX5_TRUE@
+VGP_PPC32_LINUX_FALSE = @VGP_PPC32_LINUX_FALSE@
+VGP_PPC32_LINUX_TRUE = @VGP_PPC32_LINUX_TRUE@
+VGP_PPC64_AIX5_FALSE = @VGP_PPC64_AIX5_FALSE@
+VGP_PPC64_AIX5_TRUE = @VGP_PPC64_AIX5_TRUE@
+VGP_PPC64_LINUX_FALSE = @VGP_PPC64_LINUX_FALSE@
+VGP_PPC64_LINUX_TRUE = @VGP_PPC64_LINUX_TRUE@
+VGP_X86_LINUX_FALSE = @VGP_X86_LINUX_FALSE@
+VGP_X86_LINUX_TRUE = @VGP_X86_LINUX_TRUE@
 VG_ARCH = @VG_ARCH@
 VG_ARCH_ALL = @VG_ARCH_ALL@
-VG_MAKE_PLATFORM = @VG_MAKE_PLATFORM@
 VG_OS = @VG_OS@
-VG_OS_ALL = @VG_OS_ALL@
-VG_PLATFORM = @VG_PLATFORM@
-VG_PLATFORM_ALL = @VG_PLATFORM_ALL@
-VG_PPC32_LINUX_FALSE = @VG_PPC32_LINUX_FALSE@
-VG_PPC32_LINUX_TRUE = @VG_PPC32_LINUX_TRUE@
-VG_X86_LINUX_FALSE = @VG_X86_LINUX_FALSE@
-VG_X86_LINUX_TRUE = @VG_X86_LINUX_TRUE@
+VG_PLATFORM_PRI = @VG_PLATFORM_PRI@
+VG_PLATFORM_SEC = @VG_PLATFORM_SEC@
 ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_RANLIB = @ac_ct_RANLIB@
@@ -186,15 +249,35 @@ sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 noinst_SCRIPTS = filter_stderr
 EXTRA_DIST = $(noinst_SCRIPTS) \
+	bug129390-ppc32.stdout.exp bug129390-ppc32.stderr.exp \
+	bug129390-ppc32.vgtest \
+	bug139050-ppc32.stdout.exp bug139050-ppc32.stderr.exp \
+	bug139050-ppc32.vgtest \
+	ldstrev.stderr.exp ldstrev.stdout.exp ldstrev.vgtest \
 	lsw.stderr.exp lsw.stdout.exp lsw.vgtest \
-	jm-insns.stderr.exp jm-insns.stdout.exp jm-insns.vgtest \
+	jm-int.stderr.exp jm-int.stdout.exp jm-int.vgtest \
+	jm-fp.stderr.exp jm-fp.stdout.exp jm-fp.vgtest \
 	jm-vmx.stderr.exp   jm-vmx.stdout.exp   jm-vmx.vgtest \
-	testVMX.stderr.exp  testVMX.stdout.exp  testVMX.vgtest
+	mftocrf.stderr.exp mftocrf.stdout.exp mftocrf.vgtest \
+	mcrfs.stderr.exp mcrfs.stdout.exp mcrfs.vgtest \
+	round.stderr.exp round.stdout.exp round.vgtest \
+	test_fx.stderr.exp test_fx.stdout.exp test_fx.vgtest \
+	test_gx.stderr.exp test_gx.stdout.exp test_gx.vgtest \
+	testVMX.stderr.exp  testVMX.stdout.exp  testVMX.vgtest \
+	twi.stderr.exp twi.stdout.exp twi.vgtest \
+	tw.stderr.exp tw.stdout.exp tw.vgtest \
+	xlc_dbl_u32.stderr.exp xlc_dbl_u32.stdout.exp xlc_dbl_u32.vgtest
 
-AM_CFLAGS = $(WERROR) -Winline -Wall -Wshadow -g -I$(top_srcdir)/include
-AM_CXXFLAGS = $(AM_CFLAGS)
-jm_insns_CFLAGS = -Winline -Wall -O -mregnames -DHAS_ALTIVEC -maltivec 
-testVMX_CFLAGS = -O -g -Wall -maltivec -mabi=altivec -DALTIVEC -DGCC_COMPILER
+AM_CFLAGS = $(WERROR) -Winline -Wall -Wshadow -g -I$(top_srcdir)/include \
+		@FLAG_M32@
+
+AM_CXXFLAGS = $(AM_CFLAGS) @FLAG_M32@
+jm_insns_CFLAGS = -Winline -Wall -O -mregnames \
+			-DHAS_ALTIVEC -maltivec @FLAG_M32@
+
+testVMX_CFLAGS = -O -g -Wall -maltivec -mabi=altivec -DALTIVEC \
+			-DGCC_COMPILER @FLAG_M32@
+
 all: all-am
 
 .SUFFIXES:
@@ -231,15 +314,48 @@ $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 
 clean-checkPROGRAMS:
 	-test -z "$(check_PROGRAMS)" || rm -f $(check_PROGRAMS)
+bug129390-ppc32$(EXEEXT): $(bug129390_ppc32_OBJECTS) $(bug129390_ppc32_DEPENDENCIES) 
+	@rm -f bug129390-ppc32$(EXEEXT)
+	$(LINK) $(bug129390_ppc32_LDFLAGS) $(bug129390_ppc32_OBJECTS) $(bug129390_ppc32_LDADD) $(LIBS)
+bug139050-ppc32$(EXEEXT): $(bug139050_ppc32_OBJECTS) $(bug139050_ppc32_DEPENDENCIES) 
+	@rm -f bug139050-ppc32$(EXEEXT)
+	$(LINK) $(bug139050_ppc32_LDFLAGS) $(bug139050_ppc32_OBJECTS) $(bug139050_ppc32_LDADD) $(LIBS)
 jm-insns$(EXEEXT): $(jm_insns_OBJECTS) $(jm_insns_DEPENDENCIES) 
 	@rm -f jm-insns$(EXEEXT)
 	$(LINK) $(jm_insns_LDFLAGS) $(jm_insns_OBJECTS) $(jm_insns_LDADD) $(LIBS)
+ldstrev$(EXEEXT): $(ldstrev_OBJECTS) $(ldstrev_DEPENDENCIES) 
+	@rm -f ldstrev$(EXEEXT)
+	$(LINK) $(ldstrev_LDFLAGS) $(ldstrev_OBJECTS) $(ldstrev_LDADD) $(LIBS)
 lsw$(EXEEXT): $(lsw_OBJECTS) $(lsw_DEPENDENCIES) 
 	@rm -f lsw$(EXEEXT)
 	$(LINK) $(lsw_LDFLAGS) $(lsw_OBJECTS) $(lsw_LDADD) $(LIBS)
+mcrfs$(EXEEXT): $(mcrfs_OBJECTS) $(mcrfs_DEPENDENCIES) 
+	@rm -f mcrfs$(EXEEXT)
+	$(LINK) $(mcrfs_LDFLAGS) $(mcrfs_OBJECTS) $(mcrfs_LDADD) $(LIBS)
+mftocrf$(EXEEXT): $(mftocrf_OBJECTS) $(mftocrf_DEPENDENCIES) 
+	@rm -f mftocrf$(EXEEXT)
+	$(LINK) $(mftocrf_LDFLAGS) $(mftocrf_OBJECTS) $(mftocrf_LDADD) $(LIBS)
+round$(EXEEXT): $(round_OBJECTS) $(round_DEPENDENCIES) 
+	@rm -f round$(EXEEXT)
+	$(LINK) $(round_LDFLAGS) $(round_OBJECTS) $(round_LDADD) $(LIBS)
 testVMX$(EXEEXT): $(testVMX_OBJECTS) $(testVMX_DEPENDENCIES) 
 	@rm -f testVMX$(EXEEXT)
 	$(LINK) $(testVMX_LDFLAGS) $(testVMX_OBJECTS) $(testVMX_LDADD) $(LIBS)
+test_fx$(EXEEXT): $(test_fx_OBJECTS) $(test_fx_DEPENDENCIES) 
+	@rm -f test_fx$(EXEEXT)
+	$(LINK) $(test_fx_LDFLAGS) $(test_fx_OBJECTS) $(test_fx_LDADD) $(LIBS)
+test_gx$(EXEEXT): $(test_gx_OBJECTS) $(test_gx_DEPENDENCIES) 
+	@rm -f test_gx$(EXEEXT)
+	$(LINK) $(test_gx_LDFLAGS) $(test_gx_OBJECTS) $(test_gx_LDADD) $(LIBS)
+tw$(EXEEXT): $(tw_OBJECTS) $(tw_DEPENDENCIES) 
+	@rm -f tw$(EXEEXT)
+	$(LINK) $(tw_LDFLAGS) $(tw_OBJECTS) $(tw_LDADD) $(LIBS)
+twi$(EXEEXT): $(twi_OBJECTS) $(twi_DEPENDENCIES) 
+	@rm -f twi$(EXEEXT)
+	$(LINK) $(twi_LDFLAGS) $(twi_OBJECTS) $(twi_LDADD) $(LIBS)
+xlc_dbl_u32$(EXEEXT): $(xlc_dbl_u32_OBJECTS) $(xlc_dbl_u32_DEPENDENCIES) 
+	@rm -f xlc_dbl_u32$(EXEEXT)
+	$(LINK) $(xlc_dbl_u32_LDFLAGS) $(xlc_dbl_u32_OBJECTS) $(xlc_dbl_u32_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -247,9 +363,20 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bug129390-ppc32.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bug139050-ppc32.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/jm_insns-jm-insns.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ldstrev.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lsw.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mcrfs.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mftocrf.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/round.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/testVMX-testVMX.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_fx.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_gx.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tw.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/twi.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xlc_dbl_u32.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \

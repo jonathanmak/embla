@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2005 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -114,6 +114,7 @@ extern ULong h_generic_calc_ShlN32x2 ( ULong, UInt );
 extern ULong h_generic_calc_ShrN16x4 ( ULong, UInt );
 extern ULong h_generic_calc_ShrN32x2 ( ULong, UInt );
 
+extern ULong h_generic_calc_SarN8x8  ( ULong, UInt );
 extern ULong h_generic_calc_SarN16x4 ( ULong, UInt );
 extern ULong h_generic_calc_SarN32x2 ( ULong, UInt );
 

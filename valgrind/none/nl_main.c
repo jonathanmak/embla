@@ -7,7 +7,7 @@
    This file is part of Nulgrind, the simplest possible Valgrind tool,
    which does nothing.
 
-   Copyright (C) 2002-2005 Nicholas Nethercote
+   Copyright (C) 2002-2007 Nicholas Nethercote
       njn@valgrind.org
 
    This program is free software; you can redistribute it and/or
@@ -29,7 +29,6 @@
 */
 
 #include "pub_tool_basics.h"
-#include "pub_tool_libcassert.h"
 #include "pub_tool_tooliface.h"
 
 static void nl_post_clo_init(void)
@@ -37,9 +36,11 @@ static void nl_post_clo_init(void)
 }
 
 static
-IRBB* nl_instrument(IRBB* bb, VexGuestLayout* layout, 
-                    Addr64 orig_addr_noredir, VexGuestExtents* vge,
-                    IRType gWordTy, IRType hWordTy)
+IRSB* nl_instrument ( VgCallbackClosure* closure,
+                      IRSB* bb,
+                      VexGuestLayout* layout, 
+                      VexGuestExtents* vge,
+                      IRType gWordTy, IRType hWordTy )
 {
     return bb;
 }
@@ -54,7 +55,7 @@ static void nl_pre_clo_init(void)
    VG_(details_version)         (NULL);
    VG_(details_description)     ("a binary JIT-compiler");
    VG_(details_copyright_author)(
-      "Copyright (C) 2002-2005, and GNU GPL'd, by Nicholas Nethercote.");
+      "Copyright (C) 2002-2007, and GNU GPL'd, by Nicholas Nethercote.");
    VG_(details_bug_reports_to)  (VG_BUGS_TO);
 
    VG_(basic_tool_funcs)        (nl_post_clo_init,

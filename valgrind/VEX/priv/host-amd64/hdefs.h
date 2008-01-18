@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2005 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -307,10 +307,9 @@ typedef
    enum {
       Afp_INVALID,
       /* Binary */
-//..       Xfp_ADD, Xfp_SUB, Xfp_MUL, Xfp_DIV, 
-      Afp_SCALE, Afp_ATAN, Afp_YL2X, Afp_YL2XP1, //Xfp_PREM, Xfp_PREM1,
+      Afp_SCALE, Afp_ATAN, Afp_YL2X, Afp_YL2XP1, Afp_PREM,
       /* Unary */
-      Afp_SQRT, //Xfp_ABS, Xfp_NEG, Xfp_MOV, 
+      Afp_SQRT,
       Afp_SIN, Afp_COS, Afp_TAN,
       Afp_ROUND, Afp_2XM1
    }
@@ -333,7 +332,6 @@ typedef
       Asse_RCPF, Asse_RSQRTF, Asse_SQRTF, 
       /* Bitwise */
       Asse_AND, Asse_OR, Asse_XOR, Asse_ANDN,
-//..       /* Integer binary */
       Asse_ADD8, Asse_ADD16, Asse_ADD32, Asse_ADD64,
       Asse_QADD8U, Asse_QADD16U,
       Asse_QADD8S, Asse_QADD16S,
@@ -371,6 +369,7 @@ typedef
       Ain_Sh64,        /* 64-bit shift/rotate, dst=REG or MEM */
       Ain_Test64,      /* 64-bit test (AND, set flags, discard result) */
       Ain_Unary64,     /* 64-bit not and neg */
+      Ain_Lea64,       /* 64-bit compute EA into a reg */
       Ain_MulL,        /* widening multiply */
       Ain_Div,         /* div and mod */
 //..       Xin_Sh3232,    /* shldl or shrdl */
@@ -388,6 +387,7 @@ typedef
       Ain_A87PushPop,  /* x87 loads/stores */
       Ain_A87FpOp,     /* x87 operations */
       Ain_A87LdCW,     /* load x87 control word */
+      Ain_A87StSW,     /* store x87 status word */
 //.. 
 //..       Xin_FpUnary,   /* FP fake unary op */
 //..       Xin_FpBinary,  /* FP fake binary op */
@@ -451,6 +451,11 @@ typedef
             AMD64UnaryOp op;
             HReg         dst;
          } Unary64;
+         /* 64-bit compute EA into a reg */
+         struct {
+            AMD64AMode* am;
+            HReg        dst;
+         } Lea64;
          /* 64 x 64 -> 128 bit widening multiply: RDX:RAX = RAX *s/u
             r/m64 */
          struct {
@@ -560,6 +565,11 @@ typedef
             AMD64AMode* addr;
          } A87LdCW;
 
+         /* Store the FPU status word (fstsw m16) */
+         struct {
+            AMD64AMode* addr;
+         } A87StSW;
+
          /* --- SSE --- */
 
          /* Load 32 bits into %mxcsr. */
@@ -662,6 +672,7 @@ extern AMD64Instr* AMD64Instr_Imm64      ( ULong imm64, HReg dst );
 extern AMD64Instr* AMD64Instr_Alu64R     ( AMD64AluOp, AMD64RMI*, HReg );
 extern AMD64Instr* AMD64Instr_Alu64M     ( AMD64AluOp, AMD64RI*,  AMD64AMode* );
 extern AMD64Instr* AMD64Instr_Unary64    ( AMD64UnaryOp op, HReg dst );
+extern AMD64Instr* AMD64Instr_Lea64      ( AMD64AMode* am, HReg dst );
 extern AMD64Instr* AMD64Instr_Sh64       ( AMD64ShiftOp, UInt, HReg );
 extern AMD64Instr* AMD64Instr_Test64     ( UInt imm32, HReg dst );
 extern AMD64Instr* AMD64Instr_MulL       ( Bool syned, AMD64RM* );
@@ -682,6 +693,7 @@ extern AMD64Instr* AMD64Instr_A87Free    ( Int nregs );
 extern AMD64Instr* AMD64Instr_A87PushPop ( AMD64AMode* addr, Bool isPush );
 extern AMD64Instr* AMD64Instr_A87FpOp    ( A87FpOp op );
 extern AMD64Instr* AMD64Instr_A87LdCW    ( AMD64AMode* addr );
+extern AMD64Instr* AMD64Instr_A87StSW    ( AMD64AMode* addr );
 //.. 
 //.. extern AMD64Instr* AMD64Instr_FpUnary   ( AMD64FpOp op, HReg src, HReg dst );
 //.. extern AMD64Instr* AMD64Instr_FpBinary  ( AMD64FpOp op, HReg srcL, HReg srcR, HReg dst );
@@ -708,18 +720,21 @@ extern AMD64Instr* AMD64Instr_SseCMov    ( AMD64CondCode, HReg src, HReg dst );
 extern AMD64Instr* AMD64Instr_SseShuf    ( Int order, HReg src, HReg dst );
 
 
-extern void ppAMD64Instr ( AMD64Instr* );
+extern void ppAMD64Instr ( AMD64Instr*, Bool );
 
 /* Some functions that insulate the register allocator from details
    of the underlying instruction set. */
-extern void         getRegUsage_AMD64Instr ( HRegUsage*, AMD64Instr* );
-extern void         mapRegs_AMD64Instr     ( HRegRemap*, AMD64Instr* );
+extern void         getRegUsage_AMD64Instr ( HRegUsage*, AMD64Instr*, Bool );
+extern void         mapRegs_AMD64Instr     ( HRegRemap*, AMD64Instr*, Bool );
 extern Bool         isMove_AMD64Instr      ( AMD64Instr*, HReg*, HReg* );
-extern Int          emit_AMD64Instr        ( UChar* buf, Int nbuf, AMD64Instr* );
-extern AMD64Instr*  genSpill_AMD64         ( HReg rreg, Int offset );
-extern AMD64Instr*  genReload_AMD64        ( HReg rreg, Int offset );
+extern Int          emit_AMD64Instr        ( UChar* buf, Int nbuf, AMD64Instr*, 
+                                             Bool, void* dispatch );
+extern AMD64Instr*  genSpill_AMD64         ( HReg rreg, Int offset, Bool );
+extern AMD64Instr*  genReload_AMD64        ( HReg rreg, Int offset, Bool );
 extern void         getAllocableRegs_AMD64 ( Int*, HReg** );
-extern HInstrArray* iselBB_AMD64           ( IRBB*, VexArchInfo* );
+extern HInstrArray* iselSB_AMD64           ( IRSB*, VexArch,
+                                                    VexArchInfo*,
+                                                    VexAbiInfo* );
 
 #endif /* ndef __LIBVEX_HOST_AMD64_HDEFS_H */
 

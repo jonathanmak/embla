@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward
+   Copyright (C) 2000-2007 Julian Seward
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -34,6 +34,7 @@
 //--------------------------------------------------------------------
 // PURPOSE: This module contains all the libc code that relates to
 // files and sockets:  opening, reading, writing, etc.
+// To use, you must first include: pub_core_vki.h
 //--------------------------------------------------------------------
 
 #include "pub_tool_libcfile.h"
@@ -70,7 +71,8 @@ extern Int VG_(getsockopt)  ( Int sd, Int level, Int optname, void *optval,
 extern Int VG_(access) ( HChar* path, Bool irusr, Bool iwusr, Bool ixusr );
 
 /* Is the file executable?  Returns: 0 = success, non-0 is failure */
-extern Int VG_(check_executable)(HChar* f);
+extern Int VG_(check_executable)(/*OUT*/Bool* is_setuid,
+                                 HChar* f, Bool allow_setuid);
 
 extern SysRes VG_(pread) ( Int fd, void* buf, Int count, Int offset );
 
@@ -79,6 +81,14 @@ extern SysRes VG_(pread) ( Int fd, void* buf, Int count, Int offset );
    non-NULL, the file's name is written into it.  The number of bytes
    written is guaranteed not to exceed 64+strlen(part_of_name). */
 extern Int VG_(mkstemp) ( HChar* part_of_name, /*OUT*/HChar* fullname );
+
+/* Record the process' working directory at startup.  Is intended to
+   be called exactly once, at startup, before the working directory
+   changes.  Return True for success, False for failure, so that the
+   caller can bomb out suitably without creating module cycles if
+   there is a problem.  The saved value can later be acquired by
+   calling VG_(get_startup_wd) (in pub_tool_libcfile.h). */
+extern Bool VG_(record_startup_wd) ( void );
 
 #endif   // __PUB_CORE_LIBCFILE_H
 

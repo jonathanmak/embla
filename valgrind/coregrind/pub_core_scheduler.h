@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward
+   Copyright (C) 2000-2007 Julian Seward
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -43,31 +43,31 @@ extern ThreadId VG_(alloc_ThreadState)(void);
 /* A thread exits.  tid must currently be running. */
 extern void VG_(exit_thread)(ThreadId tid);
 
-/* Kill a thread.  This interrupts whatever a thread is doing, and
-   makes it exit ASAP.  This does not set the exitreason or
-   exitcode. */
-extern void VG_(kill_thread)(ThreadId tid);
+/* If 'tid' is blocked in a syscall, send it SIGVGKILL so as to get it
+   out of the syscall and onto doing the next thing, whatever that is.
+   If it isn't blocked in a syscall, has no effect on the thread. */
+extern void VG_(get_thread_out_of_syscall)(ThreadId tid);
 
 /* Nuke all threads except tid. */
 extern void VG_(nuke_all_threads_except) ( ThreadId me,
                                            VgSchedReturnCode reason );
 
 /* Make a thread the running thread.  The thread must previously been
-   sleeping, and not holding the CPU semaphore. This will set the
+   sleeping, and not holding the CPU lock.  This will set the
    thread state to VgTs_Runnable, and the thread will attempt to take
-   the CPU semaphore.  By the time it returns, tid will be the running
+   the CPU lock.  By the time it returns, tid will be the running
    thread. */
-extern void VG_(set_running) ( ThreadId tid );
+extern void VG_(acquire_BigLock) ( ThreadId tid, HChar* who );
 
 /* Set a thread into a sleeping state.  Before the call, the thread
-   must be runnable, and holding the CPU semaphore.  When this call
+   must be runnable, and holding the CPU lock.  When this call
    returns, the thread will be set to the specified sleeping state,
-   and will not be holding the CPU semaphore.  Note that another
+   and will not be holding the CPU lock.  Note that another
    thread could be running by the time this call returns, so the
    caller must be careful not to touch any shared state.  It is also
    the caller's responsibility to actually block until the thread is
    ready to run again. */
-extern void VG_(set_sleeping) ( ThreadId tid, ThreadStatus state );
+extern void VG_(release_BigLock) ( ThreadId tid, ThreadStatus state, HChar* who );
 
 /* Yield the CPU for a while */
 extern void VG_(vg_yield)(void);
@@ -75,14 +75,21 @@ extern void VG_(vg_yield)(void);
 // The scheduler.
 extern VgSchedReturnCode VG_(scheduler) ( ThreadId tid );
 
-// Initialise.  Is passed the extent of the root thread's client stack.
-extern void VG_(scheduler_init) ( Addr clstack_end, SizeT clstack_size );
+// Initialise, phase 1.  Zero out VG_(threads), decide on the root
+// ThreadId and initialise the bigLock.
+extern ThreadId VG_(scheduler_init_phase1) ( void );
+
+// Initialise, phase 2.  Is passed the extent of the root thread's
+// client stack and the root ThreadId decided on by phase 1.
+extern void VG_(scheduler_init_phase2) ( ThreadId main_tid, 
+                                         Addr     clstack_end, 
+                                         SizeT    clstack_size );
 
 /* Stats ... */
 extern void VG_(print_scheduler_stats) ( void );
 
-/* If true, a fault is Valgrind-internal (ie, a bug) */
-extern Bool VG_(my_fault);
+/* If False, a fault is Valgrind-internal (ie, a bug) */
+extern Bool VG_(in_generated_code);
 
 /* Sanity checks which may be done at any time.  The scheduler decides when. */
 extern void VG_(sanity_check_general) ( Bool force_expensive );

@@ -9,7 +9,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward 
+   Copyright (C) 2000-2007 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -31,6 +31,8 @@
 */
 
 #include "pub_core_basics.h"
+#include "pub_core_vki.h"
+#include "pub_core_xarray.h"
 #include "pub_core_clientstate.h"
 
 /*-----------------------------------------------------------------*/
@@ -63,10 +65,10 @@ Int VG_(cl_cmdline_fd) = -1;
 // (the default arena).  They are never freed.
 
 /* Args for the client. */
-XArrayStrings VG_(args_for_client) = {0,0,NULL};
+XArray* /* of HChar* */ VG_(args_for_client) = NULL;
 
 /* Args for V (augments, then those from the launcher). */
-XArrayStrings VG_(args_for_valgrind) = {0,0,NULL};
+XArray* /* of HChar* */ VG_(args_for_valgrind) = NULL;
 
 /* How many of the above not to pass on at execve time? */
 Int VG_(args_for_valgrind_noexecpass) = 0;
@@ -86,6 +88,16 @@ HChar* VG_(name_of_launcher) = NULL;
 /* Application-visible file descriptor limits */
 Int VG_(fd_soft_limit) = -1;
 Int VG_(fd_hard_limit) = -1;
+
+/* Useful addresses extracted from the client */
+/* Where is the __libc_freeres_wrapper routine we made? */
+Addr VG_(client___libc_freeres_wrapper) = 0;
+
+/* x86-linux only: where is glibc's _dl_sysinfo_int80 function?
+   Finding it isn't essential, but knowing where it is does sometimes
+   help produce better back traces.  See big comment in
+   VG_(get_StackTrace) in m_stacktrace.c for further info. */
+Addr VG_(client__dl_sysinfo_int80) = 0;
 
 
 /*--------------------------------------------------------------------*/

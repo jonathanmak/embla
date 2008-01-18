@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2005 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -62,7 +62,7 @@
    MByte/sec.  Once the size increases enough to fall out of the cache
    into memory, the rate falls by about a factor of 3. 
 */
-#define N_TEMPORARY_BYTES 2400000
+#define N_TEMPORARY_BYTES 4000000
 
 static HChar  temporary[N_TEMPORARY_BYTES] __attribute__((aligned(8)));
 static HChar* temporary_first = &temporary[0];
@@ -71,12 +71,12 @@ static HChar* temporary_last  = &temporary[N_TEMPORARY_BYTES-1];
 
 static ULong  temporary_bytes_allocd_TOT = 0;
 
-#define N_PERMANENT_BYTES 1000
+#define N_PERMANENT_BYTES 10000
 
-static HChar  permanent[N_TEMPORARY_BYTES] __attribute__((aligned(8)));
+static HChar  permanent[N_PERMANENT_BYTES] __attribute__((aligned(8)));
 static HChar* permanent_first = &permanent[0];
 static HChar* permanent_curr  = &permanent[0];
-static HChar* permanent_last  = &permanent[N_TEMPORARY_BYTES-1];
+static HChar* permanent_last  = &permanent[N_PERMANENT_BYTES-1];
 
 static VexAllocMode mode = VexAllocModeTEMP;
 
@@ -85,7 +85,7 @@ void vexAllocSanityCheck ( void )
    vassert(temporary_first == &temporary[0]);
    vassert(temporary_last  == &temporary[N_TEMPORARY_BYTES-1]);
    vassert(permanent_first == &permanent[0]);
-   vassert(permanent_last  == &permanent[N_TEMPORARY_BYTES-1]);
+   vassert(permanent_last  == &permanent[N_PERMANENT_BYTES-1]);
    vassert(temporary_first <= temporary_curr);
    vassert(temporary_curr  <= temporary_last);
    vassert(permanent_first <= permanent_curr);
@@ -178,7 +178,7 @@ void private_LibVEX_alloc_OOM(void)
               private_LibVEX_alloc_first,
               private_LibVEX_alloc_curr,
               private_LibVEX_alloc_last,
-              (ULong)(private_LibVEX_alloc_last - private_LibVEX_alloc_first));
+              (Long)(private_LibVEX_alloc_last + 1 - private_LibVEX_alloc_first));
    vpanic("VEX temporary storage exhausted.\n"
           "Increase N_{TEMPORARY,PERMANENT}_BYTES and recompile.");
 }
@@ -202,6 +202,8 @@ void LibVEX_ShowAllocStats ( void )
 {
    vex_printf("vex storage: T total %lld bytes allocated\n",
               (Long)temporary_bytes_allocd_TOT );
+   vex_printf("vex storage: P total %lld bytes allocated\n",
+              (Long)(permanent_curr - permanent_first) );
 }
 
 
@@ -375,8 +377,8 @@ UInt vprintf_wrk ( void(*sink)(HChar),
                str = "(null)";
             len1 = len3 = 0;
             len2 = vex_strlen(str);
-            if (fwidth > len2) { len1 = ljustify ? fwidth-len2 : 0;
-                                 len3 = ljustify ? 0 : fwidth-len2; }
+            if (fwidth > len2) { len1 = ljustify ? 0 : fwidth-len2;
+                                 len3 = ljustify ? fwidth-len2 : 0; }
             PAD(len1); PUTSTR(str); PAD(len3);
             break;
          }
@@ -387,8 +389,8 @@ UInt vprintf_wrk ( void(*sink)(HChar),
             str[1] = 0;
             len1 = len3 = 0;
             len2 = vex_strlen(str);
-            if (fwidth > len2) { len1 = ljustify ? fwidth-len2 : 0;
-                                 len3 = ljustify ? 0 : fwidth-len2; }
+            if (fwidth > len2) { len1 = ljustify ? 0 : fwidth-len2;
+                                 len3 = ljustify ? fwidth-len2 : 0; }
             PAD(len1); PUTSTR(str); PAD(len3);
             break;
          }
@@ -403,8 +405,8 @@ UInt vprintf_wrk ( void(*sink)(HChar),
                                 False/*irrelevant*/);
             len1 = len3 = 0;
             len2 = vex_strlen(intbuf);
-            if (fwidth > len2) { len1 = ljustify ? fwidth-len2 : 0;
-                                 len3 = ljustify ? 0 : fwidth-len2; }
+            if (fwidth > len2) { len1 = ljustify ? 0 : fwidth-len2;
+                                 len3 = ljustify ? fwidth-len2 : 0; }
             PAD(len1); PUTSTR(intbuf); PAD(len3);
             break;
          }
@@ -422,8 +424,8 @@ UInt vprintf_wrk ( void(*sink)(HChar),
             convert_int(intbuf, l, base, False/*unsigned*/, hexcaps);
             len1 = len3 = 0;
             len2 = vex_strlen(intbuf);
-            if (fwidth > len2) { len1 = ljustify ? fwidth-len2 : 0;
-                                 len3 = ljustify ? 0 : fwidth-len2; }
+            if (fwidth > len2) { len1 = ljustify ? 0 : fwidth-len2;
+                                 len3 = ljustify ? fwidth-len2 : 0; }
             PAD(len1); PUTSTR(intbuf); PAD(len3);
             break;
          }
@@ -434,9 +436,13 @@ UInt vprintf_wrk ( void(*sink)(HChar),
             convert_int(intbuf, l, 16/*base*/, False/*unsigned*/, hexcaps);
             len1 = len3 = 0;
             len2 = vex_strlen(intbuf)+2;
-            if (fwidth > len2) { len1 = ljustify ? fwidth-len2 : 0;
-                                 len3 = ljustify ? 0 : fwidth-len2; }
+            if (fwidth > len2) { len1 = ljustify ? 0 : fwidth-len2;
+                                 len3 = ljustify ? fwidth-len2 : 0; }
             PAD(len1); PUT('0'); PUT('x'); PUTSTR(intbuf); PAD(len3);
+            break;
+         }
+         case '%': {
+            PUT('%');
             break;
          }
          default:

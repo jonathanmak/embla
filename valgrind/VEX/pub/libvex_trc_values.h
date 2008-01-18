@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2005 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -54,12 +54,22 @@
 
    This file may get included in assembly code, so do not put
    C-specific constructs in it.
+
+   These values should be 61 or above so as not to conflict
+   with Valgrind's VG_TRC_ values, which are 60 or below.
 */
 
 #define VEX_TRC_JMP_TINVAL     61  /* invalidate translations before
                                       continuing */
+#define VEX_TRC_JMP_NOREDIR    81  /* jump to undirected guest addr */
+#define VEX_TRC_JMP_SIGTRAP    85  /* deliver trap (SIGTRAP) before
+                                      continuing */
+#define VEX_TRC_JMP_SIGSEGV    87  /* deliver segv (SIGSEGV) before
+                                      continuing */
 #define VEX_TRC_JMP_EMWARN     63  /* deliver emulation warning before
                                       continuing */
+#define VEX_TRC_JMP_EMFAIL     83  /* emulation fatal error; abort system */
+
 #define VEX_TRC_JMP_CLIENTREQ  65  /* do a client req before continuing */
 #define VEX_TRC_JMP_YIELD      67  /* yield to thread sched 
                                       before continuing */

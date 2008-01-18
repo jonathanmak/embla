@@ -11,7 +11,7 @@
 // Occasionally we have to be careful not to cause Valgrind to seg fault in
 // its pre-syscall wrappers;  it does so because it can't know in general
 // when memory is unaddressable, and so tries to dereference it when doing
-// PRE_MEM_READ/PRE_MEM_WRITE calls.  (Note that Memcheck and Addrcheck will
+// PRE_MEM_READ/PRE_MEM_WRITE calls.  (Note that Memcheck will
 // always issue an error message immediately before these seg faults occur).
 
 //#include <asm/ipc.h>
@@ -821,7 +821,7 @@ int main(void)
       ss.ss_sp     = NULL;
       ss.ss_flags  = 0;
       ss.ss_size   = 0;
-      VALGRIND_MAKE_NOACCESS(& ss, sizeof(struct our_sigaltstack));
+      VALGRIND_MAKE_MEM_NOACCESS(& ss, sizeof(struct our_sigaltstack));
       GO(__NR_sigaltstack, "2s 2m");
       SY(__NR_sigaltstack, x0+&ss, x0+&ss); SUCC;
    }

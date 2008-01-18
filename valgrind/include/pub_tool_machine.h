@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward
+   Copyright (C) 2000-2007 Julian Seward
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -31,24 +31,45 @@
 #ifndef __PUB_TOOL_MACHINE_H
 #define __PUB_TOOL_MACHINE_H
 
-#if defined(VGA_x86)
+#if defined(VGP_x86_linux)
 #  define VG_MIN_INSTR_SZB          1  // min length of native instruction
 #  define VG_MAX_INSTR_SZB         16  // max length of native instruction
-#  define VG_CLREQ_SZB             18  // length of a client request, may
+#  define VG_CLREQ_SZB             14  // length of a client request, may
                                        //   be larger than VG_MAX_INSTR_SZB
-#  define VG_STACK_REDZONE_SZB      0  // number of addressable bytes below SP
-#elif defined(VGA_amd64)
+#  define VG_STACK_REDZONE_SZB      0  // number of addressable bytes below %RSP
+#elif defined(VGP_amd64_linux)
 #  define VG_MIN_INSTR_SZB          1
 #  define VG_MAX_INSTR_SZB         16
-#  define VG_CLREQ_SZB             18
+#  define VG_CLREQ_SZB             19
 #  define VG_STACK_REDZONE_SZB    128
-#elif defined(VGA_ppc32)
+#elif defined(VGP_ppc32_linux)
 #  define VG_MIN_INSTR_SZB          4
 #  define VG_MAX_INSTR_SZB          4 
-#  define VG_CLREQ_SZB             24
+#  define VG_CLREQ_SZB             20
 #  define VG_STACK_REDZONE_SZB      0
+#elif defined(VGP_ppc64_linux)
+#  define VG_MIN_INSTR_SZB          4
+#  define VG_MAX_INSTR_SZB          4 
+#  define VG_CLREQ_SZB             20
+#  define VG_STACK_REDZONE_SZB    288  // number of addressable bytes below R1
+                                       // from 64-bit PowerPC ELF ABI Supplement 1.7
+#elif defined(VGP_ppc32_aix5)
+#  define VG_MIN_INSTR_SZB          4
+#  define VG_MAX_INSTR_SZB          4 
+#  define VG_CLREQ_SZB             20
+   /* The PowerOpen ABI actually says 220 bytes, but that is not an
+      8-aligned number, and frequently forces Memcheck's
+      mc_{new,die}_mem_stack_N routines into slow cases by losing
+      8-alignment of the area to be messed with.  So let's just say
+      224 instead.  Gdb has a similar kludge. */
+#  define VG_STACK_REDZONE_SZB    224
+#elif defined(VGP_ppc64_aix5)
+#  define VG_MIN_INSTR_SZB          4
+#  define VG_MAX_INSTR_SZB          4 
+#  define VG_CLREQ_SZB             20
+#  define VG_STACK_REDZONE_SZB    288 // is this right?
 #else
-#  error Unknown arch
+#  error Unknown platform
 #endif
 
 // Guest state accessors
@@ -78,6 +99,15 @@ extern void VG_(apply_to_GP_regs)(void (*f)(UWord val));
 extern void VG_(thread_stack_reset_iter) ( void );
 extern Bool VG_(thread_stack_next)       ( ThreadId* tid, Addr* stack_min,
                                                           Addr* stack_max );
+
+// Returns .client_stack_highest_word for the given thread
+extern Addr VG_(thread_get_stack_max) ( ThreadId tid );
+
+// Given a pointer to a function as obtained by "& functionname" in C,
+// produce a pointer to the actual entry point for the function.  For
+// most platforms it's the identity function.  Unfortunately, on
+// ppc64-linux it isn't (sigh).
+extern void* VG_(fnptr_to_fnentry)( void* );
 
 #endif   // __PUB_TOOL_MACHINE_H
 

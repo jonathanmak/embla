@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2005 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -66,46 +66,149 @@ typedef
       VexArchX86, 
       VexArchAMD64, 
       VexArchARM,
-      VexArchPPC32
+      VexArchPPC32,
+      VexArchPPC64
    }
    VexArch;
 
-typedef
-   enum {
-      VexSubArch_INVALID,
-      VexSubArch_NONE,        /* Arch has no variants */
-      VexSubArchX86_sse0,     /* no SSE state; or SSE state but no insns */
-      VexSubArchX86_sse1,     /* SSE1 support (Pentium III) */
-      VexSubArchX86_sse2,     /* SSE2 support (Pentium 4) */
-      VexSubArchARM_v4,       /* ARM version 4 */
-      VexSubArchPPC32_I,      /* 32-bit PowerPC, no FP, no Altivec */
-      VexSubArchPPC32_FI,     /* 32-bit PowerPC, with FP but no Altivec */
-      VexSubArchPPC32_VFI     /* 32-bit PowerPC, with FP and Altivec */
-   }
-   VexSubArch;
+
+/* For a given architecture, these specify extra capabilities beyond
+   the minimum supported (baseline) capabilities.  They may be OR'd
+   together, although some combinations don't make sense.  (eg, SSE2
+   but not SSE1).  LibVEX_Translate will check for nonsensical
+   combinations. */
+
+/* x86: baseline capability is Pentium-1 (FPU, MMX, but no SSE) */
+#define VEX_HWCAPS_X86_SSE1   (1<<1)  /* SSE1 support (Pentium III) */
+#define VEX_HWCAPS_X86_SSE2   (1<<2)  /* SSE2 support (Pentium 4) */
+#define VEX_HWCAPS_X86_SSE3   (1<<3)  /* SSE3 support (>= Prescott) */
+
+/* amd64: baseline capability is SSE2 */
+#define VEX_HWCAPS_AMD64_SSE3 (1<<4)  /* SSE3 support */
+
+/* ppc32: baseline capability is integer only */
+#define VEX_HWCAPS_PPC32_F    (1<<5)  /* basic (non-optional) FP */
+#define VEX_HWCAPS_PPC32_V    (1<<6)  /* Altivec (VMX) */
+#define VEX_HWCAPS_PPC32_FX   (1<<7)  /* FP extns (fsqrt, fsqrts) */
+#define VEX_HWCAPS_PPC32_GX   (1<<8)  /* Graphics extns
+                                         (fres,frsqrte,fsel,stfiwx) */
+
+/* ppc64: baseline capability is integer and basic FP insns */
+#define VEX_HWCAPS_PPC64_V    (1<<9)  /* Altivec (VMX) */
+#define VEX_HWCAPS_PPC64_FX   (1<<10) /* FP extns (fsqrt, fsqrts) */
+#define VEX_HWCAPS_PPC64_GX   (1<<11) /* Graphics extns
+                                         (fres,frsqrte,fsel,stfiwx) */
+
+/* arm: baseline capability is ARMv4 */
+/* No extra capabilities */
+
 
 /* These return statically allocated strings. */
 
 extern const HChar* LibVEX_ppVexArch    ( VexArch );
-extern const HChar* LibVEX_ppVexSubArch ( VexSubArch );
+extern const HChar* LibVEX_ppVexHwCaps  ( VexArch, UInt );
 
 
 /* This struct is a bit of a hack, but is needed to carry misc
-   important bits of info about an arch.  Fields which are optional or
-   ignored on some arch should be set to zero. */
+   important bits of info about an arch.  Fields which are meaningless
+   or ignored for the platform in question should be set to zero. */
 
 typedef
    struct {
       /* This is the only mandatory field. */
-      VexSubArch subarch;
-      /* PPC32 only: size of cache line */
-      Int ppc32_cache_line_szB;
+      UInt hwcaps;
+      /* PPC32/PPC64 only: size of cache line */
+      Int ppc_cache_line_szB;
    }
    VexArchInfo;
 
 /* Write default settings info *vai. */
 extern 
 void LibVEX_default_VexArchInfo ( /*OUT*/VexArchInfo* vai );
+
+
+/* This struct carries guest and host ABI variant information that may
+   be needed.  Fields which are meaningless or ignored for the
+   platform in question should be set to zero.
+
+   Settings which are believed to be correct are:
+
+   guest_stack_redzone_size
+      guest is ppc32-linux                ==> 0
+      guest is ppc64-linux                ==> 288
+      guest is ppc32-aix5                 ==> 220
+      guest is ppc64-aix5                 ==> unknown
+      guest is amd64-linux                ==> 128
+      guest is other                      ==> inapplicable
+
+   guest_ppc_zap_RZ_at_blr
+      guest is ppc64-linux                ==> True
+      guest is ppc32-linux                ==> False
+      guest is ppc64-aix5                 ==> unknown
+      guest is ppc32-aix5                 ==> False
+      guest is other                      ==> inapplicable
+
+   guest_ppc_zap_RZ_at_bl
+      guest is ppc64-linux                ==> const True
+      guest is ppc32-linux                ==> const False
+      guest is ppc64-aix5                 ==> unknown
+      guest is ppc32-aix5                 ==> True except for calls to
+                                              millicode, $SAVEFn, $RESTFn
+      guest is other                      ==> inapplicable
+
+   guest_ppc_sc_continues_at_LR:
+      guest is ppc32-aix5  or ppc64-aix5  ==> True
+      guest is ppc32-linux or ppc64-linux ==> False
+      guest is other                      ==> inapplicable
+
+   host_ppc_calls_use_fndescrs:
+      host is ppc32-linux                 ==> False
+      host is ppc64-linux                 ==> True
+      host is ppc32-aix5 or ppc64-aix5    ==> True
+      host is other                       ==> inapplicable
+
+   host_ppc32_regalign_int64_args:
+      host is ppc32-linux                 ==> True
+      host is ppc32-aix5                  ==> False
+      host is other                       ==> inapplicable
+*/
+
+typedef
+   struct {
+      /* PPC and AMD64 GUESTS only: how many bytes below the 
+         stack pointer are validly addressible? */
+      Int guest_stack_redzone_size;
+
+      /* PPC GUESTS only: should we zap the stack red zone at a 'blr'
+         (function return) ? */
+      Bool guest_ppc_zap_RZ_at_blr;
+
+      /* PPC GUESTS only: should we zap the stack red zone at a 'bl'
+         (function call) ?  Is supplied with the guest address of the
+         target of the call since that may be significant.  If NULL,
+         is assumed equivalent to a fn which always returns False. */
+      Bool (*guest_ppc_zap_RZ_at_bl)(Addr64);
+
+      /* PPC32/PPC64 GUESTS only: where does the kernel resume after
+         'sc'?  False => Linux style, at the next insn.  True => AIX
+         style, at the address stated in the link register. */
+      Bool guest_ppc_sc_continues_at_LR;
+
+      /* PPC32/PPC64 HOSTS only: does '&f' give us a pointer to a
+         function descriptor on the host, or to the function code
+         itself?  True => descriptor, False => code. */
+      Bool host_ppc_calls_use_fndescrs;
+
+      /* PPC32 HOSTS only: when generating code to pass a 64-bit value
+         (actual parameter) in a pair of regs, should we skip an arg
+         reg if it is even-numbered?  True => yes, False => no. */
+      Bool host_ppc32_regalign_int64_args;
+   }
+   VexAbiInfo;
+
+/* Write default settings info *vbi. */
+extern 
+void LibVEX_default_VexAbiInfo ( /*OUT*/VexAbiInfo* vbi );
 
 
 /*-------------------------------------------------------*/
@@ -242,7 +345,7 @@ typedef
    On entry, the baseblock pointer register must be 8-aligned.
 */
 
-#define LibVEX_N_SPILL_BYTES 1024
+#define LibVEX_N_SPILL_BYTES 2048
 
 
 /*-------------------------------------------------------*/
@@ -297,45 +400,111 @@ typedef
    VexGuestExtents;
 
 
-extern 
-VexTranslateResult LibVEX_Translate (
+/* A structure to carry arguments for LibVEX_Translate.  There are so
+   many of them, it seems better to have a structure. */
+typedef
+   struct {
+      /* IN: The instruction sets we are translating from and to.  And
+         guest/host misc info. */
+      VexArch      arch_guest;
+      VexArchInfo  archinfo_guest;
+      VexArch      arch_host;
+      VexArchInfo  archinfo_host;
+      VexAbiInfo   abiinfo_both;
 
-   /* The instruction sets we are translating from and to. */
-   VexArch      arch_guest,
-   VexArchInfo* archinfo_guest,
-   VexArch      arch_host,
-   VexArchInfo* archinfo_host,
-   /* IN: the block to translate, and its guest address. */
-   /* where are the actual bytes in the host's address space? */
-   UChar*  guest_bytes,
-   /* where do the bytes came from in the guest's aspace? */
-   Addr64  guest_bytes_addr,
-   /* what guest entry point address do they correspond to? */
-   Addr64  guest_bytes_addr_noredir,
-   /* Is it OK to chase into this guest address? */
-   Bool    (*chase_into_ok) ( Addr64 ),
-   /* OUT: which bits of guest code actually got translated */
-   VexGuestExtents* guest_extents,
-   /* IN: a place to put the resulting code, and its size */
-   UChar*  host_bytes,
-   Int     host_bytes_size,
-   /* OUT: how much of the output area is used. */
-   Int*    host_bytes_used,
-   /* IN: optionally, two instrumentation functions. */
-   IRBB*   (*instrument1) ( IRBB*, VexGuestLayout*, 
-                            Addr64, VexGuestExtents*,
-                            IRType gWordTy, IRType hWordTy ),
-   IRBB*   (*instrument2) ( IRBB*, VexGuestLayout*, 
-                            Addr64, VexGuestExtents*,
-                            IRType gWordTy, IRType hWordTy ),
-   Bool    cleanup_after_instrumentation,
-   /* IN: should this translation be self-checking? */
-   Bool    do_self_check,
-   /* IN: optionally, an access check function for guest code. */
-   Bool    (*byte_accessible) ( Addr64 ),
-   /* IN: debug: trace vex activity at various points */
-   Int     traceflags
-);
+      /* IN: an opaque value which is passed as the first arg to all
+         callback functions supplied in this struct.  Vex has no idea
+         what's at the other end of this pointer. */
+      void*   callback_opaque;
+
+      /* IN: the block to translate, and its guest address. */
+      /* where are the actual bytes in the host's address space? */
+      UChar*  guest_bytes;
+      /* where do the bytes really come from in the guest's aspace?
+         This is the post-redirection guest address.  Not that Vex
+         understands anything about redirection; that is all done on
+         the Valgrind side. */
+      Addr64  guest_bytes_addr;
+
+      /* Is it OK to chase into this guest address?  May not be
+	 NULL. */
+      Bool    (*chase_into_ok) ( /*callback_opaque*/void*, Addr64 );
+
+      /* OUT: which bits of guest code actually got translated */
+      VexGuestExtents* guest_extents;
+
+      /* IN: a place to put the resulting code, and its size */
+      UChar*  host_bytes;
+      Int     host_bytes_size;
+      /* OUT: how much of the output area is used. */
+      Int*    host_bytes_used;
+
+      /* IN: optionally, two instrumentation functions.  May be
+	 NULL. */
+      IRSB*   (*instrument1) ( /*callback_opaque*/void*, 
+                               IRSB*, 
+                               VexGuestLayout*, 
+                               VexGuestExtents*,
+                               IRType gWordTy, IRType hWordTy );
+      IRSB*   (*instrument2) ( /*callback_opaque*/void*, 
+                               IRSB*, 
+                               VexGuestLayout*, 
+                               VexGuestExtents*,
+                               IRType gWordTy, IRType hWordTy );
+
+      IRSB* (*finaltidy) ( IRSB* );
+
+      /* IN: should this translation be self-checking?  default: False */
+      Bool    do_self_check;
+
+      /* IN: optionally, a callback which allows the caller to add its
+         own IR preamble following the self-check and any other
+         VEX-generated preamble, if any.  May be NULL.  If non-NULL,
+         the IRSB under construction is handed to this function, which
+         presumably adds IR statements to it.  The callback may
+         optionally complete the block and direct bb_to_IR not to
+         disassemble any instructions into it; this is indicated by
+         the callback returning True.
+      */
+      Bool    (*preamble_function)(/*callback_opaque*/void*, IRSB*);
+
+      /* IN: debug: trace vex activity at various points */
+      Int     traceflags;
+
+      /* IN: address of the dispatcher entry point.  Describes the
+         place where generated code should jump to at the end of each
+         bb.
+
+         At the end of each translation, the next guest address is
+         placed in the host's standard return register (x86: %eax,
+         amd64: %rax, ppc32: %r3, ppc64: %r3).  Optionally, the guest
+         state pointer register (on host x86: %ebp; amd64: %rbp;
+         ppc32/64: r31) may be set to a VEX_TRC_ value to indicate any
+         special action required before the next block is run.
+
+         Control is then passed back to the dispatcher (beyond Vex's
+         control; caller supplies this) in the following way:
+
+         - On host archs which lack a link register (x86, amd64), by a
+           jump to the host address specified in 'dispatcher', which
+           must be non-NULL.
+
+         - On host archs which have a link register (ppc32, ppc64), by
+           a branch to the link register (which is guaranteed to be
+           unchanged from whatever it was at entry to the
+           translation).  'dispatch' must be NULL.
+
+         The aim is to get back and forth between translations and the
+         dispatcher without creating memory traffic to store return
+         addresses.
+      */
+      void* dispatch;
+   }
+   VexTranslateArgs;
+
+
+extern 
+VexTranslateResult LibVEX_Translate ( VexTranslateArgs* );
 
 /* A subtlety re interaction between self-checking translations and
    bb-chasing.  The supplied chase_into_ok function should say NO
@@ -366,7 +535,7 @@ extern void LibVEX_ShowStats ( void );
 
    x86
    ~~~
-   Generated code should be entered using a CALL instruction.  On
+   Generated code should be entered using a JMP instruction.  On
    entry, %ebp should point to the guest state, and %esp should be a
    valid stack pointer.  The generated code may change %eax, %ebx,
    %ecx, %edx, %esi, %edi, all the FP registers and control state, and
@@ -377,9 +546,11 @@ extern void LibVEX_ShowStats ( void );
    should still have those values (after masking off the lowest 6 bits
    of %mxcsr).  If they don't, there is a bug in VEX-generated code.
 
-   Generated code returns to the scheduler using a RET instruction.
+   Generated code returns to the scheduler using a JMP instruction, to
+   the address specified in the .dispatch field of VexTranslateArgs.
    %eax (or %eax:%edx, if simulating a 64-bit target) will contain the
-   guest address of the next block to execute.
+   guest address of the next block to execute.  %ebp may be changed
+   to a VEX_TRC_ value, otherwise it should be as it was at entry.
 
    CRITICAL ISSUES in x86 code generation.  The only known critical
    issue is that the host FPU and SSE state is not properly saved
@@ -389,13 +560,37 @@ extern void LibVEX_ShowStats ( void );
    generated code, the generated code is likely to go wrong.  This
    really should be fixed.
 
+   amd64
+   ~~~~~
+   Analogous to x86.
+
+   ppc32
+   ~~~~~
+   On entry, guest state pointer is r31.  .dispatch must be NULL.
+   Control is returned with a branch to the link register.  Generated
+   code will not change lr.  At return, r3 holds the next guest addr
+   (or r3:r4 ?).  r31 may be may be changed to a VEX_TRC_ value,
+   otherwise it should be as it was at entry.
+
+   ppc64
+   ~~~~~
+   Same as ppc32.
+
    ALL GUEST ARCHITECTURES
    ~~~~~~~~~~~~~~~~~~~~~~~
-   The architecture must contain two pseudo-registers, guest_TISTART
+   The guest state must contain two pseudo-registers, guest_TISTART
    and guest_TILEN.  These are used to pass the address of areas of
    guest code, translations of which are to be invalidated, back to
    the despatcher.  Both pseudo-regs must have size equal to the guest
    word size.
+
+   The architecture must a third pseudo-register, guest_NRADDR, also
+   guest-word-sized.  This is used to record the unredirected guest
+   address at the start of a translation whose start has been
+   redirected.  By reading this pseudo-register shortly afterwards,
+   the translation can find out what the corresponding no-redirection
+   address was.  Note, this is only set for wrap-style redirects, not
+   for replace-style ones.
 */
 #endif /* ndef __LIBVEX_H */
 

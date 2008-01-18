@@ -1,6 +1,6 @@
 
 /*--------------------------------------------------------------------*/
-/*--- The JITter proper: register allocation & code improvement    ---*/
+/*--- Interface to LibVEX_Translate, and the SP-update pass        ---*/
 /*---                                                m_translate.c ---*/
 /*--------------------------------------------------------------------*/
 
@@ -8,7 +8,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward 
+   Copyright (C) 2000-2007 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -30,25 +30,61 @@
 */
 
 #include "pub_core_basics.h"
+#include "pub_core_vki.h"
 #include "pub_core_aspacemgr.h"
 
-#include "pub_core_machine.h"       // For VG_(machine_get_VexArchInfo)
-                                    // and VG_(get_SP)
+#include "pub_core_machine.h"    // VG_(fnptr_to_fnentry)
+                                 // VG_(get_SP)
+                                 // VG_(machine_get_VexArchInfo)
 #include "pub_core_libcbase.h"
 #include "pub_core_libcassert.h"
 #include "pub_core_libcprint.h"
 #include "pub_core_options.h"
-#include "pub_core_profile.h"
 
-#include "pub_core_debuginfo.h"     // Needed for pub_core_redir :(
-#include "pub_core_redir.h"         // For VG_(code_redirect)()
+#include "pub_core_debuginfo.h"  // VG_(get_fnname_w_offset)
+#include "pub_core_redir.h"      // VG_(redir_do_lookup)
 
-#include "pub_core_signals.h"       // For VG_(synth_fault_{perms,mapping})()
-#include "pub_core_stacks.h"        // For VG_(unknown_SP_update)()
-#include "pub_core_tooliface.h"     // For VG_(tdict)
+#include "pub_core_signals.h"    // VG_(synth_fault_{perms,mapping}
+#include "pub_core_stacks.h"     // VG_(unknown_SP_update)()
+#include "pub_core_tooliface.h"  // VG_(tdict)
+
 #include "pub_core_translate.h"
 #include "pub_core_transtab.h"
+#include "pub_core_dispatch.h" // VG_(run_innerloop__dispatch_{un}profiled)
+                               // VG_(run_a_noredir_translation__return_point)
 
+#include "pub_core_threadstate.h"  // VexGuestArchState
+#include "pub_core_trampoline.h"   // VG_(ppctoc_magic_redirect_return_stub)
+
+
+/*------------------------------------------------------------*/
+/*--- Stats                                                ---*/
+/*------------------------------------------------------------*/
+
+static UInt n_SP_updates_fast            = 0;
+static UInt n_SP_updates_generic_known   = 0;
+static UInt n_SP_updates_generic_unknown = 0;
+
+void VG_(print_translation_stats) ( void )
+{
+   Char buf[6];
+   UInt n_SP_updates = n_SP_updates_fast + n_SP_updates_generic_known
+                                         + n_SP_updates_generic_unknown;
+   VG_(percentify)(n_SP_updates_fast, n_SP_updates, 1, 6, buf);
+   VG_(message)(Vg_DebugMsg,
+      "translate:            fast SP updates identified: %,u (%s)",
+      n_SP_updates_fast, buf );
+
+   VG_(percentify)(n_SP_updates_generic_known, n_SP_updates, 1, 6, buf);
+   VG_(message)(Vg_DebugMsg,
+      "translate:   generic_known SP updates identified: %,u (%s)",
+      n_SP_updates_generic_known, buf );
+
+   VG_(percentify)(n_SP_updates_generic_unknown, n_SP_updates, 1, 6, buf);
+   VG_(message)(Vg_DebugMsg,
+      "translate: generic_unknown SP updates identified: %,u (%s)",
+      n_SP_updates_generic_unknown, buf );
+}
 
 /*------------------------------------------------------------*/
 /*--- %SP-update pass                                      ---*/
@@ -56,62 +92,147 @@
 
 static Bool need_to_handle_SP_assignment(void)
 {
-   return ( VG_(tdict).track_new_mem_stack_4  ||
-            VG_(tdict).track_die_mem_stack_4  ||
-            VG_(tdict).track_new_mem_stack_8  ||
-            VG_(tdict).track_die_mem_stack_8  ||
-            VG_(tdict).track_new_mem_stack_12 ||
-            VG_(tdict).track_die_mem_stack_12 ||
-            VG_(tdict).track_new_mem_stack_16 ||
-            VG_(tdict).track_die_mem_stack_16 ||
-            VG_(tdict).track_new_mem_stack_32 ||
-            VG_(tdict).track_die_mem_stack_32 ||
-            VG_(tdict).track_new_mem_stack    ||
-            VG_(tdict).track_die_mem_stack    );
+   return ( VG_(tdict).track_new_mem_stack_4   ||
+            VG_(tdict).track_die_mem_stack_4   ||
+            VG_(tdict).track_new_mem_stack_8   ||
+            VG_(tdict).track_die_mem_stack_8   ||
+            VG_(tdict).track_new_mem_stack_12  ||
+            VG_(tdict).track_die_mem_stack_12  ||
+            VG_(tdict).track_new_mem_stack_16  ||
+            VG_(tdict).track_die_mem_stack_16  ||
+            VG_(tdict).track_new_mem_stack_32  ||
+            VG_(tdict).track_die_mem_stack_32  ||
+            VG_(tdict).track_new_mem_stack_112 ||
+            VG_(tdict).track_die_mem_stack_112 ||
+            VG_(tdict).track_new_mem_stack_128 ||
+            VG_(tdict).track_die_mem_stack_128 ||
+            VG_(tdict).track_new_mem_stack_144 ||
+            VG_(tdict).track_die_mem_stack_144 ||
+            VG_(tdict).track_new_mem_stack_160 ||
+            VG_(tdict).track_die_mem_stack_160 ||
+            VG_(tdict).track_new_mem_stack     ||
+            VG_(tdict).track_die_mem_stack     );
 }
 
-/* NOTE: this comment is out of date */
+// - The SP aliases are held in an array which is used as a circular buffer.
+//   This misses very few constant updates of SP (ie. < 0.1%) while using a
+//   small, constant structure that will also never fill up and cause
+//   execution to abort.
+// - Unused slots have a .temp value of 'IRTemp_INVALID'.
+// - 'next_SP_alias_slot' is the index where the next alias will be stored.
+// - If the buffer fills, we circle around and start over-writing
+//   non-IRTemp_INVALID values.  This is rare, and the overwriting of a
+//   value that would have subsequently be used is even rarer.
+// - Every slot below next_SP_alias_slot holds a non-IRTemp_INVALID value.
+//   The rest either all won't (if we haven't yet circled around) or all
+//   will (if we have circled around).
 
-/* For tools that want to know about %ESP changes, this pass adds
+typedef 
+   struct {
+      IRTemp temp;
+      Long   delta;
+   }
+   SP_Alias;
+
+// With 32 slots the buffer fills very rarely -- eg. once in a run of GCC.
+// And I've tested with smaller values and the wrap-around case works ok.
+#define N_ALIASES    32
+static SP_Alias SP_aliases[N_ALIASES];
+static Int      next_SP_alias_slot = 0;
+
+static void clear_SP_aliases(void)
+{
+   Int i;
+   for (i = 0; i < N_ALIASES; i++) {
+      SP_aliases[i].temp  = IRTemp_INVALID;
+      SP_aliases[i].delta = 0;
+   }
+   next_SP_alias_slot = 0;
+}
+
+static void add_SP_alias(IRTemp temp, Long delta)
+{
+   vg_assert(temp != IRTemp_INVALID);
+   SP_aliases[ next_SP_alias_slot ].temp  = temp;
+   SP_aliases[ next_SP_alias_slot ].delta = delta;
+   next_SP_alias_slot++;
+   if (N_ALIASES == next_SP_alias_slot) next_SP_alias_slot = 0;
+}
+
+static Bool get_SP_delta(IRTemp temp, ULong* delta)
+{
+   Int i;      // i must be signed!
+   vg_assert(IRTemp_INVALID != temp);
+   // Search backwards between current buffer position and the start.
+   for (i = next_SP_alias_slot-1; i >= 0; i--) {
+      if (temp == SP_aliases[i].temp) {
+         *delta = SP_aliases[i].delta;
+         return True;
+      }
+   }
+   // Search backwards between the end and the current buffer position.
+   for (i = N_ALIASES-1; i >= next_SP_alias_slot; i--) {
+      if (temp == SP_aliases[i].temp) {
+         *delta = SP_aliases[i].delta;
+         return True;
+      }
+   }
+   return False;
+}
+
+static void update_SP_aliases(Long delta)
+{
+   Int i;
+   for (i = 0; i < N_ALIASES; i++) {
+      if (SP_aliases[i].temp == IRTemp_INVALID) {
+         return;
+      }
+      SP_aliases[i].delta += delta;
+   }
+}
+
+
+/* For tools that want to know about SP changes, this pass adds
    in the appropriate hooks.  We have to do it after the tool's
-   instrumentation, so the tool doesn't have to worry about the CCALLs
+   instrumentation, so the tool doesn't have to worry about the C calls
    it adds in, and we must do it before register allocation because
-   spilled temps make it much harder to work out the %esp deltas.
-   Thus we have it as an extra phase between the two. 
-   
-   We look for "GETL %ESP, t_ESP", then track ADDs and SUBs of
-   literal values to t_ESP, and the total delta of the ADDs/SUBs.  Then if
-   "PUTL t_ESP, %ESP" happens, we call the helper with the known delta.  We
-   also cope with "MOVL t_ESP, tX", making tX the new t_ESP.  If any other
-   instruction clobbers t_ESP, we don't track it anymore, and fall back to
-   the delta-is-unknown case.  That case is also used when the delta is not
-   a nice small amount, or an unknown amount.
-*/
+   spilled temps make it much harder to work out the SP deltas.
+   This it is done with Vex's "second instrumentation" pass.
 
+   Basically, we look for GET(SP)/PUT(SP) pairs and track constant
+   increments/decrements of SP between them.  (This requires tracking one or
+   more "aliases", which are not exact aliases but instead are tempregs
+   whose value is equal to the SP's plus or minus a known constant.)
+   If all the changes to SP leading up to a PUT(SP) are by known, small
+   constants, we can do a specific call to eg. new_mem_stack_4, otherwise
+   we fall back to the case that handles an unknown SP change.
+
+   There is some extra complexity to deal correctly with updates to
+   only parts of SP.  Bizarre, but it has been known to happen.
+*/
 static
-IRBB* vg_SP_update_pass ( IRBB*             bb_in, 
+IRSB* vg_SP_update_pass ( void*             closureV,
+                          IRSB*             sb_in, 
                           VexGuestLayout*   layout, 
-                          Addr64            orig_addr_noredir,
                           VexGuestExtents*  vge,
                           IRType            gWordTy, 
                           IRType            hWordTy )
 {
-   Int      i, j, minoff_ST, maxoff_ST, sizeof_SP, offset_SP;
-   IRDirty  *dcall, *d;
-   IRStmt*  st;
-   IRExpr*  e;
-   IRArray* descr;
-   IRTemp   curr;
-   IRType   typeof_SP;
-   Long     delta;
+   Int         i, j, minoff_ST, maxoff_ST, sizeof_SP, offset_SP;
+   Int         first_SP, last_SP, first_Put, last_Put;
+   IRDirty     *dcall, *d;
+   IRStmt*     st;
+   IRExpr*     e;
+   IRRegArray* descr;
+   IRType      typeof_SP;
+   Long        delta, con;
 
    /* Set up BB */
-   IRBB* bb     = emptyIRBB();
-   bb->tyenv    = dopyIRTypeEnv(bb_in->tyenv);
-   bb->next     = dopyIRExpr(bb_in->next);
-   bb->jumpkind = bb_in->jumpkind;
+   IRSB* bb     = emptyIRSB();
+   bb->tyenv    = deepCopyIRTypeEnv(sb_in->tyenv);
+   bb->next     = deepCopyIRExpr(sb_in->next);
+   bb->jumpkind = sb_in->jumpkind;
 
-   curr  = IRTemp_INVALID;
    delta = 0;
 
    sizeof_SP = layout->sizeof_SP;
@@ -128,9 +249,10 @@ IRBB* vg_SP_update_pass ( IRBB*             bb_in,
        (sizeof_SP==4 ? (Long)(Int)(con->Ico.U32)                        \
                      : (Long)(con->Ico.U64))
 
-#  define DO(kind, syze)                                                \
+// XXX: convert this to a function
+#  define DO(kind, syze, tmpp)                                          \
       do {                                                              \
-         if (!VG_(tdict).track_##kind##_mem_stack_##syze) \
+         if (!VG_(tdict).track_##kind##_mem_stack_##syze)               \
             goto generic;                                               \
                                                                         \
          /* I don't know if it's really necessary to say that the */    \
@@ -138,102 +260,217 @@ IRBB* vg_SP_update_pass ( IRBB*             bb_in,
          dcall = unsafeIRDirty_0_N(                                     \
                     1/*regparms*/,                                      \
                     "track_" #kind "_mem_stack_" #syze,                 \
-                    VG_(tdict).track_##kind##_mem_stack_##syze,         \
-                    mkIRExprVec_1(IRExpr_Tmp(curr))                     \
+                    VG_(fnptr_to_fnentry)(                              \
+                       VG_(tdict).track_##kind##_mem_stack_##syze ),    \
+                    mkIRExprVec_1(IRExpr_RdTmp(tmpp))                   \
                  );                                                     \
          dcall->nFxState = 1;                                           \
          dcall->fxState[0].fx     = Ifx_Read;                           \
          dcall->fxState[0].offset = layout->offset_SP;                  \
          dcall->fxState[0].size   = layout->sizeof_SP;                  \
                                                                         \
-         addStmtToIRBB( bb, IRStmt_Dirty(dcall) );                      \
+         addStmtToIRSB( bb, IRStmt_Dirty(dcall) );                      \
+                                                                        \
+         update_SP_aliases(-delta);                                     \
+                                                                        \
+         n_SP_updates_fast++;                                           \
+                                                                        \
       } while (0)
 
-   for (i = 0; i <  bb_in->stmts_used; i++) {
+   clear_SP_aliases();
 
-      st = bb_in->stmts[i];
-      if (!st)
-         continue;
+   for (i = 0; i <  sb_in->stmts_used; i++) {
+
+      st = sb_in->stmts[i];
 
       /* t = Get(sp):   curr = t, delta = 0 */
-      if (st->tag != Ist_Tmp) goto case2;
-      e = st->Ist.Tmp.data;
+      if (st->tag != Ist_WrTmp) goto case2;
+      e = st->Ist.WrTmp.data;
       if (e->tag != Iex_Get)              goto case2;
       if (e->Iex.Get.offset != offset_SP) goto case2;
       if (e->Iex.Get.ty != typeof_SP)     goto case2;
-      curr = st->Ist.Tmp.tmp;
-      delta = 0;
-      addStmtToIRBB( bb, st );
+      vg_assert( typeOfIRTemp(bb->tyenv, st->Ist.WrTmp.tmp) == typeof_SP );
+      add_SP_alias(st->Ist.WrTmp.tmp, 0);
+      addStmtToIRSB( bb, st );
       continue;
 
      case2:
       /* t' = curr +/- const:   curr = t',  delta +=/-= const */
-      if (st->tag != Ist_Tmp) goto case3;
-      e = st->Ist.Tmp.data;
+      if (st->tag != Ist_WrTmp) goto case3;
+      e = st->Ist.WrTmp.data;
       if (e->tag != Iex_Binop) goto case3;
-      if (e->Iex.Binop.arg1->tag != Iex_Tmp) goto case3;
-      if (e->Iex.Binop.arg1->Iex.Tmp.tmp != curr) goto case3;
+      if (e->Iex.Binop.arg1->tag != Iex_RdTmp) goto case3;
+      if (!get_SP_delta(e->Iex.Binop.arg1->Iex.RdTmp.tmp, &delta)) goto case3;
       if (e->Iex.Binop.arg2->tag != Iex_Const) goto case3;
       if (!IS_ADD_OR_SUB(e->Iex.Binop.op)) goto case3;
-      curr = st->Ist.Tmp.tmp;
-      if (IS_ADD(e->Iex.Binop.op))
-         delta += GET_CONST(e->Iex.Binop.arg2->Iex.Const.con);
-      else
-         delta -= GET_CONST(e->Iex.Binop.arg2->Iex.Const.con);
-      addStmtToIRBB( bb, st );
+      con = GET_CONST(e->Iex.Binop.arg2->Iex.Const.con);
+      vg_assert( typeOfIRTemp(bb->tyenv, st->Ist.WrTmp.tmp) == typeof_SP );
+      if (IS_ADD(e->Iex.Binop.op)) {
+         add_SP_alias(st->Ist.WrTmp.tmp, delta + con);
+      } else {
+         add_SP_alias(st->Ist.WrTmp.tmp, delta - con);
+      }
+      addStmtToIRSB( bb, st );
       continue;
 
      case3:
       /* t' = curr:   curr = t' */
-      if (st->tag != Ist_Tmp) goto case4;
-      e = st->Ist.Tmp.data;
-      if (e->tag != Iex_Tmp) goto case4;
-      if (e->Iex.Tmp.tmp != curr) goto case4;
-      curr = st->Ist.Tmp.tmp;
-      addStmtToIRBB( bb, st );
+      if (st->tag != Ist_WrTmp) goto case4;
+      e = st->Ist.WrTmp.data;
+      if (e->tag != Iex_RdTmp) goto case4;
+      if (!get_SP_delta(e->Iex.RdTmp.tmp, &delta)) goto case4;
+      vg_assert( typeOfIRTemp(bb->tyenv, st->Ist.WrTmp.tmp) == typeof_SP );
+      add_SP_alias(st->Ist.WrTmp.tmp, delta);
+      addStmtToIRSB( bb, st );
       continue;
 
      case4:
       /* Put(sp) = curr */
+      /* More generally, we must correctly handle a Put which writes
+         any part of SP, not just the case where all of SP is
+         written. */
       if (st->tag != Ist_Put) goto case5;
-      if (st->Ist.Put.offset != offset_SP) goto case5;
-      if (st->Ist.Put.data->tag != Iex_Tmp) goto case5;
-      if (st->Ist.Put.data->Iex.Tmp.tmp == curr) {
+      first_SP  = offset_SP;
+      last_SP   = first_SP + sizeof_SP - 1;
+      first_Put = st->Ist.Put.offset;
+      last_Put  = first_Put
+                  + sizeofIRType( typeOfIRExpr( bb->tyenv, st->Ist.Put.data ))
+                  - 1;
+      vg_assert(first_SP <= last_SP);
+      vg_assert(first_Put <= last_Put);
+
+      if (last_Put < first_SP || last_SP < first_Put)
+         goto case5; /* no overlap */
+
+      if (st->Ist.Put.data->tag == Iex_RdTmp
+          && get_SP_delta(st->Ist.Put.data->Iex.RdTmp.tmp, &delta)) {
+         IRTemp tttmp = st->Ist.Put.data->Iex.RdTmp.tmp;
+         /* Why should the following assertion hold?  Because any
+            alias added by put_SP_alias must be of a temporary which
+            has the same type as typeof_SP, and whose value is a Get
+            at exactly offset_SP of size typeof_SP.  Each call to
+            put_SP_alias is immediately preceded by an assertion that
+            we are putting in a binding for a correctly-typed
+            temporary. */
+         vg_assert( typeOfIRTemp(bb->tyenv, tttmp) == typeof_SP );
+         /* From the same type-and-offset-correctness argument, if 
+            we found a useable alias, it must for an "exact" write of SP. */
+         vg_assert(first_SP == first_Put);
+         vg_assert(last_SP == last_Put);
          switch (delta) {
-            case   0:              addStmtToIRBB(bb,st); delta = 0; continue;
-            case   4: DO(die, 4);  addStmtToIRBB(bb,st); delta = 0; continue;
-            case  -4: DO(new, 4);  addStmtToIRBB(bb,st); delta = 0; continue;
-            case   8: DO(die, 8);  addStmtToIRBB(bb,st); delta = 0; continue;
-            case  -8: DO(new, 8);  addStmtToIRBB(bb,st); delta = 0; continue;
-            case  12: DO(die, 12); addStmtToIRBB(bb,st); delta = 0; continue;
-            case -12: DO(new, 12); addStmtToIRBB(bb,st); delta = 0; continue;
-            case  16: DO(die, 16); addStmtToIRBB(bb,st); delta = 0; continue;
-            case -16: DO(new, 16); addStmtToIRBB(bb,st); delta = 0; continue;
-            case  32: DO(die, 32); addStmtToIRBB(bb,st); delta = 0; continue;
-            case -32: DO(new, 32); addStmtToIRBB(bb,st); delta = 0; continue;
-            default:  goto generic;
+            case    0:                      addStmtToIRSB(bb,st); continue;
+            case    4: DO(die,  4,  tttmp); addStmtToIRSB(bb,st); continue;
+            case   -4: DO(new,  4,  tttmp); addStmtToIRSB(bb,st); continue;
+            case    8: DO(die,  8,  tttmp); addStmtToIRSB(bb,st); continue;
+            case   -8: DO(new,  8,  tttmp); addStmtToIRSB(bb,st); continue;
+            case   12: DO(die,  12, tttmp); addStmtToIRSB(bb,st); continue;
+            case  -12: DO(new,  12, tttmp); addStmtToIRSB(bb,st); continue;
+            case   16: DO(die,  16, tttmp); addStmtToIRSB(bb,st); continue;
+            case  -16: DO(new,  16, tttmp); addStmtToIRSB(bb,st); continue;
+            case   32: DO(die,  32, tttmp); addStmtToIRSB(bb,st); continue;
+            case  -32: DO(new,  32, tttmp); addStmtToIRSB(bb,st); continue;
+            case  112: DO(die, 112, tttmp); addStmtToIRSB(bb,st); continue;
+            case -112: DO(new, 112, tttmp); addStmtToIRSB(bb,st); continue;
+            case  128: DO(die, 128, tttmp); addStmtToIRSB(bb,st); continue;
+            case -128: DO(new, 128, tttmp); addStmtToIRSB(bb,st); continue;
+            case  144: DO(die, 144, tttmp); addStmtToIRSB(bb,st); continue;
+            case -144: DO(new, 144, tttmp); addStmtToIRSB(bb,st); continue;
+            case  160: DO(die, 160, tttmp); addStmtToIRSB(bb,st); continue;
+            case -160: DO(new, 160, tttmp); addStmtToIRSB(bb,st); continue;
+            default:  
+               /* common values for ppc64: 144 128 160 112 176 */
+               n_SP_updates_generic_known++;
+               goto generic;
          }
       } else {
+         /* Deal with an unknown update to SP.  We're here because
+            either:
+            (1) the Put does not exactly cover SP; it is a partial update.
+                Highly unlikely, but has been known to happen for 16-bit
+                Windows apps running on Wine, doing 16-bit adjustments to
+                %sp.
+            (2) the Put does exactly cover SP, but we are unable to
+                determine how the value relates to the old SP.  In any 
+                case, we cannot assume that the Put.data value is a tmp;
+                we must assume it can be anything allowed in flat IR (tmp
+                or const).
+         */
          IRTemp old_SP;
+         n_SP_updates_generic_unknown++;
+
+         // Nb: if all is well, this generic case will typically be
+         // called something like every 1000th SP update.  If it's more than
+         // that, the above code may be missing some cases.
         generic:
          /* Pass both the old and new SP values to this helper. */
          old_SP = newIRTemp(bb->tyenv, typeof_SP);
-         addStmtToIRBB( 
+         addStmtToIRSB( 
             bb,
-            IRStmt_Tmp( old_SP, IRExpr_Get(offset_SP, typeof_SP) ) 
+            IRStmt_WrTmp( old_SP, IRExpr_Get(offset_SP, typeof_SP) ) 
          );
 
-         dcall = unsafeIRDirty_0_N( 
-                    2/*regparms*/, 
-                    "VG_(unknown_SP_update)", &VG_(unknown_SP_update),
-                    mkIRExprVec_2( IRExpr_Tmp(old_SP), st->Ist.Put.data ) 
-                 );
-         addStmtToIRBB( bb, IRStmt_Dirty(dcall) );
+         /* Now we know what the old value of SP is.  But knowing the new
+            value is a bit tricky if there is a partial write. */
+         if (first_Put == first_SP && last_Put == last_SP) {
+           /* The common case, an exact write to SP.  So st->Ist.Put.data
+              does hold the new value; simple. */
+            dcall = unsafeIRDirty_0_N( 
+                       2/*regparms*/, 
+                       "VG_(unknown_SP_update)", 
+                       VG_(fnptr_to_fnentry)( &VG_(unknown_SP_update) ),
+                       mkIRExprVec_2( IRExpr_RdTmp(old_SP), st->Ist.Put.data ) 
+                    );
+            addStmtToIRSB( bb, IRStmt_Dirty(dcall) );
+            /* don't forget the original assignment */
+            addStmtToIRSB( bb, st );
+         } else {
+            /* We have a partial update to SP.  We need to know what
+               the new SP will be, and hand that to the helper call,
+               but when the helper call happens, SP must hold the
+               value it had before the update.  Tricky.
+               Therefore use the following kludge:
+               1. do the partial SP update (Put)
+               2. Get the new SP value into a tmp, new_SP
+               3. Put old_SP
+               4. Call the helper
+               5. Put new_SP
+            */
+            IRTemp new_SP;
+            /* 1 */
+            addStmtToIRSB( bb, st );
+            /* 2 */
+            new_SP = newIRTemp(bb->tyenv, typeof_SP);
+            addStmtToIRSB( 
+               bb,
+               IRStmt_WrTmp( new_SP, IRExpr_Get(offset_SP, typeof_SP) ) 
+            );
+            /* 3 */
+            addStmtToIRSB( bb, IRStmt_Put(offset_SP, IRExpr_RdTmp(old_SP) ));
+            /* 4 */
+            dcall = unsafeIRDirty_0_N( 
+                       2/*regparms*/, 
+                       "VG_(unknown_SP_update)", 
+                       VG_(fnptr_to_fnentry)( &VG_(unknown_SP_update) ),
+                       mkIRExprVec_2( IRExpr_RdTmp(old_SP),
+                                      IRExpr_RdTmp(new_SP))
+                    );
+            addStmtToIRSB( bb, IRStmt_Dirty(dcall) );
+            /* 5 */
+            addStmtToIRSB( bb, IRStmt_Put(offset_SP, IRExpr_RdTmp(new_SP) ));
+         }
 
-         addStmtToIRBB( bb, st );
+         /* Forget what we already know. */
+         clear_SP_aliases();
 
-         curr = st->Ist.Put.data->Iex.Tmp.tmp;
-         delta = 0;
+         /* If this is a Put of a tmp that exactly updates SP,
+            start tracking aliases against this tmp. */
+
+         if (first_Put == first_SP && last_Put == last_SP
+             && st->Ist.Put.data->tag == Iex_RdTmp) {
+            vg_assert( typeOfIRTemp(bb->tyenv, st->Ist.Put.data->Iex.RdTmp.tmp)
+                       == typeof_SP );
+            add_SP_alias(st->Ist.Put.data->Iex.RdTmp.tmp, 0);
+         }
          continue;
       }
 
@@ -244,8 +481,10 @@ IRBB* vg_SP_update_pass ( IRBB*             bb_in,
       if (st->tag == Ist_PutI) {
          descr = st->Ist.PutI.descr;
          minoff_ST = descr->base;
-         maxoff_ST = descr->base + descr->nElems * sizeofIRType(descr->elemTy) - 1;
-         if (!(offset_SP > maxoff_ST || (offset_SP + sizeof_SP - 1) < minoff_ST))
+         maxoff_ST = descr->base 
+                     + descr->nElems * sizeofIRType(descr->elemTy) - 1;
+         if (!(offset_SP > maxoff_ST
+               || (offset_SP + sizeof_SP - 1) < minoff_ST))
             goto complain;
       }
       if (st->tag == Ist_Dirty) {
@@ -255,15 +494,16 @@ IRBB* vg_SP_update_pass ( IRBB*             bb_in,
             maxoff_ST = d->fxState[j].offset + d->fxState[j].size - 1;
             if (d->fxState[j].fx == Ifx_Read || d->fxState[j].fx == Ifx_None)
                continue;
-            if (!(offset_SP > maxoff_ST || (offset_SP + sizeof_SP - 1) < minoff_ST))
+            if (!(offset_SP > maxoff_ST
+                  || (offset_SP + sizeof_SP - 1) < minoff_ST))
                goto complain;
          }
       }
 
       /* well, not interesting.  Just copy and keep going. */
-      addStmtToIRBB( bb, st );
+      addStmtToIRSB( bb, st );
 
-   } /* for (i = 0; i <  bb_in->stmts_used; i++) */
+   } /* for (i = 0; i < sb_in->stmts_used; i++) */
 
    return bb;
 
@@ -271,7 +511,6 @@ IRBB* vg_SP_update_pass ( IRBB*             bb_in,
    VG_(core_panic)("vg_SP_update_pass: PutI or Dirty which overlaps SP");
 
 }
-
 
 /*------------------------------------------------------------*/
 /*--- Main entry point for the JITter.                     ---*/
@@ -330,10 +569,14 @@ IRBB* vg_SP_update_pass ( IRBB*             bb_in,
    this comment.
 */
 
+
 /* Vex dumps the final code in here.  Then we can copy it off
    wherever we like. */
-#define N_TMPBUF 20000
+/* 60000: should agree with assertion in VG_(add_to_transtab) in
+   m_transtab.c. */
+#define N_TMPBUF 60000
 static UChar tmpbuf[N_TMPBUF];
+
 
 /* Function pointers we must supply to LibVEX in order that it
    can bomb out and emit messages under Valgrind's control. */
@@ -355,78 +598,87 @@ void log_bytes ( HChar* bytes, Int nbytes )
      VG_(printf)("%c", bytes[i]);
 }
 
-/* Translate the basic block beginning at orig_addr, and add it to
-   the translation cache & translation table.  Unless 'debugging' is true,
-   in which case the call is being done for debugging purposes, so
-   (a) throw away the translation once it is made, and (b) produce a
-   load of debugging output. 
 
-   'tid' is the identity of the thread needing this block.
-*/
+/* --------- Various helper functions for translation --------- */
 
 /* Look for reasons to disallow making translations from the given
    segment. */
 
-static Bool translations_allowable_from_seg ( NSegment* seg )
+static Bool translations_allowable_from_seg ( NSegment const* seg )
 {
 #  if defined(VGA_x86)
    Bool allowR = True;
 #  else
    Bool allowR = False;
 #  endif
-
    return seg != NULL
           && (seg->kind == SkAnonC || seg->kind == SkFileC)
           && (seg->hasX || (seg->hasR && allowR));
 }
 
 
+/* Is a self-check required for a translation of a guest address
+   inside segment SEG when requested by thread TID ? */
 
-/* This stops Vex from chasing into function entry points that we wish
-   to redirect.  Chasing across them obviously defeats the redirect
-   mechanism, with bad effects for Memcheck, Addrcheck, and possibly
-   others.
+static Bool self_check_required ( NSegment const* seg, ThreadId tid )
+{
+   switch (VG_(clo_smc_check)) {
+      case Vg_SmcNone:  return False;
+      case Vg_SmcAll:   return True;
+      case Vg_SmcStack: 
+         return seg 
+                ? (seg->start <= VG_(get_SP)(tid)
+                   && VG_(get_SP)(tid)+sizeof(Word)-1 <= seg->end)
+                : False;
+         break;
+      default: 
+         vg_assert2(0, "unknown VG_(clo_smc_check) value");
+   }
+}
+
+
+/* This is a callback passed to LibVEX_Translate.  It stops Vex from
+   chasing into function entry points that we wish to redirect.
+   Chasing across them obviously defeats the redirect mechanism, with
+   bad effects for Memcheck, Addrcheck, and possibly others.
 
    Also, we must stop Vex chasing into blocks for which we might want
    to self checking.
-
-   This fn needs to know also the tid of the requesting thread, but
-   it can't be passed in as a parameter since this fn is passed to
-   Vex and that has no notion of tids.  So we clumsily pass it as
-   a global, chase_into_ok__CLOSURE_tid.
 */
-static ThreadId chase_into_ok__CLOSURE_tid;
-static Bool     chase_into_ok ( Addr64 addr64 )
+static Bool chase_into_ok ( void* closureV, Addr64 addr64 )
 {
-   NSegment* seg;
+   Addr               addr    = (Addr)addr64;
+   NSegment const*    seg     = VG_(am_find_nsegment)(addr);
+   VgCallbackClosure* closure = (VgCallbackClosure*)closureV;
 
    /* Work through a list of possibilities why we might not want to
       allow a chase. */
-   Addr addr = (Addr)addr64;
 
-   /* All chasing disallowed if all bbs require self-checks. */
-   if (VG_(clo_smc_check) == Vg_SmcAll)
-      goto dontchase;
-
-   /* Check the segment permissions. */
-   seg = VG_(am_find_nsegment)(addr);
+   /* Destination not in a plausible segment? */
    if (!translations_allowable_from_seg(seg))
       goto dontchase;
 
-   /* AAABBBCCC: if default self-checks are in force, reject if we
-      would choose to have a self-check for the dest.  Note, this must
-      match the logic at XXXYYYZZZ below. */
-   if (VG_(clo_smc_check) == Vg_SmcStack) {
-      ThreadId tid = chase_into_ok__CLOSURE_tid;
-      if (seg
-          && (seg->kind == SkAnonC || seg->kind == SkFileC)
-          && seg->start <= VG_(get_SP)(tid)
-          && VG_(get_SP)(tid)+sizeof(Word)-1 <= seg->end)
-         goto dontchase;
-   }
+   /* Destination requires a self-check? */
+   if (self_check_required(seg, closure->tid))
+      goto dontchase;
 
    /* Destination is redirected? */
-   if (addr != VG_(code_redirect)(addr))
+   if (addr != VG_(redir_do_lookup)(addr, NULL))
+      goto dontchase;
+
+#  if defined(VG_PLAT_USES_PPCTOC)
+   /* This needs to be at the start of its own block.  Don't chase. Re
+      ULong_to_Ptr, be careful to ensure we only compare 32 bits on a
+      32-bit target.*/
+   if (ULong_to_Ptr(addr64)
+       == (void*)&VG_(ppctoc_magic_redirect_return_stub))
+      goto dontchase;
+#  endif
+
+   /* overly conservative, but .. don't chase into the distinguished
+      address that m_transtab uses as an empty-slot marker for
+      VG_(tt_fast). */
+   if (addr == TRANSTAB_BOGUS_GUEST_ADDR)
       goto dontchase;
 
    /* well, ok then.  go on and chase. */
@@ -436,26 +688,497 @@ static Bool     chase_into_ok ( Addr64 addr64 )
    /*NOTREACHED*/
 
   dontchase:
-   if (0) VG_(printf)("not chasing into 0x%x\n", addr);
+   if (0) VG_(printf)("not chasing into 0x%lx\n", addr);
    return False;
 }
 
 
+/* --------------- helpers for with-TOC platforms --------------- */
+
+/* NOTE: with-TOC platforms are: ppc64-linux, ppc32-aix5, ppc64-aix5. */
+
+static IRExpr* mkU64 ( ULong n ) {
+   return IRExpr_Const(IRConst_U64(n));
+}
+static IRExpr* mkU32 ( UInt n ) {
+   return IRExpr_Const(IRConst_U32(n));
+}
+
+#if defined(VG_PLAT_USES_PPCTOC)
+static IRExpr* mkU8 ( UChar n ) {
+   return IRExpr_Const(IRConst_U8(n));
+}
+static IRExpr* narrowTo32 ( IRTypeEnv* tyenv, IRExpr* e ) {
+   if (typeOfIRExpr(tyenv, e) == Ity_I32) {
+      return e;
+   } else {
+      vg_assert(typeOfIRExpr(tyenv, e) == Ity_I64);
+      return IRExpr_Unop(Iop_64to32, e);
+   }
+}
+
+/* Generate code to push word-typed expression 'e' onto this thread's
+   redir stack, checking for stack overflow and generating code to
+   bomb out if so. */
+
+static void gen_PUSH ( IRSB* bb, IRExpr* e )
+{
+   IRRegArray* descr;
+   IRTemp      t1;
+   IRExpr*     one;
+
+#  if defined(VGP_ppc64_linux) || defined(VGP_ppc64_aix5)
+   Int    stack_size       = VEX_GUEST_PPC64_REDIR_STACK_SIZE;
+   Int    offB_REDIR_SP    = offsetof(VexGuestPPC64State,guest_REDIR_SP);
+   Int    offB_REDIR_STACK = offsetof(VexGuestPPC64State,guest_REDIR_STACK);
+   Int    offB_EMWARN      = offsetof(VexGuestPPC64State,guest_EMWARN);
+   Bool   is64             = True;
+   IRType ty_Word          = Ity_I64;
+   IROp   op_CmpNE         = Iop_CmpNE64;
+   IROp   op_Sar           = Iop_Sar64;
+   IROp   op_Sub           = Iop_Sub64;
+   IROp   op_Add           = Iop_Add64;
+   IRExpr*(*mkU)(ULong)    = mkU64;
+   vg_assert(VG_WORDSIZE == 8);
+#  else
+   Int    stack_size       = VEX_GUEST_PPC32_REDIR_STACK_SIZE;
+   Int    offB_REDIR_SP    = offsetof(VexGuestPPC32State,guest_REDIR_SP);
+   Int    offB_REDIR_STACK = offsetof(VexGuestPPC32State,guest_REDIR_STACK);
+   Int    offB_EMWARN      = offsetof(VexGuestPPC32State,guest_EMWARN);
+   Bool   is64             = False;
+   IRType ty_Word          = Ity_I32;
+   IROp   op_CmpNE         = Iop_CmpNE32;
+   IROp   op_Sar           = Iop_Sar32;
+   IROp   op_Sub           = Iop_Sub32;
+   IROp   op_Add           = Iop_Add32;
+   IRExpr*(*mkU)(UInt)     = mkU32;
+   vg_assert(VG_WORDSIZE == 4);
+#  endif
+
+   vg_assert(sizeof(void*) == VG_WORDSIZE);
+   vg_assert(sizeof(Word)  == VG_WORDSIZE);
+   vg_assert(sizeof(Addr)  == VG_WORDSIZE);
+
+   descr = mkIRRegArray( offB_REDIR_STACK, ty_Word, stack_size );
+   t1    = newIRTemp( bb->tyenv, ty_Word );
+   one   = mkU(1);
+
+   vg_assert(typeOfIRExpr(bb->tyenv, e) == ty_Word);
+
+   /* t1 = guest_REDIR_SP + 1 */
+   addStmtToIRSB(
+      bb, 
+      IRStmt_WrTmp(
+         t1, 
+         IRExpr_Binop(op_Add, IRExpr_Get( offB_REDIR_SP, ty_Word ), one)
+      )
+   );
+
+   /* Bomb out if t1 >=s stack_size, that is, (stack_size-1)-t1 <s 0.
+      The destination (0) is a bit bogus but it doesn't matter since
+      this is an unrecoverable error and will lead to Valgrind
+      shutting down.  _EMWARN is set regardless - that's harmless
+      since is only has a meaning if the exit is taken. */
+   addStmtToIRSB(
+      bb,
+      IRStmt_Put(offB_EMWARN, mkU32(EmWarn_PPC64_redir_overflow))
+   );
+   addStmtToIRSB(
+      bb,
+      IRStmt_Exit(
+         IRExpr_Binop(
+            op_CmpNE,
+            IRExpr_Binop(
+               op_Sar,
+               IRExpr_Binop(op_Sub,mkU(stack_size-1),IRExpr_RdTmp(t1)),
+               mkU8(8 * VG_WORDSIZE - 1)
+            ),
+            mkU(0)
+         ),
+         Ijk_EmFail,
+         is64 ? IRConst_U64(0) : IRConst_U32(0)
+      )
+   );
+
+   /* guest_REDIR_SP = t1 */
+   addStmtToIRSB(bb, IRStmt_Put(offB_REDIR_SP, IRExpr_RdTmp(t1)));
+
+   /* guest_REDIR_STACK[t1+0] = e */
+   /* PutI/GetI have I32-typed indexes regardless of guest word size */
+   addStmtToIRSB(
+      bb, 
+      IRStmt_PutI(descr, narrowTo32(bb->tyenv,IRExpr_RdTmp(t1)), 0, e)
+   );
+}
+
+
+/* Generate code to pop a word-sized value from this thread's redir
+   stack, binding it to a new temporary, which is returned.  As with
+   gen_PUSH, an overflow check is also performed. */
+
+static IRTemp gen_POP ( IRSB* bb )
+{
+#  if defined(VGP_ppc64_linux) || defined(VGP_ppc64_aix5)
+   Int    stack_size       = VEX_GUEST_PPC64_REDIR_STACK_SIZE;
+   Int    offB_REDIR_SP    = offsetof(VexGuestPPC64State,guest_REDIR_SP);
+   Int    offB_REDIR_STACK = offsetof(VexGuestPPC64State,guest_REDIR_STACK);
+   Int    offB_EMWARN      = offsetof(VexGuestPPC64State,guest_EMWARN);
+   Bool   is64             = True;
+   IRType ty_Word          = Ity_I64;
+   IROp   op_CmpNE         = Iop_CmpNE64;
+   IROp   op_Sar           = Iop_Sar64;
+   IROp   op_Sub           = Iop_Sub64;
+   IRExpr*(*mkU)(ULong)    = mkU64;
+#  else
+   Int    stack_size       = VEX_GUEST_PPC32_REDIR_STACK_SIZE;
+   Int    offB_REDIR_SP    = offsetof(VexGuestPPC32State,guest_REDIR_SP);
+   Int    offB_REDIR_STACK = offsetof(VexGuestPPC32State,guest_REDIR_STACK);
+   Int    offB_EMWARN      = offsetof(VexGuestPPC32State,guest_EMWARN);
+   Bool   is64             = False;
+   IRType ty_Word          = Ity_I32;
+   IROp   op_CmpNE         = Iop_CmpNE32;
+   IROp   op_Sar           = Iop_Sar32;
+   IROp   op_Sub           = Iop_Sub32;
+   IRExpr*(*mkU)(UInt)     = mkU32;
+#  endif
+
+   IRRegArray* descr = mkIRRegArray( offB_REDIR_STACK, ty_Word, stack_size );
+   IRTemp      t1    = newIRTemp( bb->tyenv, ty_Word );
+   IRTemp      res   = newIRTemp( bb->tyenv, ty_Word );
+   IRExpr*     one   = mkU(1);
+
+   vg_assert(sizeof(void*) == VG_WORDSIZE);
+   vg_assert(sizeof(Word)  == VG_WORDSIZE);
+   vg_assert(sizeof(Addr)  == VG_WORDSIZE);
+
+   /* t1 = guest_REDIR_SP */
+   addStmtToIRSB(
+      bb, 
+      IRStmt_WrTmp( t1, IRExpr_Get( offB_REDIR_SP, ty_Word ) )
+   );
+
+   /* Bomb out if t1 < 0.  Same comments as gen_PUSH apply. */
+   addStmtToIRSB(
+      bb,
+      IRStmt_Put(offB_EMWARN, mkU32(EmWarn_PPC64_redir_underflow))
+   );
+   addStmtToIRSB(
+      bb,
+      IRStmt_Exit(
+         IRExpr_Binop(
+            op_CmpNE,
+            IRExpr_Binop(
+               op_Sar,
+               IRExpr_RdTmp(t1),
+               mkU8(8 * VG_WORDSIZE - 1)
+            ),
+            mkU(0)
+         ),
+         Ijk_EmFail,
+         is64 ? IRConst_U64(0) : IRConst_U32(0)
+      )
+   );
+
+   /* res = guest_REDIR_STACK[t1+0] */
+   /* PutI/GetI have I32-typed indexes regardless of guest word size */
+   addStmtToIRSB(
+      bb,
+      IRStmt_WrTmp(
+         res, 
+         IRExpr_GetI(descr, narrowTo32(bb->tyenv,IRExpr_RdTmp(t1)), 0)
+      )
+   );
+
+   /* guest_REDIR_SP = t1-1 */
+   addStmtToIRSB(
+      bb, 
+      IRStmt_Put(offB_REDIR_SP, IRExpr_Binop(op_Sub, IRExpr_RdTmp(t1), one))
+   );
+
+   return res;
+}
+
+/* Generate code to push LR and R2 onto this thread's redir stack,
+   then set R2 to the new value (which is the TOC pointer to be used
+   for the duration of the replacement function, as determined by
+   m_debuginfo), and set LR to the magic return stub, so we get to
+   intercept the return and restore R2 and L2 to the values saved
+   here. */
+
+static void gen_push_and_set_LR_R2 ( IRSB* bb, Addr64 new_R2_value )
+{
+#  if defined(VGP_ppc64_linux) || defined(VGP_ppc64_aix5)
+   Addr64 bogus_RA  = (Addr64)&VG_(ppctoc_magic_redirect_return_stub);
+   Int    offB_GPR2 = offsetof(VexGuestPPC64State,guest_GPR2);
+   Int    offB_LR   = offsetof(VexGuestPPC64State,guest_LR);
+   gen_PUSH( bb, IRExpr_Get(offB_LR,   Ity_I64) );
+   gen_PUSH( bb, IRExpr_Get(offB_GPR2, Ity_I64) );
+   addStmtToIRSB( bb, IRStmt_Put( offB_LR,   mkU64( bogus_RA )) );
+   addStmtToIRSB( bb, IRStmt_Put( offB_GPR2, mkU64( new_R2_value )) );
+
+#  elif defined(VGP_ppc32_aix5)
+   Addr32 bogus_RA  = (Addr32)&VG_(ppctoc_magic_redirect_return_stub);
+   Int    offB_GPR2 = offsetof(VexGuestPPC32State,guest_GPR2);
+   Int    offB_LR   = offsetof(VexGuestPPC32State,guest_LR);
+   gen_PUSH( bb, IRExpr_Get(offB_LR,   Ity_I32) );
+   gen_PUSH( bb, IRExpr_Get(offB_GPR2, Ity_I32) );
+   addStmtToIRSB( bb, IRStmt_Put( offB_LR,   mkU32( bogus_RA )) );
+   addStmtToIRSB( bb, IRStmt_Put( offB_GPR2, mkU32( new_R2_value )) );
+
+#  else
+#    error Platform is not TOC-afflicted, fortunately
+#  endif
+}
+
+static void gen_pop_R2_LR_then_bLR ( IRSB* bb )
+{
+#  if defined(VGP_ppc64_linux) || defined(VGP_ppc64_aix5)
+   Int    offB_GPR2 = offsetof(VexGuestPPC64State,guest_GPR2);
+   Int    offB_LR   = offsetof(VexGuestPPC64State,guest_LR);
+   IRTemp old_R2    = newIRTemp( bb->tyenv, Ity_I64 );
+   IRTemp old_LR    = newIRTemp( bb->tyenv, Ity_I64 );
+   /* Restore R2 */
+   old_R2 = gen_POP( bb );
+   addStmtToIRSB( bb, IRStmt_Put( offB_GPR2, IRExpr_RdTmp(old_R2)) );
+   /* Restore LR */
+   old_LR = gen_POP( bb );
+   addStmtToIRSB( bb, IRStmt_Put( offB_LR, IRExpr_RdTmp(old_LR)) );
+   /* Branch to LR */
+   /* re boring, we arrived here precisely because a wrapped fn did a
+      blr (hence Ijk_Ret); so we should just mark this jump as Boring,
+      else one _Call will have resulted in two _Rets. */
+   bb->jumpkind = Ijk_Boring;
+   bb->next = IRExpr_Binop(Iop_And64, IRExpr_RdTmp(old_LR), mkU64(~(3ULL)));
+
+#  elif defined(VGP_ppc32_aix5)
+   Int    offB_GPR2 = offsetof(VexGuestPPC32State,guest_GPR2);
+   Int    offB_LR   = offsetof(VexGuestPPC32State,guest_LR);
+   IRTemp old_R2    = newIRTemp( bb->tyenv, Ity_I32 );
+   IRTemp old_LR    = newIRTemp( bb->tyenv, Ity_I32 );
+   /* Restore R2 */
+   old_R2 = gen_POP( bb );
+   addStmtToIRSB( bb, IRStmt_Put( offB_GPR2, IRExpr_RdTmp(old_R2)) );
+   /* Restore LR */
+   old_LR = gen_POP( bb );
+   addStmtToIRSB( bb, IRStmt_Put( offB_LR, IRExpr_RdTmp(old_LR)) );
+
+   /* Branch to LR */
+   /* re boring, we arrived here precisely because a wrapped fn did a
+      blr (hence Ijk_Ret); so we should just mark this jump as Boring,
+      else one _Call will have resulted in two _Rets. */
+   bb->jumpkind = Ijk_Boring;
+   bb->next = IRExpr_Binop(Iop_And32, IRExpr_RdTmp(old_LR), mkU32(~3));
+
+#  else
+#    error Platform is not TOC-afflicted, fortunately
+#  endif
+}
+
+static
+Bool mk_preamble__ppctoc_magic_return_stub ( void* closureV, IRSB* bb )
+{
+   VgCallbackClosure* closure = (VgCallbackClosure*)closureV;
+   /* Since we're creating the entire IRSB right here, give it a
+      proper IMark, as it won't get one any other way, and cachegrind
+      will barf if it doesn't have one (fair enough really). */
+   addStmtToIRSB( bb, IRStmt_IMark( closure->readdr, 4 ) );
+   /* Generate the magic sequence:
+         pop R2 from hidden stack
+         pop LR from hidden stack
+         goto LR
+   */
+   gen_pop_R2_LR_then_bLR(bb);
+   return True; /* True == this is the entire BB; don't disassemble any
+                   real insns into it - just hand it directly to
+                   optimiser/instrumenter/backend. */
+}
+#endif
+
+/* --------------- END helpers for with-TOC platforms --------------- */
+
+
+/* This is the IR preamble generator used for replacement
+   functions.  It adds code to set the guest_NRADDR{_GPR2} to zero
+   (technically not necessary, but facilitates detecting mixups in
+   which a replacement function has been erroneously declared using
+   VG_REPLACE_FUNCTION_Z{U,Z} when instead it should have been written
+   using VG_WRAP_FUNCTION_Z{U,Z}).
+
+   On with-TOC platforms the follow hacks are also done: LR and R2 are
+   pushed onto a hidden stack, R2 is set to the correct value for the
+   replacement function, and LR is set to point at the magic
+   return-stub address.  Setting LR causes the return of the
+   wrapped/redirected function to lead to our magic return stub, which
+   restores LR and R2 from said stack and returns for real.
+
+   VG_(get_StackTrace2) understands that the LR value may point to the
+   return stub address, and that in that case it can get the real LR
+   value from the hidden stack instead. */
+static 
+Bool mk_preamble__set_NRADDR_to_zero ( void* closureV, IRSB* bb )
+{
+   Int nraddr_szB
+      = sizeof(((VexGuestArchState*)0)->guest_NRADDR);
+   vg_assert(nraddr_szB == 4 || nraddr_szB == 8);
+   vg_assert(nraddr_szB == VG_WORDSIZE);
+   addStmtToIRSB( 
+      bb,
+      IRStmt_Put( 
+         offsetof(VexGuestArchState,guest_NRADDR),
+         nraddr_szB == 8 ? mkU64(0) : mkU32(0)
+      )
+   );
+#  if defined(VG_PLAT_USES_PPCTOC)
+   { VgCallbackClosure* closure = (VgCallbackClosure*)closureV;
+     addStmtToIRSB(
+        bb,
+        IRStmt_Put(
+           offsetof(VexGuestArchState,guest_NRADDR_GPR2),
+           VG_WORDSIZE==8 ? mkU64(0) : mkU32(0)
+        )
+     );
+     gen_push_and_set_LR_R2 ( bb, VG_(get_tocptr)( closure->readdr ) );
+   }
+#  endif
+   return False;
+}
+
+/* Ditto, except set guest_NRADDR to nraddr (the un-redirected guest
+   address).  This is needed for function wrapping - so the wrapper
+   can read _NRADDR and find the address of the function being
+   wrapped.  On toc-afflicted platforms we must also snarf r2. */
+static 
+Bool mk_preamble__set_NRADDR_to_nraddr ( void* closureV, IRSB* bb )
+{
+   VgCallbackClosure* closure = (VgCallbackClosure*)closureV;
+   Int nraddr_szB
+      = sizeof(((VexGuestArchState*)0)->guest_NRADDR);
+   vg_assert(nraddr_szB == 4 || nraddr_szB == 8);
+   vg_assert(nraddr_szB == VG_WORDSIZE);
+   addStmtToIRSB( 
+      bb,
+      IRStmt_Put( 
+         offsetof(VexGuestArchState,guest_NRADDR),
+         nraddr_szB == 8
+            ? IRExpr_Const(IRConst_U64( closure->nraddr ))
+            : IRExpr_Const(IRConst_U32( (UInt)closure->nraddr ))
+      )
+   );
+#  if defined(VGP_ppc64_linux) || defined(VGP_ppc32_aix5) \
+                               || defined(VGP_ppc64_aix5)
+   addStmtToIRSB( 
+      bb,
+      IRStmt_Put( 
+         offsetof(VexGuestArchState,guest_NRADDR_GPR2),
+         IRExpr_Get(offsetof(VexGuestArchState,guest_GPR2), 
+                    VG_WORDSIZE==8 ? Ity_I64 : Ity_I32)
+      )
+   );
+   gen_push_and_set_LR_R2 ( bb, VG_(get_tocptr)( closure->readdr ) );
+#  endif
+   return False;
+}
+
+/* --- Helpers to do with PPC related stack redzones. --- */
+
+__attribute__((unused))
+static Bool const_True ( Addr64 guest_addr )
+{
+   return True;
+}
+
+__attribute__((unused))
+static Bool bl_RZ_zap_ok_for_AIX ( Addr64 bl_target )
+{
+   /* paranoia */
+   if (sizeof(void*) == 4)
+      bl_target &= 0xFFFFFFFFULL;
+
+   /* don't zap the redzone for calls to millicode. */
+   if (bl_target < 0x10000ULL)
+      return False;
+
+   /* don't zap the redzone for calls to .$SAVEF14 .. .$SAVEF31.
+      First we need to be reasonably sure we won't segfault by looking
+      at the branch target. */
+   { NSegment const*const seg = VG_(am_find_nsegment)( (Addr)bl_target );
+     if (seg && seg->hasR) {
+        switch ( *(UInt*)(Addr)bl_target ) {
+           case 0xd9c1ff70: /* stfd f14,-144(r1) */
+           case 0xd9e1ff78: /* stfd f15,-136(r1) */
+           case 0xda01ff80: /* stfd f16,-128(r1) */
+           case 0xda21ff88: /* stfd f17,-120(r1) */
+           case 0xda41ff90: /* stfd f18,-112(r1) */
+           case 0xda61ff98: /* stfd f19,-104(r1) */
+           case 0xda81ffa0: /* stfd f20,-96(r1) */
+           case 0xdaa1ffa8: /* stfd f21,-88(r1) */
+           case 0xdac1ffb0: /* stfd f22,-80(r1) */
+           case 0xdae1ffb8: /* stfd f23,-72(r1) */
+           case 0xdb01ffc0: /* stfd f24,-64(r1) */
+           case 0xdb21ffc8: /* stfd f25,-56(r1) */
+           case 0xdb41ffd0: /* stfd f26,-48(r1) */
+           case 0xdb61ffd8: /* stfd f27,-40(r1) */
+           case 0xdb81ffe0: /* stfd f28,-32(r1) */
+           case 0xdba1ffe8: /* stfd f29,-24(r1) */
+           case 0xdbc1fff0: /* stfd f30,-16(r1) */
+           case 0xdbe1fff8: /* stfd f31,-8(r1) */
+              return False;
+        }
+     }
+   }
+   return True;
+}
+
+/* --------------- main translation function --------------- */
+
+/* Note: see comments at top of m_redir.c for the Big Picture on how
+   redirections are managed. */
+
+typedef 
+   enum {
+      /* normal translation, redir neither requested nor inhibited */
+      T_Normal, 
+      /* redir translation, function-wrap (set _NRADDR) style */
+      T_Redir_Wrap,
+      /* redir translation, replacement (don't set _NRADDR) style */
+      T_Redir_Replace,
+      /* a translation in which redir is specifically disallowed */
+      T_NoRedir
+   }
+   T_Kind;
+
+/* Translate the basic block beginning at NRADDR, and add it to the
+   translation cache & translation table.  Unless
+   DEBUGGING_TRANSLATION is true, in which case the call is being done
+   for debugging purposes, so (a) throw away the translation once it
+   is made, and (b) produce a load of debugging output.  If
+   ALLOW_REDIRECTION is False, do not attempt redirection of NRADDR,
+   and also, put the resulting translation into the no-redirect tt/tc
+   instead of the normal one.
+
+   TID is the identity of the thread requesting this translation.
+*/
+
 Bool VG_(translate) ( ThreadId tid, 
-                      Addr64   orig_addr,
+                      Addr64   nraddr,
                       Bool     debugging_translation,
                       Int      debugging_verbosity,
-                      ULong    bbs_done )
+                      ULong    bbs_done,
+                      Bool     allow_redirection )
 {
-   Addr64             redir, orig_addr_noredir = orig_addr;
+   Addr64             addr;
+   T_Kind             kind;
    Int                tmpbuf_used, verbosity, i;
    Bool               notrace_until_done, do_self_check;
    UInt               notrace_until_limit = 0;
-   NSegment*          seg;
+   Bool (*preamble_fn)(void*,IRSB*);
    VexArch            vex_arch;
    VexArchInfo        vex_archinfo;
+   VexAbiInfo         vex_abiinfo;
    VexGuestExtents    vge;
+   VexTranslateArgs   vta;
    VexTranslateResult tres;
+   VgCallbackClosure  closure;
 
    /* Make sure Vex is initialised right. */
 
@@ -469,28 +1192,44 @@ Bool VG_(translate) ( ThreadId tid,
       vex_init_done = True;
    }
 
-   /* profiling ... */
-   VGP_PUSHCC(VgpTranslate);
+   /* Establish the translation kind and actual guest address to
+      start from.  Sets (addr,kind). */
+   if (allow_redirection) {
+      Bool isWrap;
+      Addr64 tmp = VG_(redir_do_lookup)( nraddr, &isWrap );
+      if (tmp == nraddr) {
+         /* no redirection found */
+         addr = nraddr;
+         kind = T_Normal;
+      } else {
+         /* found a redirect */
+         addr = tmp;
+         kind = isWrap ? T_Redir_Wrap : T_Redir_Replace;
+      }
+   } else {
+      addr = nraddr;
+      kind = T_NoRedir;
+   }
 
-   /* Look in the code redirect table to see if we should
-      translate an alternative address for orig_addr. */
-   redir = VG_(code_redirect)(orig_addr);
+   /* Established: (nraddr, addr, kind) */
 
-   if (redir != orig_addr && VG_(clo_verbosity) >= 2) {
+   /* Printing redirection info. */
+
+   if ((kind == T_Redir_Wrap || kind == T_Redir_Replace)
+       && (VG_(clo_verbosity) >= 2 || VG_(clo_trace_redir))) {
       Bool ok;
       Char name1[64] = "";
       Char name2[64] = "";
       name1[0] = name2[0] = 0;
-      ok = VG_(get_fnname_w_offset)(orig_addr, name1, 64);
+      ok = VG_(get_fnname_w_offset)(nraddr, name1, 64);
       if (!ok) VG_(strcpy)(name1, "???");
-      ok = VG_(get_fnname_w_offset)(redir, name2, 64);
+      ok = VG_(get_fnname_w_offset)(addr, name2, 64);
       if (!ok) VG_(strcpy)(name2, "???");
       VG_(message)(Vg_DebugMsg, 
                    "REDIR: 0x%llx (%s) redirected to 0x%llx (%s)",
-                   orig_addr, name1,
-                   redir, name2 );
+                   nraddr, name1,
+                   addr, name2 );
    }
-   orig_addr = redir;
 
    /* If codegen tracing, don't start tracing until
       notrace_until_limit blocks have gone by.  This avoids printing
@@ -503,55 +1242,45 @@ Bool VG_(translate) ( ThreadId tid,
 
    if (!debugging_translation)
       VG_TRACK( pre_mem_read, Vg_CoreTranslate, 
-                              tid, "(translator)", orig_addr, 1 );
+                              tid, "(translator)", addr, 1 );
 
    /* If doing any code printing, print a basic block start marker */
    if (VG_(clo_trace_flags) || debugging_translation) {
       Char fnname[64] = "";
-      VG_(get_fnname_w_offset)(orig_addr, fnname, 64);
+      VG_(get_fnname_w_offset)(addr, fnname, 64);
       VG_(printf)(
               "==== BB %d %s(0x%llx) BBs exec'd %lld ====\n",
-              VG_(get_bbs_translated)(), fnname, orig_addr, 
+              VG_(get_bbs_translated)(), fnname, addr, 
               bbs_done);
    }
 
    /* Are we allowed to translate here? */
 
-   seg = VG_(am_find_nsegment)(orig_addr);
+   { /* BEGIN new scope specially for 'seg' */
+   NSegment const* seg = VG_(am_find_nsegment)(addr);
 
-   if (!translations_allowable_from_seg(seg)) {
+   if ( (!translations_allowable_from_seg(seg))
+        || addr == TRANSTAB_BOGUS_GUEST_ADDR ) {
+      if (VG_(clo_trace_signals))
+         VG_(message)(Vg_DebugMsg, "translations not allowed here (0x%llx)"
+                                   " - throwing SEGV", addr);
       /* U R busted, sonny.  Place your hands on your head and step
          away from the orig_addr. */
       /* Code address is bad - deliver a signal instead */
       if (seg != NULL) {
          /* There's some kind of segment at the requested place, but we
             aren't allowed to execute code here. */
-         VG_(synth_fault_perms)(tid, orig_addr);
+         VG_(synth_fault_perms)(tid, addr);
       } else {
         /* There is no segment at all; we are attempting to execute in
            the middle of nowhere. */
-         VG_(synth_fault_mapping)(tid, orig_addr);
+         VG_(synth_fault_mapping)(tid, addr);
       }
       return False;
    }
 
    /* Do we want a self-checking translation? */
-   do_self_check = False;
-   switch (VG_(clo_smc_check)) {
-      case Vg_SmcNone:  do_self_check = False; break;
-      case Vg_SmcAll:   do_self_check = True;  break;
-      case Vg_SmcStack: 
-         /* XXXYYYZZZ: must match the logic at AAABBBCCC above */
-         do_self_check
-            /* = seg ? toBool(seg->flags & SF_GROWDOWN) : False; */
-            = seg 
-              ? (seg->start <= VG_(get_SP)(tid)
-                 && VG_(get_SP)(tid)+sizeof(Word)-1 <= seg->end)
-              : False;
-         break;
-      default: 
-         vg_assert2(0, "unknown VG_(clo_smc_check) value");
-   }
+   do_self_check = self_check_required( seg, tid );
 
    /* True if a debug trans., or if bit N set in VG_(clo_trace_codegen). */
    verbosity = 0;
@@ -564,8 +1293,28 @@ Bool VG_(translate) ( ThreadId tid,
       verbosity = VG_(clo_trace_flags);
    }
 
-   VGP_PUSHCC(VgpVexTime);
-   
+   /* Figure out which preamble-mangling callback to send. */
+   preamble_fn = NULL;
+   if (kind == T_Redir_Replace)
+      preamble_fn = mk_preamble__set_NRADDR_to_zero;
+   else 
+   if (kind == T_Redir_Wrap)
+      preamble_fn = mk_preamble__set_NRADDR_to_nraddr;
+
+#  if defined(VG_PLAT_USES_PPCTOC)
+   if (ULong_to_Ptr(nraddr)
+       == (void*)&VG_(ppctoc_magic_redirect_return_stub)) {
+      /* If entering the special return stub, this means a wrapped or
+         redirected function is returning.  Make this translation one
+         which restores R2 and LR from the thread's hidden redir
+         stack, and branch to the (restored) link register, thereby
+         really causing the function to return. */
+      vg_assert(kind == T_Normal);
+      vg_assert(nraddr == addr);
+      preamble_fn = mk_preamble__ppctoc_magic_return_stub;
+   }
+#  endif
+
    /* ------ Actually do the translation. ------ */
    tl_assert2(VG_(tdict).tool_instrument,
               "you forgot to set VgToolInterface function 'tool_instrument'");
@@ -573,46 +1322,118 @@ Bool VG_(translate) ( ThreadId tid,
    /* Get the CPU info established at startup. */
    VG_(machine_get_VexArchInfo)( &vex_arch, &vex_archinfo );
 
-   /* Set up closure arg for "chase_into_ok" */
-   chase_into_ok__CLOSURE_tid = tid;
+   /* Set up 'abiinfo' structure with stuff Vex needs to know about
+      the guest and host ABIs. */
 
-   tres = LibVEX_Translate ( 
-             vex_arch, &vex_archinfo,
-             vex_arch, &vex_archinfo,
-             (UChar*)ULong_to_Ptr(orig_addr), 
-             (Addr64)orig_addr, 
-             (Addr64)orig_addr_noredir, 
-             chase_into_ok,
-             &vge,
-             tmpbuf, N_TMPBUF, &tmpbuf_used,
-             VG_(tdict).tool_instrument,
-             need_to_handle_SP_assignment()
-                ? vg_SP_update_pass
-                : NULL,
-             True, /* cleanup after instrumentation */
-             do_self_check,
-             NULL,
-             verbosity
-          );
+   LibVEX_default_VexAbiInfo( &vex_abiinfo );
+   vex_abiinfo.guest_stack_redzone_size = VG_STACK_REDZONE_SZB;
+
+#  if defined(VGP_ppc32_linux)
+   vex_abiinfo.guest_ppc_zap_RZ_at_blr        = False;
+   vex_abiinfo.guest_ppc_zap_RZ_at_bl         = NULL;
+   vex_abiinfo.host_ppc32_regalign_int64_args = True;
+#  endif
+#  if defined(VGP_ppc64_linux)
+   vex_abiinfo.guest_ppc_zap_RZ_at_blr        = True;
+   vex_abiinfo.guest_ppc_zap_RZ_at_bl         = const_True;
+   vex_abiinfo.host_ppc_calls_use_fndescrs    = True;
+#  endif
+#  if defined(VGP_ppc32_aix5) || defined(VGP_ppc64_aix5)
+   vex_abiinfo.guest_ppc_zap_RZ_at_blr        = False;
+   vex_abiinfo.guest_ppc_zap_RZ_at_bl         = bl_RZ_zap_ok_for_AIX;
+   vex_abiinfo.guest_ppc_sc_continues_at_LR   = True;
+   vex_abiinfo.host_ppc_calls_use_fndescrs    = True;
+#  endif
+
+   /* Set up closure args. */
+   closure.tid    = tid;
+   closure.nraddr = nraddr;
+   closure.readdr = addr;
+
+   /* Set up args for LibVEX_Translate. */
+   vta.arch_guest       = vex_arch;
+   vta.archinfo_guest   = vex_archinfo;
+   vta.arch_host        = vex_arch;
+   vta.archinfo_host    = vex_archinfo;
+   vta.abiinfo_both     = vex_abiinfo;
+   vta.guest_bytes      = (UChar*)ULong_to_Ptr(addr);
+   vta.guest_bytes_addr = (Addr64)addr;
+   vta.callback_opaque  = (void*)&closure;
+   vta.chase_into_ok    = chase_into_ok;
+   vta.preamble_function = preamble_fn;
+   vta.guest_extents    = &vge;
+   vta.host_bytes       = tmpbuf;
+   vta.host_bytes_size  = N_TMPBUF;
+   vta.host_bytes_used  = &tmpbuf_used;
+   { /* At this point we have to reconcile Vex's view of the
+        instrumentation callback - which takes a void* first argument
+        - with Valgrind's view, in which the first arg is a
+        VgCallbackClosure*.  Hence the following longwinded casts.
+        They are entirely legal but longwinded so as to maximise the
+        chance of the C typechecker picking up any type snafus. */
+     IRSB*(*f)(VgCallbackClosure*,
+               IRSB*,VexGuestLayout*,VexGuestExtents*,
+               IRType,IRType)
+       = VG_(tdict).tool_instrument;
+     IRSB*(*g)(void*,
+               IRSB*,VexGuestLayout*,VexGuestExtents*,
+               IRType,IRType)
+       = (IRSB*(*)(void*,IRSB*,VexGuestLayout*,VexGuestExtents*,IRType,IRType))f;
+     vta.instrument1    = g;
+   }
+   /* No need for type kludgery here. */
+   vta.instrument2      = need_to_handle_SP_assignment()
+                             ? vg_SP_update_pass
+                             : NULL;
+   vta.finaltidy        = VG_(needs).final_IR_tidy_pass
+                             ? VG_(tdict).tool_final_IR_tidy_pass
+                             : NULL;
+   vta.do_self_check    = do_self_check;
+   vta.traceflags       = verbosity;
+
+   /* Set up the dispatch-return info.  For archs without a link
+      register, vex generates a jump back to the specified dispatch
+      address.  Else, it just generates a branch-to-LR. */
+#  if defined(VGA_x86) || defined(VGA_amd64)
+   vta.dispatch 
+      = (!allow_redirection)
+        ? /* It's a no-redir translation.  Will be run with the nonstandard
+           dispatcher VG_(run_a_noredir_translation)
+           and so needs a nonstandard return point. */
+          (void*) &VG_(run_a_noredir_translation__return_point)
+
+        : /* normal translation.  Uses VG_(run_innerloop).  Return
+             point depends on whether we're profiling bbs or not. */
+          VG_(clo_profile_flags) > 0
+          ? (void*) &VG_(run_innerloop__dispatch_profiled)
+          : (void*) &VG_(run_innerloop__dispatch_unprofiled);
+#  elif defined(VGA_ppc32) || defined(VGA_ppc64)
+   vta.dispatch = NULL;
+#  else
+#    error "Unknown arch"
+#  endif
+
+   /* Sheesh.  Finally, actually _do_ the translation! */
+   tres = LibVEX_Translate ( &vta );
 
    vg_assert(tres == VexTransOK);
    vg_assert(tmpbuf_used <= N_TMPBUF);
    vg_assert(tmpbuf_used > 0);
 
-   VGP_POPCC(VgpVexTime);
-
    /* Tell aspacem of all segments that have had translations taken
       from them.  Optimisation: don't re-look up vge.base[0] since seg
       should already point to it. */
 
-   vg_assert( vge.base[0] == (Addr64)orig_addr );
-   if (seg->kind == SkFileC || seg->kind == SkAnonC)
-      seg->hasT = True; /* has cached code */
+   vg_assert( vge.base[0] == (Addr64)addr );
+   /* set 'translations taken from this segment' flag */
+   VG_(am_set_segment_hasT_if_SkFileC_or_SkAnonC)( (NSegment*)seg );
+   } /* END new scope specially for 'seg' */
 
    for (i = 1; i < vge.n_used; i++) {
-      seg = VG_(am_find_nsegment)( vge.base[i] );
-      if (seg->kind == SkFileC || seg->kind == SkAnonC)
-         seg->hasT = True; /* has cached code */
+      NSegment const* seg 
+         = VG_(am_find_nsegment)( vge.base[i] );
+      /* set 'translations taken from this segment' flag */
+      VG_(am_set_segment_hasT_if_SkFileC_or_SkAnonC)( (NSegment*)seg );
    }
 
    /* Copy data at trans_addr into the translation cache. */
@@ -621,16 +1442,26 @@ Bool VG_(translate) ( ThreadId tid,
    // If debugging, don't do anything with the translated block;  we
    // only did this for the debugging output produced along the way.
    if (!debugging_translation) {
-      // Note that we use orig_addr_noredir, not orig_addr, which
-      // might have been changed by the redirection
-      VG_(add_to_transtab)( &vge,
-                            orig_addr_noredir,
-                            (Addr)(&tmpbuf[0]), 
-                            tmpbuf_used,
-                            do_self_check );
-   }
 
-   VGP_POPCC(VgpTranslate);
+      if (kind != T_NoRedir) {
+          // Put it into the normal TT/TC structures.  This is the
+          // normal case.
+
+          // Note that we use nraddr (the non-redirected address), not
+          // addr, which might have been changed by the redirection
+          VG_(add_to_transtab)( &vge,
+                                nraddr,
+                                (Addr)(&tmpbuf[0]), 
+                                tmpbuf_used,
+                                do_self_check );
+      } else {
+          VG_(add_to_unredir_transtab)( &vge,
+                                        nraddr,
+                                        (Addr)(&tmpbuf[0]), 
+                                        tmpbuf_used,
+                                        do_self_check );
+      }
+   }
 
    return True;
 }
@@ -638,4 +1469,3 @@ Bool VG_(translate) ( ThreadId tid,
 /*--------------------------------------------------------------------*/
 /*--- end                                                          ---*/
 /*--------------------------------------------------------------------*/
-

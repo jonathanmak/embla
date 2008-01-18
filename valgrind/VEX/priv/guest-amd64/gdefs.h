@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2005 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -57,13 +57,16 @@
 /* Convert one amd64 insn to IR.  See the type DisOneInstrFn in
    bb_to_IR.h. */
 extern
-DisResult disInstr_AMD64 ( IRBB*        irbb,
+DisResult disInstr_AMD64 ( IRSB*        irbb,
                            Bool         put_IP,
-                           Bool         (*resteerOkFn) ( Addr64 ),
+                           Bool         (*resteerOkFn) ( void*, Addr64 ),
+                           void*        callback_opaque,
                            UChar*       guest_code,
                            Long         delta,
                            Addr64       guest_IP,
+                           VexArch      guest_arch,
                            VexArchInfo* archinfo,
+                           VexAbiInfo*  abiinfo,
                            Bool         host_bigendian );
 
 /* Used by the optimiser to specialise calls to helpers. */
@@ -109,6 +112,10 @@ extern ULong amd64g_calculate_RCR  (
                 ULong arg, ULong rot_amt, ULong rflags_in, Long sz 
              );
 
+extern ULong amd64g_calculate_RCL  ( 
+                ULong arg, ULong rot_amt, ULong rflags_in, Long sz 
+             );
+
 extern ULong amd64g_check_fldcw ( ULong fpucw );
 
 extern ULong amd64g_create_fpucw ( ULong fpround );
@@ -147,7 +154,13 @@ extern void  amd64g_dirtyhelper_CPUID ( VexGuestAMD64State* st );
 
 extern void  amd64g_dirtyhelper_FINIT ( VexGuestAMD64State* );
 
+extern void  amd64g_dirtyhelper_FXSAVE ( VexGuestAMD64State*, HWord );
+
 extern ULong amd64g_dirtyhelper_RDTSC ( void );
+
+extern ULong amd64g_dirtyhelper_IN  ( ULong portno, ULong sz/*1,2 or 4*/ );
+extern void  amd64g_dirtyhelper_OUT ( ULong portno, ULong data, 
+                                      ULong sz/*1,2 or 4*/ );
 
 //extern void  amd64g_dirtyhelper_CPUID_sse0 ( VexGuestAMD64State* );
 //extern void  amd64g_dirtyhelper_CPUID_sse1 ( VexGuestAMD64State* );
@@ -163,7 +176,6 @@ extern ULong amd64g_dirtyhelper_RDTSC ( void );
 //extern VexEmWarn 
 //            amd64g_dirtyhelper_FLDENV ( VexGuestAMD64State*, HWord );
 
-//extern void  amd64g_dirtyhelper_FXSAVE ( VexGuestAMD64State*, HWord );
 
 
 /*---------------------------------------------------------*/
@@ -178,12 +190,12 @@ extern ULong amd64g_dirtyhelper_RDTSC ( void );
 #define AMD64G_CC_SHIFT_C   0
 #define AMD64G_CC_SHIFT_P   2
 
-#define AMD64G_CC_MASK_O    (1 << AMD64G_CC_SHIFT_O)
-#define AMD64G_CC_MASK_S    (1 << AMD64G_CC_SHIFT_S)
-#define AMD64G_CC_MASK_Z    (1 << AMD64G_CC_SHIFT_Z)
-#define AMD64G_CC_MASK_A    (1 << AMD64G_CC_SHIFT_A)
-#define AMD64G_CC_MASK_C    (1 << AMD64G_CC_SHIFT_C)
-#define AMD64G_CC_MASK_P    (1 << AMD64G_CC_SHIFT_P)
+#define AMD64G_CC_MASK_O    (1ULL << AMD64G_CC_SHIFT_O)
+#define AMD64G_CC_MASK_S    (1ULL << AMD64G_CC_SHIFT_S)
+#define AMD64G_CC_MASK_Z    (1ULL << AMD64G_CC_SHIFT_Z)
+#define AMD64G_CC_MASK_A    (1ULL << AMD64G_CC_SHIFT_A)
+#define AMD64G_CC_MASK_C    (1ULL << AMD64G_CC_SHIFT_C)
+#define AMD64G_CC_MASK_P    (1ULL << AMD64G_CC_SHIFT_P)
 
 /* FPU flag masks */
 #define AMD64G_FC_SHIFT_C3   14
@@ -191,10 +203,10 @@ extern ULong amd64g_dirtyhelper_RDTSC ( void );
 #define AMD64G_FC_SHIFT_C1   9
 #define AMD64G_FC_SHIFT_C0   8
 
-#define AMD64G_FC_MASK_C3    (1 << AMD64G_FC_SHIFT_C3)
-#define AMD64G_FC_MASK_C2    (1 << AMD64G_FC_SHIFT_C2)
-#define AMD64G_FC_MASK_C1    (1 << AMD64G_FC_SHIFT_C1)
-#define AMD64G_FC_MASK_C0    (1 << AMD64G_FC_SHIFT_C0)
+#define AMD64G_FC_MASK_C3    (1ULL << AMD64G_FC_SHIFT_C3)
+#define AMD64G_FC_MASK_C2    (1ULL << AMD64G_FC_SHIFT_C2)
+#define AMD64G_FC_MASK_C1    (1ULL << AMD64G_FC_SHIFT_C1)
+#define AMD64G_FC_MASK_C0    (1ULL << AMD64G_FC_SHIFT_C0)
 
 
 /* %RFLAGS thunk descriptors.  A four-word thunk is used to record

@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2005 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -50,7 +50,7 @@
 
 /* This defines stuff needed by the guest insn disassemblers.
    It's a bit circular; is imported by
-   - the guest-specific toIR.c files (guest-{x86,amd64,ppc32,arm}/toIR.c)
+   - the guest-specific toIR.c files (guest-{x86,amd64,ppc,arm}/toIR.c)
    - the generic disassembly driver (bb_to_IR.c)
    - vex_main.c
 */
@@ -116,15 +116,19 @@ typedef
 
    DisResult (*DisOneInstrFn) ( 
 
-      /* This is the IRBB to which the resulting IR is to be appended. */
-      /*OUT*/ IRBB*        irbb,
+      /* This is the IRSB to which the resulting IR is to be appended. */
+      /*OUT*/ IRSB*        irbb,
 
       /* Do we need to generate IR to set the guest IP for this insn,
          or not? */
       /*IN*/  Bool         put_IP,
 
       /* Return True iff resteering to the given addr is allowed */
-      /*IN*/  Bool         (*resteerOkFn) ( Addr64 ),
+      /*IN*/  Bool         (*resteerOkFn) ( /*opaque*/void*, Addr64 ),
+
+      /* Vex-opaque data passed to all caller (valgrind) supplied
+         callbacks. */
+      /*IN*/  void*        callback_opaque,
 
       /* Where is the guest code? */
       /*IN*/  UChar*       guest_code,
@@ -136,7 +140,11 @@ typedef
       /*IN*/  Addr64       guest_IP,
 
       /* Info about the guest architecture */
+      /*IN*/  VexArch      guest_arch,
       /*IN*/  VexArchInfo* archinfo,
+
+      /* ABI info for both guest and host */
+      /*IN*/  VexAbiInfo*  abiinfo,
 
       /* Is the host bigendian? */
       /*IN*/  Bool         host_bigendian
@@ -150,15 +158,19 @@ typedef
 
 /* See detailed comment in bb_to_IR.c. */
 extern
-IRBB* bb_to_IR ( /*OUT*/VexGuestExtents* vge,
+IRSB* bb_to_IR ( /*OUT*/VexGuestExtents* vge,
+                 /*IN*/ void*            closure_opaque,
                  /*IN*/ DisOneInstrFn    dis_instr_fn,
                  /*IN*/ UChar*           guest_code,
                  /*IN*/ Addr64           guest_IP_bbstart,
-                 /*IN*/ Bool             (*chase_into_ok)(Addr64),
+                 /*IN*/ Bool             (*chase_into_ok)(void*,Addr64),
                  /*IN*/ Bool             host_bigendian,
+                 /*IN*/ VexArch          arch_guest,
                  /*IN*/ VexArchInfo*     archinfo_guest,
+                 /*IN*/ VexAbiInfo*      abiinfo_both,
                  /*IN*/ IRType           guest_word_type,
                  /*IN*/ Bool             do_self_check,
+                 /*IN*/ Bool             (*preamble_function)(void*,IRSB*),
                  /*IN*/ Int              offB_TISTART,
                  /*IN*/ Int              offB_TILEN );
 

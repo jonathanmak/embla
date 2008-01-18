@@ -27,12 +27,28 @@
 #define OFFSET_amd64_RIP 168
 
 #define OFFSET_ppc32_GPR0        0
+#define OFFSET_ppc32_GPR2        8
 #define OFFSET_ppc32_GPR3       12
 #define OFFSET_ppc32_GPR4       16
 #define OFFSET_ppc32_GPR5       20
 #define OFFSET_ppc32_GPR6       24
 #define OFFSET_ppc32_GPR7       28
 #define OFFSET_ppc32_GPR8       32
+#define OFFSET_ppc32_GPR9       36
+#define OFFSET_ppc32_GPR10      40
 #define OFFSET_ppc32_CIA       896
 #define OFFSET_ppc32_CR0_0     913
+
+#define OFFSET_ppc64_GPR0        0
+#define OFFSET_ppc64_GPR2       16
+#define OFFSET_ppc64_GPR3       24
+#define OFFSET_ppc64_GPR4       32
+#define OFFSET_ppc64_GPR5       40
+#define OFFSET_ppc64_GPR6       48
+#define OFFSET_ppc64_GPR7       56
+#define OFFSET_ppc64_GPR8       64
+#define OFFSET_ppc64_GPR9       72
+#define OFFSET_ppc64_GPR10      80
+#define OFFSET_ppc64_CIA      1024
+#define OFFSET_ppc64_CR0_0    1053
 

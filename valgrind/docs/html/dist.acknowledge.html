@@ -1,9 +1,9 @@
-<html xmlns:cf="http://docbook.sourceforge.net/xmlns/chunkfast/1.0">
+<html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
 <title>1. ACKNOWLEDGEMENTS</title>
 <link rel="stylesheet" href="vg_basic.css" type="text/css">
-<meta name="generator" content="DocBook XSL Stylesheets V1.69.0">
+<meta name="generator" content="DocBook XSL Stylesheets V1.69.1">
 <link rel="start" href="index.html" title="Valgrind Documentation">
 <link rel="up" href="dist.html" title="Valgrind Distribution Documents">
 <link rel="prev" href="dist.html" title="Valgrind Distribution Documents">
@@ -29,13 +29,14 @@ dynamic-translation framework.<br>
 <br>
 Jeremy Fitzhardinge, jeremy@valgrind.org<br>
 <br>
-Jeremy wrote Helgrind and totally overhauled low-level syscall/signal<br>
-and address space layout stuff, among many other improvements.<br>
+Jeremy wrote Helgrind (in the 2.X line) and totally overhauled<br>
+low-level syscall/signal and address space layout stuff, among many<br>
+other improvements.<br>
 <br>
 Tom Hughes, tom@valgrind.org<br>
 <br>
 Tom did a vast number of bug fixes, and helped out with support for<br>
-more recent Linux/glibc versions.<br>
+more recent Linux/glibc versions, and set up the present build system.<br>
 <br>
 Nicholas Nethercote, njn@valgrind.org<br>
 <br>
@@ -61,8 +62,8 @@ Keeper of the very excellent http://www.valgrind.org.<br>
 Julian Seward, julian@valgrind.org<br>
 <br>
 Julian was the original designer and author of Valgrind, created the<br>
-dynamic translation framework, wrote Memcheck and Addrcheck, and did<br>
-lots of other things.<br>
+dynamic translation framework, wrote Memcheck and 3.3.X Helgrind, and<br>
+did lots of other things.<br>
 <br>
 Robert Walsh, rjwalsh@valgrind.org<br>
 <br>
@@ -70,14 +71,27 @@ Robert added file descriptor leakage checking, new library<br>
 interception machinery, support for client allocation pools, and minor<br>
 other tweakage.<br>
 <br>
+Josef Weidendorfer, Josef.Weidendorfer@gmx.de.<br>
+<br>
+Josef wrote Callgrind and the associated KCachegrind GUI.<br>
+<br>
+Omega was written by Bryan Meredith and is maintained by Rich Coe.<br>
+DRD was written by and is maintained by Bart Van Assche.<br>
 <br>
 Frederic Gobry helped with autoconf and automake.  Daniel Berlin<br>
 modified readelf's dwarf2 source line reader, written by Nick Clifton,<br>
 for use in Valgrind.  Michael Matz and Simon Hausmann modified the GNU<br>
 binutils demangler(s) for use in Valgrind.<br>
 <br>
-And lots and lots of other people sent bug reports, patches, and very<br>
-helpful feedback.<br>
+David Woodhouse and Tom Hughes have helped out with test and build<br>
+machines over the course of many releases.<br>
+<br>
+Many, many people sent bug reports, patches, and helpful feedback.<br>
+<br>
+Development of Valgrind was supported in part by the Tri-Lab Partners<br>
+(Lawrence Livermore National Laboratory, Los Alamos National<br>
+Laboratory, and Sandia National Laboratories) of the U.S. Department<br>
+of Energy's Advanced Simulation &amp; Computing (ASC) Program.<br>
 <br>
     </p></div>
 </div>

@@ -36,11 +36,16 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+@BUILD_SSE3_TESTS_TRUE@am__append_1 = insn_sse3
 check_PROGRAMS = badseg$(EXEEXT) bt_everything$(EXEEXT) \
-	bt_literal$(EXEEXT) cmpxchg8b$(EXEEXT) cpuid$(EXEEXT) \
-	faultstatus$(EXEEXT) fpu_lazy_eflags$(EXEEXT) fxtract$(EXEEXT) \
-	getseg$(EXEEXT) incdec_alt$(EXEEXT) $(am__EXEEXT_1) \
-	lahf$(EXEEXT) looper$(EXEEXT) int$(EXEEXT) pushpopseg$(EXEEXT) \
+	bt_literal$(EXEEXT) bug125959-x86$(EXEEXT) \
+	bug126147-x86$(EXEEXT) bug132813-x86$(EXEEXT) \
+	bug135421-x86$(EXEEXT) bug137714-x86$(EXEEXT) \
+	cmpxchg8b$(EXEEXT) cpuid$(EXEEXT) cse_fail$(EXEEXT) \
+	faultstatus$(EXEEXT) fcmovnu$(EXEEXT) fpu_lazy_eflags$(EXEEXT) \
+	fxtract$(EXEEXT) getseg$(EXEEXT) incdec_alt$(EXEEXT) \
+	$(am__EXEEXT_2) jcxz$(EXEEXT) lahf$(EXEEXT) looper$(EXEEXT) \
+	movx$(EXEEXT) int$(EXEEXT) pushpopseg$(EXEEXT) \
 	sbbmisc$(EXEEXT) seg_override$(EXEEXT) sigcontext$(EXEEXT) \
 	smc1$(EXEEXT) yield$(EXEEXT)
 subdir = none/tests/x86
@@ -52,9 +57,10 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
-am__EXEEXT_1 = insn_basic$(EXEEXT) insn_fpu$(EXEEXT) \
+@BUILD_SSE3_TESTS_TRUE@am__EXEEXT_1 = insn_sse3$(EXEEXT)
+am__EXEEXT_2 = insn_basic$(EXEEXT) insn_fpu$(EXEEXT) \
 	insn_cmov$(EXEEXT) insn_mmx$(EXEEXT) insn_mmxext$(EXEEXT) \
-	insn_sse$(EXEEXT) insn_sse2$(EXEEXT)
+	insn_sse$(EXEEXT) insn_sse2$(EXEEXT) $(am__EXEEXT_1)
 badseg_SOURCES = badseg.c
 badseg_OBJECTS = badseg.$(OBJEXT)
 badseg_LDADD = $(LDADD)
@@ -64,15 +70,36 @@ bt_everything_LDADD = $(LDADD)
 bt_literal_SOURCES = bt_literal.c
 bt_literal_OBJECTS = bt_literal.$(OBJEXT)
 bt_literal_LDADD = $(LDADD)
+bug125959_x86_SOURCES = bug125959-x86.c
+bug125959_x86_OBJECTS = bug125959-x86.$(OBJEXT)
+bug125959_x86_LDADD = $(LDADD)
+bug126147_x86_SOURCES = bug126147-x86.c
+bug126147_x86_OBJECTS = bug126147-x86.$(OBJEXT)
+bug126147_x86_LDADD = $(LDADD)
+bug132813_x86_SOURCES = bug132813-x86.c
+bug132813_x86_OBJECTS = bug132813-x86.$(OBJEXT)
+bug132813_x86_LDADD = $(LDADD)
+bug135421_x86_SOURCES = bug135421-x86.c
+bug135421_x86_OBJECTS = bug135421-x86.$(OBJEXT)
+bug135421_x86_LDADD = $(LDADD)
+bug137714_x86_SOURCES = bug137714-x86.c
+bug137714_x86_OBJECTS = bug137714-x86.$(OBJEXT)
+bug137714_x86_LDADD = $(LDADD)
 cmpxchg8b_SOURCES = cmpxchg8b.c
 cmpxchg8b_OBJECTS = cmpxchg8b.$(OBJEXT)
 cmpxchg8b_LDADD = $(LDADD)
 am_cpuid_OBJECTS = cpuid_c.$(OBJEXT) cpuid_s.$(OBJEXT)
 cpuid_OBJECTS = $(am_cpuid_OBJECTS)
 cpuid_LDADD = $(LDADD)
+cse_fail_SOURCES = cse_fail.c
+cse_fail_OBJECTS = cse_fail.$(OBJEXT)
+cse_fail_LDADD = $(LDADD)
 faultstatus_SOURCES = faultstatus.c
 faultstatus_OBJECTS = faultstatus.$(OBJEXT)
 faultstatus_LDADD = $(LDADD)
+fcmovnu_SOURCES = fcmovnu.c
+fcmovnu_OBJECTS = fcmovnu.$(OBJEXT)
+fcmovnu_LDADD = $(LDADD)
 fpu_lazy_eflags_SOURCES = fpu_lazy_eflags.c
 fpu_lazy_eflags_OBJECTS = fpu_lazy_eflags-fpu_lazy_eflags.$(OBJEXT)
 fpu_lazy_eflags_LDADD = $(LDADD)
@@ -106,15 +133,24 @@ insn_sse_DEPENDENCIES =
 am_insn_sse2_OBJECTS = insn_sse2.$(OBJEXT)
 insn_sse2_OBJECTS = $(am_insn_sse2_OBJECTS)
 insn_sse2_DEPENDENCIES =
+am_insn_sse3_OBJECTS = insn_sse3.$(OBJEXT)
+insn_sse3_OBJECTS = $(am_insn_sse3_OBJECTS)
+insn_sse3_DEPENDENCIES =
 int_SOURCES = int.c
 int_OBJECTS = int.$(OBJEXT)
 int_LDADD = $(LDADD)
+jcxz_SOURCES = jcxz.c
+jcxz_OBJECTS = jcxz.$(OBJEXT)
+jcxz_LDADD = $(LDADD)
 lahf_SOURCES = lahf.c
 lahf_OBJECTS = lahf.$(OBJEXT)
 lahf_LDADD = $(LDADD)
 looper_SOURCES = looper.c
 looper_OBJECTS = looper.$(OBJEXT)
 looper_LDADD = $(LDADD)
+movx_SOURCES = movx.c
+movx_OBJECTS = movx.$(OBJEXT)
+movx_LDADD = $(LDADD)
 pushpopseg_SOURCES = pushpopseg.c
 pushpopseg_OBJECTS = pushpopseg.$(OBJEXT)
 pushpopseg_LDADD = $(LDADD)
@@ -142,20 +178,24 @@ COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 CCLD = $(CC)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 CCASCOMPILE = $(CCAS) $(AM_CCASFLAGS) $(CCASFLAGS)
-SOURCES = badseg.c bt_everything.c bt_literal.c cmpxchg8b.c \
-	$(cpuid_SOURCES) faultstatus.c fpu_lazy_eflags.c fxtract.c \
-	getseg.c incdec_alt.c $(insn_basic_SOURCES) \
-	$(insn_cmov_SOURCES) $(insn_fpu_SOURCES) $(insn_mmx_SOURCES) \
-	$(insn_mmxext_SOURCES) $(insn_sse_SOURCES) \
-	$(insn_sse2_SOURCES) int.c lahf.c looper.c pushpopseg.c \
-	sbbmisc.c seg_override.c sigcontext.c smc1.c yield.c
-DIST_SOURCES = badseg.c bt_everything.c bt_literal.c cmpxchg8b.c \
-	$(cpuid_SOURCES) faultstatus.c fpu_lazy_eflags.c fxtract.c \
-	getseg.c incdec_alt.c $(insn_basic_SOURCES) \
-	$(insn_cmov_SOURCES) $(insn_fpu_SOURCES) $(insn_mmx_SOURCES) \
-	$(insn_mmxext_SOURCES) $(insn_sse_SOURCES) \
-	$(insn_sse2_SOURCES) int.c lahf.c looper.c pushpopseg.c \
-	sbbmisc.c seg_override.c sigcontext.c smc1.c yield.c
+SOURCES = badseg.c bt_everything.c bt_literal.c bug125959-x86.c \
+	bug126147-x86.c bug132813-x86.c bug135421-x86.c \
+	bug137714-x86.c cmpxchg8b.c $(cpuid_SOURCES) cse_fail.c \
+	faultstatus.c fcmovnu.c fpu_lazy_eflags.c fxtract.c getseg.c \
+	incdec_alt.c $(insn_basic_SOURCES) $(insn_cmov_SOURCES) \
+	$(insn_fpu_SOURCES) $(insn_mmx_SOURCES) $(insn_mmxext_SOURCES) \
+	$(insn_sse_SOURCES) $(insn_sse2_SOURCES) $(insn_sse3_SOURCES) \
+	int.c jcxz.c lahf.c looper.c movx.c pushpopseg.c sbbmisc.c \
+	seg_override.c sigcontext.c smc1.c yield.c
+DIST_SOURCES = badseg.c bt_everything.c bt_literal.c bug125959-x86.c \
+	bug126147-x86.c bug132813-x86.c bug135421-x86.c \
+	bug137714-x86.c cmpxchg8b.c $(cpuid_SOURCES) cse_fail.c \
+	faultstatus.c fcmovnu.c fpu_lazy_eflags.c fxtract.c getseg.c \
+	incdec_alt.c $(insn_basic_SOURCES) $(insn_cmov_SOURCES) \
+	$(insn_fpu_SOURCES) $(insn_mmx_SOURCES) $(insn_mmxext_SOURCES) \
+	$(insn_sse_SOURCES) $(insn_sse2_SOURCES) $(insn_sse3_SOURCES) \
+	int.c jcxz.c lahf.c looper.c movx.c pushpopseg.c sbbmisc.c \
+	seg_override.c sigcontext.c smc1.c yield.c
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -167,6 +207,12 @@ AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+BUILD_MPIWRAP_PRI_FALSE = @BUILD_MPIWRAP_PRI_FALSE@
+BUILD_MPIWRAP_PRI_TRUE = @BUILD_MPIWRAP_PRI_TRUE@
+BUILD_MPIWRAP_SEC_FALSE = @BUILD_MPIWRAP_SEC_FALSE@
+BUILD_MPIWRAP_SEC_TRUE = @BUILD_MPIWRAP_SEC_TRUE@
+BUILD_SSE3_TESTS_FALSE = @BUILD_SSE3_TESTS_FALSE@
+BUILD_SSE3_TESTS_TRUE = @BUILD_SSE3_TESTS_TRUE@
 CC = @CC@
 CCAS = @CCAS@
 CCASFLAGS = @CCASFLAGS@
@@ -187,9 +233,14 @@ ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
+FLAG_FNO_STACK_PROTECTOR = @FLAG_FNO_STACK_PROTECTOR@
 FLAG_M32 = @FLAG_M32@
+FLAG_M64 = @FLAG_M64@
+FLAG_MAIX32 = @FLAG_MAIX32@
+FLAG_MAIX64 = @FLAG_MAIX64@
 FLAG_MMMX = @FLAG_MMMX@
 FLAG_MSSE = @FLAG_MSSE@
+FLAG_WDECL_AFTER_STMT = @FLAG_WDECL_AFTER_STMT@
 GDB = @GDB@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -204,6 +255,7 @@ MAINT = @MAINT@
 MAINTAINER_MODE_FALSE = @MAINTAINER_MODE_FALSE@
 MAINTAINER_MODE_TRUE = @MAINTAINER_MODE_TRUE@
 MAKEINFO = @MAKEINFO@
+MPI_CC = @MPI_CC@
 OBJEXT = @OBJEXT@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
@@ -221,19 +273,29 @@ STRIP = @STRIP@
 VALT_LOAD_ADDRESS = @VALT_LOAD_ADDRESS@
 VERSION = @VERSION@
 VEX_DIR = @VEX_DIR@
-VG_AMD64_LINUX_FALSE = @VG_AMD64_LINUX_FALSE@
-VG_AMD64_LINUX_TRUE = @VG_AMD64_LINUX_TRUE@
+VGO_AIX5_FALSE = @VGO_AIX5_FALSE@
+VGO_AIX5_TRUE = @VGO_AIX5_TRUE@
+VGO_LINUX_FALSE = @VGO_LINUX_FALSE@
+VGO_LINUX_TRUE = @VGO_LINUX_TRUE@
+VGP_AMD64_LINUX_FALSE = @VGP_AMD64_LINUX_FALSE@
+VGP_AMD64_LINUX_TRUE = @VGP_AMD64_LINUX_TRUE@
+VGP_HAVE_SECONDARY_FALSE = @VGP_HAVE_SECONDARY_FALSE@
+VGP_HAVE_SECONDARY_TRUE = @VGP_HAVE_SECONDARY_TRUE@
+VGP_PPC32_AIX5_FALSE = @VGP_PPC32_AIX5_FALSE@
+VGP_PPC32_AIX5_TRUE = @VGP_PPC32_AIX5_TRUE@
+VGP_PPC32_LINUX_FALSE = @VGP_PPC32_LINUX_FALSE@
+VGP_PPC32_LINUX_TRUE = @VGP_PPC32_LINUX_TRUE@
+VGP_PPC64_AIX5_FALSE = @VGP_PPC64_AIX5_FALSE@
+VGP_PPC64_AIX5_TRUE = @VGP_PPC64_AIX5_TRUE@
+VGP_PPC64_LINUX_FALSE = @VGP_PPC64_LINUX_FALSE@
+VGP_PPC64_LINUX_TRUE = @VGP_PPC64_LINUX_TRUE@
+VGP_X86_LINUX_FALSE = @VGP_X86_LINUX_FALSE@
+VGP_X86_LINUX_TRUE = @VGP_X86_LINUX_TRUE@
 VG_ARCH = @VG_ARCH@
 VG_ARCH_ALL = @VG_ARCH_ALL@
-VG_MAKE_PLATFORM = @VG_MAKE_PLATFORM@
 VG_OS = @VG_OS@
-VG_OS_ALL = @VG_OS_ALL@
-VG_PLATFORM = @VG_PLATFORM@
-VG_PLATFORM_ALL = @VG_PLATFORM_ALL@
-VG_PPC32_LINUX_FALSE = @VG_PPC32_LINUX_FALSE@
-VG_PPC32_LINUX_TRUE = @VG_PPC32_LINUX_TRUE@
-VG_X86_LINUX_FALSE = @VG_X86_LINUX_FALSE@
-VG_X86_LINUX_TRUE = @VG_X86_LINUX_TRUE@
+VG_PLATFORM_PRI = @VG_PLATFORM_PRI@
+VG_PLATFORM_SEC = @VG_PLATFORM_SEC@
 ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_RANLIB = @ac_ct_RANLIB@
@@ -277,31 +339,46 @@ sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 noinst_SCRIPTS = filter_cpuid filter_stderr gen_insn_test.pl
 CLEANFILES = $(addsuffix .c,$(INSN_TESTS))
-INSN_TESTS = insn_basic insn_fpu insn_cmov insn_mmx insn_mmxext insn_sse insn_sse2
+INSN_TESTS = insn_basic insn_fpu insn_cmov insn_mmx insn_mmxext \
+	insn_sse insn_sse2 $(am__append_1)
+
+# Explicitly include insn_sse3 even if ! BUILD_SSE3_TESTS, 
+# to avoid packaging screwups if 'make dist' is run on a machine
+# which failed the BUILD_SSE3_TESTS test in configure.in.
 EXTRA_DIST = $(noinst_SCRIPTS) \
 	badseg.stderr.exp badseg.stdout.exp badseg.vgtest \
 	bt_everything.stderr.exp bt_everything.stdout.exp bt_everything.vgtest \
 	bt_literal.stderr.exp bt_literal.stdout.exp bt_literal.vgtest \
+	bug125959-x86.stderr.exp bug125959-x86.stdout.exp bug125959-x86.vgtest \
+	bug126147-x86.stderr.exp bug126147-x86.stdout.exp bug126147-x86.vgtest \
+	bug132813-x86.stderr.exp bug132813-x86.stdout.exp bug132813-x86.vgtest \
+	bug135421-x86.stderr.exp bug135421-x86.stdout.exp bug135421-x86.vgtest \
+	bug137714-x86.stderr.exp bug137714-x86.stdout.exp bug137714-x86.vgtest \
 	cpuid.stderr.exp cpuid.stdout.exp cpuid.vgtest \
 	cmpxchg8b.stderr.exp cmpxchg8b.stdout.exp cmpxchg8b.vgtest \
-	faultstatus.vgtest faultstatus.stderr.exp \
+	cse_fail.stderr.exp cse_fail.stdout.exp cse_fail.vgtest \
+	faultstatus.disabled faultstatus.stderr.exp \
+	fcmovnu.vgtest fcmovnu.stderr.exp fcmovnu.stdout.exp \
 	fpu_lazy_eflags.stderr.exp fpu_lazy_eflags.stdout.exp \
 	fpu_lazy_eflags.vgtest \
 	fxtract.stdout.exp fxtract.stderr.exp fxtract.vgtest \
 	getseg.stdout.exp getseg.stderr.exp getseg.vgtest \
 	incdec_alt.stdout.exp incdec_alt.stderr.exp incdec_alt.vgtest \
-	int.stderr.exp int.stdout.exp int.vgtest \
+	int.stderr.exp int.stdout.exp int.disabled \
 	$(addsuffix .stderr.exp,$(INSN_TESTS)) \
 	$(addsuffix .stdout.exp,$(INSN_TESTS)) \
 	$(addsuffix .vgtest,$(INSN_TESTS)) \
+	insn_sse3.stdout.exp insn_sse3.stderr.exp insn_sse3.vgtest \
+	jcxz.stdout.exp jcxz.stderr.exp jcxz.vgtest \
 	lahf.stdout.exp lahf.stderr.exp lahf.vgtest \
 	looper.stderr.exp looper.stdout.exp looper.vgtest \
+	movx.stderr.exp movx.stdout.exp movx.vgtest \
 	pushpopseg.stderr.exp pushpopseg.stdout.exp pushpopseg.vgtest \
 	sbbmisc.stderr.exp sbbmisc.stdout.exp sbbmisc.vgtest \
 	seg_override.stderr.exp seg_override.stdout.exp seg_override.vgtest \
 	sigcontext.stdout.exp sigcontext.stderr.exp sigcontext.vgtest \
 	smc1.stderr.exp smc1.stdout.exp smc1.vgtest \
-	yield.stderr.exp yield.stdout.exp yield.vgtest
+	yield.stderr.exp yield.stdout.exp yield.disabled
 
 AM_CFLAGS = $(WERROR) -Winline -Wall -Wshadow \
 		@FLAG_M32@ -g -I$(top_srcdir)/include \
@@ -329,6 +406,8 @@ insn_sse_SOURCES = insn_sse.def
 insn_sse_LDADD = -lm
 insn_sse2_SOURCES = insn_sse2.def
 insn_sse2_LDADD = -lm
+insn_sse3_SOURCES = insn_sse3.def
+insn_sse3_LDADD = -lm
 yield_CFLAGS = $(AM_CFLAGS) -D__$(VG_ARCH)__
 yield_LDADD = -lpthread
 all: all-am
@@ -376,15 +455,36 @@ bt_everything$(EXEEXT): $(bt_everything_OBJECTS) $(bt_everything_DEPENDENCIES)
 bt_literal$(EXEEXT): $(bt_literal_OBJECTS) $(bt_literal_DEPENDENCIES) 
 	@rm -f bt_literal$(EXEEXT)
 	$(LINK) $(bt_literal_LDFLAGS) $(bt_literal_OBJECTS) $(bt_literal_LDADD) $(LIBS)
+bug125959-x86$(EXEEXT): $(bug125959_x86_OBJECTS) $(bug125959_x86_DEPENDENCIES) 
+	@rm -f bug125959-x86$(EXEEXT)
+	$(LINK) $(bug125959_x86_LDFLAGS) $(bug125959_x86_OBJECTS) $(bug125959_x86_LDADD) $(LIBS)
+bug126147-x86$(EXEEXT): $(bug126147_x86_OBJECTS) $(bug126147_x86_DEPENDENCIES) 
+	@rm -f bug126147-x86$(EXEEXT)
+	$(LINK) $(bug126147_x86_LDFLAGS) $(bug126147_x86_OBJECTS) $(bug126147_x86_LDADD) $(LIBS)
+bug132813-x86$(EXEEXT): $(bug132813_x86_OBJECTS) $(bug132813_x86_DEPENDENCIES) 
+	@rm -f bug132813-x86$(EXEEXT)
+	$(LINK) $(bug132813_x86_LDFLAGS) $(bug132813_x86_OBJECTS) $(bug132813_x86_LDADD) $(LIBS)
+bug135421-x86$(EXEEXT): $(bug135421_x86_OBJECTS) $(bug135421_x86_DEPENDENCIES) 
+	@rm -f bug135421-x86$(EXEEXT)
+	$(LINK) $(bug135421_x86_LDFLAGS) $(bug135421_x86_OBJECTS) $(bug135421_x86_LDADD) $(LIBS)
+bug137714-x86$(EXEEXT): $(bug137714_x86_OBJECTS) $(bug137714_x86_DEPENDENCIES) 
+	@rm -f bug137714-x86$(EXEEXT)
+	$(LINK) $(bug137714_x86_LDFLAGS) $(bug137714_x86_OBJECTS) $(bug137714_x86_LDADD) $(LIBS)
 cmpxchg8b$(EXEEXT): $(cmpxchg8b_OBJECTS) $(cmpxchg8b_DEPENDENCIES) 
 	@rm -f cmpxchg8b$(EXEEXT)
 	$(LINK) $(cmpxchg8b_LDFLAGS) $(cmpxchg8b_OBJECTS) $(cmpxchg8b_LDADD) $(LIBS)
 cpuid$(EXEEXT): $(cpuid_OBJECTS) $(cpuid_DEPENDENCIES) 
 	@rm -f cpuid$(EXEEXT)
 	$(LINK) $(cpuid_LDFLAGS) $(cpuid_OBJECTS) $(cpuid_LDADD) $(LIBS)
+cse_fail$(EXEEXT): $(cse_fail_OBJECTS) $(cse_fail_DEPENDENCIES) 
+	@rm -f cse_fail$(EXEEXT)
+	$(LINK) $(cse_fail_LDFLAGS) $(cse_fail_OBJECTS) $(cse_fail_LDADD) $(LIBS)
 faultstatus$(EXEEXT): $(faultstatus_OBJECTS) $(faultstatus_DEPENDENCIES) 
 	@rm -f faultstatus$(EXEEXT)
 	$(LINK) $(faultstatus_LDFLAGS) $(faultstatus_OBJECTS) $(faultstatus_LDADD) $(LIBS)
+fcmovnu$(EXEEXT): $(fcmovnu_OBJECTS) $(fcmovnu_DEPENDENCIES) 
+	@rm -f fcmovnu$(EXEEXT)
+	$(LINK) $(fcmovnu_LDFLAGS) $(fcmovnu_OBJECTS) $(fcmovnu_LDADD) $(LIBS)
 fpu_lazy_eflags$(EXEEXT): $(fpu_lazy_eflags_OBJECTS) $(fpu_lazy_eflags_DEPENDENCIES) 
 	@rm -f fpu_lazy_eflags$(EXEEXT)
 	$(LINK) $(fpu_lazy_eflags_LDFLAGS) $(fpu_lazy_eflags_OBJECTS) $(fpu_lazy_eflags_LDADD) $(LIBS)
@@ -418,15 +518,24 @@ insn_sse$(EXEEXT): $(insn_sse_OBJECTS) $(insn_sse_DEPENDENCIES)
 insn_sse2$(EXEEXT): $(insn_sse2_OBJECTS) $(insn_sse2_DEPENDENCIES) 
 	@rm -f insn_sse2$(EXEEXT)
 	$(LINK) $(insn_sse2_LDFLAGS) $(insn_sse2_OBJECTS) $(insn_sse2_LDADD) $(LIBS)
+insn_sse3$(EXEEXT): $(insn_sse3_OBJECTS) $(insn_sse3_DEPENDENCIES) 
+	@rm -f insn_sse3$(EXEEXT)
+	$(LINK) $(insn_sse3_LDFLAGS) $(insn_sse3_OBJECTS) $(insn_sse3_LDADD) $(LIBS)
 int$(EXEEXT): $(int_OBJECTS) $(int_DEPENDENCIES) 
 	@rm -f int$(EXEEXT)
 	$(LINK) $(int_LDFLAGS) $(int_OBJECTS) $(int_LDADD) $(LIBS)
+jcxz$(EXEEXT): $(jcxz_OBJECTS) $(jcxz_DEPENDENCIES) 
+	@rm -f jcxz$(EXEEXT)
+	$(LINK) $(jcxz_LDFLAGS) $(jcxz_OBJECTS) $(jcxz_LDADD) $(LIBS)
 lahf$(EXEEXT): $(lahf_OBJECTS) $(lahf_DEPENDENCIES) 
 	@rm -f lahf$(EXEEXT)
 	$(LINK) $(lahf_LDFLAGS) $(lahf_OBJECTS) $(lahf_LDADD) $(LIBS)
 looper$(EXEEXT): $(looper_OBJECTS) $(looper_DEPENDENCIES) 
 	@rm -f looper$(EXEEXT)
 	$(LINK) $(looper_LDFLAGS) $(looper_OBJECTS) $(looper_LDADD) $(LIBS)
+movx$(EXEEXT): $(movx_OBJECTS) $(movx_DEPENDENCIES) 
+	@rm -f movx$(EXEEXT)
+	$(LINK) $(movx_LDFLAGS) $(movx_OBJECTS) $(movx_LDADD) $(LIBS)
 pushpopseg$(EXEEXT): $(pushpopseg_OBJECTS) $(pushpopseg_DEPENDENCIES) 
 	@rm -f pushpopseg$(EXEEXT)
 	$(LINK) $(pushpopseg_LDFLAGS) $(pushpopseg_OBJECTS) $(pushpopseg_LDADD) $(LIBS)
@@ -455,9 +564,16 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/badseg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bt_everything.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bt_literal.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bug125959-x86.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bug126147-x86.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bug132813-x86.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bug135421-x86.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bug137714-x86.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmpxchg8b.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpuid_c.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cse_fail.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/faultstatus.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fcmovnu.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fpu_lazy_eflags-fpu_lazy_eflags.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fxtract.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/getseg.Po@am__quote@
@@ -469,9 +585,12 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/insn_mmxext.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/insn_sse.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/insn_sse2.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/insn_sse3.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/int.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/jcxz.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lahf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/looper.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/movx.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pushpopseg.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sbbmisc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/seg_override.Po@am__quote@

@@ -14,6 +14,19 @@
 
 @SET_MAKE@
 
+# What the first for loop does: it copies a bunch of files which names
+# of the form wurble-arch-os to $prefix/lib/valgrind/arch-os/wurble.
+# There is some complexity in the sed mangling because wurble may itself
+# contain a dash, which must be ignored.  For example we want
+#    exp-omega-x86-linux
+# to be installed in 
+#    $prefix/lib/valgrind/x86-linux/exp-omega
+# and not in
+#    $prefix/lib/valgrind/omega-x86-linux/exp
+# or similarly mutant place.
+#
+# Note there is identical sed magic in Makefile.tool-inplace.am.
+
 # What the second for loop does: it copies libcoregrind.a and libvex.a
 # into the correct (target-specific) lib dirs at install time.
 # $(noinst_LIBRARIES) will look like this:
@@ -23,6 +36,9 @@
 # pD and pU are the (arch,os) target pairs separated by a dash (pD) or
 # an underscore (pU) respectively, eg amd64-linux (pD) and amd64_linux (pU).
 # It then copies libcoregrind.a and libvex.a to the right places.
+
+# For a description of what these magic sed commands do, see comments
+# in Makefile.install.am (which has identical magic)
 
 
 srcdir = @srcdir@
@@ -54,10 +70,14 @@ DIST_COMMON = $(mcinclude_HEADERS) $(noinst_HEADERS) \
 	$(top_srcdir)/Makefile.tool-flags.am \
 	$(top_srcdir)/Makefile.tool-inplace.am \
 	$(top_srcdir)/Makefile.tool.am
-noinst_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2) $(am__EXEEXT_3)
-@VG_X86_LINUX_TRUE@am__append_1 = memcheck-x86-linux vgpreload_memcheck-x86-linux.so
-@VG_AMD64_LINUX_TRUE@am__append_2 = memcheck-amd64-linux vgpreload_memcheck-amd64-linux.so
-@VG_PPC32_LINUX_TRUE@am__append_3 = memcheck-ppc32-linux vgpreload_memcheck-ppc32-linux.so
+noinst_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2) $(am__EXEEXT_3) \
+	$(am__EXEEXT_4) $(am__EXEEXT_5) $(am__EXEEXT_6)
+@VGP_X86_LINUX_TRUE@am__append_1 = memcheck-x86-linux vgpreload_memcheck-x86-linux.so
+@VGP_AMD64_LINUX_TRUE@am__append_2 = memcheck-amd64-linux vgpreload_memcheck-amd64-linux.so
+@VGP_PPC32_LINUX_TRUE@am__append_3 = memcheck-ppc32-linux vgpreload_memcheck-ppc32-linux.so
+@VGP_PPC64_LINUX_TRUE@am__append_4 = memcheck-ppc64-linux vgpreload_memcheck-ppc64-linux.so
+@VGP_PPC32_AIX5_TRUE@am__append_5 = memcheck-ppc32-aix5 vgpreload_memcheck-ppc32-aix5.so
+@VGP_PPC64_AIX5_TRUE@am__append_6 = memcheck-ppc64-aix5 vgpreload_memcheck-ppc64-aix5.so
 subdir = memcheck
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.in
@@ -66,17 +86,22 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
-@VG_X86_LINUX_TRUE@am__EXEEXT_1 = memcheck-x86-linux$(EXEEXT) \
-@VG_X86_LINUX_TRUE@	vgpreload_memcheck-x86-linux.so$(EXEEXT)
-@VG_AMD64_LINUX_TRUE@am__EXEEXT_2 = memcheck-amd64-linux$(EXEEXT) \
-@VG_AMD64_LINUX_TRUE@	vgpreload_memcheck-amd64-linux.so$(EXEEXT)
-@VG_PPC32_LINUX_TRUE@am__EXEEXT_3 = memcheck-ppc32-linux$(EXEEXT) \
-@VG_PPC32_LINUX_TRUE@	vgpreload_memcheck-ppc32-linux.so$(EXEEXT)
+@VGP_X86_LINUX_TRUE@am__EXEEXT_1 = memcheck-x86-linux$(EXEEXT) \
+@VGP_X86_LINUX_TRUE@	vgpreload_memcheck-x86-linux.so$(EXEEXT)
+@VGP_AMD64_LINUX_TRUE@am__EXEEXT_2 = memcheck-amd64-linux$(EXEEXT) \
+@VGP_AMD64_LINUX_TRUE@	vgpreload_memcheck-amd64-linux.so$(EXEEXT)
+@VGP_PPC32_LINUX_TRUE@am__EXEEXT_3 = memcheck-ppc32-linux$(EXEEXT) \
+@VGP_PPC32_LINUX_TRUE@	vgpreload_memcheck-ppc32-linux.so$(EXEEXT)
+@VGP_PPC64_LINUX_TRUE@am__EXEEXT_4 = memcheck-ppc64-linux$(EXEEXT) \
+@VGP_PPC64_LINUX_TRUE@	vgpreload_memcheck-ppc64-linux.so$(EXEEXT)
+@VGP_PPC32_AIX5_TRUE@am__EXEEXT_5 = memcheck-ppc32-aix5$(EXEEXT) \
+@VGP_PPC32_AIX5_TRUE@	vgpreload_memcheck-ppc32-aix5.so$(EXEEXT)
+@VGP_PPC64_AIX5_TRUE@am__EXEEXT_6 = memcheck-ppc64-aix5$(EXEEXT) \
+@VGP_PPC64_AIX5_TRUE@	vgpreload_memcheck-ppc64-aix5.so$(EXEEXT)
 PROGRAMS = $(noinst_PROGRAMS)
-am__objects_1 = memcheck_amd64_linux-mac_leakcheck.$(OBJEXT) \
-	memcheck_amd64_linux-mac_malloc_wrappers.$(OBJEXT) \
+am__objects_1 = memcheck_amd64_linux-mc_leakcheck.$(OBJEXT) \
+	memcheck_amd64_linux-mc_malloc_wrappers.$(OBJEXT) \
 	memcheck_amd64_linux-mc_main.$(OBJEXT) \
-	memcheck_amd64_linux-mac_shared.$(OBJEXT) \
 	memcheck_amd64_linux-mc_translate.$(OBJEXT)
 am_memcheck_amd64_linux_OBJECTS = $(am__objects_1)
 memcheck_amd64_linux_OBJECTS = $(am_memcheck_amd64_linux_OBJECTS)
@@ -85,41 +110,89 @@ am__DEPENDENCIES_1 =  \
 	@VEX_DIR@/libvex_amd64_linux.a
 am__DEPENDENCIES_2 =
 am__DEPENDENCIES_3 = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_2)
-am__objects_2 = memcheck_ppc32_linux-mac_leakcheck.$(OBJEXT) \
-	memcheck_ppc32_linux-mac_malloc_wrappers.$(OBJEXT) \
-	memcheck_ppc32_linux-mc_main.$(OBJEXT) \
-	memcheck_ppc32_linux-mac_shared.$(OBJEXT) \
-	memcheck_ppc32_linux-mc_translate.$(OBJEXT)
-am_memcheck_ppc32_linux_OBJECTS = $(am__objects_2)
-memcheck_ppc32_linux_OBJECTS = $(am_memcheck_ppc32_linux_OBJECTS)
+am__objects_2 = memcheck_ppc32_aix5-mc_leakcheck.$(OBJEXT) \
+	memcheck_ppc32_aix5-mc_malloc_wrappers.$(OBJEXT) \
+	memcheck_ppc32_aix5-mc_main.$(OBJEXT) \
+	memcheck_ppc32_aix5-mc_translate.$(OBJEXT)
+am_memcheck_ppc32_aix5_OBJECTS = $(am__objects_2)
+memcheck_ppc32_aix5_OBJECTS = $(am_memcheck_ppc32_aix5_OBJECTS)
 am__DEPENDENCIES_4 =  \
+	$(top_builddir)/coregrind/libcoregrind_ppc32_aix5.a \
+	@VEX_DIR@/libvex_ppc32_aix5.a
+am__DEPENDENCIES_5 = $(am__DEPENDENCIES_4) $(am__DEPENDENCIES_2)
+am__objects_3 = memcheck_ppc32_linux-mc_leakcheck.$(OBJEXT) \
+	memcheck_ppc32_linux-mc_malloc_wrappers.$(OBJEXT) \
+	memcheck_ppc32_linux-mc_main.$(OBJEXT) \
+	memcheck_ppc32_linux-mc_translate.$(OBJEXT)
+am_memcheck_ppc32_linux_OBJECTS = $(am__objects_3)
+memcheck_ppc32_linux_OBJECTS = $(am_memcheck_ppc32_linux_OBJECTS)
+am__DEPENDENCIES_6 =  \
 	$(top_builddir)/coregrind/libcoregrind_ppc32_linux.a \
 	@VEX_DIR@/libvex_ppc32_linux.a
-am__DEPENDENCIES_5 = $(am__DEPENDENCIES_4) $(am__DEPENDENCIES_2)
-am__objects_3 = memcheck_x86_linux-mac_leakcheck.$(OBJEXT) \
-	memcheck_x86_linux-mac_malloc_wrappers.$(OBJEXT) \
+am__DEPENDENCIES_7 = $(am__DEPENDENCIES_6) $(am__DEPENDENCIES_2)
+am__objects_4 = memcheck_ppc64_aix5-mc_leakcheck.$(OBJEXT) \
+	memcheck_ppc64_aix5-mc_malloc_wrappers.$(OBJEXT) \
+	memcheck_ppc64_aix5-mc_main.$(OBJEXT) \
+	memcheck_ppc64_aix5-mc_translate.$(OBJEXT)
+am_memcheck_ppc64_aix5_OBJECTS = $(am__objects_4)
+memcheck_ppc64_aix5_OBJECTS = $(am_memcheck_ppc64_aix5_OBJECTS)
+am__DEPENDENCIES_8 =  \
+	$(top_builddir)/coregrind/libcoregrind_ppc64_aix5.a \
+	@VEX_DIR@/libvex_ppc64_aix5.a
+am__DEPENDENCIES_9 = $(am__DEPENDENCIES_8) $(am__DEPENDENCIES_2)
+am__objects_5 = memcheck_ppc64_linux-mc_leakcheck.$(OBJEXT) \
+	memcheck_ppc64_linux-mc_malloc_wrappers.$(OBJEXT) \
+	memcheck_ppc64_linux-mc_main.$(OBJEXT) \
+	memcheck_ppc64_linux-mc_translate.$(OBJEXT)
+am_memcheck_ppc64_linux_OBJECTS = $(am__objects_5)
+memcheck_ppc64_linux_OBJECTS = $(am_memcheck_ppc64_linux_OBJECTS)
+am__DEPENDENCIES_10 =  \
+	$(top_builddir)/coregrind/libcoregrind_ppc64_linux.a \
+	@VEX_DIR@/libvex_ppc64_linux.a
+am__DEPENDENCIES_11 = $(am__DEPENDENCIES_10) $(am__DEPENDENCIES_2)
+am__objects_6 = memcheck_x86_linux-mc_leakcheck.$(OBJEXT) \
+	memcheck_x86_linux-mc_malloc_wrappers.$(OBJEXT) \
 	memcheck_x86_linux-mc_main.$(OBJEXT) \
-	memcheck_x86_linux-mac_shared.$(OBJEXT) \
 	memcheck_x86_linux-mc_translate.$(OBJEXT)
-am_memcheck_x86_linux_OBJECTS = $(am__objects_3)
+am_memcheck_x86_linux_OBJECTS = $(am__objects_6)
 memcheck_x86_linux_OBJECTS = $(am_memcheck_x86_linux_OBJECTS)
-am__DEPENDENCIES_6 =  \
+am__DEPENDENCIES_12 =  \
 	$(top_builddir)/coregrind/libcoregrind_x86_linux.a \
 	@VEX_DIR@/libvex_x86_linux.a
-am__DEPENDENCIES_7 = $(am__DEPENDENCIES_6) $(am__DEPENDENCIES_2)
-am__objects_4 = vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.$(OBJEXT)
-am_vgpreload_memcheck_amd64_linux_so_OBJECTS = $(am__objects_4)
+am__DEPENDENCIES_13 = $(am__DEPENDENCIES_12) $(am__DEPENDENCIES_2)
+am__objects_7 =  \
+	vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.$(OBJEXT)
+am_vgpreload_memcheck_amd64_linux_so_OBJECTS = $(am__objects_7)
 vgpreload_memcheck_amd64_linux_so_OBJECTS =  \
 	$(am_vgpreload_memcheck_amd64_linux_so_OBJECTS)
 vgpreload_memcheck_amd64_linux_so_LDADD = $(LDADD)
-am__objects_5 = vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.$(OBJEXT)
-am_vgpreload_memcheck_ppc32_linux_so_OBJECTS = $(am__objects_5)
+am__objects_8 =  \
+	vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.$(OBJEXT)
+am_vgpreload_memcheck_ppc32_aix5_so_OBJECTS = $(am__objects_8)
+vgpreload_memcheck_ppc32_aix5_so_OBJECTS =  \
+	$(am_vgpreload_memcheck_ppc32_aix5_so_OBJECTS)
+vgpreload_memcheck_ppc32_aix5_so_LDADD = $(LDADD)
+am__objects_9 =  \
+	vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.$(OBJEXT)
+am_vgpreload_memcheck_ppc32_linux_so_OBJECTS = $(am__objects_9)
 vgpreload_memcheck_ppc32_linux_so_OBJECTS =  \
 	$(am_vgpreload_memcheck_ppc32_linux_so_OBJECTS)
 vgpreload_memcheck_ppc32_linux_so_LDADD = $(LDADD)
-am__objects_6 =  \
-	vgpreload_memcheck_x86_linux_so-mac_replace_strmem.$(OBJEXT)
-am_vgpreload_memcheck_x86_linux_so_OBJECTS = $(am__objects_6)
+am__objects_10 =  \
+	vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.$(OBJEXT)
+am_vgpreload_memcheck_ppc64_aix5_so_OBJECTS = $(am__objects_10)
+vgpreload_memcheck_ppc64_aix5_so_OBJECTS =  \
+	$(am_vgpreload_memcheck_ppc64_aix5_so_OBJECTS)
+vgpreload_memcheck_ppc64_aix5_so_LDADD = $(LDADD)
+am__objects_11 =  \
+	vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.$(OBJEXT)
+am_vgpreload_memcheck_ppc64_linux_so_OBJECTS = $(am__objects_11)
+vgpreload_memcheck_ppc64_linux_so_OBJECTS =  \
+	$(am_vgpreload_memcheck_ppc64_linux_so_OBJECTS)
+vgpreload_memcheck_ppc64_linux_so_LDADD = $(LDADD)
+am__objects_12 =  \
+	vgpreload_memcheck_x86_linux_so-mc_replace_strmem.$(OBJEXT)
+am_vgpreload_memcheck_x86_linux_so_OBJECTS = $(am__objects_12)
 vgpreload_memcheck_x86_linux_so_OBJECTS =  \
 	$(am_vgpreload_memcheck_x86_linux_so_OBJECTS)
 vgpreload_memcheck_x86_linux_so_LDADD = $(LDADD)
@@ -131,14 +204,24 @@ COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 CCLD = $(CC)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 SOURCES = $(memcheck_amd64_linux_SOURCES) \
-	$(memcheck_ppc32_linux_SOURCES) $(memcheck_x86_linux_SOURCES) \
+	$(memcheck_ppc32_aix5_SOURCES) $(memcheck_ppc32_linux_SOURCES) \
+	$(memcheck_ppc64_aix5_SOURCES) $(memcheck_ppc64_linux_SOURCES) \
+	$(memcheck_x86_linux_SOURCES) \
 	$(vgpreload_memcheck_amd64_linux_so_SOURCES) \
+	$(vgpreload_memcheck_ppc32_aix5_so_SOURCES) \
 	$(vgpreload_memcheck_ppc32_linux_so_SOURCES) \
+	$(vgpreload_memcheck_ppc64_aix5_so_SOURCES) \
+	$(vgpreload_memcheck_ppc64_linux_so_SOURCES) \
 	$(vgpreload_memcheck_x86_linux_so_SOURCES)
 DIST_SOURCES = $(memcheck_amd64_linux_SOURCES) \
-	$(memcheck_ppc32_linux_SOURCES) $(memcheck_x86_linux_SOURCES) \
+	$(memcheck_ppc32_aix5_SOURCES) $(memcheck_ppc32_linux_SOURCES) \
+	$(memcheck_ppc64_aix5_SOURCES) $(memcheck_ppc64_linux_SOURCES) \
+	$(memcheck_x86_linux_SOURCES) \
 	$(vgpreload_memcheck_amd64_linux_so_SOURCES) \
+	$(vgpreload_memcheck_ppc32_aix5_so_SOURCES) \
 	$(vgpreload_memcheck_ppc32_linux_so_SOURCES) \
+	$(vgpreload_memcheck_ppc64_aix5_so_SOURCES) \
+	$(vgpreload_memcheck_ppc64_linux_so_SOURCES) \
 	$(vgpreload_memcheck_x86_linux_so_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	html-recursive info-recursive install-data-recursive \
@@ -167,6 +250,12 @@ AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+BUILD_MPIWRAP_PRI_FALSE = @BUILD_MPIWRAP_PRI_FALSE@
+BUILD_MPIWRAP_PRI_TRUE = @BUILD_MPIWRAP_PRI_TRUE@
+BUILD_MPIWRAP_SEC_FALSE = @BUILD_MPIWRAP_SEC_FALSE@
+BUILD_MPIWRAP_SEC_TRUE = @BUILD_MPIWRAP_SEC_TRUE@
+BUILD_SSE3_TESTS_FALSE = @BUILD_SSE3_TESTS_FALSE@
+BUILD_SSE3_TESTS_TRUE = @BUILD_SSE3_TESTS_TRUE@
 CC = @CC@
 CCAS = @CCAS@
 CCASFLAGS = @CCASFLAGS@
@@ -187,9 +276,14 @@ ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
+FLAG_FNO_STACK_PROTECTOR = @FLAG_FNO_STACK_PROTECTOR@
 FLAG_M32 = @FLAG_M32@
+FLAG_M64 = @FLAG_M64@
+FLAG_MAIX32 = @FLAG_MAIX32@
+FLAG_MAIX64 = @FLAG_MAIX64@
 FLAG_MMMX = @FLAG_MMMX@
 FLAG_MSSE = @FLAG_MSSE@
+FLAG_WDECL_AFTER_STMT = @FLAG_WDECL_AFTER_STMT@
 GDB = @GDB@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -204,6 +298,7 @@ MAINT = @MAINT@
 MAINTAINER_MODE_FALSE = @MAINTAINER_MODE_FALSE@
 MAINTAINER_MODE_TRUE = @MAINTAINER_MODE_TRUE@
 MAKEINFO = @MAKEINFO@
+MPI_CC = @MPI_CC@
 OBJEXT = @OBJEXT@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
@@ -221,19 +316,29 @@ STRIP = @STRIP@
 VALT_LOAD_ADDRESS = @VALT_LOAD_ADDRESS@
 VERSION = @VERSION@
 VEX_DIR = @VEX_DIR@
-VG_AMD64_LINUX_FALSE = @VG_AMD64_LINUX_FALSE@
-VG_AMD64_LINUX_TRUE = @VG_AMD64_LINUX_TRUE@
+VGO_AIX5_FALSE = @VGO_AIX5_FALSE@
+VGO_AIX5_TRUE = @VGO_AIX5_TRUE@
+VGO_LINUX_FALSE = @VGO_LINUX_FALSE@
+VGO_LINUX_TRUE = @VGO_LINUX_TRUE@
+VGP_AMD64_LINUX_FALSE = @VGP_AMD64_LINUX_FALSE@
+VGP_AMD64_LINUX_TRUE = @VGP_AMD64_LINUX_TRUE@
+VGP_HAVE_SECONDARY_FALSE = @VGP_HAVE_SECONDARY_FALSE@
+VGP_HAVE_SECONDARY_TRUE = @VGP_HAVE_SECONDARY_TRUE@
+VGP_PPC32_AIX5_FALSE = @VGP_PPC32_AIX5_FALSE@
+VGP_PPC32_AIX5_TRUE = @VGP_PPC32_AIX5_TRUE@
+VGP_PPC32_LINUX_FALSE = @VGP_PPC32_LINUX_FALSE@
+VGP_PPC32_LINUX_TRUE = @VGP_PPC32_LINUX_TRUE@
+VGP_PPC64_AIX5_FALSE = @VGP_PPC64_AIX5_FALSE@
+VGP_PPC64_AIX5_TRUE = @VGP_PPC64_AIX5_TRUE@
+VGP_PPC64_LINUX_FALSE = @VGP_PPC64_LINUX_FALSE@
+VGP_PPC64_LINUX_TRUE = @VGP_PPC64_LINUX_TRUE@
+VGP_X86_LINUX_FALSE = @VGP_X86_LINUX_FALSE@
+VGP_X86_LINUX_TRUE = @VGP_X86_LINUX_TRUE@
 VG_ARCH = @VG_ARCH@
 VG_ARCH_ALL = @VG_ARCH_ALL@
-VG_MAKE_PLATFORM = @VG_MAKE_PLATFORM@
 VG_OS = @VG_OS@
-VG_OS_ALL = @VG_OS_ALL@
-VG_PLATFORM = @VG_PLATFORM@
-VG_PLATFORM_ALL = @VG_PLATFORM_ALL@
-VG_PPC32_LINUX_FALSE = @VG_PPC32_LINUX_FALSE@
-VG_PPC32_LINUX_TRUE = @VG_PPC32_LINUX_TRUE@
-VG_X86_LINUX_FALSE = @VG_X86_LINUX_FALSE@
-VG_X86_LINUX_TRUE = @VG_X86_LINUX_TRUE@
+VG_PLATFORM_PRI = @VG_PLATFORM_PRI@
+VG_PLATFORM_SEC = @VG_PLATFORM_SEC@
 ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_RANLIB = @ac_ct_RANLIB@
@@ -296,22 +401,93 @@ add_includes_ppc32_linux = -I$(top_srcdir)/include \
 		-DVGO_linux=1 \
 		-DVGP_ppc32_linux=1
 
-AM_CFLAGS_BASE = -O -g -Wmissing-prototypes -Winline -Wall -Wshadow \
-                 -Wpointer-arith -Wstrict-prototypes -Wmissing-declarations
+add_includes_ppc64_linux = -I$(top_srcdir)/include \
+		-I@VEX_DIR@/pub \
+		-DVGA_ppc64=1 \
+		-DVGO_linux=1 \
+		-DVGP_ppc64_linux=1
 
-AM_CFLAGS_PIC = -fpic -fno-omit-frame-pointer
+add_includes_ppc32_aix5 = -I$(top_srcdir)/include \
+		-I@VEX_DIR@/pub \
+		-DVGA_ppc32=1 \
+		-DVGO_aix5=1 \
+		-DVGP_ppc32_aix5=1
+
+add_includes_ppc64_aix5 = -I$(top_srcdir)/include \
+		-I@VEX_DIR@/pub \
+		-DVGA_ppc64=1 \
+		-DVGO_aix5=1 \
+		-DVGP_ppc64_aix5=1
+
+
+# Baseline flags for all compilations.  Aim here is to maximise
+# performance and get whatever useful warnings we can out of gcc.
+AM_CFLAGS_BASE = -O2 -g -Wmissing-prototypes -Wall -Wshadow \
+                 -Wpointer-arith -Wstrict-prototypes -Wmissing-declarations \
+                 -fno-strict-aliasing
+
+
+# These flags are used for building the preload shared objects.
+# The aim is to give reasonable performance but also to have good
+# stack traces, since users often see stack traces extending 
+# into (and through) the preloads.
+AM_CFLAGS_PIC = -O -g -fpic -fno-omit-frame-pointer -fno-strict-aliasing
+
+# Flags for specific targets
+AM_FLAG_M3264_X86_LINUX = @FLAG_M32@
 AM_CPPFLAGS_X86_LINUX = $(add_includes_x86_linux)
-AM_CFLAGS_X86_LINUX = $(WERROR) @FLAG_M32@ @PREFERRED_STACK_BOUNDARY@ $(AM_CFLAGS_BASE)
+AM_CFLAGS_X86_LINUX = $(WERROR) @FLAG_M32@ @PREFERRED_STACK_BOUNDARY@ \
+			 	$(AM_CFLAGS_BASE)
+
 AM_CCASFLAGS_X86_LINUX = $(add_includes_x86_linux) @FLAG_M32@ -g
+AM_FLAG_M3264_AMD64_LINUX = @FLAG_M64@
 AM_CPPFLAGS_AMD64_LINUX = $(add_includes_amd64_linux)
-AM_CFLAGS_AMD64_LINUX = $(WERROR) -m64 -fomit-frame-pointer @PREFERRED_STACK_BOUNDARY@ $(AM_CFLAGS_BASE)
-AM_CCASFLAGS_AMD64_LINUX = $(add_includes_amd64_linux) -m64 -g
+AM_CFLAGS_AMD64_LINUX = $(WERROR) @FLAG_M64@ -fomit-frame-pointer \
+				@PREFERRED_STACK_BOUNDARY@ $(AM_CFLAGS_BASE)
+
+AM_CCASFLAGS_AMD64_LINUX = $(add_includes_amd64_linux) @FLAG_M64@ -g
+AM_FLAG_M3264_PPC32_LINUX = @FLAG_M32@
 AM_CPPFLAGS_PPC32_LINUX = $(add_includes_ppc32_linux)
-AM_CFLAGS_PPC32_LINUX = $(WERROR) $(AM_CFLAGS_BASE)
-AM_CCASFLAGS_PPC32_LINUX = $(add_includes_ppc32_linux) -Wa,-maltivec -g
-AM_CPPFLAGS = $(AM_CPPFLAGS_@VG_MAKE_PLATFORM@)
-AM_CFLAGS = $(AM_CFLAGS_@VG_MAKE_PLATFORM@)
-AM_CCASFLAGS = $(AM_CCASFLAGS_@VG_MAKE_PLATFORM@)
+AM_CFLAGS_PPC32_LINUX = $(WERROR) @FLAG_M32@ $(AM_CFLAGS_BASE)
+AM_CCASFLAGS_PPC32_LINUX = $(add_includes_ppc32_linux) -Wa,-maltivec @FLAG_M32@ -g
+AM_FLAG_M3264_PPC64_LINUX = @FLAG_M64@
+AM_CPPFLAGS_PPC64_LINUX = $(add_includes_ppc64_linux)
+AM_CFLAGS_PPC64_LINUX = $(WERROR) @FLAG_M64@ $(AM_CFLAGS_BASE)
+AM_CCASFLAGS_PPC64_LINUX = $(add_includes_ppc64_linux) -Wa,-maltivec @FLAG_M64@ -g
+AM_FLAG_M3264_PPC32_AIX5 = @FLAG_MAIX32@
+AM_CPPFLAGS_PPC32_AIX5 = $(add_includes_ppc32_aix5)
+AM_CFLAGS_PPC32_AIX5 = $(WERROR) @FLAG_MAIX32@ -mcpu=powerpc $(AM_CFLAGS_BASE)
+AM_CCASFLAGS_PPC32_AIX5 = $(add_includes_ppc32_aix5) \
+				@FLAG_MAIX32@ -mcpu=powerpc -g
+
+AM_FLAG_M3264_PPC64_AIX5 = @FLAG_MAIX64@
+AM_CPPFLAGS_PPC64_AIX5 = $(add_includes_ppc64_aix5)
+AM_CFLAGS_PPC64_AIX5 = $(WERROR) @FLAG_MAIX64@ -mcpu=powerpc64 $(AM_CFLAGS_BASE)
+AM_CCASFLAGS_PPC64_AIX5 = $(add_includes_ppc64_aix5) \
+				@FLAG_MAIX64@ -mcpu=powerpc64 -g
+
+
+# Flags for the primary target.  These must be used to build the
+# regtests and performance tests.  In fact, these must be used to
+# build anything which is built only once on a dual-arch build.
+#
+AM_FLAG_M3264_PRI = $(AM_FLAG_M3264_@VG_PLATFORM_PRI@)
+AM_CPPFLAGS_PRI = $(AM_CPPFLAGS_@VG_PLATFORM_PRI@)
+AM_CFLAGS_PRI = $(AM_CFLAGS_@VG_PLATFORM_PRI@)
+AM_CCASFLAGS_PRI = $(AM_CCASFLAGS_@VG_PLATFORM_PRI@)
+@VGP_HAVE_SECONDARY_FALSE@AM_FLAG_M3264_SEC = 
+@VGP_HAVE_SECONDARY_TRUE@AM_FLAG_M3264_SEC = $(AM_FLAG_M3264_@VG_PLATFORM_SEC@)
+
+# Baseline link flags for making dynamic shared objects.
+#
+PRELOAD_LDFLAGS_COMMON_LINUX = -nostdlib -shared -Wl,-z,interpose,-z,initfirst
+PRELOAD_LDFLAGS_COMMON_AIX5 = -nostdlib -shared -Wl,-G -Wl,-bnogc
+PRELOAD_LDFLAGS_X86_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
+PRELOAD_LDFLAGS_AMD64_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M64@
+PRELOAD_LDFLAGS_PPC32_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
+PRELOAD_LDFLAGS_PPC64_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M64@
+PRELOAD_LDFLAGS_PPC32_AIX5 = $(PRELOAD_LDFLAGS_COMMON_AIX5)  @FLAG_MAIX32@
+PRELOAD_LDFLAGS_PPC64_AIX5 = $(PRELOAD_LDFLAGS_COMMON_AIX5)  @FLAG_MAIX64@
 LIBREPLACEMALLOC_X86_LINUX = \
 	$(top_builddir)/coregrind/libreplacemalloc_toolpreload_x86_linux.a
 
@@ -320,6 +496,15 @@ LIBREPLACEMALLOC_AMD64_LINUX = \
 
 LIBREPLACEMALLOC_PPC32_LINUX = \
 	$(top_builddir)/coregrind/libreplacemalloc_toolpreload_ppc32_linux.a
+
+LIBREPLACEMALLOC_PPC64_LINUX = \
+	$(top_builddir)/coregrind/libreplacemalloc_toolpreload_ppc64_linux.a
+
+LIBREPLACEMALLOC_PPC32_AIX5 = \
+	$(top_builddir)/coregrind/libreplacemalloc_toolpreload_ppc32_aix5.a
+
+LIBREPLACEMALLOC_PPC64_AIX5 = \
+	$(top_builddir)/coregrind/libreplacemalloc_toolpreload_ppc64_aix5.a
 
 COREGRIND_LIBS_X86_LINUX = \
 	$(top_builddir)/coregrind/libcoregrind_x86_linux.a \
@@ -333,30 +518,52 @@ COREGRIND_LIBS_PPC32_LINUX = \
 	$(top_builddir)/coregrind/libcoregrind_ppc32_linux.a \
 	@VEX_DIR@/libvex_ppc32_linux.a
 
+COREGRIND_LIBS_PPC64_LINUX = \
+	$(top_builddir)/coregrind/libcoregrind_ppc64_linux.a \
+	@VEX_DIR@/libvex_ppc64_linux.a
+
+COREGRIND_LIBS_PPC32_AIX5 = \
+	$(top_builddir)/coregrind/libcoregrind_ppc32_aix5.a \
+	@VEX_DIR@/libvex_ppc32_aix5.a
+
+COREGRIND_LIBS_PPC64_AIX5 = \
+	$(top_builddir)/coregrind/libcoregrind_ppc64_aix5.a \
+	@VEX_DIR@/libvex_ppc64_aix5.a
+
 TOOL_LDADD_COMMON = -lgcc
-TOOL_LDFLAGS_COMMON = -static \
+TOOL_LDFLAGS_COMMON_LINUX = -static \
 	-Wl,-defsym,valt_load_address=@VALT_LOAD_ADDRESS@ \
 	-nodefaultlibs -nostartfiles -u _start
 
+TOOL_LDFLAGS_COMMON_AIX5 = -static -Wl,-e_start_valgrind
 TOOL_LDADD_X86_LINUX = $(COREGRIND_LIBS_X86_LINUX) $(TOOL_LDADD_COMMON)
 TOOL_LDFLAGS_X86_LINUX = \
-	$(TOOL_LDFLAGS_COMMON) @FLAG_M32@ \
+	$(TOOL_LDFLAGS_COMMON_LINUX) @FLAG_M32@ \
 	-Wl,-T,$(top_builddir)/valt_load_address_x86_linux.lds
 
 TOOL_LDADD_AMD64_LINUX = $(COREGRIND_LIBS_AMD64_LINUX) $(TOOL_LDADD_COMMON)
 TOOL_LDFLAGS_AMD64_LINUX = \
-	$(TOOL_LDFLAGS_COMMON) -m64 \
+	$(TOOL_LDFLAGS_COMMON_LINUX) @FLAG_M64@ \
 	-Wl,-T,$(top_builddir)/valt_load_address_amd64_linux.lds
 
 TOOL_LDADD_PPC32_LINUX = $(COREGRIND_LIBS_PPC32_LINUX) $(TOOL_LDADD_COMMON)
 TOOL_LDFLAGS_PPC32_LINUX = \
-	$(TOOL_LDFLAGS_COMMON) \
+	$(TOOL_LDFLAGS_COMMON_LINUX) @FLAG_M32@ \
 	-Wl,-T,$(top_builddir)/valt_load_address_ppc32_linux.lds
 
-PRELOAD_LDFLAGS_COMMON = -nostdlib -shared -Wl,-z,interpose,-z,initfirst
-PRELOAD_LDFLAGS_X86_LINUX = $(PRELOAD_LDFLAGS_COMMON) @FLAG_M32@
-PRELOAD_LDFLAGS_AMD64_LINUX = $(PRELOAD_LDFLAGS_COMMON) -m64
-PRELOAD_LDFLAGS_PPC32_LINUX = $(PRELOAD_LDFLAGS_COMMON)
+TOOL_LDADD_PPC64_LINUX = $(COREGRIND_LIBS_PPC64_LINUX) $(TOOL_LDADD_COMMON)
+TOOL_LDFLAGS_PPC64_LINUX = \
+	$(TOOL_LDFLAGS_COMMON_LINUX) @FLAG_M64@ \
+	-Wl,-T,$(top_builddir)/valt_load_address_ppc64_linux.lds
+
+TOOL_LDADD_PPC32_AIX5 = $(COREGRIND_LIBS_PPC32_AIX5) $(TOOL_LDADD_COMMON)
+TOOL_LDFLAGS_PPC32_AIX5 = \
+	$(TOOL_LDFLAGS_COMMON_AIX5) @FLAG_MAIX32@
+
+TOOL_LDADD_PPC64_AIX5 = $(COREGRIND_LIBS_PPC64_AIX5) $(TOOL_LDADD_COMMON)
+TOOL_LDFLAGS_PPC64_AIX5 = \
+	$(TOOL_LDFLAGS_COMMON_AIX5) @FLAG_MAIX64@ -Wl,-bbigtoc
+
 LIBREPLACEMALLOC_LDFLAGS_X86_LINUX = \
 	-Wl,--whole-archive \
 	$(LIBREPLACEMALLOC_X86_LINUX) \
@@ -372,7 +579,18 @@ LIBREPLACEMALLOC_LDFLAGS_PPC32_LINUX = \
 	$(LIBREPLACEMALLOC_PPC32_LINUX) \
 	-Wl,--no-whole-archive
 
-VGPRELOAD_MEMCHECK_SOURCES_COMMON = mac_replace_strmem.c
+LIBREPLACEMALLOC_LDFLAGS_PPC64_LINUX = \
+	-Wl,--whole-archive \
+	$(LIBREPLACEMALLOC_PPC64_LINUX) \
+	-Wl,--no-whole-archive
+
+LIBREPLACEMALLOC_LDFLAGS_PPC32_AIX5 = \
+	$(LIBREPLACEMALLOC_PPC32_AIX5)
+
+LIBREPLACEMALLOC_LDFLAGS_PPC64_AIX5 = \
+	$(LIBREPLACEMALLOC_PPC64_AIX5)
+
+VGPRELOAD_MEMCHECK_SOURCES_COMMON = mc_replace_strmem.c
 vgpreload_memcheck_x86_linux_so_SOURCES = $(VGPRELOAD_MEMCHECK_SOURCES_COMMON)
 vgpreload_memcheck_x86_linux_so_CPPFLAGS = $(AM_CPPFLAGS_X86_LINUX)
 vgpreload_memcheck_x86_linux_so_CFLAGS = $(AM_CFLAGS_X86_LINUX) $(AM_CFLAGS_PIC) -O2
@@ -400,11 +618,37 @@ vgpreload_memcheck_ppc32_linux_so_LDFLAGS = \
 	$(PRELOAD_LDFLAGS_PPC32_LINUX) \
 	$(LIBREPLACEMALLOC_LDFLAGS_PPC32_LINUX)
 
+vgpreload_memcheck_ppc64_linux_so_SOURCES = $(VGPRELOAD_MEMCHECK_SOURCES_COMMON)
+vgpreload_memcheck_ppc64_linux_so_CPPFLAGS = $(AM_CPPFLAGS_PPC64_LINUX)
+vgpreload_memcheck_ppc64_linux_so_CFLAGS = $(AM_CFLAGS_PPC64_LINUX) $(AM_CFLAGS_PIC) -O2
+vgpreload_memcheck_ppc64_linux_so_CCASFLAGS = $(AM_CCASFLAGS_PPC64_LINUX)
+vgpreload_memcheck_ppc64_linux_so_DEPENDENCIES = $(LIBREPLACEMALLOC_PPC64_LINUX)
+vgpreload_memcheck_ppc64_linux_so_LDFLAGS = \
+	$(PRELOAD_LDFLAGS_PPC64_LINUX) \
+	$(LIBREPLACEMALLOC_LDFLAGS_PPC64_LINUX)
+
+vgpreload_memcheck_ppc32_aix5_so_SOURCES = $(VGPRELOAD_MEMCHECK_SOURCES_COMMON)
+vgpreload_memcheck_ppc32_aix5_so_CPPFLAGS = $(AM_CPPFLAGS_PPC32_AIX5)
+vgpreload_memcheck_ppc32_aix5_so_CFLAGS = $(AM_CFLAGS_PPC32_AIX5) $(AM_CFLAGS_PIC) -O2
+vgpreload_memcheck_ppc32_aix5_so_CCASFLAGS = $(AM_CCASFLAGS_PPC32_AIX5)
+vgpreload_memcheck_ppc32_aix5_so_DEPENDENCIES = $(LIBREPLACEMALLOC_PPC32_AIX5)
+vgpreload_memcheck_ppc32_aix5_so_LDFLAGS = \
+	$(PRELOAD_LDFLAGS_PPC32_AIX5) \
+	$(LIBREPLACEMALLOC_LDFLAGS_PPC32_AIX5)
+
+vgpreload_memcheck_ppc64_aix5_so_SOURCES = $(VGPRELOAD_MEMCHECK_SOURCES_COMMON)
+vgpreload_memcheck_ppc64_aix5_so_CPPFLAGS = $(AM_CPPFLAGS_PPC64_AIX5)
+vgpreload_memcheck_ppc64_aix5_so_CFLAGS = $(AM_CFLAGS_PPC64_AIX5) $(AM_CFLAGS_PIC) -O2
+vgpreload_memcheck_ppc64_aix5_so_CCASFLAGS = $(AM_CCASFLAGS_PPC64_AIX5)
+vgpreload_memcheck_ppc64_aix5_so_DEPENDENCIES = $(LIBREPLACEMALLOC_PPC64_AIX5)
+vgpreload_memcheck_ppc64_aix5_so_LDFLAGS = \
+	$(PRELOAD_LDFLAGS_PPC64_AIX5) \
+	$(LIBREPLACEMALLOC_LDFLAGS_PPC64_AIX5)
+
 MEMCHECK_SOURCES_COMMON = \
-	mac_leakcheck.c \
-	mac_malloc_wrappers.c \
+	mc_leakcheck.c \
+	mc_malloc_wrappers.c \
 	mc_main.c \
-	mac_shared.c \
 	mc_translate.c
 
 memcheck_x86_linux_SOURCES = $(MEMCHECK_SOURCES_COMMON)
@@ -428,12 +672,32 @@ memcheck_ppc32_linux_CCASFLAGS = $(AM_CCASFLAGS_PPC32_LINUX)
 memcheck_ppc32_linux_DEPENDENCIES = $(COREGRIND_LIBS_PPC32_LINUX)
 memcheck_ppc32_linux_LDADD = $(TOOL_LDADD_PPC32_LINUX)
 memcheck_ppc32_linux_LDFLAGS = $(TOOL_LDFLAGS_PPC32_LINUX)
+memcheck_ppc64_linux_SOURCES = $(MEMCHECK_SOURCES_COMMON)
+memcheck_ppc64_linux_CPPFLAGS = $(AM_CPPFLAGS_PPC64_LINUX)
+memcheck_ppc64_linux_CFLAGS = $(AM_CFLAGS_PPC64_LINUX) -O2
+memcheck_ppc64_linux_CCASFLAGS = $(AM_CCASFLAGS_PPC64_LINUX)
+memcheck_ppc64_linux_DEPENDENCIES = $(COREGRIND_LIBS_PPC64_LINUX)
+memcheck_ppc64_linux_LDADD = $(TOOL_LDADD_PPC64_LINUX)
+memcheck_ppc64_linux_LDFLAGS = $(TOOL_LDFLAGS_PPC64_LINUX)
+memcheck_ppc32_aix5_SOURCES = $(MEMCHECK_SOURCES_COMMON)
+memcheck_ppc32_aix5_CPPFLAGS = $(AM_CPPFLAGS_PPC32_AIX5)
+memcheck_ppc32_aix5_CFLAGS = $(AM_CFLAGS_PPC32_AIX5) -O2
+memcheck_ppc32_aix5_CCASFLAGS = $(AM_CCASFLAGS_PPC32_AIX5)
+memcheck_ppc32_aix5_DEPENDENCIES = $(COREGRIND_LIBS_PPC32_AIX5)
+memcheck_ppc32_aix5_LDADD = $(TOOL_LDADD_PPC32_AIX5)
+memcheck_ppc32_aix5_LDFLAGS = $(TOOL_LDFLAGS_PPC32_AIX5)
+memcheck_ppc64_aix5_SOURCES = $(MEMCHECK_SOURCES_COMMON)
+memcheck_ppc64_aix5_CPPFLAGS = $(AM_CPPFLAGS_PPC64_AIX5)
+memcheck_ppc64_aix5_CFLAGS = $(AM_CFLAGS_PPC64_AIX5) -O2
+memcheck_ppc64_aix5_CCASFLAGS = $(AM_CCASFLAGS_PPC64_AIX5)
+memcheck_ppc64_aix5_DEPENDENCIES = $(COREGRIND_LIBS_PPC64_AIX5)
+memcheck_ppc64_aix5_LDADD = $(TOOL_LDADD_PPC64_AIX5)
+memcheck_ppc64_aix5_LDFLAGS = $(TOOL_LDFLAGS_PPC64_AIX5)
 mcincludedir = $(includedir)/valgrind
 mcinclude_HEADERS = \
 	memcheck.h
 
 noinst_HEADERS = \
-	mac_shared.h	\
 	mc_include.h
 
 all: all-recursive
@@ -475,18 +739,36 @@ clean-noinstPROGRAMS:
 memcheck-amd64-linux$(EXEEXT): $(memcheck_amd64_linux_OBJECTS) $(memcheck_amd64_linux_DEPENDENCIES) 
 	@rm -f memcheck-amd64-linux$(EXEEXT)
 	$(LINK) $(memcheck_amd64_linux_LDFLAGS) $(memcheck_amd64_linux_OBJECTS) $(memcheck_amd64_linux_LDADD) $(LIBS)
+memcheck-ppc32-aix5$(EXEEXT): $(memcheck_ppc32_aix5_OBJECTS) $(memcheck_ppc32_aix5_DEPENDENCIES) 
+	@rm -f memcheck-ppc32-aix5$(EXEEXT)
+	$(LINK) $(memcheck_ppc32_aix5_LDFLAGS) $(memcheck_ppc32_aix5_OBJECTS) $(memcheck_ppc32_aix5_LDADD) $(LIBS)
 memcheck-ppc32-linux$(EXEEXT): $(memcheck_ppc32_linux_OBJECTS) $(memcheck_ppc32_linux_DEPENDENCIES) 
 	@rm -f memcheck-ppc32-linux$(EXEEXT)
 	$(LINK) $(memcheck_ppc32_linux_LDFLAGS) $(memcheck_ppc32_linux_OBJECTS) $(memcheck_ppc32_linux_LDADD) $(LIBS)
+memcheck-ppc64-aix5$(EXEEXT): $(memcheck_ppc64_aix5_OBJECTS) $(memcheck_ppc64_aix5_DEPENDENCIES) 
+	@rm -f memcheck-ppc64-aix5$(EXEEXT)
+	$(LINK) $(memcheck_ppc64_aix5_LDFLAGS) $(memcheck_ppc64_aix5_OBJECTS) $(memcheck_ppc64_aix5_LDADD) $(LIBS)
+memcheck-ppc64-linux$(EXEEXT): $(memcheck_ppc64_linux_OBJECTS) $(memcheck_ppc64_linux_DEPENDENCIES) 
+	@rm -f memcheck-ppc64-linux$(EXEEXT)
+	$(LINK) $(memcheck_ppc64_linux_LDFLAGS) $(memcheck_ppc64_linux_OBJECTS) $(memcheck_ppc64_linux_LDADD) $(LIBS)
 memcheck-x86-linux$(EXEEXT): $(memcheck_x86_linux_OBJECTS) $(memcheck_x86_linux_DEPENDENCIES) 
 	@rm -f memcheck-x86-linux$(EXEEXT)
 	$(LINK) $(memcheck_x86_linux_LDFLAGS) $(memcheck_x86_linux_OBJECTS) $(memcheck_x86_linux_LDADD) $(LIBS)
 vgpreload_memcheck-amd64-linux.so$(EXEEXT): $(vgpreload_memcheck_amd64_linux_so_OBJECTS) $(vgpreload_memcheck_amd64_linux_so_DEPENDENCIES) 
 	@rm -f vgpreload_memcheck-amd64-linux.so$(EXEEXT)
 	$(LINK) $(vgpreload_memcheck_amd64_linux_so_LDFLAGS) $(vgpreload_memcheck_amd64_linux_so_OBJECTS) $(vgpreload_memcheck_amd64_linux_so_LDADD) $(LIBS)
+vgpreload_memcheck-ppc32-aix5.so$(EXEEXT): $(vgpreload_memcheck_ppc32_aix5_so_OBJECTS) $(vgpreload_memcheck_ppc32_aix5_so_DEPENDENCIES) 
+	@rm -f vgpreload_memcheck-ppc32-aix5.so$(EXEEXT)
+	$(LINK) $(vgpreload_memcheck_ppc32_aix5_so_LDFLAGS) $(vgpreload_memcheck_ppc32_aix5_so_OBJECTS) $(vgpreload_memcheck_ppc32_aix5_so_LDADD) $(LIBS)
 vgpreload_memcheck-ppc32-linux.so$(EXEEXT): $(vgpreload_memcheck_ppc32_linux_so_OBJECTS) $(vgpreload_memcheck_ppc32_linux_so_DEPENDENCIES) 
 	@rm -f vgpreload_memcheck-ppc32-linux.so$(EXEEXT)
 	$(LINK) $(vgpreload_memcheck_ppc32_linux_so_LDFLAGS) $(vgpreload_memcheck_ppc32_linux_so_OBJECTS) $(vgpreload_memcheck_ppc32_linux_so_LDADD) $(LIBS)
+vgpreload_memcheck-ppc64-aix5.so$(EXEEXT): $(vgpreload_memcheck_ppc64_aix5_so_OBJECTS) $(vgpreload_memcheck_ppc64_aix5_so_DEPENDENCIES) 
+	@rm -f vgpreload_memcheck-ppc64-aix5.so$(EXEEXT)
+	$(LINK) $(vgpreload_memcheck_ppc64_aix5_so_LDFLAGS) $(vgpreload_memcheck_ppc64_aix5_so_OBJECTS) $(vgpreload_memcheck_ppc64_aix5_so_LDADD) $(LIBS)
+vgpreload_memcheck-ppc64-linux.so$(EXEEXT): $(vgpreload_memcheck_ppc64_linux_so_OBJECTS) $(vgpreload_memcheck_ppc64_linux_so_DEPENDENCIES) 
+	@rm -f vgpreload_memcheck-ppc64-linux.so$(EXEEXT)
+	$(LINK) $(vgpreload_memcheck_ppc64_linux_so_LDFLAGS) $(vgpreload_memcheck_ppc64_linux_so_OBJECTS) $(vgpreload_memcheck_ppc64_linux_so_LDADD) $(LIBS)
 vgpreload_memcheck-x86-linux.so$(EXEEXT): $(vgpreload_memcheck_x86_linux_so_OBJECTS) $(vgpreload_memcheck_x86_linux_so_DEPENDENCIES) 
 	@rm -f vgpreload_memcheck-x86-linux.so$(EXEEXT)
 	$(LINK) $(vgpreload_memcheck_x86_linux_so_LDFLAGS) $(vgpreload_memcheck_x86_linux_so_OBJECTS) $(vgpreload_memcheck_x86_linux_so_LDADD) $(LIBS)
@@ -497,24 +779,36 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_amd64_linux-mac_leakcheck.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_amd64_linux-mac_malloc_wrappers.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_amd64_linux-mac_shared.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_amd64_linux-mc_leakcheck.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_amd64_linux-mc_main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_amd64_linux-mc_malloc_wrappers.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_amd64_linux-mc_translate.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_linux-mac_leakcheck.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_linux-mac_malloc_wrappers.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_linux-mac_shared.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_aix5-mc_leakcheck.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_aix5-mc_main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_aix5-mc_malloc_wrappers.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_aix5-mc_translate.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_linux-mc_leakcheck.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_linux-mc_main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_linux-mc_malloc_wrappers.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_linux-mc_translate.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_x86_linux-mac_leakcheck.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_x86_linux-mac_malloc_wrappers.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_x86_linux-mac_shared.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_aix5-mc_leakcheck.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_aix5-mc_main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_aix5-mc_malloc_wrappers.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_aix5-mc_translate.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_linux-mc_leakcheck.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_linux-mc_main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_linux-mc_malloc_wrappers.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_linux-mc_translate.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_x86_linux-mc_leakcheck.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_x86_linux-mc_main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_x86_linux-mc_malloc_wrappers.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_x86_linux-mc_translate.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mac_replace_strmem.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mc_replace_strmem.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
@@ -530,33 +824,33 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
 
-memcheck_amd64_linux-mac_leakcheck.o: mac_leakcheck.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -MT memcheck_amd64_linux-mac_leakcheck.o -MD -MP -MF "$(DEPDIR)/memcheck_amd64_linux-mac_leakcheck.Tpo" -c -o memcheck_amd64_linux-mac_leakcheck.o `test -f 'mac_leakcheck.c' || echo '$(srcdir)/'`mac_leakcheck.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_amd64_linux-mac_leakcheck.Tpo" "$(DEPDIR)/memcheck_amd64_linux-mac_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_amd64_linux-mac_leakcheck.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_leakcheck.c' object='memcheck_amd64_linux-mac_leakcheck.o' libtool=no @AMDEPBACKSLASH@
+memcheck_amd64_linux-mc_leakcheck.o: mc_leakcheck.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -MT memcheck_amd64_linux-mc_leakcheck.o -MD -MP -MF "$(DEPDIR)/memcheck_amd64_linux-mc_leakcheck.Tpo" -c -o memcheck_amd64_linux-mc_leakcheck.o `test -f 'mc_leakcheck.c' || echo '$(srcdir)/'`mc_leakcheck.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_amd64_linux-mc_leakcheck.Tpo" "$(DEPDIR)/memcheck_amd64_linux-mc_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_amd64_linux-mc_leakcheck.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_leakcheck.c' object='memcheck_amd64_linux-mc_leakcheck.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_amd64_linux-mac_leakcheck.o `test -f 'mac_leakcheck.c' || echo '$(srcdir)/'`mac_leakcheck.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_amd64_linux-mc_leakcheck.o `test -f 'mc_leakcheck.c' || echo '$(srcdir)/'`mc_leakcheck.c
 
-memcheck_amd64_linux-mac_leakcheck.obj: mac_leakcheck.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -MT memcheck_amd64_linux-mac_leakcheck.obj -MD -MP -MF "$(DEPDIR)/memcheck_amd64_linux-mac_leakcheck.Tpo" -c -o memcheck_amd64_linux-mac_leakcheck.obj `if test -f 'mac_leakcheck.c'; then $(CYGPATH_W) 'mac_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mac_leakcheck.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_amd64_linux-mac_leakcheck.Tpo" "$(DEPDIR)/memcheck_amd64_linux-mac_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_amd64_linux-mac_leakcheck.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_leakcheck.c' object='memcheck_amd64_linux-mac_leakcheck.obj' libtool=no @AMDEPBACKSLASH@
+memcheck_amd64_linux-mc_leakcheck.obj: mc_leakcheck.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -MT memcheck_amd64_linux-mc_leakcheck.obj -MD -MP -MF "$(DEPDIR)/memcheck_amd64_linux-mc_leakcheck.Tpo" -c -o memcheck_amd64_linux-mc_leakcheck.obj `if test -f 'mc_leakcheck.c'; then $(CYGPATH_W) 'mc_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mc_leakcheck.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_amd64_linux-mc_leakcheck.Tpo" "$(DEPDIR)/memcheck_amd64_linux-mc_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_amd64_linux-mc_leakcheck.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_leakcheck.c' object='memcheck_amd64_linux-mc_leakcheck.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_amd64_linux-mac_leakcheck.obj `if test -f 'mac_leakcheck.c'; then $(CYGPATH_W) 'mac_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mac_leakcheck.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_amd64_linux-mc_leakcheck.obj `if test -f 'mc_leakcheck.c'; then $(CYGPATH_W) 'mc_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mc_leakcheck.c'; fi`
 
-memcheck_amd64_linux-mac_malloc_wrappers.o: mac_malloc_wrappers.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -MT memcheck_amd64_linux-mac_malloc_wrappers.o -MD -MP -MF "$(DEPDIR)/memcheck_amd64_linux-mac_malloc_wrappers.Tpo" -c -o memcheck_amd64_linux-mac_malloc_wrappers.o `test -f 'mac_malloc_wrappers.c' || echo '$(srcdir)/'`mac_malloc_wrappers.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_amd64_linux-mac_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_amd64_linux-mac_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_amd64_linux-mac_malloc_wrappers.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_malloc_wrappers.c' object='memcheck_amd64_linux-mac_malloc_wrappers.o' libtool=no @AMDEPBACKSLASH@
+memcheck_amd64_linux-mc_malloc_wrappers.o: mc_malloc_wrappers.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -MT memcheck_amd64_linux-mc_malloc_wrappers.o -MD -MP -MF "$(DEPDIR)/memcheck_amd64_linux-mc_malloc_wrappers.Tpo" -c -o memcheck_amd64_linux-mc_malloc_wrappers.o `test -f 'mc_malloc_wrappers.c' || echo '$(srcdir)/'`mc_malloc_wrappers.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_amd64_linux-mc_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_amd64_linux-mc_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_amd64_linux-mc_malloc_wrappers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_malloc_wrappers.c' object='memcheck_amd64_linux-mc_malloc_wrappers.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_amd64_linux-mac_malloc_wrappers.o `test -f 'mac_malloc_wrappers.c' || echo '$(srcdir)/'`mac_malloc_wrappers.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_amd64_linux-mc_malloc_wrappers.o `test -f 'mc_malloc_wrappers.c' || echo '$(srcdir)/'`mc_malloc_wrappers.c
 
-memcheck_amd64_linux-mac_malloc_wrappers.obj: mac_malloc_wrappers.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -MT memcheck_amd64_linux-mac_malloc_wrappers.obj -MD -MP -MF "$(DEPDIR)/memcheck_amd64_linux-mac_malloc_wrappers.Tpo" -c -o memcheck_amd64_linux-mac_malloc_wrappers.obj `if test -f 'mac_malloc_wrappers.c'; then $(CYGPATH_W) 'mac_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mac_malloc_wrappers.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_amd64_linux-mac_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_amd64_linux-mac_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_amd64_linux-mac_malloc_wrappers.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_malloc_wrappers.c' object='memcheck_amd64_linux-mac_malloc_wrappers.obj' libtool=no @AMDEPBACKSLASH@
+memcheck_amd64_linux-mc_malloc_wrappers.obj: mc_malloc_wrappers.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -MT memcheck_amd64_linux-mc_malloc_wrappers.obj -MD -MP -MF "$(DEPDIR)/memcheck_amd64_linux-mc_malloc_wrappers.Tpo" -c -o memcheck_amd64_linux-mc_malloc_wrappers.obj `if test -f 'mc_malloc_wrappers.c'; then $(CYGPATH_W) 'mc_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mc_malloc_wrappers.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_amd64_linux-mc_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_amd64_linux-mc_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_amd64_linux-mc_malloc_wrappers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_malloc_wrappers.c' object='memcheck_amd64_linux-mc_malloc_wrappers.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_amd64_linux-mac_malloc_wrappers.obj `if test -f 'mac_malloc_wrappers.c'; then $(CYGPATH_W) 'mac_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mac_malloc_wrappers.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_amd64_linux-mc_malloc_wrappers.obj `if test -f 'mc_malloc_wrappers.c'; then $(CYGPATH_W) 'mc_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mc_malloc_wrappers.c'; fi`
 
 memcheck_amd64_linux-mc_main.o: mc_main.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -MT memcheck_amd64_linux-mc_main.o -MD -MP -MF "$(DEPDIR)/memcheck_amd64_linux-mc_main.Tpo" -c -o memcheck_amd64_linux-mc_main.o `test -f 'mc_main.c' || echo '$(srcdir)/'`mc_main.c; \
@@ -572,20 +866,6 @@ memcheck_amd64_linux-mc_main.obj: mc_main.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_amd64_linux-mc_main.obj `if test -f 'mc_main.c'; then $(CYGPATH_W) 'mc_main.c'; else $(CYGPATH_W) '$(srcdir)/mc_main.c'; fi`
 
-memcheck_amd64_linux-mac_shared.o: mac_shared.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -MT memcheck_amd64_linux-mac_shared.o -MD -MP -MF "$(DEPDIR)/memcheck_amd64_linux-mac_shared.Tpo" -c -o memcheck_amd64_linux-mac_shared.o `test -f 'mac_shared.c' || echo '$(srcdir)/'`mac_shared.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_amd64_linux-mac_shared.Tpo" "$(DEPDIR)/memcheck_amd64_linux-mac_shared.Po"; else rm -f "$(DEPDIR)/memcheck_amd64_linux-mac_shared.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_shared.c' object='memcheck_amd64_linux-mac_shared.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_amd64_linux-mac_shared.o `test -f 'mac_shared.c' || echo '$(srcdir)/'`mac_shared.c
-
-memcheck_amd64_linux-mac_shared.obj: mac_shared.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -MT memcheck_amd64_linux-mac_shared.obj -MD -MP -MF "$(DEPDIR)/memcheck_amd64_linux-mac_shared.Tpo" -c -o memcheck_amd64_linux-mac_shared.obj `if test -f 'mac_shared.c'; then $(CYGPATH_W) 'mac_shared.c'; else $(CYGPATH_W) '$(srcdir)/mac_shared.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_amd64_linux-mac_shared.Tpo" "$(DEPDIR)/memcheck_amd64_linux-mac_shared.Po"; else rm -f "$(DEPDIR)/memcheck_amd64_linux-mac_shared.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_shared.c' object='memcheck_amd64_linux-mac_shared.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_amd64_linux-mac_shared.obj `if test -f 'mac_shared.c'; then $(CYGPATH_W) 'mac_shared.c'; else $(CYGPATH_W) '$(srcdir)/mac_shared.c'; fi`
-
 memcheck_amd64_linux-mc_translate.o: mc_translate.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -MT memcheck_amd64_linux-mc_translate.o -MD -MP -MF "$(DEPDIR)/memcheck_amd64_linux-mc_translate.Tpo" -c -o memcheck_amd64_linux-mc_translate.o `test -f 'mc_translate.c' || echo '$(srcdir)/'`mc_translate.c; \
 @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_amd64_linux-mc_translate.Tpo" "$(DEPDIR)/memcheck_amd64_linux-mc_translate.Po"; else rm -f "$(DEPDIR)/memcheck_amd64_linux-mc_translate.Tpo"; exit 1; fi
@@ -600,33 +880,89 @@ memcheck_amd64_linux-mc_translate.obj: mc_translate.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_amd64_linux-mc_translate.obj `if test -f 'mc_translate.c'; then $(CYGPATH_W) 'mc_translate.c'; else $(CYGPATH_W) '$(srcdir)/mc_translate.c'; fi`
 
-memcheck_ppc32_linux-mac_leakcheck.o: mac_leakcheck.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_linux-mac_leakcheck.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_linux-mac_leakcheck.Tpo" -c -o memcheck_ppc32_linux-mac_leakcheck.o `test -f 'mac_leakcheck.c' || echo '$(srcdir)/'`mac_leakcheck.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_linux-mac_leakcheck.Tpo" "$(DEPDIR)/memcheck_ppc32_linux-mac_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_linux-mac_leakcheck.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_leakcheck.c' object='memcheck_ppc32_linux-mac_leakcheck.o' libtool=no @AMDEPBACKSLASH@
+memcheck_ppc32_aix5-mc_leakcheck.o: mc_leakcheck.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_aix5-mc_leakcheck.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_aix5-mc_leakcheck.Tpo" -c -o memcheck_ppc32_aix5-mc_leakcheck.o `test -f 'mc_leakcheck.c' || echo '$(srcdir)/'`mc_leakcheck.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_leakcheck.Tpo" "$(DEPDIR)/memcheck_ppc32_aix5-mc_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_leakcheck.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_leakcheck.c' object='memcheck_ppc32_aix5-mc_leakcheck.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_linux-mac_leakcheck.o `test -f 'mac_leakcheck.c' || echo '$(srcdir)/'`mac_leakcheck.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_aix5-mc_leakcheck.o `test -f 'mc_leakcheck.c' || echo '$(srcdir)/'`mc_leakcheck.c
 
-memcheck_ppc32_linux-mac_leakcheck.obj: mac_leakcheck.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_linux-mac_leakcheck.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_linux-mac_leakcheck.Tpo" -c -o memcheck_ppc32_linux-mac_leakcheck.obj `if test -f 'mac_leakcheck.c'; then $(CYGPATH_W) 'mac_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mac_leakcheck.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_linux-mac_leakcheck.Tpo" "$(DEPDIR)/memcheck_ppc32_linux-mac_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_linux-mac_leakcheck.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_leakcheck.c' object='memcheck_ppc32_linux-mac_leakcheck.obj' libtool=no @AMDEPBACKSLASH@
+memcheck_ppc32_aix5-mc_leakcheck.obj: mc_leakcheck.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_aix5-mc_leakcheck.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_aix5-mc_leakcheck.Tpo" -c -o memcheck_ppc32_aix5-mc_leakcheck.obj `if test -f 'mc_leakcheck.c'; then $(CYGPATH_W) 'mc_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mc_leakcheck.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_leakcheck.Tpo" "$(DEPDIR)/memcheck_ppc32_aix5-mc_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_leakcheck.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_leakcheck.c' object='memcheck_ppc32_aix5-mc_leakcheck.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_linux-mac_leakcheck.obj `if test -f 'mac_leakcheck.c'; then $(CYGPATH_W) 'mac_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mac_leakcheck.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_aix5-mc_leakcheck.obj `if test -f 'mc_leakcheck.c'; then $(CYGPATH_W) 'mc_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mc_leakcheck.c'; fi`
 
-memcheck_ppc32_linux-mac_malloc_wrappers.o: mac_malloc_wrappers.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_linux-mac_malloc_wrappers.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_linux-mac_malloc_wrappers.Tpo" -c -o memcheck_ppc32_linux-mac_malloc_wrappers.o `test -f 'mac_malloc_wrappers.c' || echo '$(srcdir)/'`mac_malloc_wrappers.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_linux-mac_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_ppc32_linux-mac_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_linux-mac_malloc_wrappers.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_malloc_wrappers.c' object='memcheck_ppc32_linux-mac_malloc_wrappers.o' libtool=no @AMDEPBACKSLASH@
+memcheck_ppc32_aix5-mc_malloc_wrappers.o: mc_malloc_wrappers.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_aix5-mc_malloc_wrappers.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_aix5-mc_malloc_wrappers.Tpo" -c -o memcheck_ppc32_aix5-mc_malloc_wrappers.o `test -f 'mc_malloc_wrappers.c' || echo '$(srcdir)/'`mc_malloc_wrappers.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_ppc32_aix5-mc_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_malloc_wrappers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_malloc_wrappers.c' object='memcheck_ppc32_aix5-mc_malloc_wrappers.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_linux-mac_malloc_wrappers.o `test -f 'mac_malloc_wrappers.c' || echo '$(srcdir)/'`mac_malloc_wrappers.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_aix5-mc_malloc_wrappers.o `test -f 'mc_malloc_wrappers.c' || echo '$(srcdir)/'`mc_malloc_wrappers.c
 
-memcheck_ppc32_linux-mac_malloc_wrappers.obj: mac_malloc_wrappers.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_linux-mac_malloc_wrappers.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_linux-mac_malloc_wrappers.Tpo" -c -o memcheck_ppc32_linux-mac_malloc_wrappers.obj `if test -f 'mac_malloc_wrappers.c'; then $(CYGPATH_W) 'mac_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mac_malloc_wrappers.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_linux-mac_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_ppc32_linux-mac_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_linux-mac_malloc_wrappers.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_malloc_wrappers.c' object='memcheck_ppc32_linux-mac_malloc_wrappers.obj' libtool=no @AMDEPBACKSLASH@
+memcheck_ppc32_aix5-mc_malloc_wrappers.obj: mc_malloc_wrappers.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_aix5-mc_malloc_wrappers.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_aix5-mc_malloc_wrappers.Tpo" -c -o memcheck_ppc32_aix5-mc_malloc_wrappers.obj `if test -f 'mc_malloc_wrappers.c'; then $(CYGPATH_W) 'mc_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mc_malloc_wrappers.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_ppc32_aix5-mc_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_malloc_wrappers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_malloc_wrappers.c' object='memcheck_ppc32_aix5-mc_malloc_wrappers.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_linux-mac_malloc_wrappers.obj `if test -f 'mac_malloc_wrappers.c'; then $(CYGPATH_W) 'mac_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mac_malloc_wrappers.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_aix5-mc_malloc_wrappers.obj `if test -f 'mc_malloc_wrappers.c'; then $(CYGPATH_W) 'mc_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mc_malloc_wrappers.c'; fi`
+
+memcheck_ppc32_aix5-mc_main.o: mc_main.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_aix5-mc_main.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_aix5-mc_main.Tpo" -c -o memcheck_ppc32_aix5-mc_main.o `test -f 'mc_main.c' || echo '$(srcdir)/'`mc_main.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_main.Tpo" "$(DEPDIR)/memcheck_ppc32_aix5-mc_main.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_main.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_main.c' object='memcheck_ppc32_aix5-mc_main.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_aix5-mc_main.o `test -f 'mc_main.c' || echo '$(srcdir)/'`mc_main.c
+
+memcheck_ppc32_aix5-mc_main.obj: mc_main.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_aix5-mc_main.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_aix5-mc_main.Tpo" -c -o memcheck_ppc32_aix5-mc_main.obj `if test -f 'mc_main.c'; then $(CYGPATH_W) 'mc_main.c'; else $(CYGPATH_W) '$(srcdir)/mc_main.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_main.Tpo" "$(DEPDIR)/memcheck_ppc32_aix5-mc_main.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_main.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_main.c' object='memcheck_ppc32_aix5-mc_main.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_aix5-mc_main.obj `if test -f 'mc_main.c'; then $(CYGPATH_W) 'mc_main.c'; else $(CYGPATH_W) '$(srcdir)/mc_main.c'; fi`
+
+memcheck_ppc32_aix5-mc_translate.o: mc_translate.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_aix5-mc_translate.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_aix5-mc_translate.Tpo" -c -o memcheck_ppc32_aix5-mc_translate.o `test -f 'mc_translate.c' || echo '$(srcdir)/'`mc_translate.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_translate.Tpo" "$(DEPDIR)/memcheck_ppc32_aix5-mc_translate.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_translate.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_translate.c' object='memcheck_ppc32_aix5-mc_translate.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_aix5-mc_translate.o `test -f 'mc_translate.c' || echo '$(srcdir)/'`mc_translate.c
+
+memcheck_ppc32_aix5-mc_translate.obj: mc_translate.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_aix5-mc_translate.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_aix5-mc_translate.Tpo" -c -o memcheck_ppc32_aix5-mc_translate.obj `if test -f 'mc_translate.c'; then $(CYGPATH_W) 'mc_translate.c'; else $(CYGPATH_W) '$(srcdir)/mc_translate.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_translate.Tpo" "$(DEPDIR)/memcheck_ppc32_aix5-mc_translate.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_translate.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_translate.c' object='memcheck_ppc32_aix5-mc_translate.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_aix5-mc_translate.obj `if test -f 'mc_translate.c'; then $(CYGPATH_W) 'mc_translate.c'; else $(CYGPATH_W) '$(srcdir)/mc_translate.c'; fi`
+
+memcheck_ppc32_linux-mc_leakcheck.o: mc_leakcheck.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_linux-mc_leakcheck.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_linux-mc_leakcheck.Tpo" -c -o memcheck_ppc32_linux-mc_leakcheck.o `test -f 'mc_leakcheck.c' || echo '$(srcdir)/'`mc_leakcheck.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_linux-mc_leakcheck.Tpo" "$(DEPDIR)/memcheck_ppc32_linux-mc_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_linux-mc_leakcheck.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_leakcheck.c' object='memcheck_ppc32_linux-mc_leakcheck.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_linux-mc_leakcheck.o `test -f 'mc_leakcheck.c' || echo '$(srcdir)/'`mc_leakcheck.c
+
+memcheck_ppc32_linux-mc_leakcheck.obj: mc_leakcheck.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_linux-mc_leakcheck.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_linux-mc_leakcheck.Tpo" -c -o memcheck_ppc32_linux-mc_leakcheck.obj `if test -f 'mc_leakcheck.c'; then $(CYGPATH_W) 'mc_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mc_leakcheck.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_linux-mc_leakcheck.Tpo" "$(DEPDIR)/memcheck_ppc32_linux-mc_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_linux-mc_leakcheck.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_leakcheck.c' object='memcheck_ppc32_linux-mc_leakcheck.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_linux-mc_leakcheck.obj `if test -f 'mc_leakcheck.c'; then $(CYGPATH_W) 'mc_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mc_leakcheck.c'; fi`
+
+memcheck_ppc32_linux-mc_malloc_wrappers.o: mc_malloc_wrappers.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_linux-mc_malloc_wrappers.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_linux-mc_malloc_wrappers.Tpo" -c -o memcheck_ppc32_linux-mc_malloc_wrappers.o `test -f 'mc_malloc_wrappers.c' || echo '$(srcdir)/'`mc_malloc_wrappers.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_linux-mc_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_ppc32_linux-mc_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_linux-mc_malloc_wrappers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_malloc_wrappers.c' object='memcheck_ppc32_linux-mc_malloc_wrappers.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_linux-mc_malloc_wrappers.o `test -f 'mc_malloc_wrappers.c' || echo '$(srcdir)/'`mc_malloc_wrappers.c
+
+memcheck_ppc32_linux-mc_malloc_wrappers.obj: mc_malloc_wrappers.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_linux-mc_malloc_wrappers.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_linux-mc_malloc_wrappers.Tpo" -c -o memcheck_ppc32_linux-mc_malloc_wrappers.obj `if test -f 'mc_malloc_wrappers.c'; then $(CYGPATH_W) 'mc_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mc_malloc_wrappers.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_linux-mc_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_ppc32_linux-mc_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_linux-mc_malloc_wrappers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_malloc_wrappers.c' object='memcheck_ppc32_linux-mc_malloc_wrappers.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_linux-mc_malloc_wrappers.obj `if test -f 'mc_malloc_wrappers.c'; then $(CYGPATH_W) 'mc_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mc_malloc_wrappers.c'; fi`
 
 memcheck_ppc32_linux-mc_main.o: mc_main.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_linux-mc_main.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_linux-mc_main.Tpo" -c -o memcheck_ppc32_linux-mc_main.o `test -f 'mc_main.c' || echo '$(srcdir)/'`mc_main.c; \
@@ -642,20 +978,6 @@ memcheck_ppc32_linux-mc_main.obj: mc_main.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_linux-mc_main.obj `if test -f 'mc_main.c'; then $(CYGPATH_W) 'mc_main.c'; else $(CYGPATH_W) '$(srcdir)/mc_main.c'; fi`
 
-memcheck_ppc32_linux-mac_shared.o: mac_shared.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_linux-mac_shared.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_linux-mac_shared.Tpo" -c -o memcheck_ppc32_linux-mac_shared.o `test -f 'mac_shared.c' || echo '$(srcdir)/'`mac_shared.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_linux-mac_shared.Tpo" "$(DEPDIR)/memcheck_ppc32_linux-mac_shared.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_linux-mac_shared.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_shared.c' object='memcheck_ppc32_linux-mac_shared.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_linux-mac_shared.o `test -f 'mac_shared.c' || echo '$(srcdir)/'`mac_shared.c
-
-memcheck_ppc32_linux-mac_shared.obj: mac_shared.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_linux-mac_shared.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_linux-mac_shared.Tpo" -c -o memcheck_ppc32_linux-mac_shared.obj `if test -f 'mac_shared.c'; then $(CYGPATH_W) 'mac_shared.c'; else $(CYGPATH_W) '$(srcdir)/mac_shared.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_linux-mac_shared.Tpo" "$(DEPDIR)/memcheck_ppc32_linux-mac_shared.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_linux-mac_shared.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_shared.c' object='memcheck_ppc32_linux-mac_shared.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_linux-mac_shared.obj `if test -f 'mac_shared.c'; then $(CYGPATH_W) 'mac_shared.c'; else $(CYGPATH_W) '$(srcdir)/mac_shared.c'; fi`
-
 memcheck_ppc32_linux-mc_translate.o: mc_translate.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_linux-mc_translate.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_linux-mc_translate.Tpo" -c -o memcheck_ppc32_linux-mc_translate.o `test -f 'mc_translate.c' || echo '$(srcdir)/'`mc_translate.c; \
 @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_linux-mc_translate.Tpo" "$(DEPDIR)/memcheck_ppc32_linux-mc_translate.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_linux-mc_translate.Tpo"; exit 1; fi
@@ -670,33 +992,145 @@ memcheck_ppc32_linux-mc_translate.obj: mc_translate.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_linux-mc_translate.obj `if test -f 'mc_translate.c'; then $(CYGPATH_W) 'mc_translate.c'; else $(CYGPATH_W) '$(srcdir)/mc_translate.c'; fi`
 
-memcheck_x86_linux-mac_leakcheck.o: mac_leakcheck.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -MT memcheck_x86_linux-mac_leakcheck.o -MD -MP -MF "$(DEPDIR)/memcheck_x86_linux-mac_leakcheck.Tpo" -c -o memcheck_x86_linux-mac_leakcheck.o `test -f 'mac_leakcheck.c' || echo '$(srcdir)/'`mac_leakcheck.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_x86_linux-mac_leakcheck.Tpo" "$(DEPDIR)/memcheck_x86_linux-mac_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_x86_linux-mac_leakcheck.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_leakcheck.c' object='memcheck_x86_linux-mac_leakcheck.o' libtool=no @AMDEPBACKSLASH@
+memcheck_ppc64_aix5-mc_leakcheck.o: mc_leakcheck.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_aix5-mc_leakcheck.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_aix5-mc_leakcheck.Tpo" -c -o memcheck_ppc64_aix5-mc_leakcheck.o `test -f 'mc_leakcheck.c' || echo '$(srcdir)/'`mc_leakcheck.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_leakcheck.Tpo" "$(DEPDIR)/memcheck_ppc64_aix5-mc_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_leakcheck.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_leakcheck.c' object='memcheck_ppc64_aix5-mc_leakcheck.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -c -o memcheck_x86_linux-mac_leakcheck.o `test -f 'mac_leakcheck.c' || echo '$(srcdir)/'`mac_leakcheck.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_aix5-mc_leakcheck.o `test -f 'mc_leakcheck.c' || echo '$(srcdir)/'`mc_leakcheck.c
 
-memcheck_x86_linux-mac_leakcheck.obj: mac_leakcheck.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -MT memcheck_x86_linux-mac_leakcheck.obj -MD -MP -MF "$(DEPDIR)/memcheck_x86_linux-mac_leakcheck.Tpo" -c -o memcheck_x86_linux-mac_leakcheck.obj `if test -f 'mac_leakcheck.c'; then $(CYGPATH_W) 'mac_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mac_leakcheck.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_x86_linux-mac_leakcheck.Tpo" "$(DEPDIR)/memcheck_x86_linux-mac_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_x86_linux-mac_leakcheck.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_leakcheck.c' object='memcheck_x86_linux-mac_leakcheck.obj' libtool=no @AMDEPBACKSLASH@
+memcheck_ppc64_aix5-mc_leakcheck.obj: mc_leakcheck.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_aix5-mc_leakcheck.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_aix5-mc_leakcheck.Tpo" -c -o memcheck_ppc64_aix5-mc_leakcheck.obj `if test -f 'mc_leakcheck.c'; then $(CYGPATH_W) 'mc_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mc_leakcheck.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_leakcheck.Tpo" "$(DEPDIR)/memcheck_ppc64_aix5-mc_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_leakcheck.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_leakcheck.c' object='memcheck_ppc64_aix5-mc_leakcheck.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -c -o memcheck_x86_linux-mac_leakcheck.obj `if test -f 'mac_leakcheck.c'; then $(CYGPATH_W) 'mac_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mac_leakcheck.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_aix5-mc_leakcheck.obj `if test -f 'mc_leakcheck.c'; then $(CYGPATH_W) 'mc_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mc_leakcheck.c'; fi`
 
-memcheck_x86_linux-mac_malloc_wrappers.o: mac_malloc_wrappers.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -MT memcheck_x86_linux-mac_malloc_wrappers.o -MD -MP -MF "$(DEPDIR)/memcheck_x86_linux-mac_malloc_wrappers.Tpo" -c -o memcheck_x86_linux-mac_malloc_wrappers.o `test -f 'mac_malloc_wrappers.c' || echo '$(srcdir)/'`mac_malloc_wrappers.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_x86_linux-mac_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_x86_linux-mac_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_x86_linux-mac_malloc_wrappers.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_malloc_wrappers.c' object='memcheck_x86_linux-mac_malloc_wrappers.o' libtool=no @AMDEPBACKSLASH@
+memcheck_ppc64_aix5-mc_malloc_wrappers.o: mc_malloc_wrappers.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_aix5-mc_malloc_wrappers.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_aix5-mc_malloc_wrappers.Tpo" -c -o memcheck_ppc64_aix5-mc_malloc_wrappers.o `test -f 'mc_malloc_wrappers.c' || echo '$(srcdir)/'`mc_malloc_wrappers.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_ppc64_aix5-mc_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_malloc_wrappers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_malloc_wrappers.c' object='memcheck_ppc64_aix5-mc_malloc_wrappers.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -c -o memcheck_x86_linux-mac_malloc_wrappers.o `test -f 'mac_malloc_wrappers.c' || echo '$(srcdir)/'`mac_malloc_wrappers.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_aix5-mc_malloc_wrappers.o `test -f 'mc_malloc_wrappers.c' || echo '$(srcdir)/'`mc_malloc_wrappers.c
 
-memcheck_x86_linux-mac_malloc_wrappers.obj: mac_malloc_wrappers.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -MT memcheck_x86_linux-mac_malloc_wrappers.obj -MD -MP -MF "$(DEPDIR)/memcheck_x86_linux-mac_malloc_wrappers.Tpo" -c -o memcheck_x86_linux-mac_malloc_wrappers.obj `if test -f 'mac_malloc_wrappers.c'; then $(CYGPATH_W) 'mac_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mac_malloc_wrappers.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_x86_linux-mac_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_x86_linux-mac_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_x86_linux-mac_malloc_wrappers.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_malloc_wrappers.c' object='memcheck_x86_linux-mac_malloc_wrappers.obj' libtool=no @AMDEPBACKSLASH@
+memcheck_ppc64_aix5-mc_malloc_wrappers.obj: mc_malloc_wrappers.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_aix5-mc_malloc_wrappers.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_aix5-mc_malloc_wrappers.Tpo" -c -o memcheck_ppc64_aix5-mc_malloc_wrappers.obj `if test -f 'mc_malloc_wrappers.c'; then $(CYGPATH_W) 'mc_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mc_malloc_wrappers.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_ppc64_aix5-mc_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_malloc_wrappers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_malloc_wrappers.c' object='memcheck_ppc64_aix5-mc_malloc_wrappers.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -c -o memcheck_x86_linux-mac_malloc_wrappers.obj `if test -f 'mac_malloc_wrappers.c'; then $(CYGPATH_W) 'mac_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mac_malloc_wrappers.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_aix5-mc_malloc_wrappers.obj `if test -f 'mc_malloc_wrappers.c'; then $(CYGPATH_W) 'mc_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mc_malloc_wrappers.c'; fi`
+
+memcheck_ppc64_aix5-mc_main.o: mc_main.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_aix5-mc_main.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_aix5-mc_main.Tpo" -c -o memcheck_ppc64_aix5-mc_main.o `test -f 'mc_main.c' || echo '$(srcdir)/'`mc_main.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_main.Tpo" "$(DEPDIR)/memcheck_ppc64_aix5-mc_main.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_main.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_main.c' object='memcheck_ppc64_aix5-mc_main.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_aix5-mc_main.o `test -f 'mc_main.c' || echo '$(srcdir)/'`mc_main.c
+
+memcheck_ppc64_aix5-mc_main.obj: mc_main.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_aix5-mc_main.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_aix5-mc_main.Tpo" -c -o memcheck_ppc64_aix5-mc_main.obj `if test -f 'mc_main.c'; then $(CYGPATH_W) 'mc_main.c'; else $(CYGPATH_W) '$(srcdir)/mc_main.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_main.Tpo" "$(DEPDIR)/memcheck_ppc64_aix5-mc_main.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_main.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_main.c' object='memcheck_ppc64_aix5-mc_main.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_aix5-mc_main.obj `if test -f 'mc_main.c'; then $(CYGPATH_W) 'mc_main.c'; else $(CYGPATH_W) '$(srcdir)/mc_main.c'; fi`
+
+memcheck_ppc64_aix5-mc_translate.o: mc_translate.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_aix5-mc_translate.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_aix5-mc_translate.Tpo" -c -o memcheck_ppc64_aix5-mc_translate.o `test -f 'mc_translate.c' || echo '$(srcdir)/'`mc_translate.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_translate.Tpo" "$(DEPDIR)/memcheck_ppc64_aix5-mc_translate.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_translate.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_translate.c' object='memcheck_ppc64_aix5-mc_translate.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_aix5-mc_translate.o `test -f 'mc_translate.c' || echo '$(srcdir)/'`mc_translate.c
+
+memcheck_ppc64_aix5-mc_translate.obj: mc_translate.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_aix5-mc_translate.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_aix5-mc_translate.Tpo" -c -o memcheck_ppc64_aix5-mc_translate.obj `if test -f 'mc_translate.c'; then $(CYGPATH_W) 'mc_translate.c'; else $(CYGPATH_W) '$(srcdir)/mc_translate.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_translate.Tpo" "$(DEPDIR)/memcheck_ppc64_aix5-mc_translate.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_translate.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_translate.c' object='memcheck_ppc64_aix5-mc_translate.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_aix5-mc_translate.obj `if test -f 'mc_translate.c'; then $(CYGPATH_W) 'mc_translate.c'; else $(CYGPATH_W) '$(srcdir)/mc_translate.c'; fi`
+
+memcheck_ppc64_linux-mc_leakcheck.o: mc_leakcheck.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_linux-mc_leakcheck.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_linux-mc_leakcheck.Tpo" -c -o memcheck_ppc64_linux-mc_leakcheck.o `test -f 'mc_leakcheck.c' || echo '$(srcdir)/'`mc_leakcheck.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_linux-mc_leakcheck.Tpo" "$(DEPDIR)/memcheck_ppc64_linux-mc_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_linux-mc_leakcheck.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_leakcheck.c' object='memcheck_ppc64_linux-mc_leakcheck.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_linux-mc_leakcheck.o `test -f 'mc_leakcheck.c' || echo '$(srcdir)/'`mc_leakcheck.c
+
+memcheck_ppc64_linux-mc_leakcheck.obj: mc_leakcheck.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_linux-mc_leakcheck.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_linux-mc_leakcheck.Tpo" -c -o memcheck_ppc64_linux-mc_leakcheck.obj `if test -f 'mc_leakcheck.c'; then $(CYGPATH_W) 'mc_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mc_leakcheck.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_linux-mc_leakcheck.Tpo" "$(DEPDIR)/memcheck_ppc64_linux-mc_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_linux-mc_leakcheck.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_leakcheck.c' object='memcheck_ppc64_linux-mc_leakcheck.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_linux-mc_leakcheck.obj `if test -f 'mc_leakcheck.c'; then $(CYGPATH_W) 'mc_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mc_leakcheck.c'; fi`
+
+memcheck_ppc64_linux-mc_malloc_wrappers.o: mc_malloc_wrappers.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_linux-mc_malloc_wrappers.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_linux-mc_malloc_wrappers.Tpo" -c -o memcheck_ppc64_linux-mc_malloc_wrappers.o `test -f 'mc_malloc_wrappers.c' || echo '$(srcdir)/'`mc_malloc_wrappers.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_linux-mc_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_ppc64_linux-mc_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_linux-mc_malloc_wrappers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_malloc_wrappers.c' object='memcheck_ppc64_linux-mc_malloc_wrappers.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_linux-mc_malloc_wrappers.o `test -f 'mc_malloc_wrappers.c' || echo '$(srcdir)/'`mc_malloc_wrappers.c
+
+memcheck_ppc64_linux-mc_malloc_wrappers.obj: mc_malloc_wrappers.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_linux-mc_malloc_wrappers.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_linux-mc_malloc_wrappers.Tpo" -c -o memcheck_ppc64_linux-mc_malloc_wrappers.obj `if test -f 'mc_malloc_wrappers.c'; then $(CYGPATH_W) 'mc_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mc_malloc_wrappers.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_linux-mc_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_ppc64_linux-mc_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_linux-mc_malloc_wrappers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_malloc_wrappers.c' object='memcheck_ppc64_linux-mc_malloc_wrappers.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_linux-mc_malloc_wrappers.obj `if test -f 'mc_malloc_wrappers.c'; then $(CYGPATH_W) 'mc_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mc_malloc_wrappers.c'; fi`
+
+memcheck_ppc64_linux-mc_main.o: mc_main.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_linux-mc_main.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_linux-mc_main.Tpo" -c -o memcheck_ppc64_linux-mc_main.o `test -f 'mc_main.c' || echo '$(srcdir)/'`mc_main.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_linux-mc_main.Tpo" "$(DEPDIR)/memcheck_ppc64_linux-mc_main.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_linux-mc_main.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_main.c' object='memcheck_ppc64_linux-mc_main.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_linux-mc_main.o `test -f 'mc_main.c' || echo '$(srcdir)/'`mc_main.c
+
+memcheck_ppc64_linux-mc_main.obj: mc_main.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_linux-mc_main.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_linux-mc_main.Tpo" -c -o memcheck_ppc64_linux-mc_main.obj `if test -f 'mc_main.c'; then $(CYGPATH_W) 'mc_main.c'; else $(CYGPATH_W) '$(srcdir)/mc_main.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_linux-mc_main.Tpo" "$(DEPDIR)/memcheck_ppc64_linux-mc_main.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_linux-mc_main.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_main.c' object='memcheck_ppc64_linux-mc_main.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_linux-mc_main.obj `if test -f 'mc_main.c'; then $(CYGPATH_W) 'mc_main.c'; else $(CYGPATH_W) '$(srcdir)/mc_main.c'; fi`
+
+memcheck_ppc64_linux-mc_translate.o: mc_translate.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_linux-mc_translate.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_linux-mc_translate.Tpo" -c -o memcheck_ppc64_linux-mc_translate.o `test -f 'mc_translate.c' || echo '$(srcdir)/'`mc_translate.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_linux-mc_translate.Tpo" "$(DEPDIR)/memcheck_ppc64_linux-mc_translate.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_linux-mc_translate.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_translate.c' object='memcheck_ppc64_linux-mc_translate.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_linux-mc_translate.o `test -f 'mc_translate.c' || echo '$(srcdir)/'`mc_translate.c
+
+memcheck_ppc64_linux-mc_translate.obj: mc_translate.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_linux-mc_translate.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_linux-mc_translate.Tpo" -c -o memcheck_ppc64_linux-mc_translate.obj `if test -f 'mc_translate.c'; then $(CYGPATH_W) 'mc_translate.c'; else $(CYGPATH_W) '$(srcdir)/mc_translate.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_linux-mc_translate.Tpo" "$(DEPDIR)/memcheck_ppc64_linux-mc_translate.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_linux-mc_translate.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_translate.c' object='memcheck_ppc64_linux-mc_translate.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_linux-mc_translate.obj `if test -f 'mc_translate.c'; then $(CYGPATH_W) 'mc_translate.c'; else $(CYGPATH_W) '$(srcdir)/mc_translate.c'; fi`
+
+memcheck_x86_linux-mc_leakcheck.o: mc_leakcheck.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -MT memcheck_x86_linux-mc_leakcheck.o -MD -MP -MF "$(DEPDIR)/memcheck_x86_linux-mc_leakcheck.Tpo" -c -o memcheck_x86_linux-mc_leakcheck.o `test -f 'mc_leakcheck.c' || echo '$(srcdir)/'`mc_leakcheck.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_x86_linux-mc_leakcheck.Tpo" "$(DEPDIR)/memcheck_x86_linux-mc_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_x86_linux-mc_leakcheck.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_leakcheck.c' object='memcheck_x86_linux-mc_leakcheck.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -c -o memcheck_x86_linux-mc_leakcheck.o `test -f 'mc_leakcheck.c' || echo '$(srcdir)/'`mc_leakcheck.c
+
+memcheck_x86_linux-mc_leakcheck.obj: mc_leakcheck.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -MT memcheck_x86_linux-mc_leakcheck.obj -MD -MP -MF "$(DEPDIR)/memcheck_x86_linux-mc_leakcheck.Tpo" -c -o memcheck_x86_linux-mc_leakcheck.obj `if test -f 'mc_leakcheck.c'; then $(CYGPATH_W) 'mc_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mc_leakcheck.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_x86_linux-mc_leakcheck.Tpo" "$(DEPDIR)/memcheck_x86_linux-mc_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_x86_linux-mc_leakcheck.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_leakcheck.c' object='memcheck_x86_linux-mc_leakcheck.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -c -o memcheck_x86_linux-mc_leakcheck.obj `if test -f 'mc_leakcheck.c'; then $(CYGPATH_W) 'mc_leakcheck.c'; else $(CYGPATH_W) '$(srcdir)/mc_leakcheck.c'; fi`
+
+memcheck_x86_linux-mc_malloc_wrappers.o: mc_malloc_wrappers.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -MT memcheck_x86_linux-mc_malloc_wrappers.o -MD -MP -MF "$(DEPDIR)/memcheck_x86_linux-mc_malloc_wrappers.Tpo" -c -o memcheck_x86_linux-mc_malloc_wrappers.o `test -f 'mc_malloc_wrappers.c' || echo '$(srcdir)/'`mc_malloc_wrappers.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_x86_linux-mc_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_x86_linux-mc_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_x86_linux-mc_malloc_wrappers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_malloc_wrappers.c' object='memcheck_x86_linux-mc_malloc_wrappers.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -c -o memcheck_x86_linux-mc_malloc_wrappers.o `test -f 'mc_malloc_wrappers.c' || echo '$(srcdir)/'`mc_malloc_wrappers.c
+
+memcheck_x86_linux-mc_malloc_wrappers.obj: mc_malloc_wrappers.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -MT memcheck_x86_linux-mc_malloc_wrappers.obj -MD -MP -MF "$(DEPDIR)/memcheck_x86_linux-mc_malloc_wrappers.Tpo" -c -o memcheck_x86_linux-mc_malloc_wrappers.obj `if test -f 'mc_malloc_wrappers.c'; then $(CYGPATH_W) 'mc_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mc_malloc_wrappers.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_x86_linux-mc_malloc_wrappers.Tpo" "$(DEPDIR)/memcheck_x86_linux-mc_malloc_wrappers.Po"; else rm -f "$(DEPDIR)/memcheck_x86_linux-mc_malloc_wrappers.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_malloc_wrappers.c' object='memcheck_x86_linux-mc_malloc_wrappers.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -c -o memcheck_x86_linux-mc_malloc_wrappers.obj `if test -f 'mc_malloc_wrappers.c'; then $(CYGPATH_W) 'mc_malloc_wrappers.c'; else $(CYGPATH_W) '$(srcdir)/mc_malloc_wrappers.c'; fi`
 
 memcheck_x86_linux-mc_main.o: mc_main.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -MT memcheck_x86_linux-mc_main.o -MD -MP -MF "$(DEPDIR)/memcheck_x86_linux-mc_main.Tpo" -c -o memcheck_x86_linux-mc_main.o `test -f 'mc_main.c' || echo '$(srcdir)/'`mc_main.c; \
@@ -712,20 +1146,6 @@ memcheck_x86_linux-mc_main.obj: mc_main.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -c -o memcheck_x86_linux-mc_main.obj `if test -f 'mc_main.c'; then $(CYGPATH_W) 'mc_main.c'; else $(CYGPATH_W) '$(srcdir)/mc_main.c'; fi`
 
-memcheck_x86_linux-mac_shared.o: mac_shared.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -MT memcheck_x86_linux-mac_shared.o -MD -MP -MF "$(DEPDIR)/memcheck_x86_linux-mac_shared.Tpo" -c -o memcheck_x86_linux-mac_shared.o `test -f 'mac_shared.c' || echo '$(srcdir)/'`mac_shared.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_x86_linux-mac_shared.Tpo" "$(DEPDIR)/memcheck_x86_linux-mac_shared.Po"; else rm -f "$(DEPDIR)/memcheck_x86_linux-mac_shared.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_shared.c' object='memcheck_x86_linux-mac_shared.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -c -o memcheck_x86_linux-mac_shared.o `test -f 'mac_shared.c' || echo '$(srcdir)/'`mac_shared.c
-
-memcheck_x86_linux-mac_shared.obj: mac_shared.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -MT memcheck_x86_linux-mac_shared.obj -MD -MP -MF "$(DEPDIR)/memcheck_x86_linux-mac_shared.Tpo" -c -o memcheck_x86_linux-mac_shared.obj `if test -f 'mac_shared.c'; then $(CYGPATH_W) 'mac_shared.c'; else $(CYGPATH_W) '$(srcdir)/mac_shared.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_x86_linux-mac_shared.Tpo" "$(DEPDIR)/memcheck_x86_linux-mac_shared.Po"; else rm -f "$(DEPDIR)/memcheck_x86_linux-mac_shared.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_shared.c' object='memcheck_x86_linux-mac_shared.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -c -o memcheck_x86_linux-mac_shared.obj `if test -f 'mac_shared.c'; then $(CYGPATH_W) 'mac_shared.c'; else $(CYGPATH_W) '$(srcdir)/mac_shared.c'; fi`
-
 memcheck_x86_linux-mc_translate.o: mc_translate.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -MT memcheck_x86_linux-mc_translate.o -MD -MP -MF "$(DEPDIR)/memcheck_x86_linux-mc_translate.Tpo" -c -o memcheck_x86_linux-mc_translate.o `test -f 'mc_translate.c' || echo '$(srcdir)/'`mc_translate.c; \
 @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_x86_linux-mc_translate.Tpo" "$(DEPDIR)/memcheck_x86_linux-mc_translate.Po"; else rm -f "$(DEPDIR)/memcheck_x86_linux-mc_translate.Tpo"; exit 1; fi
@@ -740,47 +1160,89 @@ memcheck_x86_linux-mc_translate.obj: mc_translate.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -c -o memcheck_x86_linux-mc_translate.obj `if test -f 'mc_translate.c'; then $(CYGPATH_W) 'mc_translate.c'; else $(CYGPATH_W) '$(srcdir)/mc_translate.c'; fi`
 
-vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.o: mac_replace_strmem.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_amd64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_amd64_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.o -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.Tpo" -c -o vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.o `test -f 'mac_replace_strmem.c' || echo '$(srcdir)/'`mac_replace_strmem.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_replace_strmem.c' object='vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.o' libtool=no @AMDEPBACKSLASH@
+vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.o: mc_replace_strmem.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_amd64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_amd64_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.o -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.Tpo" -c -o vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.o `test -f 'mc_replace_strmem.c' || echo '$(srcdir)/'`mc_replace_strmem.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_replace_strmem.c' object='vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_amd64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_amd64_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.o `test -f 'mac_replace_strmem.c' || echo '$(srcdir)/'`mac_replace_strmem.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_amd64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_amd64_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.o `test -f 'mc_replace_strmem.c' || echo '$(srcdir)/'`mc_replace_strmem.c
 
-vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.obj: mac_replace_strmem.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_amd64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_amd64_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.obj -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.Tpo" -c -o vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.obj `if test -f 'mac_replace_strmem.c'; then $(CYGPATH_W) 'mac_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mac_replace_strmem.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_replace_strmem.c' object='vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.obj' libtool=no @AMDEPBACKSLASH@
+vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.obj: mc_replace_strmem.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_amd64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_amd64_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.obj -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.Tpo" -c -o vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.obj `if test -f 'mc_replace_strmem.c'; then $(CYGPATH_W) 'mc_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mc_replace_strmem.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_replace_strmem.c' object='vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_amd64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_amd64_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_amd64_linux_so-mac_replace_strmem.obj `if test -f 'mac_replace_strmem.c'; then $(CYGPATH_W) 'mac_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mac_replace_strmem.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_amd64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_amd64_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.obj `if test -f 'mc_replace_strmem.c'; then $(CYGPATH_W) 'mc_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mc_replace_strmem.c'; fi`
 
-vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.o: mac_replace_strmem.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc32_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc32_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.o -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.Tpo" -c -o vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.o `test -f 'mac_replace_strmem.c' || echo '$(srcdir)/'`mac_replace_strmem.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_replace_strmem.c' object='vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.o' libtool=no @AMDEPBACKSLASH@
+vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.o: mc_replace_strmem.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc32_aix5_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc32_aix5_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.o -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.Tpo" -c -o vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.o `test -f 'mc_replace_strmem.c' || echo '$(srcdir)/'`mc_replace_strmem.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_replace_strmem.c' object='vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc32_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc32_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.o `test -f 'mac_replace_strmem.c' || echo '$(srcdir)/'`mac_replace_strmem.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc32_aix5_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc32_aix5_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.o `test -f 'mc_replace_strmem.c' || echo '$(srcdir)/'`mc_replace_strmem.c
 
-vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.obj: mac_replace_strmem.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc32_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc32_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.obj -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.Tpo" -c -o vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.obj `if test -f 'mac_replace_strmem.c'; then $(CYGPATH_W) 'mac_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mac_replace_strmem.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_replace_strmem.c' object='vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.obj' libtool=no @AMDEPBACKSLASH@
+vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.obj: mc_replace_strmem.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc32_aix5_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc32_aix5_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.obj -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.Tpo" -c -o vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.obj `if test -f 'mc_replace_strmem.c'; then $(CYGPATH_W) 'mc_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mc_replace_strmem.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_replace_strmem.c' object='vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc32_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc32_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_ppc32_linux_so-mac_replace_strmem.obj `if test -f 'mac_replace_strmem.c'; then $(CYGPATH_W) 'mac_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mac_replace_strmem.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc32_aix5_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc32_aix5_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_ppc32_aix5_so-mc_replace_strmem.obj `if test -f 'mc_replace_strmem.c'; then $(CYGPATH_W) 'mc_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mc_replace_strmem.c'; fi`
 
-vgpreload_memcheck_x86_linux_so-mac_replace_strmem.o: mac_replace_strmem.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_x86_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_x86_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_x86_linux_so-mac_replace_strmem.o -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mac_replace_strmem.Tpo" -c -o vgpreload_memcheck_x86_linux_so-mac_replace_strmem.o `test -f 'mac_replace_strmem.c' || echo '$(srcdir)/'`mac_replace_strmem.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mac_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mac_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mac_replace_strmem.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_replace_strmem.c' object='vgpreload_memcheck_x86_linux_so-mac_replace_strmem.o' libtool=no @AMDEPBACKSLASH@
+vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.o: mc_replace_strmem.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc32_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc32_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.o -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.Tpo" -c -o vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.o `test -f 'mc_replace_strmem.c' || echo '$(srcdir)/'`mc_replace_strmem.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_replace_strmem.c' object='vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_x86_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_x86_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_x86_linux_so-mac_replace_strmem.o `test -f 'mac_replace_strmem.c' || echo '$(srcdir)/'`mac_replace_strmem.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc32_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc32_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.o `test -f 'mc_replace_strmem.c' || echo '$(srcdir)/'`mc_replace_strmem.c
 
-vgpreload_memcheck_x86_linux_so-mac_replace_strmem.obj: mac_replace_strmem.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_x86_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_x86_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_x86_linux_so-mac_replace_strmem.obj -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mac_replace_strmem.Tpo" -c -o vgpreload_memcheck_x86_linux_so-mac_replace_strmem.obj `if test -f 'mac_replace_strmem.c'; then $(CYGPATH_W) 'mac_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mac_replace_strmem.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mac_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mac_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mac_replace_strmem.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mac_replace_strmem.c' object='vgpreload_memcheck_x86_linux_so-mac_replace_strmem.obj' libtool=no @AMDEPBACKSLASH@
+vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.obj: mc_replace_strmem.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc32_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc32_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.obj -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.Tpo" -c -o vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.obj `if test -f 'mc_replace_strmem.c'; then $(CYGPATH_W) 'mc_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mc_replace_strmem.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_replace_strmem.c' object='vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_x86_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_x86_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_x86_linux_so-mac_replace_strmem.obj `if test -f 'mac_replace_strmem.c'; then $(CYGPATH_W) 'mac_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mac_replace_strmem.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc32_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc32_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_ppc32_linux_so-mc_replace_strmem.obj `if test -f 'mc_replace_strmem.c'; then $(CYGPATH_W) 'mc_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mc_replace_strmem.c'; fi`
+
+vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.o: mc_replace_strmem.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc64_aix5_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc64_aix5_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.o -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.Tpo" -c -o vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.o `test -f 'mc_replace_strmem.c' || echo '$(srcdir)/'`mc_replace_strmem.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_replace_strmem.c' object='vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc64_aix5_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc64_aix5_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.o `test -f 'mc_replace_strmem.c' || echo '$(srcdir)/'`mc_replace_strmem.c
+
+vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.obj: mc_replace_strmem.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc64_aix5_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc64_aix5_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.obj -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.Tpo" -c -o vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.obj `if test -f 'mc_replace_strmem.c'; then $(CYGPATH_W) 'mc_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mc_replace_strmem.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_replace_strmem.c' object='vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc64_aix5_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc64_aix5_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_ppc64_aix5_so-mc_replace_strmem.obj `if test -f 'mc_replace_strmem.c'; then $(CYGPATH_W) 'mc_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mc_replace_strmem.c'; fi`
+
+vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.o: mc_replace_strmem.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc64_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.o -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.Tpo" -c -o vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.o `test -f 'mc_replace_strmem.c' || echo '$(srcdir)/'`mc_replace_strmem.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_replace_strmem.c' object='vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc64_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.o `test -f 'mc_replace_strmem.c' || echo '$(srcdir)/'`mc_replace_strmem.c
+
+vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.obj: mc_replace_strmem.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc64_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.obj -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.Tpo" -c -o vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.obj `if test -f 'mc_replace_strmem.c'; then $(CYGPATH_W) 'mc_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mc_replace_strmem.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_replace_strmem.c' object='vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_ppc64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_ppc64_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_ppc64_linux_so-mc_replace_strmem.obj `if test -f 'mc_replace_strmem.c'; then $(CYGPATH_W) 'mc_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mc_replace_strmem.c'; fi`
+
+vgpreload_memcheck_x86_linux_so-mc_replace_strmem.o: mc_replace_strmem.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_x86_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_x86_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_x86_linux_so-mc_replace_strmem.o -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mc_replace_strmem.Tpo" -c -o vgpreload_memcheck_x86_linux_so-mc_replace_strmem.o `test -f 'mc_replace_strmem.c' || echo '$(srcdir)/'`mc_replace_strmem.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mc_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mc_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mc_replace_strmem.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_replace_strmem.c' object='vgpreload_memcheck_x86_linux_so-mc_replace_strmem.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_x86_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_x86_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_x86_linux_so-mc_replace_strmem.o `test -f 'mc_replace_strmem.c' || echo '$(srcdir)/'`mc_replace_strmem.c
+
+vgpreload_memcheck_x86_linux_so-mc_replace_strmem.obj: mc_replace_strmem.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_x86_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_x86_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_x86_linux_so-mc_replace_strmem.obj -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mc_replace_strmem.Tpo" -c -o vgpreload_memcheck_x86_linux_so-mc_replace_strmem.obj `if test -f 'mc_replace_strmem.c'; then $(CYGPATH_W) 'mc_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mc_replace_strmem.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mc_replace_strmem.Tpo" "$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mc_replace_strmem.Po"; else rm -f "$(DEPDIR)/vgpreload_memcheck_x86_linux_so-mc_replace_strmem.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_replace_strmem.c' object='vgpreload_memcheck_x86_linux_so-mc_replace_strmem.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_x86_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_x86_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_memcheck_x86_linux_so-mc_replace_strmem.obj `if test -f 'mc_replace_strmem.c'; then $(CYGPATH_W) 'mc_replace_strmem.c'; else $(CYGPATH_W) '$(srcdir)/mc_replace_strmem.c'; fi`
 uninstall-info-am:
 install-mcincludeHEADERS: $(mcinclude_HEADERS)
 	@$(NORMAL_INSTALL)
@@ -1080,42 +1542,77 @@ uninstall-info: uninstall-info-recursive
 .NOTPARALLEL:
 
 install-exec-local:
-	for f in $(noinst_PROGRAMS); do \
-	  p=`echo $$f | sed -e 's/^[^-]*-//' -e 's/\..*$$//'`; \
-	  n=`echo $$f | sed -e 's/-[^-]\{1,\}-[^-.]\{1,\}//'`; \
-	  $(mkinstalldirs) $(DESTDIR)$(valdir)/$$p; \
-	  $(INSTALL_PROGRAM) $$f $(DESTDIR)$(valdir)/$$p/$$n; \
-	done ; \
-	for f in $(noinst_LIBRARIES); do \
-	  if expr match $$f libcoregrind_ > /dev/null ; then \
-	    pU=`echo $$f | sed -e 's/libcoregrind_//g' -e 's/\.a//g'` ; \
-	    pD=`echo $$pU | sed -e 's/_/-/g'` ; \
-	    $(INSTALL_DATA) $$f $(DESTDIR)$(valdir)/$$pD/libcoregrind.a ; \
-	    $(INSTALL_DATA) @VEX_DIR@/libvex_$$pU.a $(DESTDIR)$(valdir)/$$pD/libvex.a ; \
-	  fi ; \
-	done
+	if [ -n "$(noinst_PROGRAMS)" ] ; then \
+	  for f in $(noinst_PROGRAMS); do \
+	    name=`echo $$f | sed -e 's/-\([^-]*-[^-.]*\)\(\..*\)\?$$/\2/'`; \
+	    plat=`echo $$f | sed -e 's/^.*-\([^-]*-[^-.]*\)\(\..*\)\?$$/\1/'`; \
+	    $(mkinstalldirs) $(DESTDIR)$(valdir)/$$plat; \
+	    $(INSTALL_PROGRAM) $$f $(DESTDIR)$(valdir)/$$plat/$$name; \
+	  done ; \
+	fi ; \
+	if [ -n "$(noinst_LIBRARIES)" ] ; then \
+	  for f in $(noinst_LIBRARIES) expr_wont_match_me; do \
+	    if expr match $$f libcoregrind_ > /dev/null ; then \
+	      pU=`echo $$f | sed -e 's/libcoregrind_//g' -e 's/\.a//g'` ; \
+	      pD=`echo $$pU | sed -e 's/_/-/g'` ; \
+	      $(INSTALL_DATA) $$f $(DESTDIR)$(valdir)/$$pD/libcoregrind.a ; \
+	      $(INSTALL_DATA) @VEX_DIR@/libvex_$$pU.a \
+				$(DESTDIR)$(valdir)/$$pD/libvex.a ; \
+	    fi ; \
+	  done ; \
+	fi
+
 all-local:
-	for f in $(noinst_PROGRAMS); do \
-	  p=`echo $$f | sed -e 's/^[^-]*-//' -e 's/\..*$$//'`; \
-	  n=`echo $$f | sed -e 's/-[^-]\{1,\}-[^-.]\{1,\}//'`; \
-	  mkdir -p $(inplacedir)/$$p; \
-	  rm -f $(inplacedir)/$$p/$$n; \
-	  ln -f -s ../../$(subdir)/$$f $(inplacedir)/$$p/$$n; \
-	done
+	if [ -n "$(noinst_PROGRAMS)" ] ; then \
+	  for f in $(noinst_PROGRAMS); do \
+	    name=`echo $$f | sed -e 's/-\([^-]*-[^-.]*\)\(\..*\)\?$$/\2/'`; \
+	    plat=`echo $$f | sed -e 's/^.*-\([^-]*-[^-.]*\)\(\..*\)\?$$/\1/'`; \
+	    mkdir -p $(inplacedir)/$$plat; \
+	    rm -f $(inplacedir)/$$plat/$$name; \
+	    ln -f -s ../../$(subdir)/$$f $(inplacedir)/$$plat/$$name; \
+	  done ; \
+	fi
 
 @VEX_DIR@/libvex_x86_linux.a: @VEX_DIR@/priv/main/vex_svnversion.h
-	$(MAKE) -C @VEX_DIR@ CC="$(CC)" libvex_x86_linux.a EXTRA_CFLAGS="$(AM_CFLAGS_X86_LINUX)"
+	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR)" \
+	libvex_x86_linux.a \
+	EXTRA_CFLAGS="$(AM_CFLAGS_X86_LINUX) @FLAG_WDECL_AFTER_STMT@ \
+			@FLAG_FNO_STACK_PROTECTOR@"
 
 @VEX_DIR@/libvex_amd64_linux.a: @VEX_DIR@/priv/main/vex_svnversion.h
-	$(MAKE) -C @VEX_DIR@ CC="$(CC)" libvex_amd64_linux.a EXTRA_CFLAGS="$(AM_CFLAGS_AMD64_LINUX)"
+	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR)" \
+	libvex_amd64_linux.a \
+	EXTRA_CFLAGS="$(AM_CFLAGS_AMD64_LINUX) @FLAG_WDECL_AFTER_STMT@ \
+			@FLAG_FNO_STACK_PROTECTOR@"
 
 @VEX_DIR@/libvex_ppc32_linux.a: @VEX_DIR@/priv/main/vex_svnversion.h
-	$(MAKE) -C @VEX_DIR@ CC="$(CC)" libvex_ppc32_linux.a EXTRA_CFLAGS="$(AM_CFLAGS_PPC32_LINUX)"
+	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR)" \
+	libvex_ppc32_linux.a \
+	EXTRA_CFLAGS="$(AM_CFLAGS_PPC32_LINUX) @FLAG_WDECL_AFTER_STMT@ \
+			@FLAG_FNO_STACK_PROTECTOR@"
+
+@VEX_DIR@/libvex_ppc64_linux.a: @VEX_DIR@/priv/main/vex_svnversion.h
+	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR)" \
+	libvex_ppc64_linux.a \
+	EXTRA_CFLAGS="$(AM_CFLAGS_PPC64_LINUX) @FLAG_WDECL_AFTER_STMT@ \
+			@FLAG_FNO_STACK_PROTECTOR@"
+
+@VEX_DIR@/libvex_ppc32_aix5.a: @VEX_DIR@/priv/main/vex_svnversion.h
+	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR) -X32" \
+	libvex_ppc32_aix5.a \
+	EXTRA_CFLAGS="$(AM_CFLAGS_PPC32_AIX5) @FLAG_WDECL_AFTER_STMT@ \
+			@FLAG_FNO_STACK_PROTECTOR@"
+
+@VEX_DIR@/libvex_ppc64_aix5.a: @VEX_DIR@/priv/main/vex_svnversion.h
+	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR) -X64" \
+	libvex_ppc64_aix5.a \
+	EXTRA_CFLAGS="$(AM_CFLAGS_PPC64_AIX5) @FLAG_WDECL_AFTER_STMT@ \
+			@FLAG_FNO_STACK_PROTECTOR@"
 
 @VEX_DIR@/priv/main/vex_svnversion.h:
 	$(MAKE) -C @VEX_DIR@ CC="$(CC)" version
 
-mac_replace_strmem.o: CFLAGS += -fno-omit-frame-pointer
+mc_replace_strmem.o: CFLAGS += -fno-omit-frame-pointer
 
 mc_main.o: CFLAGS += -fomit-frame-pointer
 # Tell versions [3.59,3.63) of GNU make to not export all variables.

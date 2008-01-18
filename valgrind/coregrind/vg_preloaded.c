@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward 
+   Copyright (C) 2000-2007 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -42,10 +42,8 @@
    originates from Valgrind.
    ------------------------------------------------------------------ */
 
-#include "valgrind.h"
-#include "coregrind.h"
-
 #include "pub_core_basics.h"
+#include "pub_core_clreq.h"
 #include "pub_core_debuginfo.h"  // Needed for pub_core_redir.h
 #include "pub_core_redir.h"      // For VG_NOTIFY_ON_LOAD
 
@@ -57,17 +55,18 @@ void VG_NOTIFY_ON_LOAD(freeres)( void );
 void VG_NOTIFY_ON_LOAD(freeres)( void )
 {
    int res;
-#ifndef __UCLIBC__
+#if !defined(__UCLIBC__) && !defined(VGO_aix5)
    extern void __libc_freeres(void);
    __libc_freeres();
 #endif
-   VALGRIND_MAGIC_SEQUENCE(res, 0 /* default */,
-                           VG_USERREQ__LIBC_FREERES_DONE, 0, 0, 0, 0);
+   VALGRIND_DO_CLIENT_REQUEST(res, 0 /* default */,
+                              VG_USERREQ__LIBC_FREERES_DONE, 
+                              0, 0, 0, 0, 0);
    /*NOTREACHED*/
    *(int *)0 = 'x';
 }
 
+
 /*--------------------------------------------------------------------*/
 /*--- end                                                          ---*/
 /*--------------------------------------------------------------------*/
-

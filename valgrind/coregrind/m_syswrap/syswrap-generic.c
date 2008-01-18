@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward 
+   Copyright (C) 2000-2007 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -29,10 +29,13 @@
 */
 
 #include "pub_core_basics.h"
+#include "pub_core_vki.h"
+#include "pub_core_vkiscnums.h"
 #include "pub_core_threadstate.h"
 #include "pub_core_debuginfo.h"     // VG_(di_notify_*)
 #include "pub_core_aspacemgr.h"
 #include "pub_core_transtab.h"      // VG_(discard_translations)
+#include "pub_core_xarray.h"
 #include "pub_core_clientstate.h"   // VG_(brk_base), VG_(brk_limit)
 #include "pub_core_debuglog.h"
 #include "pub_core_errormgr.h"
@@ -54,8 +57,6 @@
 
 #include "priv_types_n_macros.h"
 #include "priv_syswrap-generic.h"
-
-#include "vki_unistd.h"              /* for the __NR_* constants */
 
 
 /* Returns True iff address range is something the client can
@@ -80,7 +81,7 @@ Bool ML_(valid_client_addr)(Addr start, SizeT size, ThreadId tid,
    if (!ret && syscallname != NULL) {
       VG_(message)(Vg_UserMsg, "Warning: client syscall %s tried "
                                "to modify addresses %p-%p",
-                               syscallname, start, start+size-1);
+                               syscallname, (void*)start, (void*)(start+size-1));
       if (VG_(clo_verbosity) > 1) {
          VG_(get_and_pp_StackTrace)(tid, VG_(clo_backtrace_size));
       }
@@ -177,7 +178,7 @@ SysRes do_mremap( Addr old_addr, SizeT old_len,
 #  define MIN_SIZET(_aa,_bb) (_aa) < (_bb) ? (_aa) : (_bb)
 
    Bool      ok, d;
-   NSegment* old_seg;
+   NSegment const* old_seg;
    Addr      advised;
    Bool      f_fixed   = toBool(flags & VKI_MREMAP_FIXED);
    Bool      f_maymove = toBool(flags & VKI_MREMAP_MAYMOVE);
@@ -187,6 +188,8 @@ SysRes do_mremap( Addr old_addr, SizeT old_len,
                   old_addr,old_len,new_addr,new_len, 
                   flags & VKI_MREMAP_MAYMOVE ? "MAYMOVE" : "",
                   flags & VKI_MREMAP_FIXED ? "FIXED" : "");
+   if (0)
+      VG_(am_show_nsegments)(0, "do_remap: before");
 
    if (flags & ~(VKI_MREMAP_FIXED | VKI_MREMAP_MAYMOVE))
       goto eINVAL;
@@ -327,8 +330,20 @@ SysRes do_mremap( Addr old_addr, SizeT old_len,
       /* VG_(am_get_advisory_client_simple) interprets zero to mean
          non-fixed, which is not what we want */
    advised = VG_(am_get_advisory_client_simple)( needA, needL, &ok );
+   if (ok) {
+      /* VG_(am_get_advisory_client_simple) (first arg == 0, meaning
+         this-or-nothing) is too lenient, and may allow us to trash
+         the next segment along.  So make very sure that the proposed
+         new area really is free.  This is perhaps overly
+         conservative, but it fixes #129866. */
+      NSegment const* segLo = VG_(am_find_nsegment)( needA );
+      NSegment const* segHi = VG_(am_find_nsegment)( needA + needL - 1 );
+      if (segLo == NULL || segHi == NULL 
+          || segLo != segHi || segLo->kind != SkFree)
+         ok = False;
+   }
    if (ok && advised == needA) {
-      ok = VG_(am_extend_map_client)( &d, old_seg, needL );
+      ok = VG_(am_extend_map_client)( &d, (NSegment*)old_seg, needL );
       if (ok) {
          VG_TRACK( new_mem_mmap, needA, needL, 
                                  old_seg->hasR, 
@@ -374,9 +389,20 @@ SysRes do_mremap( Addr old_addr, SizeT old_len,
       /* VG_(am_get_advisory_client_simple) interprets zero to mean
          non-fixed, which is not what we want */
    advised = VG_(am_get_advisory_client_simple)( needA, needL, &ok );
+   if (ok) {
+      /* VG_(am_get_advisory_client_simple) (first arg == 0, meaning
+         this-or-nothing) is too lenient, and may allow us to trash
+         the next segment along.  So make very sure that the proposed
+         new area really is free. */
+      NSegment const* segLo = VG_(am_find_nsegment)( needA );
+      NSegment const* segHi = VG_(am_find_nsegment)( needA + needL - 1 );
+      if (segLo == NULL || segHi == NULL 
+          || segLo != segHi || segLo->kind != SkFree)
+         ok = False;
+   }
    if (!ok || advised != needA)
       goto eNOMEM;
-   ok = VG_(am_extend_map_client)( &d, old_seg, needL );
+   ok = VG_(am_extend_map_client)( &d, (NSegment*)old_seg, needL );
    if (!ok)
       goto eNOMEM;
    VG_TRACK( new_mem_mmap, needA, needL, 
@@ -427,7 +453,7 @@ typedef struct OpenFd
 } OpenFd;
 
 /* List of allocated file descriptors. */
-static OpenFd *allocated_fds;
+static OpenFd *allocated_fds = NULL;
 
 /* Count of open file descriptors. */
 static Int fd_count = 0;
@@ -496,7 +522,7 @@ void ML_(record_fd_open_with_given_name)(ThreadId tid, Int fd, char *pathname)
 
    i->fd = fd;
    i->pathname = VG_(arena_strdup)(VG_AR_CORE, pathname);
-   i->where = (tid == -1) ? NULL : VG_(record_ExeContext)(tid);
+   i->where = (tid == -1) ? NULL : VG_(record_ExeContext)(tid, 0/*first_ip_delta*/);
 }
 
 // Record opening of an fd, and find its name.
@@ -602,7 +628,7 @@ getsockdetails(Int fd)
 
 
 /* Dump out a summary, and a more detailed list, of open file descriptors. */
-void VG_(show_open_fds) ()
+void VG_(show_open_fds) (void)
 {
    OpenFd *i = allocated_fds;
 
@@ -666,7 +692,7 @@ void do_hacky_preopened(void)
 /* Initialize the list of open file descriptors with the file descriptors
    we inherited from out parent process. */
 
-void VG_(init_preopened_fds)()
+void VG_(init_preopened_fds)(void)
 {
    Int ret;
    struct vki_dirent d;
@@ -678,23 +704,23 @@ void VG_(init_preopened_fds)()
       return;
    }
 
-   while ((ret = VG_(getdents)(f.val, &d, sizeof(d))) != 0) {
+   while ((ret = VG_(getdents)(f.res, &d, sizeof(d))) != 0) {
       if (ret == -1)
          goto out;
 
       if (VG_(strcmp)(d.d_name, ".") && VG_(strcmp)(d.d_name, "..")) {
          Int fno = VG_(atoll)(d.d_name);
 
-         if (fno != f.val)
+         if (fno != f.res)
             if (VG_(clo_track_fds))
                record_fd_open_named(-1, fno);
       }
 
-      VG_(lseek)(f.val, d.d_off, VKI_SEEK_SET);
+      VG_(lseek)(f.res, d.d_off, VKI_SEEK_SET);
    }
 
   out:
-   VG_(close)(f.val);
+   VG_(close)(f.res);
 }
 
 static
@@ -752,7 +778,7 @@ void msghdr_foreachfield (
    foreach_func ( tid, True, "(msg)", (Addr)&msg->msg_iovlen, sizeof( msg->msg_iovlen ) );
    foreach_func ( tid, True, "(msg)", (Addr)&msg->msg_control, sizeof( msg->msg_control ) );
    foreach_func ( tid, True, "(msg)", (Addr)&msg->msg_controllen, sizeof( msg->msg_controllen ) );
-   foreach_func ( tid, True, "(msg)", (Addr)&msg->msg_flags, sizeof( msg->msg_flags ) );
+   foreach_func ( tid, False, "(msg)", (Addr)&msg->msg_flags, sizeof( msg->msg_flags ) );
 
    if ( msg->msg_name )
       foreach_func ( tid, False,
@@ -769,7 +795,7 @@ void msghdr_foreachfield (
 
       for ( i = 0; i < msg->msg_iovlen; ++i, ++iov )
          foreach_func ( tid, False,
-                        "(msg.msg_iov[i]", 
+                        "(msg.msg_iov[i])", 
                         (Addr)iov->iov_base, iov->iov_len );
    }
 
@@ -922,7 +948,8 @@ void buf_and_len_post_check( ThreadId tid, SysRes res,
 
 static Addr do_brk ( Addr newbrk )
 {
-   NSegment *aseg, *rseg;
+   NSegment const* aseg;
+   NSegment const* rseg;
    Addr newbrkP;
    SizeT delta;
    Bool ok;
@@ -943,10 +970,27 @@ static Addr do_brk ( Addr newbrk )
    if (newbrk >= VG_(brk_base) && newbrk < VG_(brk_limit)) {
       /* shrinking the data segment.  Be lazy and don't munmap the
          excess area. */
-      NSegment* seg = VG_(am_find_nsegment)(newbrk);
+      NSegment const * seg = VG_(am_find_nsegment)(newbrk);
       if (seg && seg->hasT)
          VG_(discard_translations)( newbrk, VG_(brk_limit) - newbrk, 
                                     "do_brk(shrink)" );
+      /* Since we're being lazy and not unmapping pages, we have to
+         zero out the area, so that if the area later comes back into
+         circulation, it will be filled with zeroes, as if it really
+         had been unmapped and later remapped.  Be a bit paranoid and
+         try hard to ensure we're not going to segfault by doing the
+         write - check both ends of the range are in the same segment
+         and that segment is writable. */
+      if (seg) {
+         /* pre: newbrk < VG_(brk_limit) 
+              => newbrk <= VG_(brk_limit)-1 */
+         NSegment const * seg2;
+         vg_assert(newbrk < VG_(brk_limit));
+         seg2 = VG_(am_find_nsegment)( VG_(brk_limit)-1 );
+         if (seg2 && seg == seg2 && seg->hasW)
+            VG_(memset)( (void*)newbrk, 0, VG_(brk_limit) - newbrk );
+      }
+
       VG_(brk_limit) = newbrk;
       return newbrk;
    }
@@ -956,7 +1000,7 @@ static Addr do_brk ( Addr newbrk )
       aseg = VG_(am_find_nsegment)( VG_(brk_limit)-1 );
    else
       aseg = VG_(am_find_nsegment)( VG_(brk_limit) );
-   rseg = VG_(am_next_nsegment)( aseg, True/*forwards*/ );
+   rseg = VG_(am_next_nsegment)( (NSegment*)aseg, True/*forwards*/ );
 
    /* These should be assured by setup_client_dataseg in m_main. */
    vg_assert(aseg);
@@ -972,19 +1016,19 @@ static Addr do_brk ( Addr newbrk )
       return newbrk;
    }
 
-   if (newbrk >= rseg->end+1 - VKI_PAGE_SIZE) {
+   if (newbrk > rseg->end+1 - VKI_PAGE_SIZE) {
       /* request is too large -- the resvn would fall below 1 page,
          which isn't allowed. */
       goto bad;
    }
 
    newbrkP = VG_PGROUNDUP(newbrk);
-   vg_assert(newbrkP > rseg->start && newbrkP < rseg->end+1 - VKI_PAGE_SIZE);
+   vg_assert(newbrkP > rseg->start && newbrkP <= rseg->end+1 - VKI_PAGE_SIZE);
    delta = newbrkP - rseg->start;
    vg_assert(delta > 0);
    vg_assert(VG_IS_PAGE_ALIGNED(delta));
    
-   ok = VG_(am_extend_into_adjacent_reservation_client)( aseg, delta );
+   ok = VG_(am_extend_into_adjacent_reservation_client)( (NSegment*)aseg, delta );
    if (!ok) goto bad;
 
    VG_(brk_limit) = newbrk;
@@ -1121,12 +1165,12 @@ ML_(generic_POST_sys_socket) ( ThreadId tid, SysRes res )
 {
    SysRes r = res;
    vg_assert(!res.isError); /* guaranteed by caller */
-   if (!ML_(fd_allowed)(res.val, "socket", tid, True)) {
-      VG_(close)(res.val);
+   if (!ML_(fd_allowed)(res.res, "socket", tid, True)) {
+      VG_(close)(res.res);
       r = VG_(mk_SysRes_Error)( VKI_EMFILE );
    } else {
       if (VG_(clo_track_fds))
-         ML_(record_fd_open_nameless)(tid, res.val);
+         ML_(record_fd_open_nameless)(tid, res.res);
    }
    return r;
 }
@@ -1167,8 +1211,8 @@ ML_(generic_POST_sys_accept) ( ThreadId tid,
 {
    SysRes r = res;
    vg_assert(!res.isError); /* guaranteed by caller */
-   if (!ML_(fd_allowed)(res.val, "accept", tid, True)) {
-      VG_(close)(res.val);
+   if (!ML_(fd_allowed)(res.res, "accept", tid, True)) {
+      VG_(close)(res.res);
       r = VG_(mk_SysRes_Error)( VKI_EMFILE );
    } else {
       Addr addr_p     = arg1;
@@ -1177,7 +1221,7 @@ ML_(generic_POST_sys_accept) ( ThreadId tid,
          buf_and_len_post_check ( tid, res, addr_p, addrlen_p,
                                   "socketcall.accept(addrlen_out)" );
       if (VG_(clo_track_fds))
-          ML_(record_fd_open_nameless)(tid, res.val);
+          ML_(record_fd_open_nameless)(tid, res.res);
    }
    return r;
 }
@@ -1670,14 +1714,15 @@ ML_(generic_PRE_sys_shmdt) ( ThreadId tid, UWord arg0 )
 void
 ML_(generic_POST_sys_shmdt) ( ThreadId tid, UWord res, UWord arg0 )
 {
-   NSegment* s = VG_(am_find_nsegment)(arg0);
+   NSegment const* s = VG_(am_find_nsegment)(arg0);
 
    if (s != NULL) {
       Addr  s_start = s->start;
       SizeT s_len   = s->end+1 - s->start;
       Bool  d;
 
-      vg_assert(s->kind == SkShmC && s->start == arg0);
+      vg_assert(s->kind == SkShmC);
+      vg_assert(s->start == arg0);
 
       d = VG_(am_notify_munmap)(s_start, s_len);
       s = NULL; /* s is now invalid */
@@ -1844,21 +1889,40 @@ ML_(generic_PRE_sys_mmap) ( ThreadId tid,
                                     arg4 | VKI_MAP_FIXED,
                                     arg5, arg6);
 
+   /* A refinement: it may be that the kernel refused aspacem's choice
+      of address.  If we were originally asked for a hinted mapping,
+      there is still a last chance: try again at any address.
+      Hence: */
+   if (mreq.rkind == MHint && sres.isError) {
+      mreq.start = 0;
+      mreq.len   = arg2;
+      mreq.rkind = MAny;
+      advised = VG_(am_get_advisory)( &mreq, True/*client*/, &mreq_ok );
+      if (!mreq_ok) {
+         /* Our request was bounced, so we'd better fail. */
+         return VG_(mk_SysRes_Error)( VKI_EINVAL );
+      }
+      /* and try again with the kernel */
+      sres = VG_(am_do_mmap_NO_NOTIFY)(advised, arg2, arg3,
+                                       arg4 | VKI_MAP_FIXED,
+                                       arg5, arg6);
+   }
+
    if (!sres.isError) {
       /* Notify aspacem and the tool. */
       ML_(notify_aspacem_and_tool_of_mmap)( 
-         (Addr)sres.val, /* addr kernel actually assigned */
+         (Addr)sres.res, /* addr kernel actually assigned */
          arg2, arg3, 
          arg4, /* the original flags value */
          arg5, arg6 
       );
       /* Load symbols? */
-      VG_(di_notify_mmap)( (Addr)sres.val, False/*allow_SkFileV*/ );
+      VG_(di_notify_mmap)( (Addr)sres.res, False/*allow_SkFileV*/ );
    }
 
    /* Stay sane */
    if (!sres.isError && (arg4 & VKI_MAP_FIXED))
-      vg_assert(sres.val == arg1);
+      vg_assert(sres.res == arg1);
 
    return sres;
 }
@@ -1918,7 +1982,7 @@ PRE(sys_exit)
    tst = VG_(get_ThreadState)(tid);
    /* Set the thread's status to be exiting, then claim that the
       syscall succeeded. */
-   tst->exitreason = VgSrc_ExitSyscall;
+   tst->exitreason = VgSrc_ExitThread;
    tst->os_state.exitcode = ARG1;
    SET_STATUS_Success(0);
 }
@@ -2091,12 +2155,20 @@ PRE(sys_mremap)
 {
    // Nb: this is different to the glibc version described in the man pages,
    // which lacks the fifth 'new_address' argument.
-   PRINT("sys_mremap ( %p, %llu, %d, 0x%x, %p )", 
-         ARG1, (ULong)ARG2, ARG3, ARG4, ARG5);
-   PRE_REG_READ5(unsigned long, "mremap",
-                 unsigned long, old_addr, unsigned long, old_size,
-                 unsigned long, new_size, unsigned long, flags,
-                 unsigned long, new_addr);
+   if (ARG4 & VKI_MREMAP_FIXED) {
+      PRINT("sys_mremap ( %p, %llu, %d, 0x%x, %p )", 
+            ARG1, (ULong)ARG2, ARG3, ARG4, ARG5);
+      PRE_REG_READ5(unsigned long, "mremap",
+                    unsigned long, old_addr, unsigned long, old_size,
+                    unsigned long, new_size, unsigned long, flags,
+                    unsigned long, new_addr);
+   } else {
+      PRINT("sys_mremap ( %p, %llu, %d, 0x%x )", 
+            ARG1, (ULong)ARG2, ARG3, ARG4);
+      PRE_REG_READ4(unsigned long, "mremap",
+                    unsigned long, old_addr, unsigned long, old_size,
+                    unsigned long, new_size, unsigned long, flags);
+   }
    SET_STATUS_from_SysRes( 
       do_mremap((Addr)ARG1, ARG2, (Addr)ARG5, ARG3, ARG4, tid) 
    );
@@ -2220,7 +2292,7 @@ POST(sys_pread64)
 
 PRE(sys_mknod)
 {
-   PRINT("sys_mknod ( %p, 0x%x, 0x%x )", ARG1, ARG2, ARG3 );
+   PRINT("sys_mknod ( %p(%s), 0x%x, 0x%x )", ARG1, ARG1, ARG2, ARG3 );
    PRE_REG_READ3(long, "mknod",
                  const char *, pathname, int, mode, unsigned, dev);
    PRE_MEM_RASCIIZ( "mknod(pathname)", ARG1 );
@@ -2289,6 +2361,7 @@ PRE(sys_execve)
    ThreadState* tst;
    Int          i, j, tot_args;
    SysRes       res;
+   Bool         setuid_allowed;
 
    PRINT("sys_execve ( %p(%s), %p, %p )", ARG1, ARG1, ARG2, ARG3);
    PRE_REG_READ3(vki_off_t, "execve",
@@ -2316,10 +2389,12 @@ PRE(sys_execve)
    }
 
    // Do the important checks:  it is a file, is executable, permissions are
-   // ok, etc.
-   res = VG_(pre_exec_check)((const Char*)ARG1, NULL);
+   // ok, etc.  We allow setuid executables to run only in the case when
+   // we are not simulating them, that is, they to be run natively.
+   setuid_allowed = VG_(clo_trace_children)  ? False  : True;
+   res = VG_(pre_exec_check)((const Char*)ARG1, NULL, setuid_allowed);
    if (res.isError) {
-      SET_STATUS_Failure( res.val );
+      SET_STATUS_Failure( res.err );
       return;
    }
 
@@ -2339,7 +2414,7 @@ PRE(sys_execve)
    /* Resistance is futile.  Nuke all other threads.  POSIX mandates
       this. (Really, nuke them all, since the new process will make
       its own new thread.) */
-   VG_(nuke_all_threads_except)( tid, VgSrc_ExitSyscall );
+   VG_(nuke_all_threads_except)( tid, VgSrc_ExitThread );
    VG_(reap_threads)(tid);
 
    // Set up the child's exe path.
@@ -2398,14 +2473,15 @@ PRE(sys_execve)
    if (!VG_(clo_trace_children)) {
       argv = (Char**)ARG2;
    } else {
+      vg_assert( VG_(args_for_valgrind) );
       vg_assert( VG_(args_for_valgrind_noexecpass) >= 0 );
       vg_assert( VG_(args_for_valgrind_noexecpass) 
-                   <= VG_(args_for_valgrind).used );
+                   <= VG_(sizeXA)( VG_(args_for_valgrind) ) );
       /* how many args in total will there be? */
       // launcher basename
       tot_args = 1;
       // V's args
-      tot_args += VG_(args_for_valgrind).used;
+      tot_args += VG_(sizeXA)( VG_(args_for_valgrind) );
       tot_args -= VG_(args_for_valgrind_noexecpass);
       // name of client exe
       tot_args++;
@@ -2421,10 +2497,10 @@ PRE(sys_execve)
       // copy
       j = 0;
       argv[j++] = launcher_basename;
-      for (i = 0; i < VG_(args_for_valgrind).used; i++) {
+      for (i = 0; i < VG_(sizeXA)( VG_(args_for_valgrind) ); i++) {
          if (i < VG_(args_for_valgrind_noexecpass))
             continue;
-         argv[j++] = VG_(args_for_valgrind).strs[i];
+         argv[j++] = * (HChar**) VG_(indexXA)( VG_(args_for_valgrind), i );
       }
       argv[j++] = (Char*)ARG1;
       if (arg2copy && arg2copy[0])
@@ -2458,7 +2534,6 @@ PRE(sys_execve)
    {
       vki_sigset_t allsigs;
       vki_siginfo_t info;
-      static const struct vki_timespec zero = { 0, 0 };
 
       for (i = 1; i < VG_(max_signal); i++) {
          struct vki_sigaction sa;
@@ -2472,7 +2547,7 @@ PRE(sys_execve)
       }
 
       VG_(sigfillset)(&allsigs);
-      while(VG_(sigtimedwait)(&allsigs, &info, &zero) > 0)
+      while(VG_(sigtimedwait_zero)(&allsigs, &info) > 0)
          ;
 
       VG_(sigprocmask)(VKI_SIG_SETMASK, &tst->sig_mask, NULL);
@@ -2497,7 +2572,7 @@ PRE(sys_execve)
   hosed:
    vg_assert(FAILURE);
    VG_(message)(Vg_UserMsg, "execve(%p(%s), %p, %p) failed, errno %d",
-                ARG1, ARG1, ARG2, ARG3, RES_unchecked);
+                ARG1, ARG1, ARG2, ARG3, ERR);
    VG_(message)(Vg_UserMsg, "EXEC FAILED: I can't recover from "
                             "execve() failing, so I'm dying.");
    VG_(message)(Vg_UserMsg, "Add more stringent tests in PRE(sys_execve), "
@@ -2564,21 +2639,21 @@ PRE(sys_brk)
 
 PRE(sys_chdir)
 {
-   PRINT("sys_chdir ( %p )", ARG1);
+   PRINT("sys_chdir ( %p(%s) )", ARG1,ARG1);
    PRE_REG_READ1(long, "chdir", const char *, path);
    PRE_MEM_RASCIIZ( "chdir(path)", ARG1 );
 }
 
 PRE(sys_chmod)
 {
-   PRINT("sys_chmod ( %p, %d )", ARG1,ARG2);
+   PRINT("sys_chmod ( %p(%s), %d )", ARG1,ARG1,ARG2);
    PRE_REG_READ2(long, "chmod", const char *, path, vki_mode_t, mode);
    PRE_MEM_RASCIIZ( "chmod(path)", ARG1 );
 }
 
 PRE(sys_chown)
 {
-   PRINT("sys_chown ( %p, 0x%x, 0x%x )", ARG1,ARG2,ARG3);
+   PRINT("sys_chown ( %p(%s), 0x%x, 0x%x )", ARG1,ARG1,ARG2,ARG3);
    PRE_REG_READ3(long, "chown",
                  const char *, path, vki_uid_t, owner, vki_gid_t, group);
    PRE_MEM_RASCIIZ( "chown(path)", ARG1 );
@@ -2586,7 +2661,7 @@ PRE(sys_chown)
 
 PRE(sys_lchown)
 {
-   PRINT("sys_lchown ( %p, 0x%x, 0x%x )", ARG1,ARG2,ARG3);
+   PRINT("sys_lchown ( %p(%s), 0x%x, 0x%x )", ARG1,ARG1,ARG2,ARG3);
    PRE_REG_READ3(long, "lchown",
                  const char *, path, vki_uid_t, owner, vki_gid_t, group);
    PRE_MEM_RASCIIZ( "lchown(path)", ARG1 );
@@ -2598,7 +2673,10 @@ PRE(sys_close)
    PRE_REG_READ1(long, "close", unsigned int, fd);
 
    /* Detect and negate attempts by the client to close Valgrind's log fd */
-   if (!ML_(fd_allowed)(ARG1, "close", tid, False))
+   if ( (!ML_(fd_allowed)(ARG1, "close", tid, False))
+        /* If doing -d style logging (which is to fd=2), don't
+           allow that to be closed either. */
+        || (ARG1 == 2/*stderr*/ && VG_(debugLog_getLevel)() > 0) )
       SET_STATUS_Failure( VKI_EBADF );
 }
 
@@ -2817,13 +2895,22 @@ PRE(sys_fork)
    SET_STATUS_from_SysRes( VG_(do_syscall0)(__NR_fork) );
 
    if (SUCCESS && RES == 0) {
+      /* child */
       VG_(do_atfork_child)(tid);
 
       /* restore signal mask */
       VG_(sigprocmask)(VKI_SIG_SETMASK, &fork_saved_mask, NULL);
+
+      /* If --child-silent-after-fork=yes was specified, set the
+         logging file descriptor to an 'impossible' value.  This is
+         noticed by send_bytes_to_logging_sink in m_libcprint.c, which
+         duly stops writing any further logging output. */
+      if (!VG_(logging_to_socket) && VG_(clo_child_silent_after_fork))
+         VG_(clo_log_fd) = -1;
    } 
    else 
    if (SUCCESS && RES > 0) {
+      /* parent */
       PRINT("   fork: process %d created child %d\n", VG_(getpid)(), RES);
 
       /* restore signal mask */
@@ -2860,7 +2947,7 @@ PRE(sys_ftruncate64)
 #endif
 
 // XXX: this wrapper is only suitable for 32-bit platforms
-#if defined(VGP_x86_linux)
+#if defined(VGP_x86_linux) || defined(VGP_ppc32_linux)
 PRE(sys_truncate64)
 {
    *flags |= SfMayBlock;
@@ -3163,6 +3250,14 @@ PRE(sys_ioctl)
       PRE_MEM_WRITE( "ioctl(FIONREAD)",  ARG3, sizeof(int) );
       break;
 
+   case VKI_TIOCSERGETLSR:
+      PRE_MEM_WRITE( "ioctl(TIOCSERGETLSR)", ARG3, sizeof(int) );
+      break;
+   case VKI_TIOCGICOUNT:
+      PRE_MEM_WRITE( "ioctl(TIOCGICOUNT)", ARG3,
+                     sizeof(struct vki_serial_icounter_struct) );
+      break;
+
    case VKI_SG_SET_COMMAND_Q:
       PRE_MEM_READ( "ioctl(SG_SET_COMMAND_Q)", ARG3, sizeof(int) );
       break;
@@ -3427,7 +3522,7 @@ PRE(sys_ioctl)
    case VKI_SOUND_PCM_READ_RATE:
    case VKI_SOUND_PCM_READ_CHANNELS:
    case VKI_SOUND_PCM_READ_BITS:
-#if !defined(VGA_ppc32)
+#if !defined(VGA_ppc32) && !defined(VGA_ppc64)
    case (VKI_SOUND_PCM_READ_BITS|0x40000000): /* what the fuck ? */
 #endif
    case VKI_SOUND_PCM_READ_FILTER:
@@ -3549,6 +3644,9 @@ PRE(sys_ioctl)
    case VKI_HDIO_GETGEO: /* 0x0301 */
       PRE_MEM_WRITE( "ioctl(HDIO_GETGEO)", ARG3, sizeof(struct vki_hd_geometry));
       break;
+   case VKI_HDIO_GET_DMA: /* 0x030b */
+      PRE_MEM_WRITE( "ioctl(HDIO_GET_DMA)", ARG3, sizeof(long));
+      break;
    case VKI_HDIO_GET_IDENTITY: /* 0x030d */
       PRE_MEM_WRITE( "ioctl(HDIO_GET_IDENTITY)", ARG3,
                      VKI_SIZEOF_STRUCT_HD_DRIVEID );
@@ -3594,6 +3692,10 @@ PRE(sys_ioctl)
    case VKI_CDROMVOLREAD: /* 0x5313 */
       PRE_MEM_WRITE( "ioctl(CDROMVOLREAD)", ARG3,
 		     sizeof(struct vki_cdrom_volctrl));
+      break;
+   case VKI_CDROMREADRAW: /* 0x5314 */
+      PRE_MEM_READ( "ioctl(CDROMREADRAW)", ARG3, sizeof(struct vki_cdrom_msf));
+      PRE_MEM_WRITE( "ioctl(CDROMREADRAW)", ARG3, VKI_CD_FRAMESIZE_RAW);
       break;
    case VKI_CDROMREADAUDIO: /* 0x530e */
       PRE_MEM_READ( "ioctl(CDROMREADAUDIO)", ARG3,
@@ -3774,6 +3876,32 @@ PRE(sys_ioctl)
                     VKI_E_TABSZ * sizeof(unsigned short) );
       break;
 
+   case VKI_GIO_UNIMAP:
+      if ( ARG3 ) {
+         struct vki_unimapdesc *desc = (struct vki_unimapdesc *) ARG3;
+         PRE_MEM_READ( "ioctl(GIO_UNIMAP)", (Addr)&desc->entry_ct,
+                       sizeof(unsigned short));
+         PRE_MEM_READ( "ioctl(GIO_UNIMAP)", (Addr)&desc->entries,
+                       sizeof(struct vki_unipair *));
+         PRE_MEM_WRITE( "ioctl(GIO_UNIMAP).entries", (Addr)desc->entries,
+                        desc->entry_ct * sizeof(struct vki_unipair));
+      }
+      break;
+   case VKI_PIO_UNIMAP:
+      if ( ARG3 ) {
+         struct vki_unimapdesc *desc = (struct vki_unimapdesc *) ARG3;
+         PRE_MEM_READ( "ioctl(GIO_UNIMAP)", (Addr)&desc->entry_ct,
+                       sizeof(unsigned short) );
+         PRE_MEM_READ( "ioctl(GIO_UNIMAP)", (Addr)&desc->entries,
+                       sizeof(struct vki_unipair *) );
+         PRE_MEM_READ( "ioctl(PIO_UNIMAP).entries", (Addr)desc->entries,
+                       desc->entry_ct * sizeof(struct vki_unipair) );
+      }
+      break;
+   case VKI_PIO_UNIMAPCLR:
+      PRE_MEM_READ( "ioctl(GIO_UNIMAP)", ARG3, sizeof(struct vki_unimapinit));
+      break;
+
    case VKI_KDGKBMODE:
       PRE_MEM_WRITE( "ioctl(KDGKBMODE)", ARG3, sizeof(int) );
       break;
@@ -3861,7 +3989,152 @@ PRE(sys_ioctl)
    case VKI_KDKBDREP:
       PRE_MEM_READ( "ioctl(KBKBDREP)", ARG3, sizeof(struct vki_kbd_repeat) );
       break;
-      
+
+   case VKI_KDFONTOP:
+      if ( ARG3 ) {
+         struct vki_console_font_op *op = (struct vki_console_font_op *) ARG3;
+         PRE_MEM_READ( "ioctl(KDFONTOP)", (Addr)op,
+                       sizeof(struct vki_console_font_op) );
+         switch ( op->op ) {
+            case VKI_KD_FONT_OP_SET:
+               PRE_MEM_READ( "ioctl(KDFONTOP,KD_FONT_OP_SET).data",
+                             (Addr)op->data,
+                             (op->width + 7) / 8 * 32 * op->charcount );
+               break;
+            case VKI_KD_FONT_OP_GET:
+               if ( op->data )
+                  PRE_MEM_WRITE( "ioctl(KDFONTOP,KD_FONT_OP_GET).data",
+                                 (Addr)op->data,
+                                 (op->width + 7) / 8 * 32 * op->charcount );
+               break;
+            case VKI_KD_FONT_OP_SET_DEFAULT:
+               if ( op->data )
+                  PRE_MEM_RASCIIZ( "ioctl(KDFONTOP,KD_FONT_OP_SET_DEFAULT).data",
+                                   (Addr)op->data );
+               break;
+            case VKI_KD_FONT_OP_COPY:
+               break;
+         }
+      }
+      break;
+
+   case VKI_VT_OPENQRY:
+      PRE_MEM_WRITE( "ioctl(VT_OPENQRY)", ARG3, sizeof(int) );
+      break;
+   case VKI_VT_GETMODE:
+      PRE_MEM_WRITE( "ioctl(VT_GETMODE)", ARG3, sizeof(struct vki_vt_mode) );
+      break;
+   case VKI_VT_SETMODE:
+      PRE_MEM_READ( "ioctl(VT_SETMODE)", ARG3, sizeof(struct vki_vt_mode) );
+      break;
+   case VKI_VT_GETSTATE:
+      PRE_MEM_READ( "ioctl(VT_GETSTATE)", ARG3, sizeof(struct vki_vt_stat) );
+      PRE_MEM_WRITE( "ioctl(VT_GETSTATE).v_active",
+                     (Addr) &(((struct vki_vt_stat*) ARG3)->v_active),
+                     sizeof(((struct vki_vt_stat*) ARG3)->v_active));
+      PRE_MEM_WRITE( "ioctl(VT_GETSTATE).v_state",
+                     (Addr) &(((struct vki_vt_stat*) ARG3)->v_state),
+                     sizeof(((struct vki_vt_stat*) ARG3)->v_state));
+      break;
+   case VKI_VT_RELDISP:
+   case VKI_VT_ACTIVATE:
+   case VKI_VT_WAITACTIVE:
+   case VKI_VT_DISALLOCATE:
+      break;
+   case VKI_VT_RESIZE:
+      PRE_MEM_READ( "ioctl(VT_RESIZE)", ARG3, sizeof(struct vki_vt_sizes) );
+      break;
+   case VKI_VT_RESIZEX:
+      PRE_MEM_READ( "ioctl(VT_RESIZEX)", ARG3, sizeof(struct vki_vt_consize) );
+      break;
+   case VKI_VT_LOCKSWITCH:
+   case VKI_VT_UNLOCKSWITCH:
+      break;
+
+   case VKI_USBDEVFS_CONTROL:
+      if ( ARG3 ) {
+         struct vki_usbdevfs_ctrltransfer *vkuc = (struct vki_usbdevfs_ctrltransfer *)ARG3;
+         PRE_MEM_READ( "ioctl(USBDEVFS_CONTROL).bRequestType", (Addr)&vkuc->bRequestType, sizeof(vkuc->bRequestType));
+         PRE_MEM_READ( "ioctl(USBDEVFS_CONTROL).bRequest", (Addr)&vkuc->bRequest, sizeof(vkuc->bRequest));
+         PRE_MEM_READ( "ioctl(USBDEVFS_CONTROL).wValue", (Addr)&vkuc->wValue, sizeof(vkuc->wValue));
+         PRE_MEM_READ( "ioctl(USBDEVFS_CONTROL).wIndex", (Addr)&vkuc->wIndex, sizeof(vkuc->wIndex));
+         PRE_MEM_READ( "ioctl(USBDEVFS_CONTROL).wLength", (Addr)&vkuc->wLength, sizeof(vkuc->wLength));
+         PRE_MEM_READ( "ioctl(USBDEVFS_CONTROL).timeout", (Addr)&vkuc->timeout, sizeof(vkuc->timeout));
+         if (vkuc->bRequestType & 0x80)
+            PRE_MEM_WRITE( "ioctl(USBDEVFS_CONTROL).data", (Addr)vkuc->data, vkuc->wLength);
+         else
+            PRE_MEM_READ( "ioctl(USBDEVFS_CONTROL).data", (Addr)vkuc->data, vkuc->wLength);
+      }
+      break;
+   case VKI_USBDEVFS_BULK:
+      if ( ARG3 ) {
+         struct vki_usbdevfs_bulktransfer *vkub = (struct vki_usbdevfs_bulktransfer *)ARG3;
+         PRE_MEM_READ( "ioctl(USBDEVFS_BULK)", ARG3, sizeof(struct vki_usbdevfs_bulktransfer));
+         if (vkub->ep & 0x80)
+            PRE_MEM_WRITE( "ioctl(USBDEVFS_BULK).data", (Addr)vkub->data, vkub->len);
+         else
+            PRE_MEM_READ( "ioctl(USBDEVFS_BULK).data", (Addr)vkub->data, vkub->len);
+         break;
+      }
+   case VKI_USBDEVFS_GETDRIVER:
+      if ( ARG3 ) {
+         struct vki_usbdevfs_getdriver *vkugd = (struct vki_usbdevfs_getdriver *) ARG3;
+         PRE_MEM_WRITE( "ioctl(USBDEVFS_GETDRIVER)", (Addr)&vkugd->driver, sizeof(vkugd->driver));
+         break;
+      }
+   case VKI_USBDEVFS_SUBMITURB:
+      if ( ARG3 ) {
+         struct vki_usbdevfs_urb *vkuu = (struct vki_usbdevfs_urb *)ARG3;
+
+         /* Not the whole struct needs to be initialized */
+         PRE_MEM_READ( "ioctl(USBDEVFS_SUBMITURB).ep", (Addr)&vkuu->endpoint, sizeof(vkuu->endpoint));
+         PRE_MEM_READ( "ioctl(USBDEVFS_SUBMITURB).type", (Addr)&vkuu->type, sizeof(vkuu->type));
+         PRE_MEM_READ( "ioctl(USBDEVFS_SUBMITURB).flags", (Addr)&vkuu->flags, sizeof(vkuu->flags));
+         PRE_MEM_READ( "ioctl(USBDEVFS_SUBMITURB).buffer", (Addr)&vkuu->buffer, sizeof(vkuu->buffer));
+         PRE_MEM_READ( "ioctl(USBDEVFS_SUBMITURB).buffer_length", (Addr)&vkuu->buffer_length, sizeof(vkuu->buffer_length));
+         PRE_MEM_READ( "ioctl(USBDEVFS_SUBMITURB).usercontext", (Addr)&vkuu->usercontext, sizeof(vkuu->usercontext));
+         if (vkuu->endpoint & 0x80)
+            PRE_MEM_WRITE( "ioctl(USBDEVFS_URB).buffer", (Addr)vkuu->buffer, vkuu->buffer_length);
+         else
+            PRE_MEM_READ( "ioctl(USBDEVFS_URB).buffer", (Addr)vkuu->buffer, vkuu->buffer_length);
+         /* FIXME: Does not handle all cases this ioctl can do, ISOs are missing. */
+         break;
+      }
+   case VKI_USBDEVFS_REAPURB:
+   case VKI_USBDEVFS_REAPURBNDELAY:
+      if ( ARG3 ) {
+         PRE_MEM_READ( "ioctl(USBDEVFS_SUBMITURB)", ARG3, sizeof(struct vki_usbdevfs_urb *));
+         break;
+      }
+   case VKI_USBDEVFS_CONNECTINFO:
+      PRE_MEM_WRITE( "ioctl(USBDEVFS_CONNECTINFO)", ARG3, sizeof(struct vki_usbdevfs_connectinfo));
+      break;
+   case VKI_USBDEVFS_IOCTL:
+      if ( ARG3 ) {
+         struct vki_usbdevfs_ioctl *vkui = (struct vki_usbdevfs_ioctl *)ARG3;
+         UInt dir2, size2;
+         PRE_MEM_READ("ioctl(USBDEVFS_IOCTL)", (Addr)vkui, sizeof(struct vki_usbdevfs_ioctl));
+         dir2  = _VKI_IOC_DIR(vkui->ioctl_code);
+         size2 = _VKI_IOC_SIZE(vkui->ioctl_code);
+         if (size2 > 0) {
+            if (dir2 & _VKI_IOC_WRITE)
+               PRE_MEM_READ("ioctl(USBDEVFS_IOCTL).dataWrite", (Addr)vkui->data, size2);
+            else if (dir2 & _VKI_IOC_READ)
+               PRE_MEM_WRITE("ioctl(USBDEVFS_IOCTL).dataRead", (Addr)vkui->data, size2);
+         }
+      }
+      break;
+
+      /* I2C (/dev/i2c-*) ioctls */
+   case VKI_I2C_SLAVE:
+   case VKI_I2C_SLAVE_FORCE:
+   case VKI_I2C_TENBIT:
+   case VKI_I2C_PEC:
+      break;
+   case VKI_I2C_FUNCS:
+      PRE_MEM_WRITE( "ioctl(I2C_FUNCS)", ARG3, sizeof(unsigned long) );
+      break;
+
       /* We don't have any specific information on it, so
 	 try to do something reasonable based on direction and
 	 size bits.  The encoding scheme is described in
@@ -3966,6 +4239,13 @@ POST(sys_ioctl)
       break;
    case VKI_FIONREAD:                /* identical to SIOCINQ */
       POST_MEM_WRITE( ARG3, sizeof(int) );
+      break;
+
+   case VKI_TIOCSERGETLSR:
+      POST_MEM_WRITE( ARG3, sizeof(int) );
+      break;
+   case VKI_TIOCGICOUNT:
+      POST_MEM_WRITE( ARG3, sizeof(struct vki_serial_icounter_struct) );
       break;
 
    case VKI_SG_SET_COMMAND_Q:
@@ -4134,7 +4414,7 @@ POST(sys_ioctl)
    case VKI_SOUND_PCM_READ_RATE:
    case VKI_SOUND_PCM_READ_CHANNELS:
    case VKI_SOUND_PCM_READ_BITS:
-#if !defined(VGA_ppc32)
+#if !defined(VGA_ppc32) && !defined(VGA_ppc64)
    case (VKI_SOUND_PCM_READ_BITS|0x40000000): /* what the fuck ? */
 #endif
    case VKI_SOUND_PCM_READ_FILTER:
@@ -4244,6 +4524,9 @@ POST(sys_ioctl)
    case VKI_HDIO_GETGEO: /* 0x0301 */
       POST_MEM_WRITE(ARG3, sizeof(struct vki_hd_geometry));
       break;
+   case VKI_HDIO_GET_DMA: /* 0x030b */
+      POST_MEM_WRITE(ARG3, sizeof(long));
+      break;
    case VKI_HDIO_GET_IDENTITY: /* 0x030d */
       POST_MEM_WRITE(ARG3, VKI_SIZEOF_STRUCT_HD_DRIVEID );
       break;
@@ -4256,13 +4539,16 @@ POST(sys_ioctl)
       POST_MEM_WRITE(ARG3, sizeof(struct vki_cdrom_tochdr));
       break;
    case VKI_CDROMREADTOCENTRY:
-      POST_MEM_WRITE(ARG3, sizeof(struct vki_cdrom_tochdr));
+      POST_MEM_WRITE(ARG3, sizeof(struct vki_cdrom_tocentry));
       break;
    case VKI_CDROMMULTISESSION:
       POST_MEM_WRITE(ARG3, sizeof(struct vki_cdrom_multisession));
       break;
    case VKI_CDROMVOLREAD:
       POST_MEM_WRITE(ARG3, sizeof(struct vki_cdrom_volctrl));
+      break;
+   case VKI_CDROMREADRAW:
+      POST_MEM_WRITE(ARG3, VKI_CD_FRAMESIZE_RAW);
       break;
    case VKI_CDROMREADAUDIO:
    {
@@ -4399,6 +4685,19 @@ POST(sys_ioctl)
    case VKI_PIO_UNISCRNMAP:
       break;
 
+   case VKI_GIO_UNIMAP:
+      if ( ARG3 ) {
+         struct vki_unimapdesc *desc = (struct vki_unimapdesc *) ARG3;
+         POST_MEM_WRITE( (Addr)&desc->entry_ct, sizeof(desc->entry_ct));
+         POST_MEM_WRITE( (Addr)desc->entries,
+      	                 desc->entry_ct * sizeof(struct vki_unipair) );
+      }
+      break;
+   case VKI_PIO_UNIMAP:
+      break;
+   case VKI_PIO_UNIMAPCLR:
+      break;
+
    case VKI_KDGKBMODE:
       POST_MEM_WRITE( ARG3, sizeof(int) );
       break;
@@ -4450,6 +4749,110 @@ POST(sys_ioctl)
    case VKI_KDKBDREP:
       break;
 
+   case VKI_KDFONTOP:
+      if ( ARG3 ) {
+         struct vki_console_font_op *op = (struct vki_console_font_op *) ARG3;
+         switch ( op->op ) {
+            case VKI_KD_FONT_OP_SET:
+               break;
+            case VKI_KD_FONT_OP_GET:
+               if ( op->data )
+                  POST_MEM_WRITE( (Addr) op->data,
+                                  (op->width + 7) / 8 * 32 * op->charcount );
+               break;
+            case VKI_KD_FONT_OP_SET_DEFAULT:
+               break;
+            case VKI_KD_FONT_OP_COPY:
+               break;
+         }
+         POST_MEM_WRITE( (Addr) op, sizeof(*op));
+      }
+      break;
+
+   case VKI_VT_OPENQRY:
+      POST_MEM_WRITE( ARG3, sizeof(int) );
+      break;
+   case VKI_VT_GETMODE:
+      POST_MEM_WRITE( ARG3, sizeof(struct vki_vt_mode) );
+      break;
+   case VKI_VT_SETMODE:
+      break;
+   case VKI_VT_GETSTATE:
+      POST_MEM_WRITE( (Addr) &(((struct vki_vt_stat*) ARG3)->v_active),
+                      sizeof(((struct vki_vt_stat*) ARG3)->v_active) );
+      POST_MEM_WRITE( (Addr) &(((struct vki_vt_stat*) ARG3)->v_state),
+                      sizeof(((struct vki_vt_stat*) ARG3)->v_state) );
+      break;
+   case VKI_VT_RELDISP:
+   case VKI_VT_ACTIVATE:
+   case VKI_VT_WAITACTIVE:
+   case VKI_VT_DISALLOCATE:
+      break;
+   case VKI_VT_RESIZE:
+      break;
+   case VKI_VT_RESIZEX:
+      break;
+   case VKI_VT_LOCKSWITCH:
+   case VKI_VT_UNLOCKSWITCH:
+      break;
+
+   case VKI_USBDEVFS_CONTROL:
+      if ( ARG3 ) {
+         struct vki_usbdevfs_ctrltransfer *vkuc = (struct vki_usbdevfs_ctrltransfer *)ARG3;
+         if (vkuc->bRequestType & 0x80)
+            POST_MEM_WRITE((Addr)vkuc->data, RES);
+         break;
+      }
+   case VKI_USBDEVFS_BULK:
+      if ( ARG3 ) {
+         struct vki_usbdevfs_bulktransfer *vkub = (struct vki_usbdevfs_bulktransfer *)ARG3;
+         if (vkub->ep & 0x80)
+            POST_MEM_WRITE((Addr)vkub->data, RES);
+         break;
+      }
+   case VKI_USBDEVFS_GETDRIVER:
+      if ( ARG3 ) {
+         struct vki_usbdevfs_getdriver *vkugd = (struct vki_usbdevfs_getdriver *)ARG3;
+         POST_MEM_WRITE((Addr)&vkugd->driver, sizeof(vkugd->driver));
+         break;
+      }
+   case VKI_USBDEVFS_REAPURB:
+   case VKI_USBDEVFS_REAPURBNDELAY:
+      if ( ARG3 ) {
+         struct vki_usbdevfs_urb **vkuu = (struct vki_usbdevfs_urb**)ARG3;
+         if (!*vkuu)
+            break;
+         POST_MEM_WRITE((Addr) &((*vkuu)->status),sizeof((*vkuu)->status));
+         if ((*vkuu)->endpoint & 0x80)
+            POST_MEM_WRITE((Addr)(*vkuu)->buffer, (*vkuu)->actual_length);
+         break;
+      }
+   case VKI_USBDEVFS_CONNECTINFO:
+      POST_MEM_WRITE(ARG3, sizeof(struct vki_usbdevfs_connectinfo));
+      break;
+   case VKI_USBDEVFS_IOCTL:
+      if ( ARG3 ) {
+         struct vki_usbdevfs_ioctl *vkui = (struct vki_usbdevfs_ioctl *)ARG3;
+         UInt dir2, size2;
+         dir2  = _VKI_IOC_DIR(vkui->ioctl_code);
+         size2 = _VKI_IOC_SIZE(vkui->ioctl_code);
+         if (size2 > 0) {
+            if (dir2 & _VKI_IOC_READ) 
+               POST_MEM_WRITE((Addr)vkui->data, size2);
+         }
+      }
+      break;
+
+      /* I2C (/dev/i2c-*) ioctls */
+   case VKI_I2C_SLAVE:
+   case VKI_I2C_SLAVE_FORCE:
+   case VKI_I2C_TENBIT:
+   case VKI_I2C_PEC:
+      break;
+   case VKI_I2C_FUNCS:
+      POST_MEM_WRITE( ARG3, sizeof(unsigned long) );
+      break;
+
       /* We don't have any specific information on it, so
 	 try to do something reasonable based on direction and
 	 size bits.  The encoding scheme is described in
@@ -4494,7 +4897,7 @@ Bool ML_(do_sigkill)(Int pid, Int tgid)
    if (pid <= 0)
       return False;
 
-   tid = VG_(get_lwp_tid)(pid);
+   tid = VG_(lwpid_to_vgtid)(pid);
    if (tid == VG_INVALID_THREADID)
       return False;		/* none of our threads */
 
@@ -4515,7 +4918,7 @@ Bool ML_(do_sigkill)(Int pid, Int tgid)
       tst->os_state.fatalsig = VKI_SIGKILL;
       
       if (!VG_(is_running_thread)(tid))
-	 VG_(kill_thread)(tid);
+	 VG_(get_thread_out_of_syscall)(tid);
    }
    
    return True;
@@ -4549,7 +4952,7 @@ PRE(sys_kill)
 PRE(sys_link)
 {
    *flags |= SfMayBlock;
-   PRINT("sys_link ( %p, %p)", ARG1, ARG2);
+   PRINT("sys_link ( %p(%s), %p(%s) )", ARG1,ARG1,ARG2,ARG2);
    PRE_REG_READ2(long, "link", const char *, oldpath, const char *, newpath);
    PRE_MEM_RASCIIZ( "link(oldpath)", ARG1);
    PRE_MEM_RASCIIZ( "link(newpath)", ARG2);
@@ -4574,7 +4977,7 @@ POST(sys_newlstat)
 PRE(sys_mkdir)
 {
    *flags |= SfMayBlock;
-   PRINT("sys_mkdir ( %p, %d )", ARG1,ARG2);
+   PRINT("sys_mkdir ( %p(%s), %d )", ARG1,ARG1,ARG2);
    PRE_REG_READ2(long, "mkdir", const char *, pathname, int, mode);
    PRE_MEM_RASCIIZ( "mkdir(pathname)", ARG1 );
 }
@@ -4605,13 +5008,13 @@ PRE(sys_mprotect)
          The sanity check provided by the kernel is that the vma must
          have the VM_GROWSDOWN/VM_GROWSUP flag set as appropriate.  */
       UInt grows = ARG3 & (VKI_PROT_GROWSDOWN|VKI_PROT_GROWSUP);
-      NSegment *aseg = VG_(am_find_nsegment)(ARG1);
-      NSegment *rseg;
+      NSegment const *aseg = VG_(am_find_nsegment)(ARG1);
+      NSegment const *rseg;
 
       vg_assert(aseg);
 
       if (grows == VKI_PROT_GROWSDOWN) {
-         rseg = VG_(am_next_nsegment)( aseg, False/*backwards*/ );
+         rseg = VG_(am_next_nsegment)( (NSegment*)aseg, False/*backwards*/ );
          if (rseg &&
              rseg->kind == SkResvn &&
              rseg->smode == SmUpper &&
@@ -4624,7 +5027,7 @@ PRE(sys_mprotect)
             SET_STATUS_Failure( VKI_EINVAL );
          }
       } else if (grows == VKI_PROT_GROWSUP) {
-         rseg = VG_(am_next_nsegment)( aseg, True/*forwards*/ );
+         rseg = VG_(am_next_nsegment)( (NSegment*)aseg, True/*forwards*/ );
          if (rseg &&
              rseg->kind == SkResvn &&
              rseg->smode == SmLower &&
@@ -4712,7 +5115,7 @@ PRE(sys_nanosleep)
 POST(sys_nanosleep)
 {
    vg_assert(SUCCESS || FAILURE);
-   if (ARG2 != 0 && FAILURE && RES_unchecked == VKI_EINTR)
+   if (ARG2 != 0 && FAILURE && ERR == VKI_EINTR)
       POST_MEM_WRITE( ARG2, sizeof(struct vki_timespec) );
 }
 
@@ -4746,7 +5149,7 @@ PRE(sys_open)
       sres = VG_(dup)( VG_(cl_cmdline_fd) );
       SET_STATUS_from_SysRes( sres );
       if (!sres.isError) {
-         OffT off = VG_(lseek)( sres.val, 0, VKI_SEEK_SET );
+         OffT off = VG_(lseek)( sres.res, 0, VKI_SEEK_SET );
          if (off < 0)
             SET_STATUS_Failure( VKI_EMFILE );
       }
@@ -4827,7 +5230,6 @@ POST(sys_creat)
    }
 }
 
-// XXX: x86-specific, due to pollfd struct
 PRE(sys_poll)
 {
    /* struct pollfd {
@@ -4842,16 +5244,16 @@ PRE(sys_poll)
    *flags |= SfMayBlock;
    PRINT("sys_poll ( %p, %d, %d )\n", ARG1,ARG2,ARG3);
    PRE_REG_READ3(long, "poll",
-                 struct pollfd *, ufds, unsigned int, nfds, long, timeout);
-                     
+                 struct vki_pollfd *, ufds, unsigned int, nfds, long, timeout);
+
    for (i = 0; i < ARG2; i++) {
-      // 'fd' and 'events' field are inputs;  'revents' is output.
-      // XXX: this is x86 specific -- the pollfd struct varies across
-      // different architectures.
-      PRE_MEM_READ( "poll(ufds)",
-                    (Addr)(&ufds[i]), sizeof(int) + sizeof(short) );
-      PRE_MEM_WRITE( "poll(ufds)", (Addr)(&ufds[i].revents), sizeof(short) );
-   }  
+      PRE_MEM_READ( "poll(ufds.fd)",
+                    (Addr)(&ufds[i].fd), sizeof(ufds[i].fd) );
+      PRE_MEM_READ( "poll(ufds.events)",
+                    (Addr)(&ufds[i].events), sizeof(ufds[i].events) );
+      PRE_MEM_WRITE( "poll(ufds.reventss)",
+                     (Addr)(&ufds[i].revents), sizeof(ufds[i].revents) );
+   }
 }
 
 POST(sys_poll)
@@ -4859,9 +5261,8 @@ POST(sys_poll)
    if (RES > 0) {
       UInt i;
       struct vki_pollfd* ufds = (struct vki_pollfd *)ARG1;
-      // XXX: again, this is x86-specific
       for (i = 0; i < ARG2; i++)
-	 POST_MEM_WRITE( (Addr)(&ufds[i].revents), sizeof(Short) );
+	 POST_MEM_WRITE( (Addr)(&ufds[i].revents), sizeof(ufds[i].revents) );
    }
 }
 
@@ -4870,7 +5271,7 @@ PRE(sys_readlink)
    HChar name[25];
    Word  saved = SYSNO;
 
-   PRINT("sys_readlink ( %p, %p, %llu )", ARG1,ARG2,(ULong)ARG3);
+   PRINT("sys_readlink ( %p(%s), %p, %llu )", ARG1,ARG1,ARG2,(ULong)ARG3);
    PRE_REG_READ3(long, "readlink",
                  const char *, path, char *, buf, int, bufsiz);
    PRE_MEM_RASCIIZ( "readlink(path)", ARG1 );
@@ -4941,7 +5342,7 @@ POST(sys_readv)
 
 PRE(sys_rename)
 {
-   PRINT("sys_rename ( %p, %p )", ARG1, ARG2 );
+   PRINT("sys_rename ( %p(%s), %p(%s) )", ARG1,ARG1,ARG2,ARG2);
    PRE_REG_READ2(long, "rename", const char *, oldpath, const char *, newpath);
    PRE_MEM_RASCIIZ( "rename(oldpath)", ARG1 );
    PRE_MEM_RASCIIZ( "rename(newpath)", ARG2 );
@@ -4950,7 +5351,7 @@ PRE(sys_rename)
 PRE(sys_rmdir)
 {
    *flags |= SfMayBlock;
-   PRINT("sys_rmdir ( %p )", ARG1);
+   PRINT("sys_rmdir ( %p(%s) )", ARG1,ARG1);
    PRE_REG_READ1(long, "rmdir", const char *, pathname);
    PRE_MEM_RASCIIZ( "rmdir(pathname)", ARG1 );
 }
@@ -4961,7 +5362,7 @@ PRE(sys_select)
    PRINT("sys_select ( %d, %p, %p, %p, %p )", ARG1,ARG2,ARG3,ARG4,ARG5);
    PRE_REG_READ5(long, "select",
                  int, n, vki_fd_set *, readfds, vki_fd_set *, writefds,
-                 vki_fd_set *, exceptfds, struct timeval *, timeout);
+                 vki_fd_set *, exceptfds, struct vki_timeval *, timeout);
    // XXX: this possibly understates how much memory is read.
    if (ARG2 != 0)
       PRE_MEM_READ( "select(readfds)",   
@@ -5032,8 +5433,8 @@ PRE(sys_setrlimit)
       }
    }
    else if (ARG1 == VKI_RLIMIT_DATA) {
-      if (((struct vki_rlimit *)ARG2)->rlim_cur > ((struct vki_rlimit *)ARG2)->rlim_max ||
-          ((struct vki_rlimit *)ARG2)->rlim_max > ((struct vki_rlimit *)ARG2)->rlim_max) {
+      if (((struct vki_rlimit *)ARG2)->rlim_cur > VG_(client_rlimit_data).rlim_max ||
+          ((struct vki_rlimit *)ARG2)->rlim_max > VG_(client_rlimit_data).rlim_max) {
          SET_STATUS_Failure( VKI_EPERM );
       }
       else {
@@ -5042,8 +5443,8 @@ PRE(sys_setrlimit)
       }
    }
    else if (ARG1 == VKI_RLIMIT_STACK && tid == 1) {
-      if (((struct vki_rlimit *)ARG2)->rlim_cur > ((struct vki_rlimit *)ARG2)->rlim_max ||
-          ((struct vki_rlimit *)ARG2)->rlim_max > ((struct vki_rlimit *)ARG2)->rlim_max) {
+      if (((struct vki_rlimit *)ARG2)->rlim_cur > VG_(client_rlimit_stack).rlim_max ||
+          ((struct vki_rlimit *)ARG2)->rlim_max > VG_(client_rlimit_stack).rlim_max) {
          SET_STATUS_Failure( VKI_EPERM );
       }
       else {
@@ -5075,7 +5476,7 @@ POST(sys_newstat)
 
 PRE(sys_statfs)
 {
-   PRINT("sys_statfs ( %p, %p )",ARG1,ARG2);
+   PRINT("sys_statfs ( %p(%s), %p )",ARG1,ARG1,ARG2);
    PRE_REG_READ2(long, "statfs", const char *, path, struct statfs *, buf);
    PRE_MEM_RASCIIZ( "statfs(path)", ARG1 );
    PRE_MEM_WRITE( "statfs(buf)", ARG2, sizeof(struct vki_statfs) );
@@ -5087,7 +5488,7 @@ POST(sys_statfs)
 
 PRE(sys_statfs64)
 {
-   PRINT("sys_statfs64 ( %p, %llu, %p )",ARG1,(ULong)ARG2,ARG3);
+   PRINT("sys_statfs64 ( %p(%s), %llu, %p )",ARG1,ARG1,(ULong)ARG2,ARG3);
    PRE_REG_READ3(long, "statfs64",
                  const char *, path, vki_size_t, size, struct statfs64 *, buf);
    PRE_MEM_RASCIIZ( "statfs64(path)", ARG1 );
@@ -5101,7 +5502,7 @@ POST(sys_statfs64)
 PRE(sys_symlink)
 {
    *flags |= SfMayBlock;
-   PRINT("sys_symlink ( %p, %p )",ARG1,ARG2);
+   PRINT("sys_symlink ( %p(%s), %p(%s) )",ARG1,ARG1,ARG2,ARG2);
    PRE_REG_READ2(long, "symlink", const char *, oldpath, const char *, newpath);
    PRE_MEM_RASCIIZ( "symlink(oldpath)", ARG1 );
    PRE_MEM_RASCIIZ( "symlink(newpath)", ARG2 );
@@ -5233,7 +5634,7 @@ PRE(sys_writev)
 
 PRE(sys_utimes)
 {
-   PRINT("sys_utimes ( %p, %p )", ARG1,ARG2);
+   PRINT("sys_utimes ( %p(%s), %p )", ARG1,ARG1,ARG2);
    PRE_REG_READ2(long, "utimes", char *, filename, struct timeval *, tvp);
    PRE_MEM_RASCIIZ( "utimes(filename)", ARG1 );
    if (ARG2 != 0)
@@ -5242,7 +5643,7 @@ PRE(sys_utimes)
 
 PRE(sys_acct)
 {
-   PRINT("sys_acct ( %p )", ARG1);
+   PRINT("sys_acct ( %p(%s) )", ARG1,ARG1);
    PRE_REG_READ1(long, "acct", const char *, filename);
    PRE_MEM_RASCIIZ( "acct(filename)", ARG1 );
 }
@@ -5253,24 +5654,6 @@ PRE(sys_pause)
    PRINT("sys_pause ( )");
    PRE_REG_READ0(long, "pause");
 }
-
-//zz // XXX: x86-specific
-//zz PRE(sys_sigsuspend, SfMayBlock)
-//zz {
-//zz    /* The C library interface to sigsuspend just takes a pointer to
-//zz       a signal mask but this system call has three arguments - the first
-//zz       two don't appear to be used by the kernel and are always passed as
-//zz       zero by glibc and the third is the first word of the signal mask
-//zz       so only 32 signals are supported.
-//zz      
-//zz       In fact glibc normally uses rt_sigsuspend if it is available as
-//zz       that takes a pointer to the signal mask so supports more signals.
-//zz     */
-//zz    PRINT("sys_sigsuspend ( %d, %d, %d )", ARG1,ARG2,ARG3 );
-//zz    PRE_REG_READ3(int, "sigsuspend",
-//zz                  int, history0, int, history1,
-//zz                  vki_old_sigset_t, mask);
-//zz }
 
 // XXX: x86-specific
 PRE(sys_sigaltstack)

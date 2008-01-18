@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2005 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -351,9 +351,10 @@ typedef
       Xin_Alu32R,    /* 32-bit mov/arith/logical, dst=REG */
       Xin_Alu32M,    /* 32-bit mov/arith/logical, dst=MEM */
       Xin_Sh32,      /* 32-bit shift/rotate, dst=REG */
-      Xin_Test32,    /* 32-bit test of REG against imm32 (AND, set
+      Xin_Test32,    /* 32-bit test of REG or MEM against imm32 (AND, set
                         flags, discard result) */
       Xin_Unary32,   /* 32-bit not and neg */
+      Xin_Lea32,     /* 32-bit compute EA into a reg */
       Xin_MulL,      /* 32 x 32 -> 64 multiply */
       Xin_Div,       /* 64/32 -> (32,32) div and mod */
       Xin_Sh3232,    /* shldl or shrdl */
@@ -412,14 +413,19 @@ typedef
             HReg  dst;
          } Sh32;
          struct {
-            UInt imm32;
-            HReg dst; /* not written, only read */
+            UInt   imm32;
+            X86RM* dst; /* not written, only read */
          } Test32;
          /* Not and Neg */
          struct {
             X86UnaryOp op;
             HReg       dst;
          } Unary32;
+         /* 32-bit compute EA into a reg */
+         struct {
+            X86AMode* am;
+            HReg      dst;
+         } Lea32;
          /* EDX:EAX = EAX *s/u r/m32 */
          struct {
             Bool   syned;
@@ -491,10 +497,10 @@ typedef
             much as possible before continuing.  On SSE2 we emit a
             real "mfence", on SSE1 "sfence ; lock addl $0,0(%esp)" and
             on SSE0 "lock addl $0,0(%esp)".  This insn therefore
-            carries the subarch so the assembler knows what to
+            carries the host's hwcaps so the assembler knows what to
             emit. */
          struct {
-            VexSubArch subarch;
+            UInt hwcaps;
          } MFence;
 
          /* X86 Floating point (fake 3-operand, "flat reg file" insns) */
@@ -615,8 +621,10 @@ typedef
 extern X86Instr* X86Instr_Alu32R    ( X86AluOp, X86RMI*, HReg );
 extern X86Instr* X86Instr_Alu32M    ( X86AluOp, X86RI*,  X86AMode* );
 extern X86Instr* X86Instr_Unary32   ( X86UnaryOp op, HReg dst );
+extern X86Instr* X86Instr_Lea32     ( X86AMode* am, HReg dst );
+
 extern X86Instr* X86Instr_Sh32      ( X86ShiftOp, UInt, HReg );
-extern X86Instr* X86Instr_Test32    ( UInt imm32, HReg dst );
+extern X86Instr* X86Instr_Test32    ( UInt imm32, X86RM* dst );
 extern X86Instr* X86Instr_MulL      ( Bool syned, X86RM* );
 extern X86Instr* X86Instr_Div       ( Bool syned, X86RM* );
 extern X86Instr* X86Instr_Sh3232    ( X86ShiftOp, UInt amt, HReg src, HReg dst );
@@ -629,7 +637,7 @@ extern X86Instr* X86Instr_LoadEX    ( UChar szSmall, Bool syned,
 extern X86Instr* X86Instr_Store     ( UChar sz, HReg src, X86AMode* dst );
 extern X86Instr* X86Instr_Set32     ( X86CondCode cond, HReg dst );
 extern X86Instr* X86Instr_Bsfr32    ( Bool isFwds, HReg src, HReg dst );
-extern X86Instr* X86Instr_MFence    ( VexSubArch );
+extern X86Instr* X86Instr_MFence    ( UInt hwcaps );
 
 extern X86Instr* X86Instr_FpUnary   ( X86FpOp op, HReg src, HReg dst );
 extern X86Instr* X86Instr_FpBinary  ( X86FpOp op, HReg srcL, HReg srcR, HReg dst );
@@ -653,18 +661,23 @@ extern X86Instr* X86Instr_SseCMov   ( X86CondCode, HReg src, HReg dst );
 extern X86Instr* X86Instr_SseShuf   ( Int order, HReg src, HReg dst );
 
 
-extern void ppX86Instr ( X86Instr* );
+extern void ppX86Instr ( X86Instr*, Bool );
 
 /* Some functions that insulate the register allocator from details
    of the underlying instruction set. */
-extern void         getRegUsage_X86Instr ( HRegUsage*, X86Instr* );
-extern void         mapRegs_X86Instr     ( HRegRemap*, X86Instr* );
+extern void         getRegUsage_X86Instr ( HRegUsage*, X86Instr*, Bool );
+extern void         mapRegs_X86Instr     ( HRegRemap*, X86Instr*, Bool );
 extern Bool         isMove_X86Instr      ( X86Instr*, HReg*, HReg* );
-extern Int          emit_X86Instr        ( UChar* buf, Int nbuf, X86Instr* );
-extern X86Instr*    genSpill_X86         ( HReg rreg, Int offset );
-extern X86Instr*    genReload_X86        ( HReg rreg, Int offset );
+extern Int          emit_X86Instr        ( UChar* buf, Int nbuf, X86Instr*, 
+                                           Bool, void* dispatch );
+extern X86Instr*    genSpill_X86         ( HReg rreg, Int offset, Bool );
+extern X86Instr*    genReload_X86        ( HReg rreg, Int offset, Bool );
+extern X86Instr*    directReload_X86     ( X86Instr* i, 
+                                           HReg vreg, Short spill_off );
 extern void         getAllocableRegs_X86 ( Int*, HReg** );
-extern HInstrArray* iselBB_X86           ( IRBB*, VexArchInfo* );
+extern HInstrArray* iselSB_X86           ( IRSB*, VexArch,
+                                                  VexArchInfo*,
+                                                  VexAbiInfo* );
 
 #endif /* ndef __LIBVEX_HOST_X86_HDEFS_H */
 

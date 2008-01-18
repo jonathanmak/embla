@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward 
+   Copyright (C) 2000-2007 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -50,44 +50,176 @@ Bool VG_(isdigit) ( Char c )
    Converting strings to numbers
    ------------------------------------------------------------------ */
 
-Long VG_(atoll) ( Char* str )
+static Bool is_oct_digit(Char c, Long* digit)
+{
+   if (c >= '0' && c <= '7') { *digit = (Long)(c - '0'); return True; }
+   return False;
+}
+
+static Bool is_dec_digit(Char c, Long* digit)
+{
+   if (c >= '0' && c <= '9') { *digit = (Long)(c - '0'); return True; }
+   return False;
+}
+
+static Bool is_hex_digit(Char c, Long* digit)
+{
+   if (c >= '0' && c <= '9') { *digit = (Long)(c - '0');        return True; }
+   if (c >= 'A' && c <= 'F') { *digit = (Long)((c - 'A') + 10); return True; }
+   if (c >= 'a' && c <= 'f') { *digit = (Long)((c - 'a') + 10); return True; }
+   return False;
+}
+
+static Bool is_base36_digit(Char c, Long* digit)
+{
+   if (c >= '0' && c <= '9') { *digit = (Long)(c - '0');        return True; }
+   if (c >= 'A' && c <= 'Z') { *digit = (Long)((c - 'A') + 10); return True; }
+   if (c >= 'a' && c <= 'z') { *digit = (Long)((c - 'a') + 10); return True; }
+   return False;
+}
+
+Long VG_(strtoll8) ( Char* str, Char** endptr )
 {
    Bool neg = False;
-   Long n = 0;
-   if (*str == '-') { str++; neg = True; };
-   while (*str >= '0' && *str <= '9') {
-      n = 10*n + (Long)(*str - '0');
+   Long n = 0, digit = 0;
+
+   // Skip leading whitespace.
+   while (VG_(isspace)(*str)) str++;
+
+   // Allow a leading '-' or '+'.
+   if (*str == '-') { str++; neg = True; }
+   else if (*str == '+') { str++; }
+
+   while (is_oct_digit(*str, &digit)) {
+      n = 8*n + digit;
       str++;
    }
+
    if (neg) n = -n;
+   if (endptr) *endptr = str;    // Record first failing character.
    return n;
+}
+
+Long VG_(strtoll10) ( Char* str, Char** endptr )
+{
+   Bool neg = False;
+   Long n = 0, digit = 0;
+
+   // Skip leading whitespace.
+   while (VG_(isspace)(*str)) str++;
+
+   // Allow a leading '-' or '+'.
+   if (*str == '-') { str++; neg = True; }
+   else if (*str == '+') { str++; }
+
+   while (is_dec_digit(*str, &digit)) {
+      n = 10*n + digit;
+      str++;
+   }
+
+   if (neg) n = -n;
+   if (endptr) *endptr = str;    // Record first failing character.
+   return n;
+}
+
+Long VG_(strtoll16) ( Char* str, Char** endptr )
+{
+   Bool neg = False;
+   Long n = 0, digit = 0;
+
+   // Skip leading whitespace.
+   while (VG_(isspace)(*str)) str++;
+
+   // Allow a leading '-' or '+'.
+   if (*str == '-') { str++; neg = True; }
+   else if (*str == '+') { str++; }
+
+   // Allow leading "0x", but only if there's a hex digit
+   // following it.
+   if (*str == '0'
+    && (*(str+1) == 'x' || *(str+1) == 'X')
+    && is_hex_digit( *(str+2), &digit )) {
+      str += 2;
+   }
+
+   while (is_hex_digit(*str, &digit)) {
+      n = 16*n + digit;
+      str++;
+   }
+
+   if (neg) n = -n;
+   if (endptr) *endptr = str;    // Record first failing character.
+   return n;
+}
+
+Long VG_(strtoll36) ( Char* str, Char** endptr )
+{
+   Bool neg = False;
+   Long n = 0, digit = 0;
+
+   // Skip leading whitespace.
+   while (VG_(isspace)(*str)) str++;
+
+   // Allow a leading '-' or '+'.
+   if (*str == '-') { str++; neg = True; }
+   else if (*str == '+') { str++; }
+
+   while (is_base36_digit(*str, &digit)) {
+      n = 36*n + digit;
+      str++;
+   }
+
+   if (neg) n = -n;
+   if (endptr) *endptr = str;    // Record first failing character.
+   return n;
+}
+
+double VG_(strtod) ( Char* str, Char** endptr )
+{
+   Bool neg = False;
+   Long digit;
+   double n = 0, frac = 0, x = 0.1;
+
+   // Skip leading whitespace.
+   while (VG_(isspace)(*str)) str++;
+
+   // Allow a leading '-' or '+'.
+   if (*str == '-') { str++; neg = True; }
+   else if (*str == '+') { str++; }
+
+   while (is_dec_digit(*str, &digit)) {
+      n = 10*n + digit;
+      str++;
+   }
+
+   if (*str == '.') {
+      str++;
+      while (is_dec_digit(*str, &digit)) {
+         frac += x*digit;
+         x /= 10;
+         str++;
+      }
+   }
+
+   n += frac;
+   if (neg) n = -n;
+   if (endptr) *endptr = str;    // Record first failing character.
+   return n;
+}
+
+Long VG_(atoll) ( Char* str )
+{
+   return VG_(strtoll10)(str, NULL);
+}
+
+Long VG_(atoll16) ( Char* str )
+{
+   return VG_(strtoll16)(str, NULL);
 }
 
 Long VG_(atoll36) ( Char* str )
 {
-   Bool neg = False;
-   Long n = 0;
-   if (*str == '-') { str++; neg = True; };
-   while (True) {
-      Char c = *str;
-      if (c >= '0' && c <= (Char)'9') {
-         n = 36*n + (Long)(c - '0');
-      }
-      else 
-      if (c >= 'A' && c <= (Char)'Z') {
-         n = 36*n + (Long)((c - 'A') + 10);
-      }
-      else 
-      if (c >= 'a' && c <= (Char)'z') {
-         n = 36*n + (Long)((c - 'a') + 10);
-      }
-      else {
-	break;
-      }
-      str++;
-   }
-   if (neg) n = -n;
-   return n;
+   return VG_(strtoll36)(str, NULL);
 }
 
 /* ---------------------------------------------------------------------
@@ -369,13 +501,40 @@ void* VG_(memcpy) ( void *dest, const void *src, SizeT sz )
    return dest;
 }
 
+void* VG_(memmove)(void *dest, const void *src, SizeT sz)
+{
+   SizeT i;
+   if (sz == 0)
+      return dest;
+   if (dest < src) {
+      for (i = 0; i < sz; i++) {
+         ((UChar*)dest)[i] = ((UChar*)src)[i];
+      }
+   }
+   else if (dest > src) {
+      for (i = sz - 1; i >= 0; i--) {
+         ((UChar*)dest)[i] = ((UChar*)src)[i];
+      }
+   }
+   return dest;
+}
+
 void* VG_(memset) ( void *dest, Int c, SizeT sz )
 {
    Char *d = (Char *)dest;
-
-   while (sz--)
-      *d++ = c;
-
+   while (sz >= 4) {
+      d[0] = c;
+      d[1] = c;
+      d[2] = c;
+      d[3] = c;
+      d += 4;
+      sz -= 4;
+   }
+   while (sz > 0) {
+      d[0] = c;
+      d++;
+      sz--;
+   }
    return dest;
 }
 
@@ -404,6 +563,7 @@ Int VG_(memcmp) ( const void* s1, const void* s2, SizeT n )
    Misc useful functions
    ------------------------------------------------------------------ */
 
+/* Returns the base-2 logarithm of x.  Returns -1 if x is not a power of two. */
 Int VG_(log2) ( Int x ) 
 {
    Int i;
@@ -480,10 +640,34 @@ void VG_(ssort)( void* base, SizeT nmemb, SizeT size,
       #undef ASSIGN
       #undef COMPAR
 
+   } else if ( (4*sizeof(UWord)) == size ) {
+      /* special-case 4 word-elements.  This captures a lot of cases
+         from symbol table reading/canonicalisaton, because both DiLoc
+         and DiSym are 4 word structures. */
+      HChar* a = base;
+      HChar  v[size];
+
+      #define ASSIGN(dst, dsti, src, srci) \
+       do { UWord* dP = (UWord*)&dst[size*(dsti)]; \
+            UWord* sP = (UWord*)&src[size*(srci)]; \
+            dP[0] = sP[0]; \
+            dP[1] = sP[1]; \
+            dP[2] = sP[2]; \
+            dP[3] = sP[3]; \
+          } while (0)
+
+      #define COMPAR(dst, dsti, src, srci) \
+      compar( &dst[size*(dsti)], &src[size*(srci)] )
+
+      SORT;
+
+      #undef ASSIGN
+      #undef COMPAR
+
    // General case
    } else {
-      char* a = base;
-      char  v[size];      // will be at least 'size' bytes
+      HChar* a = base;
+      HChar  v[size];      // will be at least 'size' bytes
 
       #define ASSIGN(dst, dsti, src, srci) \
       VG_(memcpy)( &dst[size*(dsti)], &src[size*(srci)], size );

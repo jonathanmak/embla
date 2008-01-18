@@ -8,7 +8,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward 
+   Copyright (C) 2000-2007 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -30,14 +30,11 @@
 */
 
 
-#define _GNU_SOURCE
-#define _FILE_OFFSET_BITS 64
-
-// It seems that on SuSE 9.1 (x86) something in <fcntl.h> messes up stuff
-// acquired indirectly from vki-x86-linux.h.  Therefore our headers must be
-// included ahead of the glibc ones.  This fix is a kludge;  the right
-// solution is to entirely remove the glibc dependency.
 #include "pub_core_basics.h"
+#include "pub_core_vki.h"
+
+#if defined(VGO_linux)
+
 #include "pub_core_aspacemgr.h"   // various mapping fns
 #include "pub_core_debuglog.h"
 #include "pub_core_libcbase.h"
@@ -48,9 +45,15 @@
 #include "pub_core_libcassert.h"  // VG_(exit), vg_assert
 #include "pub_core_mallocfree.h"  // VG_(malloc), VG_(free)
 #include "pub_core_syscall.h"     // VG_(strerror)
-#include "vki_unistd.h"           // mmap-related constants
+#include "pub_core_options.h"     // VG_(clo_xml)
+#include "pub_core_ume.h"         // self
 
-#include "pub_core_ume.h"
+/* --- !!! --- EXTERNAL HEADERS start --- !!! --- */
+#define _GNU_SOURCE
+#define _FILE_OFFSET_BITS 64
+/* This is for ELF types etc, and also the AT_ constants. */
+#include <elf.h>
+/* --- !!! --- EXTERNAL HEADERS end --- !!! --- */
 
 
 #if	VG_WORDSIZE == 8
@@ -71,8 +74,14 @@ struct elfinfo
 static void check_mmap(SysRes res, Addr base, SizeT len)
 {
    if (res.isError) {
-      VG_(printf)("valgrind: mmap(0x%llx, %lld) failed in UME.\n", 
-                  (ULong)base, (Long)len);
+      VG_(printf)("valgrind: mmap(0x%llx, %lld) failed in UME "
+                  "with error %lu (%s).\n", 
+                  (ULong)base, (Long)len, 
+                  res.err, VG_(strerror)(res.err) );
+      if (res.err == VKI_EINVAL) {
+         VG_(printf)("valgrind: this can be caused by executables with "
+                     "very large text, data or bss segments.\n");
+      }
       VG_(exit)(1);
    }
 }
@@ -93,7 +102,7 @@ struct ume_auxv *VG_(find_auxv)(UWord* sp)
       sp++;
    sp++;
    
-#if defined(VGA_ppc32)
+#if defined(VGA_ppc32) || defined(VGA_ppc64)
 # if defined AT_IGNOREPPC
    while (*sp == AT_IGNOREPPC)        // skip AT_IGNOREPPC entries
       sp += 2;
@@ -118,9 +127,9 @@ struct elfinfo *readelf(Int fd, const char *filename)
    e->fd = fd;
 
    sres = VG_(pread)(fd, &e->e, sizeof(e->e), 0);
-   if (sres.isError || sres.val != sizeof(e->e)) {
+   if (sres.isError || sres.res != sizeof(e->e)) {
       VG_(printf)("valgrind: %s: can't read ELF header: %s\n", 
-                  filename, VG_(strerror)(sres.val));
+                  filename, VG_(strerror)(sres.err));
       goto bad;
    }
 
@@ -158,9 +167,9 @@ struct elfinfo *readelf(Int fd, const char *filename)
    vg_assert(e->p);
 
    sres = VG_(pread)(fd, e->p, phsz, e->e.e_phoff);
-   if (sres.isError || sres.val != phsz) {
+   if (sres.isError || sres.res != phsz) {
       VG_(printf)("valgrind: can't read phdr: %s\n", 
-                  VG_(strerror)(sres.val));
+                  VG_(strerror)(sres.err));
       VG_(free)(e->p);
       goto bad;
    }
@@ -315,7 +324,7 @@ static Bool match_ELF(const char *hdr, Int len)
 
    - The entry point in INFO is set to the interpreter's entry point,
      and we're done.  */
-static Int load_ELF(Int fd, const char *name, /*MOD*/struct exeinfo *info)
+static Int load_ELF(Int fd, const HChar* name, /*MOD*/ExeInfo* info)
 {
    SysRes sres;
    struct elfinfo *e;
@@ -328,6 +337,11 @@ static Int load_ELF(Int fd, const char *name, /*MOD*/struct exeinfo *info)
    Int i;
    void *entry;
    ESZ(Addr) ebase = 0;
+
+   /* The difference between where the interpreter got mapped and
+      where it asked to be mapped.  Needed for computing the ppc64 ELF
+      entry point and initial tocptr (R2) value. */
+   ESZ(Word) interp_offset = 0;
 
 #ifdef HAVE_PIE
    ebase = info->exe_base;
@@ -378,7 +392,7 @@ static Int load_ELF(Int fd, const char *name, /*MOD*/struct exeinfo *info)
 	    VG_(printf)("valgrind: m_ume.c: can't open interpreter\n");
 	    VG_(exit)(1);
 	 }
-         intfd = sres.val;
+         intfd = sres.res;
 
 	 interp = readelf(intfd, buf);
 	 if (interp == NULL) {
@@ -484,6 +498,7 @@ static Int load_ELF(Int fd, const char *name, /*MOD*/struct exeinfo *info)
 
       entry = (void *)(advised - interp_addr + interp->e.e_entry);
       info->interp_base = (ESZ(Addr))advised;
+      interp_offset = advised - interp_addr;
 
       VG_(free)(interp->p);
       VG_(free)(interp);
@@ -493,8 +508,19 @@ static Int load_ELF(Int fd, const char *name, /*MOD*/struct exeinfo *info)
    info->exe_base = minaddr + ebase;
    info->exe_end  = maxaddr + ebase;
 
-   info->init_eip = (Addr)entry;
-
+#if defined(VGP_ppc64_linux)
+   /* On PPC64, a func ptr is represented by a TOC entry ptr.  This
+      TOC entry contains three words; the first word is the function
+      address, the second word is the TOC ptr (r2), and the third word
+      is the static chain value. */
+   info->init_ip  = ((ULong*)entry)[0];
+   info->init_toc = ((ULong*)entry)[1];
+   info->init_ip  += interp_offset;
+   info->init_toc += interp_offset;
+#else
+   info->init_ip  = (Addr)entry;
+   info->init_toc = 0; /* meaningless on this platform */
+#endif
    VG_(free)(e->p);
    VG_(free)(e);
 
@@ -512,10 +538,20 @@ static Bool match_script(char *hdr, Int len)
    if (0 != VG_(memcmp)(hdr, "#!", 2)) return False;
 
    // Find interpreter name, make sure it's an absolute path (starts with
-   // '/') and has at least one more char.
+   // '/') and has at least one more char.  First, skip over any space
+   // between the #! and the start of the interpreter name
    while (interp < end && VG_(isspace)(*interp)) interp++;
+
+   // overrun?
+   if (interp >= end)   return False;  // can't find start of interp name
+
+   // interp should now point at the /
    if (*interp != '/')  return False;  // absolute path only for interpreter
-   if (interp == end)   return False;  // nothing after the '/'
+
+   // check for something plausible after the /
+   interp++;
+   if (interp >= end)   return False;
+   if (VG_(isspace)(*interp)) return False;
 
    // Here we should get the full interpreter name and check it with
    // check_executable().  See the "EXEC FAILED" failure when running shell
@@ -525,13 +561,13 @@ static Bool match_script(char *hdr, Int len)
 }
 
 // Forward declaration.
-static Int do_exec_inner(const char *exe, struct exeinfo *info);
+static Int do_exec_inner(const HChar* exe, ExeInfo* info);
 
 /* returns: 0 = success, non-0 is failure */
-static Int load_script(Int fd, const char *name, struct exeinfo *info)
+static Int load_script(Int fd, const HChar* name, ExeInfo* info)
 {
-   Char  hdr[VKI_PAGE_SIZE];
-   Int   len = VKI_PAGE_SIZE;
+   Char  hdr[4096];
+   Int   len = 4096;
    Int   eol;
    Char* interp;
    Char* end;
@@ -545,7 +581,7 @@ static Int load_script(Int fd, const char *name, struct exeinfo *info)
       VG_(close)(fd);
       return VKI_EACCES;
    } else {
-      len = res.val;
+      len = res.res;
    }
 
    vg_assert('#' == hdr[0] && '!' == hdr[1]);
@@ -567,7 +603,7 @@ static Int load_script(Int fd, const char *name, struct exeinfo *info)
 
    if (!eol && cp < end) {
       /* skip space before arg */
-      while (cp < end && VG_(isspace)(*cp))
+      while (cp < end && VG_(isspace)(*cp) && *cp != '\n')
 	 cp++;
 
       /* arg is from here to eol */
@@ -601,24 +637,35 @@ typedef enum {
 } ExeFormat;
 
 // Check the file looks executable.
-SysRes VG_(pre_exec_check)(const Char* exe_name, Int* out_fd)
+SysRes 
+VG_(pre_exec_check)(const HChar* exe_name, Int* out_fd, Bool allow_setuid)
 {
    Int fd, ret;
    SysRes res;
-   Char  buf[VKI_PAGE_SIZE];
-   SizeT bufsz = VKI_PAGE_SIZE, fsz;
+   Char  buf[4096];
+   SizeT bufsz = 4096, fsz;
+   Bool is_setuid = False;
 
    // Check it's readable
    res = VG_(open)(exe_name, VKI_O_RDONLY, 0);
    if (res.isError) {
       return res;
    }
-   fd = res.val;
+   fd = res.res;
 
    // Check we have execute permissions
-   ret = VG_(check_executable)((HChar*)exe_name);
+   ret = VG_(check_executable)(&is_setuid, (HChar*)exe_name, allow_setuid);
    if (0 != ret) {
       VG_(close)(fd);
+      if (is_setuid && !VG_(clo_xml)) {
+         VG_(message)(Vg_UserMsg, "");
+         VG_(message)(Vg_UserMsg,
+                      "Warning: Can't execute setuid/setgid executable: %s",
+                      exe_name);
+         VG_(message)(Vg_UserMsg, "Possible workaround: remove "
+                      "--trace-children=yes, if in effect");
+         VG_(message)(Vg_UserMsg, "");
+      }
       return VG_(mk_SysRes_Error)(ret);
    }
 
@@ -627,11 +674,11 @@ SysRes VG_(pre_exec_check)(const Char* exe_name, Int* out_fd)
       bufsz = fsz;
 
    res = VG_(pread)(fd, buf, bufsz, 0);
-   if (res.isError || res.val != bufsz) {
+   if (res.isError || res.res != bufsz) {
       VG_(close)(fd);
       return VG_(mk_SysRes_Error)(VKI_EACCES);
    }
-   bufsz = res.val;
+   bufsz = res.res;
 
    if (match_ELF(buf, bufsz)) {
       res = VG_(mk_SysRes_Success)(VG_EXE_FORMAT_ELF);
@@ -656,17 +703,17 @@ SysRes VG_(pre_exec_check)(const Char* exe_name, Int* out_fd)
 // We can execute only ELF binaries or scripts that begin with "#!".  (Not,
 // for example, scripts that don't begin with "#!";  see the VG_(do_exec)()
 // invocation from m_main.c for how that's handled.)
-static Int do_exec_inner(const char *exe, struct exeinfo *info)
+static Int do_exec_inner(const HChar *exe, ExeInfo* info)
 {
    SysRes res;
    Int fd;
    Int ret;
 
-   res = VG_(pre_exec_check)(exe, &fd);
+   res = VG_(pre_exec_check)(exe, &fd, False/*allow_setuid*/);
    if (res.isError)
-      return res.val;
+      return res.err;
 
-   switch (res.val) {
+   switch (res.res) {
     case VG_EXE_FORMAT_ELF:    ret = load_ELF   (fd, exe, info); break;
     case VG_EXE_FORMAT_SCRIPT: ret = load_script(fd, exe, info); break;
     default:
@@ -684,7 +731,7 @@ static Bool is_hash_bang_file(Char* f)
    SysRes res = VG_(open)(f, VKI_O_RDONLY, 0);
    if (!res.isError) {
       Char buf[3] = {0,0,0};
-      Int fd = res.val;
+      Int fd = res.res;
       Int n  = VG_(read)(fd, buf, 2); 
       if (n == 2 && VG_STREQ("#!", buf))
          return True;
@@ -700,7 +747,7 @@ static Bool is_binary_file(Char* f)
    SysRes res = VG_(open)(f, VKI_O_RDONLY, 0);
    if (!res.isError) {
       UChar buf[80];
-      Int fd = res.val;
+      Int fd = res.res;
       Int n  = VG_(read)(fd, buf, 80); 
       Int i;
       for (i = 0; i < n; i++) {
@@ -721,8 +768,8 @@ static Bool is_binary_file(Char* f)
 // bash as a guide).  It's worth noting that the shell can execute some
 // things that VG_(do_exec)() (which subsitutes for the kernel's exec())
 // will refuse to (eg. scripts lacking a "#!" prefix).
-static Int do_exec_shell_followup(Int ret, Char* exe_name,
-                                  struct exeinfo* info)
+static Int do_exec_shell_followup(Int ret, HChar* exe_name,
+                                  ExeInfo* info)
 {
    Char*  default_interp_name = "/bin/sh";
    SysRes res;
@@ -765,7 +812,8 @@ static Int do_exec_shell_followup(Int ret, Char* exe_name,
          VG_(printf)("valgrind: %s: is a directory\n", exe_name);
       
       // Was it not executable?
-      } else if (0 != VG_(check_executable)(exe_name)) {
+      } else if (0 != VG_(check_executable)(NULL, exe_name, 
+                                            False/*allow_setuid*/)) {
          VG_(printf)("valgrind: %s: %s\n", exe_name, VG_(strerror)(ret));
 
       // Did it start with "#!"?  If so, it must have been a bad interpreter.
@@ -775,7 +823,7 @@ static Int do_exec_shell_followup(Int ret, Char* exe_name,
 
       // Otherwise it was something else.
       } else {
-         VG_(printf)("valgrind: %s\n", exe_name, VG_(strerror)(ret));
+         VG_(printf)("valgrind: %s: %s\n", exe_name, VG_(strerror)(ret));
       }
       // 126 means NOEXEC;  I think this is Posix, and that in some cases we
       // should be returning 127, meaning NOTFOUND.  Oh well.
@@ -790,7 +838,7 @@ static Int do_exec_shell_followup(Int ret, Char* exe_name,
 // See ume.h for an indication of which entries of 'info' are inputs, which
 // are outputs, and which are both.
 /* returns: 0 = success, non-0 is failure */
-Int VG_(do_exec)(const char *exe_name, struct exeinfo *info)
+Int VG_(do_exec)(const HChar* exe_name, ExeInfo* info)
 {
    Int ret;
    
@@ -800,10 +848,13 @@ Int VG_(do_exec)(const char *exe_name, struct exeinfo *info)
    ret = do_exec_inner(exe_name, info);
 
    if (0 != ret) {
-      ret = do_exec_shell_followup(ret, (Char*)exe_name, info);
+      Char* exe_name_casted = (Char*)exe_name;
+      ret = do_exec_shell_followup(ret, exe_name_casted, info);
    }
    return ret;
 }
+
+#endif /* defined(VGO_linux) */
 
 /*--------------------------------------------------------------------*/
 /*--- end                                                          ---*/

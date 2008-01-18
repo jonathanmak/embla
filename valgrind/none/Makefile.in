@@ -14,6 +14,19 @@
 
 @SET_MAKE@
 
+# What the first for loop does: it copies a bunch of files which names
+# of the form wurble-arch-os to $prefix/lib/valgrind/arch-os/wurble.
+# There is some complexity in the sed mangling because wurble may itself
+# contain a dash, which must be ignored.  For example we want
+#    exp-omega-x86-linux
+# to be installed in 
+#    $prefix/lib/valgrind/x86-linux/exp-omega
+# and not in
+#    $prefix/lib/valgrind/omega-x86-linux/exp
+# or similarly mutant place.
+#
+# Note there is identical sed magic in Makefile.tool-inplace.am.
+
 # What the second for loop does: it copies libcoregrind.a and libvex.a
 # into the correct (target-specific) lib dirs at install time.
 # $(noinst_LIBRARIES) will look like this:
@@ -23,6 +36,9 @@
 # pD and pU are the (arch,os) target pairs separated by a dash (pD) or
 # an underscore (pU) respectively, eg amd64-linux (pD) and amd64_linux (pU).
 # It then copies libcoregrind.a and libvex.a to the right places.
+
+# For a description of what these magic sed commands do, see comments
+# in Makefile.install.am (which has identical magic)
 
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
@@ -52,10 +68,14 @@ DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(top_srcdir)/Makefile.tool-flags.am \
 	$(top_srcdir)/Makefile.tool-inplace.am \
 	$(top_srcdir)/Makefile.tool.am
-noinst_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2) $(am__EXEEXT_3)
-@VG_X86_LINUX_TRUE@am__append_1 = none-x86-linux
-@VG_AMD64_LINUX_TRUE@am__append_2 = none-amd64-linux
-@VG_PPC32_LINUX_TRUE@am__append_3 = none-ppc32-linux
+noinst_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2) $(am__EXEEXT_3) \
+	$(am__EXEEXT_4) $(am__EXEEXT_5) $(am__EXEEXT_6)
+@VGP_X86_LINUX_TRUE@am__append_1 = none-x86-linux
+@VGP_AMD64_LINUX_TRUE@am__append_2 = none-amd64-linux
+@VGP_PPC32_LINUX_TRUE@am__append_3 = none-ppc32-linux
+@VGP_PPC64_LINUX_TRUE@am__append_4 = none-ppc64-linux
+@VGP_PPC32_AIX5_TRUE@am__append_5 = none-ppc32-aix5
+@VGP_PPC64_AIX5_TRUE@am__append_6 = none-ppc64-aix5
 subdir = none
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.in
@@ -64,9 +84,12 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
-@VG_X86_LINUX_TRUE@am__EXEEXT_1 = none-x86-linux$(EXEEXT)
-@VG_AMD64_LINUX_TRUE@am__EXEEXT_2 = none-amd64-linux$(EXEEXT)
-@VG_PPC32_LINUX_TRUE@am__EXEEXT_3 = none-ppc32-linux$(EXEEXT)
+@VGP_X86_LINUX_TRUE@am__EXEEXT_1 = none-x86-linux$(EXEEXT)
+@VGP_AMD64_LINUX_TRUE@am__EXEEXT_2 = none-amd64-linux$(EXEEXT)
+@VGP_PPC32_LINUX_TRUE@am__EXEEXT_3 = none-ppc32-linux$(EXEEXT)
+@VGP_PPC64_LINUX_TRUE@am__EXEEXT_4 = none-ppc64-linux$(EXEEXT)
+@VGP_PPC32_AIX5_TRUE@am__EXEEXT_5 = none-ppc32-aix5$(EXEEXT)
+@VGP_PPC64_AIX5_TRUE@am__EXEEXT_6 = none-ppc64-aix5$(EXEEXT)
 PROGRAMS = $(noinst_PROGRAMS)
 am__objects_1 = none_amd64_linux-nl_main.$(OBJEXT)
 am_none_amd64_linux_OBJECTS = $(am__objects_1)
@@ -76,20 +99,41 @@ am__DEPENDENCIES_1 =  \
 	@VEX_DIR@/libvex_amd64_linux.a
 am__DEPENDENCIES_2 =
 am__DEPENDENCIES_3 = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_2)
-am__objects_2 = none_ppc32_linux-nl_main.$(OBJEXT)
-am_none_ppc32_linux_OBJECTS = $(am__objects_2)
-none_ppc32_linux_OBJECTS = $(am_none_ppc32_linux_OBJECTS)
+am__objects_2 = none_ppc32_aix5-nl_main.$(OBJEXT)
+am_none_ppc32_aix5_OBJECTS = $(am__objects_2)
+none_ppc32_aix5_OBJECTS = $(am_none_ppc32_aix5_OBJECTS)
 am__DEPENDENCIES_4 =  \
+	$(top_builddir)/coregrind/libcoregrind_ppc32_aix5.a \
+	@VEX_DIR@/libvex_ppc32_aix5.a
+am__DEPENDENCIES_5 = $(am__DEPENDENCIES_4) $(am__DEPENDENCIES_2)
+am__objects_3 = none_ppc32_linux-nl_main.$(OBJEXT)
+am_none_ppc32_linux_OBJECTS = $(am__objects_3)
+none_ppc32_linux_OBJECTS = $(am_none_ppc32_linux_OBJECTS)
+am__DEPENDENCIES_6 =  \
 	$(top_builddir)/coregrind/libcoregrind_ppc32_linux.a \
 	@VEX_DIR@/libvex_ppc32_linux.a
-am__DEPENDENCIES_5 = $(am__DEPENDENCIES_4) $(am__DEPENDENCIES_2)
-am__objects_3 = none_x86_linux-nl_main.$(OBJEXT)
-am_none_x86_linux_OBJECTS = $(am__objects_3)
+am__DEPENDENCIES_7 = $(am__DEPENDENCIES_6) $(am__DEPENDENCIES_2)
+am__objects_4 = none_ppc64_aix5-nl_main.$(OBJEXT)
+am_none_ppc64_aix5_OBJECTS = $(am__objects_4)
+none_ppc64_aix5_OBJECTS = $(am_none_ppc64_aix5_OBJECTS)
+am__DEPENDENCIES_8 =  \
+	$(top_builddir)/coregrind/libcoregrind_ppc64_aix5.a \
+	@VEX_DIR@/libvex_ppc64_aix5.a
+am__DEPENDENCIES_9 = $(am__DEPENDENCIES_8) $(am__DEPENDENCIES_2)
+am__objects_5 = none_ppc64_linux-nl_main.$(OBJEXT)
+am_none_ppc64_linux_OBJECTS = $(am__objects_5)
+none_ppc64_linux_OBJECTS = $(am_none_ppc64_linux_OBJECTS)
+am__DEPENDENCIES_10 =  \
+	$(top_builddir)/coregrind/libcoregrind_ppc64_linux.a \
+	@VEX_DIR@/libvex_ppc64_linux.a
+am__DEPENDENCIES_11 = $(am__DEPENDENCIES_10) $(am__DEPENDENCIES_2)
+am__objects_6 = none_x86_linux-nl_main.$(OBJEXT)
+am_none_x86_linux_OBJECTS = $(am__objects_6)
 none_x86_linux_OBJECTS = $(am_none_x86_linux_OBJECTS)
-am__DEPENDENCIES_6 =  \
+am__DEPENDENCIES_12 =  \
 	$(top_builddir)/coregrind/libcoregrind_x86_linux.a \
 	@VEX_DIR@/libvex_x86_linux.a
-am__DEPENDENCIES_7 = $(am__DEPENDENCIES_6) $(am__DEPENDENCIES_2)
+am__DEPENDENCIES_13 = $(am__DEPENDENCIES_12) $(am__DEPENDENCIES_2)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -97,10 +141,12 @@ COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 CCLD = $(CC)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(none_amd64_linux_SOURCES) $(none_ppc32_linux_SOURCES) \
-	$(none_x86_linux_SOURCES)
-DIST_SOURCES = $(none_amd64_linux_SOURCES) $(none_ppc32_linux_SOURCES) \
-	$(none_x86_linux_SOURCES)
+SOURCES = $(none_amd64_linux_SOURCES) $(none_ppc32_aix5_SOURCES) \
+	$(none_ppc32_linux_SOURCES) $(none_ppc64_aix5_SOURCES) \
+	$(none_ppc64_linux_SOURCES) $(none_x86_linux_SOURCES)
+DIST_SOURCES = $(none_amd64_linux_SOURCES) $(none_ppc32_aix5_SOURCES) \
+	$(none_ppc32_linux_SOURCES) $(none_ppc64_aix5_SOURCES) \
+	$(none_ppc64_linux_SOURCES) $(none_x86_linux_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	html-recursive info-recursive install-data-recursive \
 	install-exec-recursive install-info-recursive \
@@ -119,6 +165,12 @@ AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+BUILD_MPIWRAP_PRI_FALSE = @BUILD_MPIWRAP_PRI_FALSE@
+BUILD_MPIWRAP_PRI_TRUE = @BUILD_MPIWRAP_PRI_TRUE@
+BUILD_MPIWRAP_SEC_FALSE = @BUILD_MPIWRAP_SEC_FALSE@
+BUILD_MPIWRAP_SEC_TRUE = @BUILD_MPIWRAP_SEC_TRUE@
+BUILD_SSE3_TESTS_FALSE = @BUILD_SSE3_TESTS_FALSE@
+BUILD_SSE3_TESTS_TRUE = @BUILD_SSE3_TESTS_TRUE@
 CC = @CC@
 CCAS = @CCAS@
 CCASFLAGS = @CCASFLAGS@
@@ -139,9 +191,14 @@ ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
+FLAG_FNO_STACK_PROTECTOR = @FLAG_FNO_STACK_PROTECTOR@
 FLAG_M32 = @FLAG_M32@
+FLAG_M64 = @FLAG_M64@
+FLAG_MAIX32 = @FLAG_MAIX32@
+FLAG_MAIX64 = @FLAG_MAIX64@
 FLAG_MMMX = @FLAG_MMMX@
 FLAG_MSSE = @FLAG_MSSE@
+FLAG_WDECL_AFTER_STMT = @FLAG_WDECL_AFTER_STMT@
 GDB = @GDB@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -156,6 +213,7 @@ MAINT = @MAINT@
 MAINTAINER_MODE_FALSE = @MAINTAINER_MODE_FALSE@
 MAINTAINER_MODE_TRUE = @MAINTAINER_MODE_TRUE@
 MAKEINFO = @MAKEINFO@
+MPI_CC = @MPI_CC@
 OBJEXT = @OBJEXT@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
@@ -173,19 +231,29 @@ STRIP = @STRIP@
 VALT_LOAD_ADDRESS = @VALT_LOAD_ADDRESS@
 VERSION = @VERSION@
 VEX_DIR = @VEX_DIR@
-VG_AMD64_LINUX_FALSE = @VG_AMD64_LINUX_FALSE@
-VG_AMD64_LINUX_TRUE = @VG_AMD64_LINUX_TRUE@
+VGO_AIX5_FALSE = @VGO_AIX5_FALSE@
+VGO_AIX5_TRUE = @VGO_AIX5_TRUE@
+VGO_LINUX_FALSE = @VGO_LINUX_FALSE@
+VGO_LINUX_TRUE = @VGO_LINUX_TRUE@
+VGP_AMD64_LINUX_FALSE = @VGP_AMD64_LINUX_FALSE@
+VGP_AMD64_LINUX_TRUE = @VGP_AMD64_LINUX_TRUE@
+VGP_HAVE_SECONDARY_FALSE = @VGP_HAVE_SECONDARY_FALSE@
+VGP_HAVE_SECONDARY_TRUE = @VGP_HAVE_SECONDARY_TRUE@
+VGP_PPC32_AIX5_FALSE = @VGP_PPC32_AIX5_FALSE@
+VGP_PPC32_AIX5_TRUE = @VGP_PPC32_AIX5_TRUE@
+VGP_PPC32_LINUX_FALSE = @VGP_PPC32_LINUX_FALSE@
+VGP_PPC32_LINUX_TRUE = @VGP_PPC32_LINUX_TRUE@
+VGP_PPC64_AIX5_FALSE = @VGP_PPC64_AIX5_FALSE@
+VGP_PPC64_AIX5_TRUE = @VGP_PPC64_AIX5_TRUE@
+VGP_PPC64_LINUX_FALSE = @VGP_PPC64_LINUX_FALSE@
+VGP_PPC64_LINUX_TRUE = @VGP_PPC64_LINUX_TRUE@
+VGP_X86_LINUX_FALSE = @VGP_X86_LINUX_FALSE@
+VGP_X86_LINUX_TRUE = @VGP_X86_LINUX_TRUE@
 VG_ARCH = @VG_ARCH@
 VG_ARCH_ALL = @VG_ARCH_ALL@
-VG_MAKE_PLATFORM = @VG_MAKE_PLATFORM@
 VG_OS = @VG_OS@
-VG_OS_ALL = @VG_OS_ALL@
-VG_PLATFORM = @VG_PLATFORM@
-VG_PLATFORM_ALL = @VG_PLATFORM_ALL@
-VG_PPC32_LINUX_FALSE = @VG_PPC32_LINUX_FALSE@
-VG_PPC32_LINUX_TRUE = @VG_PPC32_LINUX_TRUE@
-VG_X86_LINUX_FALSE = @VG_X86_LINUX_FALSE@
-VG_X86_LINUX_TRUE = @VG_X86_LINUX_TRUE@
+VG_PLATFORM_PRI = @VG_PLATFORM_PRI@
+VG_PLATFORM_SEC = @VG_PLATFORM_SEC@
 ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_RANLIB = @ac_ct_RANLIB@
@@ -248,22 +316,93 @@ add_includes_ppc32_linux = -I$(top_srcdir)/include \
 		-DVGO_linux=1 \
 		-DVGP_ppc32_linux=1
 
-AM_CFLAGS_BASE = -O -g -Wmissing-prototypes -Winline -Wall -Wshadow \
-                 -Wpointer-arith -Wstrict-prototypes -Wmissing-declarations
+add_includes_ppc64_linux = -I$(top_srcdir)/include \
+		-I@VEX_DIR@/pub \
+		-DVGA_ppc64=1 \
+		-DVGO_linux=1 \
+		-DVGP_ppc64_linux=1
 
-AM_CFLAGS_PIC = -fpic -fno-omit-frame-pointer
+add_includes_ppc32_aix5 = -I$(top_srcdir)/include \
+		-I@VEX_DIR@/pub \
+		-DVGA_ppc32=1 \
+		-DVGO_aix5=1 \
+		-DVGP_ppc32_aix5=1
+
+add_includes_ppc64_aix5 = -I$(top_srcdir)/include \
+		-I@VEX_DIR@/pub \
+		-DVGA_ppc64=1 \
+		-DVGO_aix5=1 \
+		-DVGP_ppc64_aix5=1
+
+
+# Baseline flags for all compilations.  Aim here is to maximise
+# performance and get whatever useful warnings we can out of gcc.
+AM_CFLAGS_BASE = -O2 -g -Wmissing-prototypes -Wall -Wshadow \
+                 -Wpointer-arith -Wstrict-prototypes -Wmissing-declarations \
+                 -fno-strict-aliasing
+
+
+# These flags are used for building the preload shared objects.
+# The aim is to give reasonable performance but also to have good
+# stack traces, since users often see stack traces extending 
+# into (and through) the preloads.
+AM_CFLAGS_PIC = -O -g -fpic -fno-omit-frame-pointer -fno-strict-aliasing
+
+# Flags for specific targets
+AM_FLAG_M3264_X86_LINUX = @FLAG_M32@
 AM_CPPFLAGS_X86_LINUX = $(add_includes_x86_linux)
-AM_CFLAGS_X86_LINUX = $(WERROR) @FLAG_M32@ @PREFERRED_STACK_BOUNDARY@ $(AM_CFLAGS_BASE)
+AM_CFLAGS_X86_LINUX = $(WERROR) @FLAG_M32@ @PREFERRED_STACK_BOUNDARY@ \
+			 	$(AM_CFLAGS_BASE)
+
 AM_CCASFLAGS_X86_LINUX = $(add_includes_x86_linux) @FLAG_M32@ -g
+AM_FLAG_M3264_AMD64_LINUX = @FLAG_M64@
 AM_CPPFLAGS_AMD64_LINUX = $(add_includes_amd64_linux)
-AM_CFLAGS_AMD64_LINUX = $(WERROR) -m64 -fomit-frame-pointer @PREFERRED_STACK_BOUNDARY@ $(AM_CFLAGS_BASE)
-AM_CCASFLAGS_AMD64_LINUX = $(add_includes_amd64_linux) -m64 -g
+AM_CFLAGS_AMD64_LINUX = $(WERROR) @FLAG_M64@ -fomit-frame-pointer \
+				@PREFERRED_STACK_BOUNDARY@ $(AM_CFLAGS_BASE)
+
+AM_CCASFLAGS_AMD64_LINUX = $(add_includes_amd64_linux) @FLAG_M64@ -g
+AM_FLAG_M3264_PPC32_LINUX = @FLAG_M32@
 AM_CPPFLAGS_PPC32_LINUX = $(add_includes_ppc32_linux)
-AM_CFLAGS_PPC32_LINUX = $(WERROR) $(AM_CFLAGS_BASE)
-AM_CCASFLAGS_PPC32_LINUX = $(add_includes_ppc32_linux) -Wa,-maltivec -g
-AM_CPPFLAGS = $(AM_CPPFLAGS_@VG_MAKE_PLATFORM@)
-AM_CFLAGS = $(AM_CFLAGS_@VG_MAKE_PLATFORM@)
-AM_CCASFLAGS = $(AM_CCASFLAGS_@VG_MAKE_PLATFORM@)
+AM_CFLAGS_PPC32_LINUX = $(WERROR) @FLAG_M32@ $(AM_CFLAGS_BASE)
+AM_CCASFLAGS_PPC32_LINUX = $(add_includes_ppc32_linux) -Wa,-maltivec @FLAG_M32@ -g
+AM_FLAG_M3264_PPC64_LINUX = @FLAG_M64@
+AM_CPPFLAGS_PPC64_LINUX = $(add_includes_ppc64_linux)
+AM_CFLAGS_PPC64_LINUX = $(WERROR) @FLAG_M64@ $(AM_CFLAGS_BASE)
+AM_CCASFLAGS_PPC64_LINUX = $(add_includes_ppc64_linux) -Wa,-maltivec @FLAG_M64@ -g
+AM_FLAG_M3264_PPC32_AIX5 = @FLAG_MAIX32@
+AM_CPPFLAGS_PPC32_AIX5 = $(add_includes_ppc32_aix5)
+AM_CFLAGS_PPC32_AIX5 = $(WERROR) @FLAG_MAIX32@ -mcpu=powerpc $(AM_CFLAGS_BASE)
+AM_CCASFLAGS_PPC32_AIX5 = $(add_includes_ppc32_aix5) \
+				@FLAG_MAIX32@ -mcpu=powerpc -g
+
+AM_FLAG_M3264_PPC64_AIX5 = @FLAG_MAIX64@
+AM_CPPFLAGS_PPC64_AIX5 = $(add_includes_ppc64_aix5)
+AM_CFLAGS_PPC64_AIX5 = $(WERROR) @FLAG_MAIX64@ -mcpu=powerpc64 $(AM_CFLAGS_BASE)
+AM_CCASFLAGS_PPC64_AIX5 = $(add_includes_ppc64_aix5) \
+				@FLAG_MAIX64@ -mcpu=powerpc64 -g
+
+
+# Flags for the primary target.  These must be used to build the
+# regtests and performance tests.  In fact, these must be used to
+# build anything which is built only once on a dual-arch build.
+#
+AM_FLAG_M3264_PRI = $(AM_FLAG_M3264_@VG_PLATFORM_PRI@)
+AM_CPPFLAGS_PRI = $(AM_CPPFLAGS_@VG_PLATFORM_PRI@)
+AM_CFLAGS_PRI = $(AM_CFLAGS_@VG_PLATFORM_PRI@)
+AM_CCASFLAGS_PRI = $(AM_CCASFLAGS_@VG_PLATFORM_PRI@)
+@VGP_HAVE_SECONDARY_FALSE@AM_FLAG_M3264_SEC = 
+@VGP_HAVE_SECONDARY_TRUE@AM_FLAG_M3264_SEC = $(AM_FLAG_M3264_@VG_PLATFORM_SEC@)
+
+# Baseline link flags for making dynamic shared objects.
+#
+PRELOAD_LDFLAGS_COMMON_LINUX = -nostdlib -shared -Wl,-z,interpose,-z,initfirst
+PRELOAD_LDFLAGS_COMMON_AIX5 = -nostdlib -shared -Wl,-G -Wl,-bnogc
+PRELOAD_LDFLAGS_X86_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
+PRELOAD_LDFLAGS_AMD64_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M64@
+PRELOAD_LDFLAGS_PPC32_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
+PRELOAD_LDFLAGS_PPC64_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M64@
+PRELOAD_LDFLAGS_PPC32_AIX5 = $(PRELOAD_LDFLAGS_COMMON_AIX5)  @FLAG_MAIX32@
+PRELOAD_LDFLAGS_PPC64_AIX5 = $(PRELOAD_LDFLAGS_COMMON_AIX5)  @FLAG_MAIX64@
 LIBREPLACEMALLOC_X86_LINUX = \
 	$(top_builddir)/coregrind/libreplacemalloc_toolpreload_x86_linux.a
 
@@ -272,6 +411,15 @@ LIBREPLACEMALLOC_AMD64_LINUX = \
 
 LIBREPLACEMALLOC_PPC32_LINUX = \
 	$(top_builddir)/coregrind/libreplacemalloc_toolpreload_ppc32_linux.a
+
+LIBREPLACEMALLOC_PPC64_LINUX = \
+	$(top_builddir)/coregrind/libreplacemalloc_toolpreload_ppc64_linux.a
+
+LIBREPLACEMALLOC_PPC32_AIX5 = \
+	$(top_builddir)/coregrind/libreplacemalloc_toolpreload_ppc32_aix5.a
+
+LIBREPLACEMALLOC_PPC64_AIX5 = \
+	$(top_builddir)/coregrind/libreplacemalloc_toolpreload_ppc64_aix5.a
 
 COREGRIND_LIBS_X86_LINUX = \
 	$(top_builddir)/coregrind/libcoregrind_x86_linux.a \
@@ -285,30 +433,52 @@ COREGRIND_LIBS_PPC32_LINUX = \
 	$(top_builddir)/coregrind/libcoregrind_ppc32_linux.a \
 	@VEX_DIR@/libvex_ppc32_linux.a
 
+COREGRIND_LIBS_PPC64_LINUX = \
+	$(top_builddir)/coregrind/libcoregrind_ppc64_linux.a \
+	@VEX_DIR@/libvex_ppc64_linux.a
+
+COREGRIND_LIBS_PPC32_AIX5 = \
+	$(top_builddir)/coregrind/libcoregrind_ppc32_aix5.a \
+	@VEX_DIR@/libvex_ppc32_aix5.a
+
+COREGRIND_LIBS_PPC64_AIX5 = \
+	$(top_builddir)/coregrind/libcoregrind_ppc64_aix5.a \
+	@VEX_DIR@/libvex_ppc64_aix5.a
+
 TOOL_LDADD_COMMON = -lgcc
-TOOL_LDFLAGS_COMMON = -static \
+TOOL_LDFLAGS_COMMON_LINUX = -static \
 	-Wl,-defsym,valt_load_address=@VALT_LOAD_ADDRESS@ \
 	-nodefaultlibs -nostartfiles -u _start
 
+TOOL_LDFLAGS_COMMON_AIX5 = -static -Wl,-e_start_valgrind
 TOOL_LDADD_X86_LINUX = $(COREGRIND_LIBS_X86_LINUX) $(TOOL_LDADD_COMMON)
 TOOL_LDFLAGS_X86_LINUX = \
-	$(TOOL_LDFLAGS_COMMON) @FLAG_M32@ \
+	$(TOOL_LDFLAGS_COMMON_LINUX) @FLAG_M32@ \
 	-Wl,-T,$(top_builddir)/valt_load_address_x86_linux.lds
 
 TOOL_LDADD_AMD64_LINUX = $(COREGRIND_LIBS_AMD64_LINUX) $(TOOL_LDADD_COMMON)
 TOOL_LDFLAGS_AMD64_LINUX = \
-	$(TOOL_LDFLAGS_COMMON) -m64 \
+	$(TOOL_LDFLAGS_COMMON_LINUX) @FLAG_M64@ \
 	-Wl,-T,$(top_builddir)/valt_load_address_amd64_linux.lds
 
 TOOL_LDADD_PPC32_LINUX = $(COREGRIND_LIBS_PPC32_LINUX) $(TOOL_LDADD_COMMON)
 TOOL_LDFLAGS_PPC32_LINUX = \
-	$(TOOL_LDFLAGS_COMMON) \
+	$(TOOL_LDFLAGS_COMMON_LINUX) @FLAG_M32@ \
 	-Wl,-T,$(top_builddir)/valt_load_address_ppc32_linux.lds
 
-PRELOAD_LDFLAGS_COMMON = -nostdlib -shared -Wl,-z,interpose,-z,initfirst
-PRELOAD_LDFLAGS_X86_LINUX = $(PRELOAD_LDFLAGS_COMMON) @FLAG_M32@
-PRELOAD_LDFLAGS_AMD64_LINUX = $(PRELOAD_LDFLAGS_COMMON) -m64
-PRELOAD_LDFLAGS_PPC32_LINUX = $(PRELOAD_LDFLAGS_COMMON)
+TOOL_LDADD_PPC64_LINUX = $(COREGRIND_LIBS_PPC64_LINUX) $(TOOL_LDADD_COMMON)
+TOOL_LDFLAGS_PPC64_LINUX = \
+	$(TOOL_LDFLAGS_COMMON_LINUX) @FLAG_M64@ \
+	-Wl,-T,$(top_builddir)/valt_load_address_ppc64_linux.lds
+
+TOOL_LDADD_PPC32_AIX5 = $(COREGRIND_LIBS_PPC32_AIX5) $(TOOL_LDADD_COMMON)
+TOOL_LDFLAGS_PPC32_AIX5 = \
+	$(TOOL_LDFLAGS_COMMON_AIX5) @FLAG_MAIX32@
+
+TOOL_LDADD_PPC64_AIX5 = $(COREGRIND_LIBS_PPC64_AIX5) $(TOOL_LDADD_COMMON)
+TOOL_LDFLAGS_PPC64_AIX5 = \
+	$(TOOL_LDFLAGS_COMMON_AIX5) @FLAG_MAIX64@ -Wl,-bbigtoc
+
 LIBREPLACEMALLOC_LDFLAGS_X86_LINUX = \
 	-Wl,--whole-archive \
 	$(LIBREPLACEMALLOC_X86_LINUX) \
@@ -323,6 +493,17 @@ LIBREPLACEMALLOC_LDFLAGS_PPC32_LINUX = \
 	-Wl,--whole-archive \
 	$(LIBREPLACEMALLOC_PPC32_LINUX) \
 	-Wl,--no-whole-archive
+
+LIBREPLACEMALLOC_LDFLAGS_PPC64_LINUX = \
+	-Wl,--whole-archive \
+	$(LIBREPLACEMALLOC_PPC64_LINUX) \
+	-Wl,--no-whole-archive
+
+LIBREPLACEMALLOC_LDFLAGS_PPC32_AIX5 = \
+	$(LIBREPLACEMALLOC_PPC32_AIX5)
+
+LIBREPLACEMALLOC_LDFLAGS_PPC64_AIX5 = \
+	$(LIBREPLACEMALLOC_PPC64_AIX5)
 
 NONE_SOURCES_COMMON = nl_main.c
 none_x86_linux_SOURCES = $(NONE_SOURCES_COMMON)
@@ -343,6 +524,24 @@ none_ppc32_linux_CFLAGS = $(AM_CFLAGS_PPC32_LINUX)
 none_ppc32_linux_DEPENDENCIES = $(COREGRIND_LIBS_PPC32_LINUX)
 none_ppc32_linux_LDADD = $(TOOL_LDADD_PPC32_LINUX)
 none_ppc32_linux_LDFLAGS = $(TOOL_LDFLAGS_PPC32_LINUX)
+none_ppc64_linux_SOURCES = $(NONE_SOURCES_COMMON)
+none_ppc64_linux_CPPFLAGS = $(AM_CPPFLAGS_PPC64_LINUX)
+none_ppc64_linux_CFLAGS = $(AM_CFLAGS_PPC64_LINUX)
+none_ppc64_linux_DEPENDENCIES = $(COREGRIND_LIBS_PPC64_LINUX)
+none_ppc64_linux_LDADD = $(TOOL_LDADD_PPC64_LINUX)
+none_ppc64_linux_LDFLAGS = $(TOOL_LDFLAGS_PPC64_LINUX)
+none_ppc32_aix5_SOURCES = $(NONE_SOURCES_COMMON)
+none_ppc32_aix5_CPPFLAGS = $(AM_CPPFLAGS_PPC32_AIX5)
+none_ppc32_aix5_CFLAGS = $(AM_CFLAGS_PPC32_AIX5)
+none_ppc32_aix5_DEPENDENCIES = $(COREGRIND_LIBS_PPC32_AIX5)
+none_ppc32_aix5_LDADD = $(TOOL_LDADD_PPC32_AIX5)
+none_ppc32_aix5_LDFLAGS = $(TOOL_LDFLAGS_PPC32_AIX5)
+none_ppc64_aix5_SOURCES = $(NONE_SOURCES_COMMON)
+none_ppc64_aix5_CPPFLAGS = $(AM_CPPFLAGS_PPC64_AIX5)
+none_ppc64_aix5_CFLAGS = $(AM_CFLAGS_PPC64_AIX5)
+none_ppc64_aix5_DEPENDENCIES = $(COREGRIND_LIBS_PPC64_AIX5)
+none_ppc64_aix5_LDADD = $(TOOL_LDADD_PPC64_AIX5)
+none_ppc64_aix5_LDFLAGS = $(TOOL_LDFLAGS_PPC64_AIX5)
 all: all-recursive
 
 .SUFFIXES:
@@ -382,9 +581,18 @@ clean-noinstPROGRAMS:
 none-amd64-linux$(EXEEXT): $(none_amd64_linux_OBJECTS) $(none_amd64_linux_DEPENDENCIES) 
 	@rm -f none-amd64-linux$(EXEEXT)
 	$(LINK) $(none_amd64_linux_LDFLAGS) $(none_amd64_linux_OBJECTS) $(none_amd64_linux_LDADD) $(LIBS)
+none-ppc32-aix5$(EXEEXT): $(none_ppc32_aix5_OBJECTS) $(none_ppc32_aix5_DEPENDENCIES) 
+	@rm -f none-ppc32-aix5$(EXEEXT)
+	$(LINK) $(none_ppc32_aix5_LDFLAGS) $(none_ppc32_aix5_OBJECTS) $(none_ppc32_aix5_LDADD) $(LIBS)
 none-ppc32-linux$(EXEEXT): $(none_ppc32_linux_OBJECTS) $(none_ppc32_linux_DEPENDENCIES) 
 	@rm -f none-ppc32-linux$(EXEEXT)
 	$(LINK) $(none_ppc32_linux_LDFLAGS) $(none_ppc32_linux_OBJECTS) $(none_ppc32_linux_LDADD) $(LIBS)
+none-ppc64-aix5$(EXEEXT): $(none_ppc64_aix5_OBJECTS) $(none_ppc64_aix5_DEPENDENCIES) 
+	@rm -f none-ppc64-aix5$(EXEEXT)
+	$(LINK) $(none_ppc64_aix5_LDFLAGS) $(none_ppc64_aix5_OBJECTS) $(none_ppc64_aix5_LDADD) $(LIBS)
+none-ppc64-linux$(EXEEXT): $(none_ppc64_linux_OBJECTS) $(none_ppc64_linux_DEPENDENCIES) 
+	@rm -f none-ppc64-linux$(EXEEXT)
+	$(LINK) $(none_ppc64_linux_LDFLAGS) $(none_ppc64_linux_OBJECTS) $(none_ppc64_linux_LDADD) $(LIBS)
 none-x86-linux$(EXEEXT): $(none_x86_linux_OBJECTS) $(none_x86_linux_DEPENDENCIES) 
 	@rm -f none-x86-linux$(EXEEXT)
 	$(LINK) $(none_x86_linux_LDFLAGS) $(none_x86_linux_OBJECTS) $(none_x86_linux_LDADD) $(LIBS)
@@ -396,7 +604,10 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/none_amd64_linux-nl_main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/none_ppc32_aix5-nl_main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/none_ppc32_linux-nl_main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/none_ppc64_aix5-nl_main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/none_ppc64_linux-nl_main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/none_x86_linux-nl_main.Po@am__quote@
 
 .c.o:
@@ -427,6 +638,20 @@ none_amd64_linux-nl_main.obj: nl_main.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(none_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(none_amd64_linux_CFLAGS) $(CFLAGS) -c -o none_amd64_linux-nl_main.obj `if test -f 'nl_main.c'; then $(CYGPATH_W) 'nl_main.c'; else $(CYGPATH_W) '$(srcdir)/nl_main.c'; fi`
 
+none_ppc32_aix5-nl_main.o: nl_main.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(none_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(none_ppc32_aix5_CFLAGS) $(CFLAGS) -MT none_ppc32_aix5-nl_main.o -MD -MP -MF "$(DEPDIR)/none_ppc32_aix5-nl_main.Tpo" -c -o none_ppc32_aix5-nl_main.o `test -f 'nl_main.c' || echo '$(srcdir)/'`nl_main.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/none_ppc32_aix5-nl_main.Tpo" "$(DEPDIR)/none_ppc32_aix5-nl_main.Po"; else rm -f "$(DEPDIR)/none_ppc32_aix5-nl_main.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nl_main.c' object='none_ppc32_aix5-nl_main.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(none_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(none_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o none_ppc32_aix5-nl_main.o `test -f 'nl_main.c' || echo '$(srcdir)/'`nl_main.c
+
+none_ppc32_aix5-nl_main.obj: nl_main.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(none_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(none_ppc32_aix5_CFLAGS) $(CFLAGS) -MT none_ppc32_aix5-nl_main.obj -MD -MP -MF "$(DEPDIR)/none_ppc32_aix5-nl_main.Tpo" -c -o none_ppc32_aix5-nl_main.obj `if test -f 'nl_main.c'; then $(CYGPATH_W) 'nl_main.c'; else $(CYGPATH_W) '$(srcdir)/nl_main.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/none_ppc32_aix5-nl_main.Tpo" "$(DEPDIR)/none_ppc32_aix5-nl_main.Po"; else rm -f "$(DEPDIR)/none_ppc32_aix5-nl_main.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nl_main.c' object='none_ppc32_aix5-nl_main.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(none_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(none_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o none_ppc32_aix5-nl_main.obj `if test -f 'nl_main.c'; then $(CYGPATH_W) 'nl_main.c'; else $(CYGPATH_W) '$(srcdir)/nl_main.c'; fi`
+
 none_ppc32_linux-nl_main.o: nl_main.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(none_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(none_ppc32_linux_CFLAGS) $(CFLAGS) -MT none_ppc32_linux-nl_main.o -MD -MP -MF "$(DEPDIR)/none_ppc32_linux-nl_main.Tpo" -c -o none_ppc32_linux-nl_main.o `test -f 'nl_main.c' || echo '$(srcdir)/'`nl_main.c; \
 @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/none_ppc32_linux-nl_main.Tpo" "$(DEPDIR)/none_ppc32_linux-nl_main.Po"; else rm -f "$(DEPDIR)/none_ppc32_linux-nl_main.Tpo"; exit 1; fi
@@ -440,6 +665,34 @@ none_ppc32_linux-nl_main.obj: nl_main.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nl_main.c' object='none_ppc32_linux-nl_main.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(none_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(none_ppc32_linux_CFLAGS) $(CFLAGS) -c -o none_ppc32_linux-nl_main.obj `if test -f 'nl_main.c'; then $(CYGPATH_W) 'nl_main.c'; else $(CYGPATH_W) '$(srcdir)/nl_main.c'; fi`
+
+none_ppc64_aix5-nl_main.o: nl_main.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(none_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(none_ppc64_aix5_CFLAGS) $(CFLAGS) -MT none_ppc64_aix5-nl_main.o -MD -MP -MF "$(DEPDIR)/none_ppc64_aix5-nl_main.Tpo" -c -o none_ppc64_aix5-nl_main.o `test -f 'nl_main.c' || echo '$(srcdir)/'`nl_main.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/none_ppc64_aix5-nl_main.Tpo" "$(DEPDIR)/none_ppc64_aix5-nl_main.Po"; else rm -f "$(DEPDIR)/none_ppc64_aix5-nl_main.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nl_main.c' object='none_ppc64_aix5-nl_main.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(none_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(none_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o none_ppc64_aix5-nl_main.o `test -f 'nl_main.c' || echo '$(srcdir)/'`nl_main.c
+
+none_ppc64_aix5-nl_main.obj: nl_main.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(none_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(none_ppc64_aix5_CFLAGS) $(CFLAGS) -MT none_ppc64_aix5-nl_main.obj -MD -MP -MF "$(DEPDIR)/none_ppc64_aix5-nl_main.Tpo" -c -o none_ppc64_aix5-nl_main.obj `if test -f 'nl_main.c'; then $(CYGPATH_W) 'nl_main.c'; else $(CYGPATH_W) '$(srcdir)/nl_main.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/none_ppc64_aix5-nl_main.Tpo" "$(DEPDIR)/none_ppc64_aix5-nl_main.Po"; else rm -f "$(DEPDIR)/none_ppc64_aix5-nl_main.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nl_main.c' object='none_ppc64_aix5-nl_main.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(none_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(none_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o none_ppc64_aix5-nl_main.obj `if test -f 'nl_main.c'; then $(CYGPATH_W) 'nl_main.c'; else $(CYGPATH_W) '$(srcdir)/nl_main.c'; fi`
+
+none_ppc64_linux-nl_main.o: nl_main.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(none_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(none_ppc64_linux_CFLAGS) $(CFLAGS) -MT none_ppc64_linux-nl_main.o -MD -MP -MF "$(DEPDIR)/none_ppc64_linux-nl_main.Tpo" -c -o none_ppc64_linux-nl_main.o `test -f 'nl_main.c' || echo '$(srcdir)/'`nl_main.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/none_ppc64_linux-nl_main.Tpo" "$(DEPDIR)/none_ppc64_linux-nl_main.Po"; else rm -f "$(DEPDIR)/none_ppc64_linux-nl_main.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nl_main.c' object='none_ppc64_linux-nl_main.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(none_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(none_ppc64_linux_CFLAGS) $(CFLAGS) -c -o none_ppc64_linux-nl_main.o `test -f 'nl_main.c' || echo '$(srcdir)/'`nl_main.c
+
+none_ppc64_linux-nl_main.obj: nl_main.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(none_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(none_ppc64_linux_CFLAGS) $(CFLAGS) -MT none_ppc64_linux-nl_main.obj -MD -MP -MF "$(DEPDIR)/none_ppc64_linux-nl_main.Tpo" -c -o none_ppc64_linux-nl_main.obj `if test -f 'nl_main.c'; then $(CYGPATH_W) 'nl_main.c'; else $(CYGPATH_W) '$(srcdir)/nl_main.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/none_ppc64_linux-nl_main.Tpo" "$(DEPDIR)/none_ppc64_linux-nl_main.Po"; else rm -f "$(DEPDIR)/none_ppc64_linux-nl_main.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='nl_main.c' object='none_ppc64_linux-nl_main.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(none_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(none_ppc64_linux_CFLAGS) $(CFLAGS) -c -o none_ppc64_linux-nl_main.obj `if test -f 'nl_main.c'; then $(CYGPATH_W) 'nl_main.c'; else $(CYGPATH_W) '$(srcdir)/nl_main.c'; fi`
 
 none_x86_linux-nl_main.o: nl_main.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(none_x86_linux_CPPFLAGS) $(CPPFLAGS) $(none_x86_linux_CFLAGS) $(CFLAGS) -MT none_x86_linux-nl_main.o -MD -MP -MF "$(DEPDIR)/none_x86_linux-nl_main.Tpo" -c -o none_x86_linux-nl_main.o `test -f 'nl_main.c' || echo '$(srcdir)/'`nl_main.c; \
@@ -732,37 +985,72 @@ uninstall-info: uninstall-info-recursive
 .NOTPARALLEL:
 
 install-exec-local:
-	for f in $(noinst_PROGRAMS); do \
-	  p=`echo $$f | sed -e 's/^[^-]*-//' -e 's/\..*$$//'`; \
-	  n=`echo $$f | sed -e 's/-[^-]\{1,\}-[^-.]\{1,\}//'`; \
-	  $(mkinstalldirs) $(DESTDIR)$(valdir)/$$p; \
-	  $(INSTALL_PROGRAM) $$f $(DESTDIR)$(valdir)/$$p/$$n; \
-	done ; \
-	for f in $(noinst_LIBRARIES); do \
-	  if expr match $$f libcoregrind_ > /dev/null ; then \
-	    pU=`echo $$f | sed -e 's/libcoregrind_//g' -e 's/\.a//g'` ; \
-	    pD=`echo $$pU | sed -e 's/_/-/g'` ; \
-	    $(INSTALL_DATA) $$f $(DESTDIR)$(valdir)/$$pD/libcoregrind.a ; \
-	    $(INSTALL_DATA) @VEX_DIR@/libvex_$$pU.a $(DESTDIR)$(valdir)/$$pD/libvex.a ; \
-	  fi ; \
-	done
+	if [ -n "$(noinst_PROGRAMS)" ] ; then \
+	  for f in $(noinst_PROGRAMS); do \
+	    name=`echo $$f | sed -e 's/-\([^-]*-[^-.]*\)\(\..*\)\?$$/\2/'`; \
+	    plat=`echo $$f | sed -e 's/^.*-\([^-]*-[^-.]*\)\(\..*\)\?$$/\1/'`; \
+	    $(mkinstalldirs) $(DESTDIR)$(valdir)/$$plat; \
+	    $(INSTALL_PROGRAM) $$f $(DESTDIR)$(valdir)/$$plat/$$name; \
+	  done ; \
+	fi ; \
+	if [ -n "$(noinst_LIBRARIES)" ] ; then \
+	  for f in $(noinst_LIBRARIES) expr_wont_match_me; do \
+	    if expr match $$f libcoregrind_ > /dev/null ; then \
+	      pU=`echo $$f | sed -e 's/libcoregrind_//g' -e 's/\.a//g'` ; \
+	      pD=`echo $$pU | sed -e 's/_/-/g'` ; \
+	      $(INSTALL_DATA) $$f $(DESTDIR)$(valdir)/$$pD/libcoregrind.a ; \
+	      $(INSTALL_DATA) @VEX_DIR@/libvex_$$pU.a \
+				$(DESTDIR)$(valdir)/$$pD/libvex.a ; \
+	    fi ; \
+	  done ; \
+	fi
+
 all-local:
-	for f in $(noinst_PROGRAMS); do \
-	  p=`echo $$f | sed -e 's/^[^-]*-//' -e 's/\..*$$//'`; \
-	  n=`echo $$f | sed -e 's/-[^-]\{1,\}-[^-.]\{1,\}//'`; \
-	  mkdir -p $(inplacedir)/$$p; \
-	  rm -f $(inplacedir)/$$p/$$n; \
-	  ln -f -s ../../$(subdir)/$$f $(inplacedir)/$$p/$$n; \
-	done
+	if [ -n "$(noinst_PROGRAMS)" ] ; then \
+	  for f in $(noinst_PROGRAMS); do \
+	    name=`echo $$f | sed -e 's/-\([^-]*-[^-.]*\)\(\..*\)\?$$/\2/'`; \
+	    plat=`echo $$f | sed -e 's/^.*-\([^-]*-[^-.]*\)\(\..*\)\?$$/\1/'`; \
+	    mkdir -p $(inplacedir)/$$plat; \
+	    rm -f $(inplacedir)/$$plat/$$name; \
+	    ln -f -s ../../$(subdir)/$$f $(inplacedir)/$$plat/$$name; \
+	  done ; \
+	fi
 
 @VEX_DIR@/libvex_x86_linux.a: @VEX_DIR@/priv/main/vex_svnversion.h
-	$(MAKE) -C @VEX_DIR@ CC="$(CC)" libvex_x86_linux.a EXTRA_CFLAGS="$(AM_CFLAGS_X86_LINUX)"
+	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR)" \
+	libvex_x86_linux.a \
+	EXTRA_CFLAGS="$(AM_CFLAGS_X86_LINUX) @FLAG_WDECL_AFTER_STMT@ \
+			@FLAG_FNO_STACK_PROTECTOR@"
 
 @VEX_DIR@/libvex_amd64_linux.a: @VEX_DIR@/priv/main/vex_svnversion.h
-	$(MAKE) -C @VEX_DIR@ CC="$(CC)" libvex_amd64_linux.a EXTRA_CFLAGS="$(AM_CFLAGS_AMD64_LINUX)"
+	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR)" \
+	libvex_amd64_linux.a \
+	EXTRA_CFLAGS="$(AM_CFLAGS_AMD64_LINUX) @FLAG_WDECL_AFTER_STMT@ \
+			@FLAG_FNO_STACK_PROTECTOR@"
 
 @VEX_DIR@/libvex_ppc32_linux.a: @VEX_DIR@/priv/main/vex_svnversion.h
-	$(MAKE) -C @VEX_DIR@ CC="$(CC)" libvex_ppc32_linux.a EXTRA_CFLAGS="$(AM_CFLAGS_PPC32_LINUX)"
+	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR)" \
+	libvex_ppc32_linux.a \
+	EXTRA_CFLAGS="$(AM_CFLAGS_PPC32_LINUX) @FLAG_WDECL_AFTER_STMT@ \
+			@FLAG_FNO_STACK_PROTECTOR@"
+
+@VEX_DIR@/libvex_ppc64_linux.a: @VEX_DIR@/priv/main/vex_svnversion.h
+	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR)" \
+	libvex_ppc64_linux.a \
+	EXTRA_CFLAGS="$(AM_CFLAGS_PPC64_LINUX) @FLAG_WDECL_AFTER_STMT@ \
+			@FLAG_FNO_STACK_PROTECTOR@"
+
+@VEX_DIR@/libvex_ppc32_aix5.a: @VEX_DIR@/priv/main/vex_svnversion.h
+	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR) -X32" \
+	libvex_ppc32_aix5.a \
+	EXTRA_CFLAGS="$(AM_CFLAGS_PPC32_AIX5) @FLAG_WDECL_AFTER_STMT@ \
+			@FLAG_FNO_STACK_PROTECTOR@"
+
+@VEX_DIR@/libvex_ppc64_aix5.a: @VEX_DIR@/priv/main/vex_svnversion.h
+	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR) -X64" \
+	libvex_ppc64_aix5.a \
+	EXTRA_CFLAGS="$(AM_CFLAGS_PPC64_AIX5) @FLAG_WDECL_AFTER_STMT@ \
+			@FLAG_FNO_STACK_PROTECTOR@"
 
 @VEX_DIR@/priv/main/vex_svnversion.h:
 	$(MAKE) -C @VEX_DIR@ CC="$(CC)" version

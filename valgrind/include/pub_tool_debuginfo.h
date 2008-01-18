@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward
+   Copyright (C) 2000-2007 Julian Seward
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -87,9 +87,6 @@ extern Bool VG_(get_objname)  ( Addr a, Char* objname,  Int n_objname  );
 */
 extern Char* VG_(describe_IP)(Addr eip, Char* buf, Int n_buf);
 
-/* Returns a string containing an expression for the given
-   address. String is malloced with VG_(malloc)() */
-Char *VG_(describe_addr)(ThreadId, Addr);
 
 /*====================================================================*/
 /*=== Obtaining segment information                                ===*/
@@ -102,12 +99,29 @@ typedef struct _SegInfo SegInfo;
    is present or not. */
 extern       SegInfo* VG_(find_seginfo)      ( Addr a );
 
-extern const SegInfo* VG_(next_seginfo)      ( const SegInfo *si );
+/* Fish bits out of SegInfos. */
 extern       Addr     VG_(seginfo_start)     ( const SegInfo *si );
 extern       SizeT    VG_(seginfo_size)      ( const SegInfo *si );
 extern const UChar*   VG_(seginfo_soname)    ( const SegInfo *si );
 extern const UChar*   VG_(seginfo_filename)  ( const SegInfo *si );
 extern       ULong    VG_(seginfo_sym_offset)( const SegInfo *si );
+
+/* Function for traversing the seginfo list.  When called with NULL it
+   returns the first element; otherwise it returns the given element's
+   successor. */
+extern const SegInfo* VG_(next_seginfo)      ( const SegInfo *si );
+
+/* Functions for traversing all the symbols in a SegInfo.  _howmany
+   tells how many there are.  _getidx retrieves the n'th, for n in 0
+   .. _howmany-1.  You may not modify the function name thereby
+   acquired; if you want to do so, first strdup it. */
+extern Int  VG_(seginfo_syms_howmany) ( const SegInfo *si );
+extern void VG_(seginfo_syms_getidx)  ( const SegInfo *si, 
+                                        Int idx,
+                                        /*OUT*/Addr*   addr,
+                                        /*OUT*/Addr*   tocptr,
+                                        /*OUT*/UInt*   size,
+                                        /*OUT*/HChar** name );
 
 typedef
    enum {
@@ -121,6 +135,9 @@ typedef
    VgSectKind;
 
 extern VgSectKind VG_(seginfo_sect_kind)(Addr);
+
+extern Char* VG_(seginfo_sect_kind_name)(Addr a, Char* buf, UInt n_buf);
+
 
 #endif   // __PUB_TOOL_DEBUGINFO_H
 

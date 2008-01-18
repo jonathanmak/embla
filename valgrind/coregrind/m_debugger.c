@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward 
+   Copyright (C) 2000-2007 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -29,13 +29,16 @@
 */
 
 #include "pub_core_basics.h"
+#include "pub_core_vki.h"
 #include "pub_core_threadstate.h"
+#include "pub_core_xarray.h"
 #include "pub_core_clientstate.h"
 #include "pub_core_debugger.h"
 #include "pub_core_libcbase.h"
 #include "pub_core_libcprint.h"
 #include "pub_core_libcproc.h"
 #include "pub_core_libcsignal.h"
+#include "pub_core_libcassert.h"
 #include "pub_core_options.h"
 
 
@@ -44,8 +47,9 @@
 
 static Int ptrace_setregs(Int pid, VexGuestArchState* vex)
 {
-#if defined(VGA_x86)
+#if defined(VGP_x86_linux)
    struct vki_user_regs_struct regs;
+   VG_(memset)(&regs, 0, sizeof(regs));
    regs.cs     = vex->guest_CS;
    regs.ss     = vex->guest_SS;
    regs.ds     = vex->guest_DS;
@@ -64,8 +68,9 @@ static Int ptrace_setregs(Int pid, VexGuestArchState* vex)
    regs.eip    = vex->guest_EIP;
    return VG_(ptrace)(VKI_PTRACE_SETREGS, pid, NULL, &regs);
 
-#elif defined(VGA_amd64)
+#elif defined(VGP_amd64_linux)
    struct vki_user_regs_struct regs;
+   VG_(memset)(&regs, 0, sizeof(regs));
    regs.rax    = vex->guest_RAX;
    regs.rbx    = vex->guest_RBX;
    regs.rcx    = vex->guest_RCX;
@@ -84,9 +89,24 @@ static Int ptrace_setregs(Int pid, VexGuestArchState* vex)
    regs.r15    = vex->guest_R15;
    regs.eflags = LibVEX_GuestAMD64_get_rflags(vex);
    regs.rip    = vex->guest_RIP;
+   /* Set %{c,d,e,f,s,g}s and %{fs,gs}_base (whatever those are) to
+      values which don't fail the kernel's sanity checks.  I have no
+      idea what these should really be set to.  Anyway, mostly it
+      seems that zero is an allowable value, except for %cs and %ss
+      which have to have their lowest 2 bits be 11.  See putreg() in
+      linux-2.6.23/arch/x86_64/kernel/ptrace.c for the apparently
+      relevant sanity checks.  This fixes #145622. */
+   regs.cs      = 3;
+   regs.ds      = 0;
+   regs.es      = 0;
+   regs.fs      = 0;
+   regs.ss      = 3;
+   regs.gs      = 0;
+   regs.fs_base = 0;
+   regs.gs_base = 0;
    return VG_(ptrace)(VKI_PTRACE_SETREGS, pid, NULL, &regs);
 
-#elif defined(VGA_ppc32)
+#elif defined(VGP_ppc32_linux)
    Int rc = 0;
    /* apparently the casting to void* is the Right Thing To Do */
    rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R0  * 4), (void*)vex->guest_GPR0);
@@ -130,6 +150,67 @@ static Int ptrace_setregs(Int pid, VexGuestArchState* vex)
                      (void*)LibVEX_GuestPPC32_get_XER(vex));
    return rc;
 
+#elif defined(VGP_ppc64_linux)
+   Int rc = 0; 
+   /* FRJ: copied nearly verbatim from the ppc32 case. I compared the 
+      vki-ppc64-linux.h with its ppc32 counterpart and saw no 
+      appreciable differences, other than the registers being 8 bytes 
+      instead of 4. No idea why we don't set all of the entries 
+      declared in vki_pt_regs, but ppc32 doesn't so there must be a 
+      reason. 
+ 
+      Finally, note that CR and XER are 32 bits even for ppc64 (see 
+      libvex_guest_ppc64.h), but the vki_pt_regs struct still gives 
+      them 64 bits. 
+   */ 
+   /* apparently the casting to void* is the Right Thing To Do */ 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R0  * 8), (void*)vex->guest_GPR0); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R1  * 8), (void*)vex->guest_GPR1); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R2  * 8), (void*)vex->guest_GPR2); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R3  * 8), (void*)vex->guest_GPR3); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R4  * 8), (void*)vex->guest_GPR4); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R5  * 8), (void*)vex->guest_GPR5); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R6  * 8), (void*)vex->guest_GPR6); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R7  * 8), (void*)vex->guest_GPR7); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R8  * 8), (void*)vex->guest_GPR8); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R9  * 8), (void*)vex->guest_GPR9); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R10 * 8), (void*)vex->guest_GPR10); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R11 * 8), (void*)vex->guest_GPR11); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R12 * 8), (void*)vex->guest_GPR12); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R13 * 8), (void*)vex->guest_GPR13); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R14 * 8), (void*)vex->guest_GPR14); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R15 * 8), (void*)vex->guest_GPR15); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R16 * 8), (void*)vex->guest_GPR16); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R17 * 8), (void*)vex->guest_GPR17); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R18 * 8), (void*)vex->guest_GPR18); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R19 * 8), (void*)vex->guest_GPR19); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R20 * 8), (void*)vex->guest_GPR20); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R21 * 8), (void*)vex->guest_GPR21); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R22 * 8), (void*)vex->guest_GPR22); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R23 * 8), (void*)vex->guest_GPR23); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R24 * 8), (void*)vex->guest_GPR24); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R25 * 8), (void*)vex->guest_GPR25); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R26 * 8), (void*)vex->guest_GPR26); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R27 * 8), (void*)vex->guest_GPR27); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R28 * 8), (void*)vex->guest_GPR28); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R29 * 8), (void*)vex->guest_GPR29); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R30 * 8), (void*)vex->guest_GPR30); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_R31 * 8), (void*)vex->guest_GPR31); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_NIP * 8), (void*)vex->guest_CIA); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_CCR * 8), 
+                                              (void*)(long)LibVEX_GuestPPC64_get_CR(vex)); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_LNK * 8), (void*)vex->guest_LR); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_CTR * 8), (void*)vex->guest_CTR); 
+   rc |= VG_(ptrace)(VKI_PTRACE_POKEUSR, pid, (void*)(VKI_PT_XER * 8), 
+                                              (void*)(long)LibVEX_GuestPPC64_get_XER(vex)); 
+   return rc; 
+
+#elif defined(VGP_ppc32_aix5)
+   I_die_here;
+
+#elif defined(VGP_ppc64_aix5)
+   I_die_here;
+
 #else
 #  error Unknown arch
 #endif
@@ -142,13 +223,20 @@ static Int ptrace_setregs(Int pid, VexGuestArchState* vex)
    continue, quit the debugger.  */
 void VG_(start_debugger) ( ThreadId tid )
 {
-  Int pid;
+#  define N_BUF 4096
+   Int pid, rc;
 
-  if ((pid = VG_(fork)()) == 0) {
-      VG_(ptrace)(VKI_PTRACE_TRACEME, 0, NULL, NULL);
-      VG_(kill)(VG_(getpid)(), VKI_SIGSTOP);
+   pid = VG_(fork)();
+
+   if (pid == 0) {
+      /* child */
+      rc = VG_(ptrace)(VKI_PTRACE_TRACEME, 0, NULL, NULL);
+      vg_assert(rc == 0);
+      rc = VG_(kill)(VG_(getpid)(), VKI_SIGSTOP);
+      vg_assert(rc == 0);
 
    } else if (pid > 0) {
+      /* parent */
       Int status;
       Int res;
 
@@ -159,8 +247,8 @@ void VG_(start_debugger) ( ThreadId tid )
           VG_(ptrace)(VKI_PTRACE_DETACH, pid, NULL, 0) == 0)
       {
          Char pidbuf[15];
-         Char file[30];
-         Char buf[100];
+         Char file[50];
+         Char buf[N_BUF];
          Char *bufptr;
          Char *cmdptr;
          
@@ -171,6 +259,10 @@ void VG_(start_debugger) ( ThreadId tid )
          cmdptr = VG_(clo_db_command);
          
          while (*cmdptr) {
+            /* each iteration can advance bufptr by at most the length
+               of file[], so the following assertion is generously
+               over-paranoid. */
+            vg_assert(bufptr - buf < N_BUF-15-50-10/*paranoia*/);
             switch (*cmdptr) {
                case '%':
                   switch (*++cmdptr) {
@@ -179,20 +271,21 @@ void VG_(start_debugger) ( ThreadId tid )
                         bufptr += VG_(strlen)(file);
                         cmdptr++;
                         break;
-                  case 'p':
-                     VG_(memcpy)(bufptr, pidbuf, VG_(strlen)(pidbuf));
-                     bufptr += VG_(strlen)(pidbuf);
-                     cmdptr++;
-                     break;
-                  default:
-                     *bufptr++ = *cmdptr++;
-                     break;
+                     case 'p':
+                        VG_(memcpy)(bufptr, pidbuf, VG_(strlen)(pidbuf));
+                        bufptr += VG_(strlen)(pidbuf);
+                        cmdptr++;
+                        break;
+                     default:
+                        *bufptr++ = *cmdptr++;
+                        break;
                   }
                   break;
                default:
                   *bufptr++ = *cmdptr++;
                   break;
             }
+            vg_assert(bufptr - buf < N_BUF-15-50-10/*paranoia*/);
          }
          
          *bufptr++ = '\0';
@@ -202,16 +295,23 @@ void VG_(start_debugger) ( ThreadId tid )
          if (res == 0) {      
             VG_(message)(Vg_UserMsg, "");
             VG_(message)(Vg_UserMsg, 
-                         "Debugger has detached.  Valgrind regains control.  We continue.");
+                         "Debugger has detached.  Valgrind regains control."
+                         "  We continue.");
          } else {
-            VG_(message)(Vg_UserMsg, "Apparently failed!");
+            VG_(message)(Vg_UserMsg, 
+                         "Warning: Debugger attach failed! (sys_system)");
             VG_(message)(Vg_UserMsg, "");
          }
+      } else {
+         VG_(message)(Vg_UserMsg, 
+                      "Warning: Debugger attach failed! (ptrace problem?)");
+         VG_(message)(Vg_UserMsg, "");
       }
 
       VG_(kill)(pid, VKI_SIGKILL);
       VG_(waitpid)(pid, &status, 0);
    }
+#  undef N_BUF
 }
 
 

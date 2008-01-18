@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2005 Nicholas Nethercote
+   Copyright (C) 2005-2007 Nicholas Nethercote
       njn@valgrind.org
 
    This program is free software; you can redistribute it and/or
@@ -42,7 +42,8 @@
 // - First is the AVL metadata, which is three words: a left pointer, a
 //   right pointer, and a word containing balancing information and a
 //   "magic" value which provides some checking that the user has not
-//   corrupted the metadata.
+//   corrupted the metadata.  So the overhead is 12 bytes on 32-bit
+//   platforms and 24 bytes on 64-bit platforms.
 // - Second is the user's data.  This can be anything.  Note that because it
 //   comes after the metadata, it will only be word-aligned, even if the
 //   user data is a struct that would normally be doubleword-aligned.
@@ -55,7 +56,7 @@
 //      keyOff ->   | key           | elemSize
 //                  +---------------+  v
 //
-// Users have to allocate AvlNodes with OSet_AllocNode(), which allocates
+// Users have to allocate AvlNodes with OSetGen_AllocNode(), which allocates
 // space for the metadata.
 //
 // The terminology used throughout this file:
@@ -69,7 +70,7 @@
 // an AvlNode.
 //
 // Each tree also has an iterator.  Note that we cannot use the iterator
-// internally within this file (eg. we could implement OSet_Size() by
+// internally within this file (eg. we could implement OSetGen_Size() by
 // stepping through with the iterator and counting nodes) because it's
 // non-reentrant -- the user might be using it themselves, and the
 // concurrent uses would screw things up.
@@ -84,6 +85,8 @@
 /*--- Types and constants                                          ---*/
 /*--------------------------------------------------------------------*/
 
+typedef struct _OSetNode OSetNode;
+
 // Internal names for the OSet types.
 typedef OSet     AvlTree;
 typedef OSetNode AvlNode;
@@ -95,7 +98,7 @@ struct _OSetNode {
    AvlNode* left;
    AvlNode* right;
    Char     balance;
-   Char     padding[sizeof(void*)-3];
+   Char     padding[sizeof(void*)-sizeof(Char)-sizeof(Short)];
    Short    magic;
 };
 
@@ -132,7 +135,7 @@ AvlNode* node_of_elem(const void *elem)
    vg_assert2(n->magic == OSET_MAGIC,
               "bad magic on node %p = %x (expected %x)\n"
               "possible causes:\n"
-              " - node not allocated with VG_(OSet_AllocNode)()?\n"
+              " - node not allocated with VG_(OSetGen_AllocNode)()?\n"
               " - node metadata corrupted by underwriting start of element?\n",
               n, n->magic, OSET_MAGIC);
    return n;
@@ -170,13 +173,23 @@ void* fast_key_of_node(AvlNode* n)
 }
 
 // Compare the first word of each element.  Inlining is *crucial*.
-static inline Int fast_cmp(void* k, AvlNode* n)
+static inline Word fast_cmp(void* k, AvlNode* n)
 {
-   return ( *(Int*)k - *(Int*)elem_of_node(n) );
+   Word w1 = *(Word*)k;
+   Word w2 = *(Word*)elem_of_node(n);
+   // In previous versions, we tried to do this faster by doing
+   // "return w1 - w2".  But it didn't work reliably, because the
+   // complete result of subtracting two N-bit numbers is an N+1-bit
+   // number, and what the caller is interested in is the sign of
+   // the complete N+1-bit result.  The branching version is slightly
+   // slower, but safer and easier to understand.
+   if (w1 > w2) return  1;
+   if (w1 < w2) return -1;
+   return 0;
 }
 
 // Compare a key and an element.  Inlining is *crucial*.
-static inline Int slow_cmp(AvlTree* t, void* k, AvlNode* n)
+static inline Word slow_cmp(AvlTree* t, void* k, AvlNode* n)
 {
    return t->cmp(k, elem_of_node(n));
 }
@@ -235,7 +248,7 @@ static void stackClear(AvlTree* t)
 }
 
 // Push onto the iterator stack.
-static void stackPush(AvlTree* t, AvlNode* n, Int i)
+static inline void stackPush(AvlTree* t, AvlNode* n, Int i)
 {
    vg_assert(t->stackTop < STACK_MAX);
    vg_assert(1 <= i && i <= 3);
@@ -245,7 +258,7 @@ static void stackPush(AvlTree* t, AvlNode* n, Int i)
 }
 
 // Pop from the iterator stack.
-static Bool stackPop(AvlTree* t, AvlNode** n, Int* i)
+static inline Bool stackPop(AvlTree* t, AvlNode** n, Int* i)
 {
    vg_assert(t->stackTop <= STACK_MAX);
 
@@ -267,8 +280,8 @@ static Bool stackPop(AvlTree* t, AvlNode** n, Int* i)
 /*--------------------------------------------------------------------*/
 
 // The underscores avoid GCC complaints about overshadowing global names.
-AvlTree* VG_(OSet_Create)(OffT _keyOff, OSetCmp_t _cmp,
-                          OSetAlloc_t _alloc, OSetFree_t _free)
+AvlTree* VG_(OSetGen_Create)(OffT _keyOff, OSetCmp_t _cmp,
+                             OSetAlloc_t _alloc, OSetFree_t _free)
 {
    AvlTree* t;
 
@@ -292,19 +305,24 @@ AvlTree* VG_(OSet_Create)(OffT _keyOff, OSetCmp_t _cmp,
    return t;
 }
 
-// Destructor, frees up all memory held by remaining nodes.
-void VG_(OSet_Destroy)(AvlTree* t)
+AvlTree* VG_(OSetWord_Create)(OSetAlloc_t _alloc, OSetFree_t _free)
 {
-   AvlNode* n;
-   Int i, sz = 0;
+   return VG_(OSetGen_Create)(/*keyOff*/0, /*cmp*/NULL, _alloc, _free);
+}
+
+// Destructor, frees up all memory held by remaining nodes.
+void VG_(OSetGen_Destroy)(AvlTree* t)
+{
+   AvlNode* n = NULL;
+   Int i = 0, sz = 0;
    
    vg_assert(t);
    stackClear(t);
    if (t->root)
       stackPush(t, t->root, 1);
 
-   // Free all the AvlNodes.  This is a post-order traversal, because we
-   // must free all children of a node before the node itself.
+   /* Free all the AvlNodes.  This is a post-order traversal, because we */
+   /* must free all children of a node before the node itself. */
    while (stackPop(t, &n, &i)) {
       switch (i) {
       case 1: 
@@ -323,12 +341,17 @@ void VG_(OSet_Destroy)(AvlTree* t)
    }
    vg_assert(sz == t->nElems);
 
-   // Free the AvlTree itself.
+   /* Free the AvlTree itself. */
    t->free(t);
 }
 
+void VG_(OSetWord_Destroy)(AvlTree* t)
+{
+   VG_(OSetGen_Destroy)(t);
+}
+
 // Allocate and initialise a new node.
-void* VG_(OSet_AllocNode)(AvlTree* t, SizeT elemSize)
+void* VG_(OSetGen_AllocNode)(AvlTree* t, SizeT elemSize)
 {
    Int nodeSize = sizeof(AvlNode) + elemSize;
    AvlNode* n   = t->alloc( nodeSize );
@@ -338,7 +361,7 @@ void* VG_(OSet_AllocNode)(AvlTree* t, SizeT elemSize)
    return elem_of_node(n);
 }
 
-void VG_(OSet_FreeNode)(AvlTree* t, void* e)
+void VG_(OSetGen_FreeNode)(AvlTree* t, void* e)
 {
    t->free( node_of_elem(e) );
 }
@@ -347,7 +370,7 @@ void VG_(OSet_FreeNode)(AvlTree* t, void* e)
 /*--- Insertion                                                    ---*/
 /*--------------------------------------------------------------------*/
 
-static inline Int cmp_key_root(AvlTree* t, AvlNode* n)
+static inline Word cmp_key_root(AvlTree* t, AvlNode* n)
 {
    return t->cmp
           ? slow_cmp(t, slow_key_of_node(t, n), t->root)
@@ -358,7 +381,7 @@ static inline Int cmp_key_root(AvlTree* t, AvlNode* n)
 // Returns True if the depth of the tree has grown.
 static Bool avl_insert(AvlTree* t, AvlNode* n)
 {
-   Int cmpres = cmp_key_root(t, n);
+   Word cmpres = cmp_key_root(t, n);
 
    if (cmpres < 0) {
       // Insert into the left subtree.
@@ -425,19 +448,19 @@ static Bool avl_insert(AvlTree* t, AvlNode* n)
       }
 
    } else {
-      vg_assert2(0, "OSet_Insert: duplicate element added");
+      vg_assert2(0, "OSet{Word,Gen}_Insert: duplicate element added");
    }
 }
 
 // Insert element e into the AVL tree t.  This is just a wrapper for
 // avl_insert() which doesn't return a Bool.
-void VG_(OSet_Insert)(AvlTree* t, void* e)
+void VG_(OSetGen_Insert)(AvlTree* t, void* e)
 {
    AvlNode* n;
 
    vg_assert(t);
 
-   // Initialise.  Even though OSet_AllocNode zeroes these fields, we should
+   // Initialise.  Even though OSetGen_AllocNode zeroes these fields, we should
    // do it again in case a node is removed and then re-added to the tree.
    n          = node_of_elem(e);
    n->left    = 0;
@@ -455,6 +478,13 @@ void VG_(OSet_Insert)(AvlTree* t, void* e)
    t->stackTop = 0;  // So the iterator can't get out of sync
 }
 
+void VG_(OSetWord_Insert)(AvlTree* t, Word val)
+{
+   Word* node = VG_(OSetGen_AllocNode)(t, sizeof(Word));
+   *node = val;
+   VG_(OSetGen_Insert)(t, node);
+}
+
 /*--------------------------------------------------------------------*/
 /*--- Lookup                                                       ---*/
 /*--------------------------------------------------------------------*/
@@ -462,7 +492,7 @@ void VG_(OSet_Insert)(AvlTree* t, void* e)
 // Find the *node* in t matching k, or NULL if not found.
 static AvlNode* avl_lookup(AvlTree* t, void* k)
 {
-   Int      cmpres;
+   Word     cmpres;
    AvlNode* curr = t->root;
 
    if (t->cmp) {
@@ -470,28 +500,29 @@ static AvlNode* avl_lookup(AvlTree* t, void* k)
       while (True) {
          if (curr == NULL) return NULL;
          cmpres = slow_cmp(t, k, curr);
-         if (cmpres < 0) curr = curr->left;  else
-         if (cmpres > 0) curr = curr->right; else
-         return curr;
+         if      (cmpres < 0) curr = curr->left;
+         else if (cmpres > 0) curr = curr->right;
+         else return curr;
       }
    } else {
       // Fast-track special case.  We use the no-check version of
       // elem_of_node because it saves about 10% on lookup time.  This
       // shouldn't be very dangerous because each node will have been
       // checked on insertion.
-      Int kk = *(Int*)k;
+      Word w1 = *(Word*)k;
+      Word w2;
       while (True) {
          if (curr == NULL) return NULL;
-         cmpres = kk - *(Int*)elem_of_node_no_check(curr);
-         if (cmpres < 0) curr = curr->left;  else
-         if (cmpres > 0) curr = curr->right; else
-         return curr;
+         w2 = *(Word*)elem_of_node_no_check(curr);
+         if      (w1 < w2) curr = curr->left;
+         else if (w1 > w2) curr = curr->right;
+         else return curr;
       }
    }
 }
 
 // Find the *element* in t matching k, or NULL if not found.
-void* VG_(OSet_Lookup)(AvlTree* t, void* k)
+void* VG_(OSetGen_Lookup)(AvlTree* t, void* k)
 {
    AvlNode* n;
    vg_assert(t);
@@ -501,7 +532,7 @@ void* VG_(OSet_Lookup)(AvlTree* t, void* k)
 
 // Find the *element* in t matching k, or NULL if not found;  use the given
 // comparison function rather than the standard one.
-void* VG_(OSet_LookupWithCmp)(AvlTree* t, void* k, OSetCmp_t cmp)
+void* VG_(OSetGen_LookupWithCmp)(AvlTree* t, void* k, OSetCmp_t cmp)
 {
    // Save the normal one to the side, then restore once we're done.
    void* e;
@@ -509,15 +540,20 @@ void* VG_(OSet_LookupWithCmp)(AvlTree* t, void* k, OSetCmp_t cmp)
    vg_assert(t);
    tmpcmp = t->cmp;
    t->cmp = cmp;
-   e = VG_(OSet_Lookup)(t, k);
+   e = VG_(OSetGen_Lookup)(t, k);
    t->cmp = tmpcmp;
    return e;
 }
 
 // Is there an element matching k?
-Bool VG_(OSet_Contains)(AvlTree* t, void* k)
+Bool VG_(OSetGen_Contains)(AvlTree* t, void* k)
 {
-   return (NULL != VG_(OSet_Lookup)(t, k));
+   return (NULL != VG_(OSetGen_Lookup)(t, k));
+}
+
+Bool VG_(OSetWord_Contains)(AvlTree* t, Word val)
+{
+   return (NULL != VG_(OSetGen_Lookup)(t, &val));
 }
 
 /*--------------------------------------------------------------------*/
@@ -531,7 +567,7 @@ static Bool avl_removeroot(AvlTree* t);
 static Bool avl_remove(AvlTree* t, AvlNode* n)
 {
    Bool ch;
-   Int  cmpres = cmp_key_root(t, n);
+   Word cmpres = cmp_key_root(t, n);
 
    if (cmpres < 0) {
       AvlTree left_subtree;
@@ -614,7 +650,7 @@ static Bool avl_remove(AvlTree* t, AvlNode* n)
 // Returns True if the depth of the tree has shrunk.
 static Bool avl_removeroot(AvlTree* t)
 {
-   Int ch;
+   Bool     ch;
    AvlNode* n;
 
    if (!t->root->left) {
@@ -648,7 +684,7 @@ static Bool avl_removeroot(AvlTree* t)
 }
 
 // Remove and return the element matching the key 'k', or NULL if not present.
-void* VG_(OSet_Remove)(AvlTree* t, void* k)
+void* VG_(OSetGen_Remove)(AvlTree* t, void* k)
 {
    // Have to find the node first, then remove it.
    AvlNode* n = avl_lookup(t, k);
@@ -662,15 +698,26 @@ void* VG_(OSet_Remove)(AvlTree* t, void* k)
    }
 }
 
+Bool VG_(OSetWord_Remove)(AvlTree* t, Word val)
+{
+   void* n = VG_(OSetGen_Remove)(t, &val);
+   if (n) {
+      VG_(OSetGen_FreeNode)(t, n);
+      return True;
+   } else {
+      return False;
+   }
+}
+
 /*--------------------------------------------------------------------*/
 /*--- Iterator                                                     ---*/
 /*--------------------------------------------------------------------*/
 
 // The iterator is implemented using in-order traversal with an explicit
 // stack, which lets us do the traversal one step at a time and remember
-// where we are between each call to OSet_Next().
+// where we are between each call to OSetGen_Next().
 
-void VG_(OSet_ResetIter)(AvlTree* t)
+void VG_(OSetGen_ResetIter)(AvlTree* t)
 {
    vg_assert(t);
    stackClear(t);
@@ -678,10 +725,15 @@ void VG_(OSet_ResetIter)(AvlTree* t)
       stackPush(t, t->root, 1);
 }
 
-void* VG_(OSet_Next)(AvlTree* t)
+void VG_(OSetWord_ResetIter)(AvlTree* t)
 {
-   Int i;
-   OSetNode* n;
+   VG_(OSetGen_ResetIter)(t);
+}
+
+void* VG_(OSetGen_Next)(AvlTree* t)
+{
+   Int i = 0;
+   OSetNode* n = NULL;
    
    vg_assert(t);
 
@@ -708,14 +760,30 @@ void* VG_(OSet_Next)(AvlTree* t)
    return NULL;
 }
 
+Bool VG_(OSetWord_Next)(AvlTree* t, Word* val)
+{
+   Word* n = VG_(OSetGen_Next)(t);
+   if (n) {
+      *val = *n;
+      return True;
+   } else {
+      return False;
+   }
+}
+
 /*--------------------------------------------------------------------*/
 /*--- Miscellaneous operations                                     ---*/
 /*--------------------------------------------------------------------*/
 
-Int VG_(OSet_Size)(AvlTree* t)
+Int VG_(OSetGen_Size)(AvlTree* t)
 {
    vg_assert(t);
    return t->nElems;
+}
+
+Int VG_(OSetWord_Size)(AvlTree* t)
+{
+   return VG_(OSetGen_Size)(t);
 }
 
 static void OSet_Print2( AvlTree* t, AvlNode* n,

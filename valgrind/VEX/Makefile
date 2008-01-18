@@ -8,12 +8,13 @@ PUB_HEADERS = 	pub/libvex_basictypes.h 		\
 		pub/libvex_guest_amd64.h		\
 		pub/libvex_guest_arm.h			\
 		pub/libvex_guest_ppc32.h		\
+		pub/libvex_guest_ppc64.h		\
 		pub/libvex_guest_offsets.h
 
 PRIV_HEADERS = 	priv/host-x86/hdefs.h			\
 		priv/host-amd64/hdefs.h			\
 		priv/host-arm/hdefs.h			\
-		priv/host-ppc32/hdefs.h			\
+		priv/host-ppc/hdefs.h			\
 		priv/host-generic/h_generic_regs.h	\
 		priv/host-generic/h_generic_simd64.h	\
 		priv/main/vex_globals.h			\
@@ -23,7 +24,7 @@ PRIV_HEADERS = 	priv/host-x86/hdefs.h			\
 		priv/guest-x86/gdefs.h			\
 		priv/guest-amd64/gdefs.h		\
 		priv/guest-arm/gdefs.h			\
-		priv/guest-ppc32/gdefs.h		\
+		priv/guest-ppc/gdefs.h			\
 		priv/ir/irmatch.h			\
 		priv/ir/iropt.h
 
@@ -36,11 +37,11 @@ LIB_OBJS = 	priv/ir/irdefs.o			\
 		priv/host-x86/hdefs.o			\
 		priv/host-amd64/hdefs.o			\
 		priv/host-arm/hdefs.o			\
-		priv/host-ppc32/hdefs.o			\
+		priv/host-ppc/hdefs.o			\
 		priv/host-x86/isel.o			\
 		priv/host-amd64/isel.o			\
 		priv/host-arm/isel.o			\
-		priv/host-ppc32/isel.o			\
+		priv/host-ppc/isel.o			\
 		priv/host-generic/h_generic_regs.o	\
 		priv/host-generic/h_generic_simd64.o	\
 		priv/host-generic/reg_alloc2.o		\
@@ -49,11 +50,11 @@ LIB_OBJS = 	priv/ir/irdefs.o			\
 		priv/guest-x86/ghelpers.o		\
 		priv/guest-amd64/ghelpers.o		\
 		priv/guest-arm/ghelpers.o		\
-		priv/guest-ppc32/ghelpers.o		\
+		priv/guest-ppc/ghelpers.o		\
 		priv/guest-x86/toIR.o			\
 		priv/guest-amd64/toIR.o			\
 		priv/guest-arm/toIR.o			\
-		priv/guest-ppc32/toIR.o
+		priv/guest-ppc/toIR.o
 
 PUB_INCLUDES = -Ipub
 
@@ -63,19 +64,19 @@ PUB_INCLUDES = -Ipub
 PRIV_INCLUDES = -Ipriv
 
 
-ifndef $(CC)
+ifndef CC
    CC = gcc 
 endif 
-ifndef $(AR)
+ifndef AR
    AR = ar 
 endif
 
 # Put -g -O2 after any flags we inherit from V.  -O2 vs -O
 # makes a significant difference, at least with gcc4.
-CCFLAGS = -Wall -Wmissing-prototypes -Wshadow -Winline \
+CCFLAGS = -Wall -Wmissing-prototypes -Wshadow \
 		-Wpointer-arith -Wbad-function-cast -Wcast-qual \
 		-Wcast-align -Wmissing-declarations \
-		$(EXTRA_CFLAGS) -g -O2
+		$(EXTRA_CFLAGS) -g -O2 -fstrict-aliasing
 
 #CC = icc
 #CCFLAGS = -g -Wall -wd981 -wd279 -wd1287 -wd869 -wd111 -wd188 -wd186
@@ -130,6 +131,24 @@ TAG_ppc32_linux:
 	if [ ! -f TAG_ppc32_linux ] ; then rm -f $(LIB_OBJS) TAG_* libvex.a ; fi
 	touch TAG_ppc32_linux
 
+libvex_ppc64_linux.a: TAG_ppc64_linux libvex.a
+	mv -f libvex.a libvex_ppc64_linux.a
+TAG_ppc64_linux:
+	if [ ! -f TAG_ppc64_linux ] ; then rm -f $(LIB_OBJS) TAG_* libvex.a ; fi
+	touch TAG_ppc64_linux
+
+libvex_ppc32_aix5.a: TAG_ppc32_aix5 libvex.a
+	mv -f libvex.a libvex_ppc32_aix5.a
+TAG_ppc32_aix5:
+	if [ ! -f TAG_ppc32_aix5 ] ; then rm -f $(LIB_OBJS) TAG_* libvex.a ; fi
+	touch TAG_ppc32_aix5
+
+libvex_ppc64_aix5.a: TAG_ppc64_aix5 libvex.a
+	mv -f libvex.a libvex_ppc64_aix5.a
+TAG_ppc64_aix5:
+	if [ ! -f TAG_ppc64_aix5 ] ; then rm -f $(LIB_OBJS) TAG_* libvex.a ; fi
+	touch TAG_ppc64_aix5
+
 
 # This doesn't get rid of priv/main/vex_svnversion.h, because
 # that can't be regenerated in the final Valgrind tarball, and
@@ -141,9 +160,10 @@ clean:
 
 version:
 	rm -f priv/main/vex_svnversion.h
-	echo -n "\""  > priv/main/vex_svnversion.h
+	cat quote.txt   >> priv/main/vex_svnversion.h
 	svnversion -n . >> priv/main/vex_svnversion.h
-	echo "\""  >> priv/main/vex_svnversion.h
+	cat quote.txt   >> priv/main/vex_svnversion.h
+	cat newline.txt >> priv/main/vex_svnversion.h
 
 minidist: version
 	rm -f vex--minidist-2005MMDD.tar
@@ -207,9 +227,9 @@ priv/host-arm/hdefs.o: $(ALL_HEADERS) priv/host-arm/hdefs.c
 	$(CC) $(CCFLAGS) $(ALL_INCLUDES) -o priv/host-arm/hdefs.o \
 					 -c priv/host-arm/hdefs.c
 
-priv/host-ppc32/hdefs.o: $(ALL_HEADERS) priv/host-ppc32/hdefs.c
-	$(CC) $(CCFLAGS) $(ALL_INCLUDES) -o priv/host-ppc32/hdefs.o \
-					 -c priv/host-ppc32/hdefs.c
+priv/host-ppc/hdefs.o: $(ALL_HEADERS) priv/host-ppc/hdefs.c
+	$(CC) $(CCFLAGS) $(ALL_INCLUDES) -o priv/host-ppc/hdefs.o \
+					 -c priv/host-ppc/hdefs.c
 
 priv/host-x86/isel.o: $(ALL_HEADERS) priv/host-x86/isel.c
 	$(CC) $(CCFLAGS) $(ALL_INCLUDES) -o priv/host-x86/isel.o \
@@ -223,9 +243,9 @@ priv/host-arm/isel.o: $(ALL_HEADERS) priv/host-arm/isel.c
 	$(CC) $(CCFLAGS) $(ALL_INCLUDES) -o priv/host-arm/isel.o \
 					 -c priv/host-arm/isel.c
 
-priv/host-ppc32/isel.o: $(ALL_HEADERS) priv/host-ppc32/isel.c
-	$(CC) $(CCFLAGS) $(ALL_INCLUDES) -o priv/host-ppc32/isel.o \
-					 -c priv/host-ppc32/isel.c
+priv/host-ppc/isel.o: $(ALL_HEADERS) priv/host-ppc/isel.c
+	$(CC) $(CCFLAGS) $(ALL_INCLUDES) -o priv/host-ppc/isel.o \
+					 -c priv/host-ppc/isel.c
 
 priv/host-generic/h_generic_regs.o: $(ALL_HEADERS) priv/host-generic/h_generic_regs.c
 	$(CC) $(CCFLAGS) $(ALL_INCLUDES) -o priv/host-generic/h_generic_regs.o \
@@ -271,10 +291,10 @@ priv/guest-arm/toIR.o: $(ALL_HEADERS) priv/guest-arm/toIR.c
 	$(CC) $(CCFLAGS) $(ALL_INCLUDES) -o priv/guest-arm/toIR.o \
 					 -c priv/guest-arm/toIR.c
 
-priv/guest-ppc32/ghelpers.o: $(ALL_HEADERS) priv/guest-ppc32/ghelpers.c
-	$(CC) $(CCFLAGS) $(ALL_INCLUDES) -o priv/guest-ppc32/ghelpers.o \
-					 -c priv/guest-ppc32/ghelpers.c
+priv/guest-ppc/ghelpers.o: $(ALL_HEADERS) priv/guest-ppc/ghelpers.c
+	$(CC) $(CCFLAGS) $(ALL_INCLUDES) -o priv/guest-ppc/ghelpers.o \
+					 -c priv/guest-ppc/ghelpers.c
 
-priv/guest-ppc32/toIR.o: $(ALL_HEADERS) priv/guest-ppc32/toIR.c
-	$(CC) $(CCFLAGS) $(ALL_INCLUDES) -o priv/guest-ppc32/toIR.o \
-					 -c priv/guest-ppc32/toIR.c
+priv/guest-ppc/toIR.o: $(ALL_HEADERS) priv/guest-ppc/toIR.c
+	$(CC) $(CCFLAGS) $(ALL_INCLUDES) -o priv/guest-ppc/toIR.o \
+					 -c priv/guest-ppc/toIR.c

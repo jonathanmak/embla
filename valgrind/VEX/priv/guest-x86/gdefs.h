@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2005 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -57,13 +57,16 @@
 /* Convert one x86 insn to IR.  See the type DisOneInstrFn in
    bb_to_IR.h. */
 extern
-DisResult disInstr_X86 ( IRBB*        irbb,
+DisResult disInstr_X86 ( IRSB*        irbb,
                          Bool         put_IP,
-                         Bool         (*resteerOkFn) ( Addr64 ),
+                         Bool         (*resteerOkFn) ( void*, Addr64 ),
+                         void*        callback_opaque,
                          UChar*       guest_code,
                          Long         delta,
                          Addr64       guest_IP,
+                         VexArch      guest_arch,
                          VexArchInfo* archinfo,
+                         VexAbiInfo*  abiinfo,
                          Bool         host_bigendian );
 
 /* Used by the optimiser to specialise calls to helpers. */
@@ -111,6 +114,8 @@ extern ULong x86g_calculate_RCL (
                 UInt arg, UInt rot_amt, UInt eflags_in, UInt sz 
              );
 
+extern UInt x86g_calculate_daa_das_aaa_aas ( UInt AX_and_flags, UInt opcode );
+
 extern ULong x86g_check_fldcw ( UInt fpucw );
 
 extern UInt  x86g_create_fpucw ( UInt fpround );
@@ -118,8 +123,6 @@ extern UInt  x86g_create_fpucw ( UInt fpround );
 extern ULong x86g_check_ldmxcsr ( UInt mxcsr );
 
 extern UInt  x86g_create_mxcsr ( UInt sseround );
-
-extern ULong x86g_calculate_FXTRACT ( ULong arg, UInt getExp );
 
 
 /* Translate a guest virtual_addr into a guest linear address by

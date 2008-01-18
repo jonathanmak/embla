@@ -36,37 +36,48 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-@VG_X86_LINUX_TRUE@am__append_1 = x86
-@VG_AMD64_LINUX_TRUE@am__append_2 = amd64
-@VG_PPC32_LINUX_TRUE@am__append_3 = ppc32
+DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
+	$(top_srcdir)/Makefile.flags.am
+@VGP_X86_LINUX_TRUE@am__append_1 = x86
+@VGP_AMD64_LINUX_TRUE@am__append_2 = amd64
+@VGP_PPC32_LINUX_TRUE@am__append_3 = ppc32
+@VGP_PPC64_LINUX_TRUE@am__append_4 = ppc64
 check_PROGRAMS = addressable$(EXEEXT) badaddrvalue$(EXEEXT) \
 	badfree$(EXEEXT) badjump$(EXEEXT) badjump2$(EXEEXT) \
 	badloop$(EXEEXT) badpoll$(EXEEXT) badrw$(EXEEXT) brk$(EXEEXT) \
 	brk2$(EXEEXT) buflen_check$(EXEEXT) clientperm$(EXEEXT) \
-	custom_alloc$(EXEEXT) describe-block$(EXEEXT) \
-	doublefree$(EXEEXT) error_counts$(EXEEXT) errs1$(EXEEXT) \
-	exitprog$(EXEEXT) execve$(EXEEXT) execve2$(EXEEXT) \
-	erringfds$(EXEEXT) fprw$(EXEEXT) fwrite$(EXEEXT) \
-	hello$(EXEEXT) inits$(EXEEXT) inline$(EXEEXT) leak-0$(EXEEXT) \
-	leak-cycle$(EXEEXT) leak-tree$(EXEEXT) leak-regroot$(EXEEXT) \
-	leakotron$(EXEEXT) malloc_usable$(EXEEXT) malloc1$(EXEEXT) \
-	malloc2$(EXEEXT) malloc3$(EXEEXT) manuel1$(EXEEXT) \
-	manuel2$(EXEEXT) manuel3$(EXEEXT) match-overrun$(EXEEXT) \
-	memalign_test$(EXEEXT) memalign2$(EXEEXT) memcmptest$(EXEEXT) \
-	mempool$(EXEEXT) mmaptest$(EXEEXT) nanoleak$(EXEEXT) \
-	new_nothrow$(EXEEXT) null_socket$(EXEEXT) oset_test$(EXEEXT) \
-	overlap$(EXEEXT) partiallydefinedeq$(EXEEXT) \
-	partial_load$(EXEEXT) pipe$(EXEEXT) pointer-trace$(EXEEXT) \
-	post-syscall$(EXEEXT) realloc1$(EXEEXT) realloc2$(EXEEXT) \
-	realloc3$(EXEEXT) sigaltstack$(EXEEXT) signal2$(EXEEXT) \
+	custom_alloc$(EXEEXT) deep_templates$(EXEEXT) \
+	describe-block$(EXEEXT) doublefree$(EXEEXT) \
+	error_counts$(EXEEXT) errs1$(EXEEXT) exitprog$(EXEEXT) \
+	execve$(EXEEXT) execve2$(EXEEXT) erringfds$(EXEEXT) \
+	fprw$(EXEEXT) fwrite$(EXEEXT) hello$(EXEEXT) inits$(EXEEXT) \
+	inline$(EXEEXT) leak-0$(EXEEXT) leak-cycle$(EXEEXT) \
+	leak-pool$(EXEEXT) leak-tree$(EXEEXT) leak-regroot$(EXEEXT) \
+	leakotron$(EXEEXT) long_namespace_xml$(EXEEXT) \
+	malloc_free_fill$(EXEEXT) malloc_usable$(EXEEXT) \
+	malloc1$(EXEEXT) malloc2$(EXEEXT) malloc3$(EXEEXT) \
+	manuel1$(EXEEXT) manuel2$(EXEEXT) manuel3$(EXEEXT) \
+	match-overrun$(EXEEXT) memalign_test$(EXEEXT) \
+	memalign2$(EXEEXT) memcmptest$(EXEEXT) mempool$(EXEEXT) \
+	mmaptest$(EXEEXT) nanoleak$(EXEEXT) nanoleak2$(EXEEXT) \
+	new_nothrow$(EXEEXT) noisy_child$(EXEEXT) null_socket$(EXEEXT) \
+	oset_test$(EXEEXT) overlap$(EXEEXT) \
+	partiallydefinedeq$(EXEEXT) partial_load$(EXEEXT) \
+	pdb-realloc$(EXEEXT) pdb-realloc2$(EXEEXT) pipe$(EXEEXT) \
+	pointer-trace$(EXEEXT) post-syscall$(EXEEXT) realloc1$(EXEEXT) \
+	realloc2$(EXEEXT) realloc3$(EXEEXT) sh-mem$(EXEEXT) \
+	sh-mem-random$(EXEEXT) sigaltstack$(EXEEXT) signal2$(EXEEXT) \
 	sigprocmask$(EXEEXT) sigkill$(EXEEXT) stack_changes$(EXEEXT) \
 	stack_switch$(EXEEXT) strchr$(EXEEXT) str_tester$(EXEEXT) \
 	supp_unknown$(EXEEXT) supp1$(EXEEXT) supp2$(EXEEXT) \
 	suppfree$(EXEEXT) trivialleak$(EXEEXT) mismatches$(EXEEXT) \
-	new_override$(EXEEXT) metadata$(EXEEXT) xml1$(EXEEXT) \
-	writev$(EXEEXT) zeropage$(EXEEXT)
+	new_override$(EXEEXT) metadata$(EXEEXT) vcpu_bz2$(EXEEXT) \
+	vcpu_fbench$(EXEEXT) vcpu_fnfns$(EXEEXT) xml1$(EXEEXT) \
+	wrap1$(EXEEXT) wrap2$(EXEEXT) wrap3$(EXEEXT) wrap4$(EXEEXT) \
+	wrap5$(EXEEXT) wrap6$(EXEEXT) wrap7$(EXEEXT) \
+	wrap7so.so$(EXEEXT) wrap8$(EXEEXT) writev$(EXEEXT) \
+	zeropage$(EXEEXT)
 subdir = memcheck/tests
-DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.in
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
@@ -113,6 +124,9 @@ clientperm_LDADD = $(LDADD)
 custom_alloc_SOURCES = custom_alloc.c
 custom_alloc_OBJECTS = custom_alloc.$(OBJEXT)
 custom_alloc_LDADD = $(LDADD)
+am_deep_templates_OBJECTS = deep_templates-deep_templates.$(OBJEXT)
+deep_templates_OBJECTS = $(am_deep_templates_OBJECTS)
+deep_templates_LDADD = $(LDADD)
 describe_block_SOURCES = describe-block.c
 describe_block_OBJECTS = describe-block.$(OBJEXT)
 describe_block_LDADD = $(LDADD)
@@ -158,6 +172,9 @@ leak_0_LDADD = $(LDADD)
 leak_cycle_SOURCES = leak-cycle.c
 leak_cycle_OBJECTS = leak-cycle.$(OBJEXT)
 leak_cycle_LDADD = $(LDADD)
+leak_pool_SOURCES = leak-pool.c
+leak_pool_OBJECTS = leak-pool.$(OBJEXT)
+leak_pool_LDADD = $(LDADD)
 leak_regroot_SOURCES = leak-regroot.c
 leak_regroot_OBJECTS = leak-regroot.$(OBJEXT)
 leak_regroot_LDADD = $(LDADD)
@@ -167,6 +184,9 @@ leak_tree_LDADD = $(LDADD)
 leakotron_SOURCES = leakotron.c
 leakotron_OBJECTS = leakotron.$(OBJEXT)
 leakotron_LDADD = $(LDADD)
+am_long_namespace_xml_OBJECTS = long_namespace_xml.$(OBJEXT)
+long_namespace_xml_OBJECTS = $(am_long_namespace_xml_OBJECTS)
+long_namespace_xml_LDADD = $(LDADD)
 malloc1_SOURCES = malloc1.c
 malloc1_OBJECTS = malloc1.$(OBJEXT)
 malloc1_LDADD = $(LDADD)
@@ -176,6 +196,9 @@ malloc2_LDADD = $(LDADD)
 malloc3_SOURCES = malloc3.c
 malloc3_OBJECTS = malloc3.$(OBJEXT)
 malloc3_LDADD = $(LDADD)
+malloc_free_fill_SOURCES = malloc_free_fill.c
+malloc_free_fill_OBJECTS = malloc_free_fill.$(OBJEXT)
+malloc_free_fill_LDADD = $(LDADD)
 malloc_usable_SOURCES = malloc_usable.c
 malloc_usable_OBJECTS = malloc_usable.$(OBJEXT)
 malloc_usable_LDADD = $(LDADD)
@@ -215,12 +238,18 @@ mmaptest_LDADD = $(LDADD)
 nanoleak_SOURCES = nanoleak.c
 nanoleak_OBJECTS = nanoleak.$(OBJEXT)
 nanoleak_LDADD = $(LDADD)
+nanoleak2_SOURCES = nanoleak2.c
+nanoleak2_OBJECTS = nanoleak2.$(OBJEXT)
+nanoleak2_LDADD = $(LDADD)
 am_new_nothrow_OBJECTS = new_nothrow.$(OBJEXT)
 new_nothrow_OBJECTS = $(am_new_nothrow_OBJECTS)
 new_nothrow_LDADD = $(LDADD)
 am_new_override_OBJECTS = new_override.$(OBJEXT)
 new_override_OBJECTS = $(am_new_override_OBJECTS)
 new_override_LDADD = $(LDADD)
+noisy_child_SOURCES = noisy_child.c
+noisy_child_OBJECTS = noisy_child.$(OBJEXT)
+noisy_child_LDADD = $(LDADD)
 null_socket_SOURCES = null_socket.c
 null_socket_OBJECTS = null_socket.$(OBJEXT)
 null_socket_LDADD = $(LDADD)
@@ -236,6 +265,12 @@ partial_load_LDADD = $(LDADD)
 partiallydefinedeq_SOURCES = partiallydefinedeq.c
 partiallydefinedeq_OBJECTS = partiallydefinedeq.$(OBJEXT)
 partiallydefinedeq_LDADD = $(LDADD)
+pdb_realloc_SOURCES = pdb-realloc.c
+pdb_realloc_OBJECTS = pdb-realloc.$(OBJEXT)
+pdb_realloc_LDADD = $(LDADD)
+pdb_realloc2_SOURCES = pdb-realloc2.c
+pdb_realloc2_OBJECTS = pdb-realloc2.$(OBJEXT)
+pdb_realloc2_LDADD = $(LDADD)
 pipe_SOURCES = pipe.c
 pipe_OBJECTS = pipe.$(OBJEXT)
 pipe_LDADD = $(LDADD)
@@ -254,6 +289,12 @@ realloc2_LDADD = $(LDADD)
 realloc3_SOURCES = realloc3.c
 realloc3_OBJECTS = realloc3.$(OBJEXT)
 realloc3_LDADD = $(LDADD)
+sh_mem_SOURCES = sh-mem.c
+sh_mem_OBJECTS = sh-mem.$(OBJEXT)
+sh_mem_LDADD = $(LDADD)
+sh_mem_random_SOURCES = sh-mem-random.c
+sh_mem_random_OBJECTS = sh-mem-random.$(OBJEXT)
+sh_mem_random_LDADD = $(LDADD)
 sigaltstack_SOURCES = sigaltstack.c
 sigaltstack_OBJECTS = sigaltstack.$(OBJEXT)
 sigaltstack_LDADD = $(LDADD)
@@ -293,6 +334,40 @@ suppfree_LDADD = $(LDADD)
 trivialleak_SOURCES = trivialleak.c
 trivialleak_OBJECTS = trivialleak.$(OBJEXT)
 trivialleak_LDADD = $(LDADD)
+vcpu_bz2_SOURCES = vcpu_bz2.c
+vcpu_bz2_OBJECTS = vcpu_bz2-vcpu_bz2.$(OBJEXT)
+vcpu_bz2_LDADD = $(LDADD)
+vcpu_fbench_SOURCES = vcpu_fbench.c
+vcpu_fbench_OBJECTS = vcpu_fbench-vcpu_fbench.$(OBJEXT)
+vcpu_fbench_LDADD = $(LDADD)
+vcpu_fnfns_SOURCES = vcpu_fnfns.c
+vcpu_fnfns_OBJECTS = vcpu_fnfns-vcpu_fnfns.$(OBJEXT)
+vcpu_fnfns_DEPENDENCIES =
+wrap1_SOURCES = wrap1.c
+wrap1_OBJECTS = wrap1.$(OBJEXT)
+wrap1_LDADD = $(LDADD)
+wrap2_SOURCES = wrap2.c
+wrap2_OBJECTS = wrap2.$(OBJEXT)
+wrap2_LDADD = $(LDADD)
+wrap3_SOURCES = wrap3.c
+wrap3_OBJECTS = wrap3.$(OBJEXT)
+wrap3_LDADD = $(LDADD)
+wrap4_SOURCES = wrap4.c
+wrap4_OBJECTS = wrap4.$(OBJEXT)
+wrap4_LDADD = $(LDADD)
+wrap5_SOURCES = wrap5.c
+wrap5_OBJECTS = wrap5.$(OBJEXT)
+wrap5_LDADD = $(LDADD)
+wrap6_SOURCES = wrap6.c
+wrap6_OBJECTS = wrap6-wrap6.$(OBJEXT)
+wrap6_LDADD = $(LDADD)
+am_wrap7_OBJECTS = wrap7.$(OBJEXT)
+wrap7_OBJECTS = $(am_wrap7_OBJECTS)
+am_wrap7so_so_OBJECTS = wrap7so_so-wrap7so.$(OBJEXT)
+wrap7so_so_OBJECTS = $(am_wrap7so_so_OBJECTS)
+wrap8_SOURCES = wrap8.c
+wrap8_OBJECTS = wrap8.$(OBJEXT)
+wrap8_LDADD = $(LDADD)
 writev_SOURCES = writev.c
 writev_OBJECTS = writev.$(OBJEXT)
 writev_LDADD = $(LDADD)
@@ -317,38 +392,50 @@ CXXLINK = $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
 	-o $@
 SOURCES = addressable.c badaddrvalue.c badfree.c badjump.c badjump2.c \
 	badloop.c badpoll.c badrw.c brk.c brk2.c buflen_check.c \
-	clientperm.c custom_alloc.c describe-block.c doublefree.c \
-	erringfds.c error_counts.c errs1.c execve.c execve2.c \
-	exitprog.c fprw.c fwrite.c hello.c inits.c inline.c leak-0.c \
-	leak-cycle.c leak-regroot.c leak-tree.c leakotron.c malloc1.c \
-	malloc2.c malloc3.c malloc_usable.c manuel1.c manuel2.c \
+	clientperm.c custom_alloc.c $(deep_templates_SOURCES) \
+	describe-block.c doublefree.c erringfds.c error_counts.c \
+	errs1.c execve.c execve2.c exitprog.c fprw.c fwrite.c hello.c \
+	inits.c inline.c leak-0.c leak-cycle.c leak-pool.c \
+	leak-regroot.c leak-tree.c leakotron.c \
+	$(long_namespace_xml_SOURCES) malloc1.c malloc2.c malloc3.c \
+	malloc_free_fill.c malloc_usable.c manuel1.c manuel2.c \
 	manuel3.c match-overrun.c memalign2.c memalign_test.c \
 	memcmptest.c mempool.c metadata.c $(mismatches_SOURCES) \
-	mmaptest.c nanoleak.c $(new_nothrow_SOURCES) \
-	$(new_override_SOURCES) null_socket.c oset_test.c overlap.c \
-	partial_load.c partiallydefinedeq.c pipe.c pointer-trace.c \
-	post-syscall.c realloc1.c realloc2.c realloc3.c sigaltstack.c \
-	sigkill.c signal2.c sigprocmask.c stack_changes.c \
-	stack_switch.c str_tester.c strchr.c $(supp1_SOURCES) \
-	$(supp2_SOURCES) $(supp_unknown_SOURCES) suppfree.c \
-	trivialleak.c writev.c xml1.c zeropage.c
+	mmaptest.c nanoleak.c nanoleak2.c $(new_nothrow_SOURCES) \
+	$(new_override_SOURCES) noisy_child.c null_socket.c \
+	oset_test.c overlap.c partial_load.c partiallydefinedeq.c \
+	pdb-realloc.c pdb-realloc2.c pipe.c pointer-trace.c \
+	post-syscall.c realloc1.c realloc2.c realloc3.c sh-mem.c \
+	sh-mem-random.c sigaltstack.c sigkill.c signal2.c \
+	sigprocmask.c stack_changes.c stack_switch.c str_tester.c \
+	strchr.c $(supp1_SOURCES) $(supp2_SOURCES) \
+	$(supp_unknown_SOURCES) suppfree.c trivialleak.c vcpu_bz2.c \
+	vcpu_fbench.c vcpu_fnfns.c wrap1.c wrap2.c wrap3.c wrap4.c \
+	wrap5.c wrap6.c $(wrap7_SOURCES) $(wrap7so_so_SOURCES) wrap8.c \
+	writev.c xml1.c zeropage.c
 DIST_SOURCES = addressable.c badaddrvalue.c badfree.c badjump.c \
 	badjump2.c badloop.c badpoll.c badrw.c brk.c brk2.c \
-	buflen_check.c clientperm.c custom_alloc.c describe-block.c \
-	doublefree.c erringfds.c error_counts.c errs1.c execve.c \
-	execve2.c exitprog.c fprw.c fwrite.c hello.c inits.c inline.c \
-	leak-0.c leak-cycle.c leak-regroot.c leak-tree.c leakotron.c \
-	malloc1.c malloc2.c malloc3.c malloc_usable.c manuel1.c \
+	buflen_check.c clientperm.c custom_alloc.c \
+	$(deep_templates_SOURCES) describe-block.c doublefree.c \
+	erringfds.c error_counts.c errs1.c execve.c execve2.c \
+	exitprog.c fprw.c fwrite.c hello.c inits.c inline.c leak-0.c \
+	leak-cycle.c leak-pool.c leak-regroot.c leak-tree.c \
+	leakotron.c $(long_namespace_xml_SOURCES) malloc1.c malloc2.c \
+	malloc3.c malloc_free_fill.c malloc_usable.c manuel1.c \
 	manuel2.c manuel3.c match-overrun.c memalign2.c \
 	memalign_test.c memcmptest.c mempool.c metadata.c \
-	$(mismatches_SOURCES) mmaptest.c nanoleak.c \
-	$(new_nothrow_SOURCES) $(new_override_SOURCES) null_socket.c \
-	oset_test.c overlap.c partial_load.c partiallydefinedeq.c \
-	pipe.c pointer-trace.c post-syscall.c realloc1.c realloc2.c \
-	realloc3.c sigaltstack.c sigkill.c signal2.c sigprocmask.c \
-	stack_changes.c stack_switch.c str_tester.c strchr.c \
-	$(supp1_SOURCES) $(supp2_SOURCES) $(supp_unknown_SOURCES) \
-	suppfree.c trivialleak.c writev.c xml1.c zeropage.c
+	$(mismatches_SOURCES) mmaptest.c nanoleak.c nanoleak2.c \
+	$(new_nothrow_SOURCES) $(new_override_SOURCES) noisy_child.c \
+	null_socket.c oset_test.c overlap.c partial_load.c \
+	partiallydefinedeq.c pdb-realloc.c pdb-realloc2.c pipe.c \
+	pointer-trace.c post-syscall.c realloc1.c realloc2.c \
+	realloc3.c sh-mem.c sh-mem-random.c sigaltstack.c sigkill.c \
+	signal2.c sigprocmask.c stack_changes.c stack_switch.c \
+	str_tester.c strchr.c $(supp1_SOURCES) $(supp2_SOURCES) \
+	$(supp_unknown_SOURCES) suppfree.c trivialleak.c vcpu_bz2.c \
+	vcpu_fbench.c vcpu_fnfns.c wrap1.c wrap2.c wrap3.c wrap4.c \
+	wrap5.c wrap6.c $(wrap7_SOURCES) $(wrap7so_so_SOURCES) wrap8.c \
+	writev.c xml1.c zeropage.c
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	html-recursive info-recursive install-data-recursive \
 	install-exec-recursive install-info-recursive \
@@ -366,6 +453,12 @@ AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+BUILD_MPIWRAP_PRI_FALSE = @BUILD_MPIWRAP_PRI_FALSE@
+BUILD_MPIWRAP_PRI_TRUE = @BUILD_MPIWRAP_PRI_TRUE@
+BUILD_MPIWRAP_SEC_FALSE = @BUILD_MPIWRAP_SEC_FALSE@
+BUILD_MPIWRAP_SEC_TRUE = @BUILD_MPIWRAP_SEC_TRUE@
+BUILD_SSE3_TESTS_FALSE = @BUILD_SSE3_TESTS_FALSE@
+BUILD_SSE3_TESTS_TRUE = @BUILD_SSE3_TESTS_TRUE@
 CC = @CC@
 CCAS = @CCAS@
 CCASFLAGS = @CCASFLAGS@
@@ -386,9 +479,14 @@ ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
+FLAG_FNO_STACK_PROTECTOR = @FLAG_FNO_STACK_PROTECTOR@
 FLAG_M32 = @FLAG_M32@
+FLAG_M64 = @FLAG_M64@
+FLAG_MAIX32 = @FLAG_MAIX32@
+FLAG_MAIX64 = @FLAG_MAIX64@
 FLAG_MMMX = @FLAG_MMMX@
 FLAG_MSSE = @FLAG_MSSE@
+FLAG_WDECL_AFTER_STMT = @FLAG_WDECL_AFTER_STMT@
 GDB = @GDB@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -403,6 +501,7 @@ MAINT = @MAINT@
 MAINTAINER_MODE_FALSE = @MAINTAINER_MODE_FALSE@
 MAINTAINER_MODE_TRUE = @MAINTAINER_MODE_TRUE@
 MAKEINFO = @MAKEINFO@
+MPI_CC = @MPI_CC@
 OBJEXT = @OBJEXT@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
@@ -420,19 +519,29 @@ STRIP = @STRIP@
 VALT_LOAD_ADDRESS = @VALT_LOAD_ADDRESS@
 VERSION = @VERSION@
 VEX_DIR = @VEX_DIR@
-VG_AMD64_LINUX_FALSE = @VG_AMD64_LINUX_FALSE@
-VG_AMD64_LINUX_TRUE = @VG_AMD64_LINUX_TRUE@
+VGO_AIX5_FALSE = @VGO_AIX5_FALSE@
+VGO_AIX5_TRUE = @VGO_AIX5_TRUE@
+VGO_LINUX_FALSE = @VGO_LINUX_FALSE@
+VGO_LINUX_TRUE = @VGO_LINUX_TRUE@
+VGP_AMD64_LINUX_FALSE = @VGP_AMD64_LINUX_FALSE@
+VGP_AMD64_LINUX_TRUE = @VGP_AMD64_LINUX_TRUE@
+VGP_HAVE_SECONDARY_FALSE = @VGP_HAVE_SECONDARY_FALSE@
+VGP_HAVE_SECONDARY_TRUE = @VGP_HAVE_SECONDARY_TRUE@
+VGP_PPC32_AIX5_FALSE = @VGP_PPC32_AIX5_FALSE@
+VGP_PPC32_AIX5_TRUE = @VGP_PPC32_AIX5_TRUE@
+VGP_PPC32_LINUX_FALSE = @VGP_PPC32_LINUX_FALSE@
+VGP_PPC32_LINUX_TRUE = @VGP_PPC32_LINUX_TRUE@
+VGP_PPC64_AIX5_FALSE = @VGP_PPC64_AIX5_FALSE@
+VGP_PPC64_AIX5_TRUE = @VGP_PPC64_AIX5_TRUE@
+VGP_PPC64_LINUX_FALSE = @VGP_PPC64_LINUX_FALSE@
+VGP_PPC64_LINUX_TRUE = @VGP_PPC64_LINUX_TRUE@
+VGP_X86_LINUX_FALSE = @VGP_X86_LINUX_FALSE@
+VGP_X86_LINUX_TRUE = @VGP_X86_LINUX_TRUE@
 VG_ARCH = @VG_ARCH@
 VG_ARCH_ALL = @VG_ARCH_ALL@
-VG_MAKE_PLATFORM = @VG_MAKE_PLATFORM@
 VG_OS = @VG_OS@
-VG_OS_ALL = @VG_OS_ALL@
-VG_PLATFORM = @VG_PLATFORM@
-VG_PLATFORM_ALL = @VG_PLATFORM_ALL@
-VG_PPC32_LINUX_FALSE = @VG_PPC32_LINUX_FALSE@
-VG_PPC32_LINUX_TRUE = @VG_PPC32_LINUX_TRUE@
-VG_X86_LINUX_FALSE = @VG_X86_LINUX_FALSE@
-VG_X86_LINUX_TRUE = @VG_X86_LINUX_TRUE@
+VG_PLATFORM_PRI = @VG_PLATFORM_PRI@
+VG_PLATFORM_SEC = @VG_PLATFORM_SEC@
 ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
 ac_ct_RANLIB = @ac_ct_RANLIB@
@@ -474,7 +583,79 @@ sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
-SUBDIRS = . $(am__append_1) $(am__append_2) $(am__append_3)
+
+# Baseline flags for all compilations.  Aim here is to maximise
+# performance and get whatever useful warnings we can out of gcc.
+AM_CFLAGS_BASE = -O2 -g -Wmissing-prototypes -Wall -Wshadow \
+                 -Wpointer-arith -Wstrict-prototypes -Wmissing-declarations \
+                 -fno-strict-aliasing
+
+
+# These flags are used for building the preload shared objects.
+# The aim is to give reasonable performance but also to have good
+# stack traces, since users often see stack traces extending 
+# into (and through) the preloads.
+AM_CFLAGS_PIC = -O -g -fpic -fno-omit-frame-pointer -fno-strict-aliasing
+
+# Flags for specific targets
+AM_FLAG_M3264_X86_LINUX = @FLAG_M32@
+AM_CPPFLAGS_X86_LINUX = $(add_includes_x86_linux)
+AM_CFLAGS_X86_LINUX = $(WERROR) @FLAG_M32@ @PREFERRED_STACK_BOUNDARY@ \
+			 	$(AM_CFLAGS_BASE)
+
+AM_CCASFLAGS_X86_LINUX = $(add_includes_x86_linux) @FLAG_M32@ -g
+AM_FLAG_M3264_AMD64_LINUX = @FLAG_M64@
+AM_CPPFLAGS_AMD64_LINUX = $(add_includes_amd64_linux)
+AM_CFLAGS_AMD64_LINUX = $(WERROR) @FLAG_M64@ -fomit-frame-pointer \
+				@PREFERRED_STACK_BOUNDARY@ $(AM_CFLAGS_BASE)
+
+AM_CCASFLAGS_AMD64_LINUX = $(add_includes_amd64_linux) @FLAG_M64@ -g
+AM_FLAG_M3264_PPC32_LINUX = @FLAG_M32@
+AM_CPPFLAGS_PPC32_LINUX = $(add_includes_ppc32_linux)
+AM_CFLAGS_PPC32_LINUX = $(WERROR) @FLAG_M32@ $(AM_CFLAGS_BASE)
+AM_CCASFLAGS_PPC32_LINUX = $(add_includes_ppc32_linux) -Wa,-maltivec @FLAG_M32@ -g
+AM_FLAG_M3264_PPC64_LINUX = @FLAG_M64@
+AM_CPPFLAGS_PPC64_LINUX = $(add_includes_ppc64_linux)
+AM_CFLAGS_PPC64_LINUX = $(WERROR) @FLAG_M64@ $(AM_CFLAGS_BASE)
+AM_CCASFLAGS_PPC64_LINUX = $(add_includes_ppc64_linux) -Wa,-maltivec @FLAG_M64@ -g
+AM_FLAG_M3264_PPC32_AIX5 = @FLAG_MAIX32@
+AM_CPPFLAGS_PPC32_AIX5 = $(add_includes_ppc32_aix5)
+AM_CFLAGS_PPC32_AIX5 = $(WERROR) @FLAG_MAIX32@ -mcpu=powerpc $(AM_CFLAGS_BASE)
+AM_CCASFLAGS_PPC32_AIX5 = $(add_includes_ppc32_aix5) \
+				@FLAG_MAIX32@ -mcpu=powerpc -g
+
+AM_FLAG_M3264_PPC64_AIX5 = @FLAG_MAIX64@
+AM_CPPFLAGS_PPC64_AIX5 = $(add_includes_ppc64_aix5)
+AM_CFLAGS_PPC64_AIX5 = $(WERROR) @FLAG_MAIX64@ -mcpu=powerpc64 $(AM_CFLAGS_BASE)
+AM_CCASFLAGS_PPC64_AIX5 = $(add_includes_ppc64_aix5) \
+				@FLAG_MAIX64@ -mcpu=powerpc64 -g
+
+
+# Flags for the primary target.  These must be used to build the
+# regtests and performance tests.  In fact, these must be used to
+# build anything which is built only once on a dual-arch build.
+#
+AM_FLAG_M3264_PRI = $(AM_FLAG_M3264_@VG_PLATFORM_PRI@)
+AM_CPPFLAGS_PRI = $(AM_CPPFLAGS_@VG_PLATFORM_PRI@)
+AM_CFLAGS_PRI = $(AM_CFLAGS_@VG_PLATFORM_PRI@)
+AM_CCASFLAGS_PRI = $(AM_CCASFLAGS_@VG_PLATFORM_PRI@)
+@VGP_HAVE_SECONDARY_FALSE@AM_FLAG_M3264_SEC = 
+@VGP_HAVE_SECONDARY_TRUE@AM_FLAG_M3264_SEC = $(AM_FLAG_M3264_@VG_PLATFORM_SEC@)
+
+# Baseline link flags for making dynamic shared objects.
+#
+PRELOAD_LDFLAGS_COMMON_LINUX = -nostdlib -shared -Wl,-z,interpose,-z,initfirst
+PRELOAD_LDFLAGS_COMMON_AIX5 = -nostdlib -shared -Wl,-G -Wl,-bnogc
+PRELOAD_LDFLAGS_X86_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
+PRELOAD_LDFLAGS_AMD64_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M64@
+PRELOAD_LDFLAGS_PPC32_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
+PRELOAD_LDFLAGS_PPC64_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M64@
+PRELOAD_LDFLAGS_PPC32_AIX5 = $(PRELOAD_LDFLAGS_COMMON_AIX5)  @FLAG_MAIX32@
+PRELOAD_LDFLAGS_PPC64_AIX5 = $(PRELOAD_LDFLAGS_COMMON_AIX5)  @FLAG_MAIX64@
+
+# For AM_FLAG_M3264_PRI
+SUBDIRS = . $(am__append_1) $(am__append_2) $(am__append_3) \
+	$(am__append_4)
 DIST_SUBDIRS = ${VG_ARCH_ALL} .
 noinst_SCRIPTS = filter_allocs filter_leak_check_size \
 		 filter_stderr filter_stderr_backtrace filter_xml
@@ -496,6 +677,8 @@ EXTRA_DIST = $(noinst_SCRIPTS) \
 	clientperm.stderr.exp \
 	clientperm.stdout.exp clientperm.vgtest \
 	custom_alloc.stderr.exp custom_alloc.vgtest \
+	deep_templates.vgtest \
+	deep_templates.stdout.exp deep_templates.stderr.exp \
 	describe-block.stderr.exp describe-block.vgtest \
 	doublefree.stderr.exp doublefree.vgtest \
 	erringfds.stderr.exp erringfds.stdout.exp erringfds.vgtest \
@@ -510,10 +693,21 @@ EXTRA_DIST = $(noinst_SCRIPTS) \
 	inline.stderr.exp inline.stdout.exp inline.vgtest \
 	leak-0.vgtest leak-0.stderr.exp \
 	leak-cycle.vgtest leak-cycle.stderr.exp leak-cycle.stderr.exp64 \
+	leak-pool-0.vgtest leak-pool-0.stderr.exp leak-pool-0.stderr.exp64 \
+	leak-pool-1.vgtest leak-pool-1.stderr.exp leak-pool-1.stderr.exp64 \
+	leak-pool-2.vgtest leak-pool-2.stderr.exp leak-pool-2.stderr.exp64 \
+	leak-pool-3.vgtest leak-pool-3.stderr.exp leak-pool-3.stderr.exp64 \
+	leak-pool-4.vgtest leak-pool-4.stderr.exp leak-pool-4.stderr.exp64 \
+	leak-pool-5.vgtest leak-pool-5.stderr.exp leak-pool-5.stderr.exp64 \
 	leak-tree.vgtest leak-tree.stderr.exp \
 	leak-tree.stderr.exp2 leak-tree.stderr.exp64 \
 	leak-regroot.vgtest leak-regroot.stderr.exp \
 	leakotron.vgtest leakotron.stdout.exp leakotron.stderr.exp \
+	long_namespace_xml.vgtest long_namespace_xml.stdout.exp \
+	long_namespace_xml.stderr.exp \
+	malloc_free_fill.vgtest malloc_free_fill.stdout.exp \
+	malloc_free_fill.stderr.exp-glibc25-amd64 \
+	malloc_free_fill.stderr.exp-glibc25-x86 \
 	malloc_usable.stderr.exp malloc_usable.vgtest \
 	malloc1.stderr.exp malloc1.vgtest \
 	malloc2.stderr.exp malloc2.vgtest \
@@ -531,15 +725,20 @@ EXTRA_DIST = $(noinst_SCRIPTS) \
 	mmaptest.stderr.exp mmaptest.vgtest \
 	nanoleak.stderr.exp nanoleak.vgtest \
 	nanoleak_supp.stderr.exp nanoleak_supp.vgtest nanoleak.supp \
+	nanoleak2.stderr.exp nanoleak2.vgtest \
 	new_nothrow.stderr.exp new_nothrow.vgtest \
 	new_override.stderr.exp new_override.stdout.exp new_override.vgtest \
+	noisy_child.vgtest noisy_child.stderr.exp noisy_child.stdout.exp \
 	null_socket.stderr.exp null_socket.vgtest \
 	overlap.stderr.exp overlap.stdout.exp overlap.vgtest \
 	oset_test.stderr.exp oset_test.stdout.exp oset_test.vgtest \
 	partiallydefinedeq.vgtest partiallydefinedeq.stderr.exp \
+	partiallydefinedeq.stderr.exp2 \
 	partiallydefinedeq.stdout.exp \
 	partial_load_ok.vgtest partial_load_ok.stderr.exp partial_load_ok.stderr.exp64 \
 	partial_load_dflt.vgtest partial_load_dflt.stderr.exp partial_load_dflt.stderr.exp64 \
+	pdb-realloc.stderr.exp pdb-realloc.vgtest \
+	pdb-realloc2.stderr.exp pdb-realloc2.stdout.exp pdb-realloc2.vgtest \
 	pipe.stderr.exp pipe.vgtest \
 	pointer-trace.vgtest \
 	pointer-trace.stderr.exp pointer-trace.stderr.exp64 \
@@ -547,11 +746,15 @@ EXTRA_DIST = $(noinst_SCRIPTS) \
 	realloc1.stderr.exp realloc1.vgtest \
 	realloc2.stderr.exp realloc2.vgtest \
 	realloc3.stderr.exp realloc3.vgtest \
+	sh-mem.stderr.exp sh-mem.vgtest \
+	sh-mem-random.stderr.exp sh-mem-random.stdout.exp64 \
+	sh-mem-random.stdout.exp sh-mem-random.vgtest \
 	sigaltstack.stderr.exp sigaltstack.vgtest \
 	sigkill.stderr.exp sigkill.stderr.exp2 sigkill.stderr.exp3 sigkill.vgtest \
 	signal2.stderr.exp signal2.stdout.exp signal2.vgtest \
 	sigprocmask.stderr.exp sigprocmask.stderr.exp2 sigprocmask.vgtest \
-	stack_changes.stderr.exp stack_changes.stdout.exp stack_changes.vgtest \
+	stack_changes.stderr.exp stack_changes.stdout.exp \
+	stack_changes.stdout.exp2 stack_changes.vgtest \
 	stack_switch.stderr.exp stack_switch.vgtest \
 	strchr.stderr.exp strchr.stderr.exp2 strchr.vgtest \
 	str_tester.stderr.exp str_tester.vgtest \
@@ -562,8 +765,21 @@ EXTRA_DIST = $(noinst_SCRIPTS) \
 	suppfree.stderr.exp suppfree.vgtest \
 	toobig-allocs.stderr.exp toobig-allocs.vgtest \
 	trivialleak.stderr.exp trivialleak.vgtest \
-	metadata.stderr.exp metadata.stdout.exp metadata.vgtest-HIDING \
+	metadata.stderr.exp metadata.stdout.exp metadata.vgtest \
+	vcpu_bz2.stdout.exp vcpu_bz2.stderr.exp vcpu_bz2.vgtest \
+	vcpu_fbench.stdout.exp vcpu_fbench.stderr.exp vcpu_fbench.vgtest \
+	vcpu_fnfns.stdout.exp vcpu_fnfns.stderr.exp vcpu_fnfns.vgtest \
 	vgtest_ume.stderr.exp vgtest_ume.disabled \
+	with-space.stderr.exp with-space.stdout.exp with-space.vgtest \
+	wrap1.vgtest wrap1.stdout.exp wrap1.stderr.exp \
+	wrap2.vgtest wrap2.stdout.exp wrap2.stderr.exp \
+	wrap3.vgtest wrap3.stdout.exp wrap3.stderr.exp \
+	wrap4.vgtest wrap4.stdout.exp wrap4.stderr.exp \
+	wrap5.vgtest wrap5.stdout.exp wrap5.stderr.exp \
+	wrap6.vgtest wrap6.stdout.exp wrap6.stderr.exp \
+	wrap7.vgtest wrap7.stdout.exp wrap7.stderr.exp \
+	wrap8.vgtest wrap8.stdout.exp wrap8.stderr.exp \
+	wrap8.stdout.exp2 wrap8.stderr.exp2 \
 	writev.stderr.exp writev.stderr.exp2 writev.stderr.exp3 writev.vgtest \
 	xml1.stderr.exp xml1.stderr.exp2 xml1.stderr.exp3 \
 	xml1.stderr.exp64 xml1.stderr.exp64_2 xml1.stdout.exp \
@@ -571,13 +787,25 @@ EXTRA_DIST = $(noinst_SCRIPTS) \
 	zeropage.stderr.exp zeropage.stderr.exp2 zeropage.stdout.exp \
 	zeropage.vgtest
 
-AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/include -I$(top_srcdir)/coregrind -I$(top_builddir)/include -I@VEX_DIR@/pub
-AM_CFLAGS = $(WERROR) -Winline -Wall -Wshadow -g 
+AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/include \
+		-I$(top_srcdir)/coregrind -I$(top_builddir)/include \
+		-I@VEX_DIR@/pub
+
+AM_CFLAGS = $(WERROR) -Winline -Wall -Wshadow -g $(AM_FLAG_M3264_PRI)
 AM_CXXFLAGS = $(AM_CFLAGS)
 
 # Extra stuff for C tests
-memcmptest_CFLAGS = $(AM_CFLAGS) -fno-builtin-memcmp
-oset_test_CFLAGS = -DVGA_$(VG_ARCH) -DVGO_$(VG_OS) -DVGP_$(VG_PLATFORM)
+memcmptest_CFLAGS = $(AM_FLAG_M3264_PRI) $(AM_CFLAGS) -fno-builtin-memcmp
+oset_test_CFLAGS = $(AM_FLAG_M3264_PRI) \
+				-DVGA_$(VG_ARCH)=1 -DVGO_$(VG_OS)=1 \
+				-DVGP_$(VG_ARCH)_$(VG_OS)=1
+
+vcpu_bz2_CFLAGS = $(AM_FLAG_M3264_PRI) $(AM_CFLAGS) -O2 -g
+vcpu_fbench_CFLAGS = $(AM_FLAG_M3264_PRI) $(AM_CFLAGS) -O2 -g
+vcpu_fnfns_CFLAGS = $(AM_FLAG_M3264_PRI) $(AM_CFLAGS) -O2 -g
+vcpu_fnfns_LDADD = -lm
+wrap6_CFLAGS = $(AM_FLAG_M3264_PRI) $(AM_CFLAGS) -O2 -g
+
 # Don't allow GCC to inline memcpy(), because then we can't intercept it
 overlap_CFLAGS = $(AM_CFLAGS) -fno-builtin-memcpy
 stack_switch_LDADD = -lpthread
@@ -590,11 +818,44 @@ supp2_SOURCES = supp.c
 mismatches_SOURCES = mismatches.cpp
 new_nothrow_SOURCES = new_nothrow.cpp
 new_override_SOURCES = new_override.cpp
+deep_templates_SOURCES = deep_templates.cpp
+long_namespace_xml_SOURCES = long_namespace_xml.cpp
+deep_templates_CXXFLAGS = $(AM_FLAG_M3264_PRI) $(AM_CFLAGS) -O -gstabs
+@VGP_PPC32_AIX5_TRUE@@VGP_PPC64_AIX5_FALSE@wrap1_LDFLAGS = $(AM_FLAG_M3264_PRI) -Wl,-G -Wl,-bnogc
+@VGP_PPC32_AIX5_TRUE@@VGP_PPC64_AIX5_FALSE@wrap2_LDFLAGS = $(AM_FLAG_M3264_PRI) -Wl,-G -Wl,-bnogc
+@VGP_PPC32_AIX5_TRUE@@VGP_PPC64_AIX5_FALSE@wrap3_LDFLAGS = $(AM_FLAG_M3264_PRI) -Wl,-G -Wl,-bnogc
+@VGP_PPC32_AIX5_TRUE@@VGP_PPC64_AIX5_FALSE@wrap4_LDFLAGS = $(AM_FLAG_M3264_PRI) -Wl,-G -Wl,-bnogc
+@VGP_PPC32_AIX5_TRUE@@VGP_PPC64_AIX5_FALSE@wrap5_LDFLAGS = $(AM_FLAG_M3264_PRI) -Wl,-G -Wl,-bnogc
+@VGP_PPC32_AIX5_TRUE@@VGP_PPC64_AIX5_FALSE@wrap6_LDFLAGS = $(AM_FLAG_M3264_PRI) -Wl,-G -Wl,-bnogc
+@VGP_PPC32_AIX5_TRUE@@VGP_PPC64_AIX5_FALSE@wrap8_LDFLAGS = $(AM_FLAG_M3264_PRI) -Wl,-G -Wl,-bnogc
+
+# Build shared object for wrap7
+wrap7_SOURCES = wrap7.c
+wrap7_DEPENDENCIES = wrap7so.so
+@VGP_PPC32_AIX5_FALSE@@VGP_PPC64_AIX5_FALSE@wrap7_LDADD = wrap7so.so
+@VGP_PPC32_AIX5_TRUE@@VGP_PPC64_AIX5_FALSE@wrap7_LDADD = `pwd`/wrap7so.so
+@VGP_PPC64_AIX5_TRUE@wrap7_LDADD = `pwd`/wrap7so.so
+@VGP_PPC32_AIX5_FALSE@@VGP_PPC64_AIX5_FALSE@wrap7_LDFLAGS = $(AM_FLAG_M3264_PRI) \
+@VGP_PPC32_AIX5_FALSE@@VGP_PPC64_AIX5_FALSE@				-Wl,-rpath,$(top_builddir)/memcheck/tests
+
+@VGP_PPC32_AIX5_TRUE@@VGP_PPC64_AIX5_FALSE@wrap7_LDFLAGS = $(AM_FLAG_M3264_PRI) -Wl,-G -Wl,-bnogc
+@VGP_PPC64_AIX5_TRUE@wrap7_LDFLAGS = $(AM_FLAG_M3264_PRI)
+wrap7so_so_SOURCES = wrap7so.c
+wrap7so_so_LDADD = 
+wrap7so_so_DEPENDENCIES = 
+wrap7so_so_CFLAGS = -fpic $(AM_FLAG_M3264_PRI)
+@VGP_PPC32_AIX5_FALSE@@VGP_PPC64_AIX5_FALSE@wrap7so_so_LDFLAGS = -fpic $(AM_FLAG_M3264_PRI) -shared \
+@VGP_PPC32_AIX5_FALSE@@VGP_PPC64_AIX5_FALSE@				-Wl,-soname -Wl,wrap7so.so
+
+@VGP_PPC32_AIX5_TRUE@@VGP_PPC64_AIX5_FALSE@wrap7so_so_LDFLAGS = -fpic $(AM_FLAG_M3264_PRI) -shared \
+@VGP_PPC32_AIX5_TRUE@@VGP_PPC64_AIX5_FALSE@				-Wl,-G -Wl,-bnogc
+
+@VGP_PPC64_AIX5_TRUE@wrap7so_so_LDFLAGS = -fpic $(AM_FLAG_M3264_PRI) -shared
 all: all-recursive
 
 .SUFFIXES:
 .SUFFIXES: .c .cpp .o .obj
-$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
+$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/Makefile.flags.am $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -665,6 +926,9 @@ clientperm$(EXEEXT): $(clientperm_OBJECTS) $(clientperm_DEPENDENCIES)
 custom_alloc$(EXEEXT): $(custom_alloc_OBJECTS) $(custom_alloc_DEPENDENCIES) 
 	@rm -f custom_alloc$(EXEEXT)
 	$(LINK) $(custom_alloc_LDFLAGS) $(custom_alloc_OBJECTS) $(custom_alloc_LDADD) $(LIBS)
+deep_templates$(EXEEXT): $(deep_templates_OBJECTS) $(deep_templates_DEPENDENCIES) 
+	@rm -f deep_templates$(EXEEXT)
+	$(CXXLINK) $(deep_templates_LDFLAGS) $(deep_templates_OBJECTS) $(deep_templates_LDADD) $(LIBS)
 describe-block$(EXEEXT): $(describe_block_OBJECTS) $(describe_block_DEPENDENCIES) 
 	@rm -f describe-block$(EXEEXT)
 	$(LINK) $(describe_block_LDFLAGS) $(describe_block_OBJECTS) $(describe_block_LDADD) $(LIBS)
@@ -710,6 +974,9 @@ leak-0$(EXEEXT): $(leak_0_OBJECTS) $(leak_0_DEPENDENCIES)
 leak-cycle$(EXEEXT): $(leak_cycle_OBJECTS) $(leak_cycle_DEPENDENCIES) 
 	@rm -f leak-cycle$(EXEEXT)
 	$(LINK) $(leak_cycle_LDFLAGS) $(leak_cycle_OBJECTS) $(leak_cycle_LDADD) $(LIBS)
+leak-pool$(EXEEXT): $(leak_pool_OBJECTS) $(leak_pool_DEPENDENCIES) 
+	@rm -f leak-pool$(EXEEXT)
+	$(LINK) $(leak_pool_LDFLAGS) $(leak_pool_OBJECTS) $(leak_pool_LDADD) $(LIBS)
 leak-regroot$(EXEEXT): $(leak_regroot_OBJECTS) $(leak_regroot_DEPENDENCIES) 
 	@rm -f leak-regroot$(EXEEXT)
 	$(LINK) $(leak_regroot_LDFLAGS) $(leak_regroot_OBJECTS) $(leak_regroot_LDADD) $(LIBS)
@@ -719,6 +986,9 @@ leak-tree$(EXEEXT): $(leak_tree_OBJECTS) $(leak_tree_DEPENDENCIES)
 leakotron$(EXEEXT): $(leakotron_OBJECTS) $(leakotron_DEPENDENCIES) 
 	@rm -f leakotron$(EXEEXT)
 	$(LINK) $(leakotron_LDFLAGS) $(leakotron_OBJECTS) $(leakotron_LDADD) $(LIBS)
+long_namespace_xml$(EXEEXT): $(long_namespace_xml_OBJECTS) $(long_namespace_xml_DEPENDENCIES) 
+	@rm -f long_namespace_xml$(EXEEXT)
+	$(CXXLINK) $(long_namespace_xml_LDFLAGS) $(long_namespace_xml_OBJECTS) $(long_namespace_xml_LDADD) $(LIBS)
 malloc1$(EXEEXT): $(malloc1_OBJECTS) $(malloc1_DEPENDENCIES) 
 	@rm -f malloc1$(EXEEXT)
 	$(LINK) $(malloc1_LDFLAGS) $(malloc1_OBJECTS) $(malloc1_LDADD) $(LIBS)
@@ -728,6 +998,9 @@ malloc2$(EXEEXT): $(malloc2_OBJECTS) $(malloc2_DEPENDENCIES)
 malloc3$(EXEEXT): $(malloc3_OBJECTS) $(malloc3_DEPENDENCIES) 
 	@rm -f malloc3$(EXEEXT)
 	$(LINK) $(malloc3_LDFLAGS) $(malloc3_OBJECTS) $(malloc3_LDADD) $(LIBS)
+malloc_free_fill$(EXEEXT): $(malloc_free_fill_OBJECTS) $(malloc_free_fill_DEPENDENCIES) 
+	@rm -f malloc_free_fill$(EXEEXT)
+	$(LINK) $(malloc_free_fill_LDFLAGS) $(malloc_free_fill_OBJECTS) $(malloc_free_fill_LDADD) $(LIBS)
 malloc_usable$(EXEEXT): $(malloc_usable_OBJECTS) $(malloc_usable_DEPENDENCIES) 
 	@rm -f malloc_usable$(EXEEXT)
 	$(LINK) $(malloc_usable_LDFLAGS) $(malloc_usable_OBJECTS) $(malloc_usable_LDADD) $(LIBS)
@@ -767,12 +1040,18 @@ mmaptest$(EXEEXT): $(mmaptest_OBJECTS) $(mmaptest_DEPENDENCIES)
 nanoleak$(EXEEXT): $(nanoleak_OBJECTS) $(nanoleak_DEPENDENCIES) 
 	@rm -f nanoleak$(EXEEXT)
 	$(LINK) $(nanoleak_LDFLAGS) $(nanoleak_OBJECTS) $(nanoleak_LDADD) $(LIBS)
+nanoleak2$(EXEEXT): $(nanoleak2_OBJECTS) $(nanoleak2_DEPENDENCIES) 
+	@rm -f nanoleak2$(EXEEXT)
+	$(LINK) $(nanoleak2_LDFLAGS) $(nanoleak2_OBJECTS) $(nanoleak2_LDADD) $(LIBS)
 new_nothrow$(EXEEXT): $(new_nothrow_OBJECTS) $(new_nothrow_DEPENDENCIES) 
 	@rm -f new_nothrow$(EXEEXT)
 	$(CXXLINK) $(new_nothrow_LDFLAGS) $(new_nothrow_OBJECTS) $(new_nothrow_LDADD) $(LIBS)
 new_override$(EXEEXT): $(new_override_OBJECTS) $(new_override_DEPENDENCIES) 
 	@rm -f new_override$(EXEEXT)
 	$(CXXLINK) $(new_override_LDFLAGS) $(new_override_OBJECTS) $(new_override_LDADD) $(LIBS)
+noisy_child$(EXEEXT): $(noisy_child_OBJECTS) $(noisy_child_DEPENDENCIES) 
+	@rm -f noisy_child$(EXEEXT)
+	$(LINK) $(noisy_child_LDFLAGS) $(noisy_child_OBJECTS) $(noisy_child_LDADD) $(LIBS)
 null_socket$(EXEEXT): $(null_socket_OBJECTS) $(null_socket_DEPENDENCIES) 
 	@rm -f null_socket$(EXEEXT)
 	$(LINK) $(null_socket_LDFLAGS) $(null_socket_OBJECTS) $(null_socket_LDADD) $(LIBS)
@@ -788,6 +1067,12 @@ partial_load$(EXEEXT): $(partial_load_OBJECTS) $(partial_load_DEPENDENCIES)
 partiallydefinedeq$(EXEEXT): $(partiallydefinedeq_OBJECTS) $(partiallydefinedeq_DEPENDENCIES) 
 	@rm -f partiallydefinedeq$(EXEEXT)
 	$(LINK) $(partiallydefinedeq_LDFLAGS) $(partiallydefinedeq_OBJECTS) $(partiallydefinedeq_LDADD) $(LIBS)
+pdb-realloc$(EXEEXT): $(pdb_realloc_OBJECTS) $(pdb_realloc_DEPENDENCIES) 
+	@rm -f pdb-realloc$(EXEEXT)
+	$(LINK) $(pdb_realloc_LDFLAGS) $(pdb_realloc_OBJECTS) $(pdb_realloc_LDADD) $(LIBS)
+pdb-realloc2$(EXEEXT): $(pdb_realloc2_OBJECTS) $(pdb_realloc2_DEPENDENCIES) 
+	@rm -f pdb-realloc2$(EXEEXT)
+	$(LINK) $(pdb_realloc2_LDFLAGS) $(pdb_realloc2_OBJECTS) $(pdb_realloc2_LDADD) $(LIBS)
 pipe$(EXEEXT): $(pipe_OBJECTS) $(pipe_DEPENDENCIES) 
 	@rm -f pipe$(EXEEXT)
 	$(LINK) $(pipe_LDFLAGS) $(pipe_OBJECTS) $(pipe_LDADD) $(LIBS)
@@ -806,6 +1091,12 @@ realloc2$(EXEEXT): $(realloc2_OBJECTS) $(realloc2_DEPENDENCIES)
 realloc3$(EXEEXT): $(realloc3_OBJECTS) $(realloc3_DEPENDENCIES) 
 	@rm -f realloc3$(EXEEXT)
 	$(LINK) $(realloc3_LDFLAGS) $(realloc3_OBJECTS) $(realloc3_LDADD) $(LIBS)
+sh-mem$(EXEEXT): $(sh_mem_OBJECTS) $(sh_mem_DEPENDENCIES) 
+	@rm -f sh-mem$(EXEEXT)
+	$(LINK) $(sh_mem_LDFLAGS) $(sh_mem_OBJECTS) $(sh_mem_LDADD) $(LIBS)
+sh-mem-random$(EXEEXT): $(sh_mem_random_OBJECTS) $(sh_mem_random_DEPENDENCIES) 
+	@rm -f sh-mem-random$(EXEEXT)
+	$(LINK) $(sh_mem_random_LDFLAGS) $(sh_mem_random_OBJECTS) $(sh_mem_random_LDADD) $(LIBS)
 sigaltstack$(EXEEXT): $(sigaltstack_OBJECTS) $(sigaltstack_DEPENDENCIES) 
 	@rm -f sigaltstack$(EXEEXT)
 	$(LINK) $(sigaltstack_LDFLAGS) $(sigaltstack_OBJECTS) $(sigaltstack_LDADD) $(LIBS)
@@ -845,6 +1136,42 @@ suppfree$(EXEEXT): $(suppfree_OBJECTS) $(suppfree_DEPENDENCIES)
 trivialleak$(EXEEXT): $(trivialleak_OBJECTS) $(trivialleak_DEPENDENCIES) 
 	@rm -f trivialleak$(EXEEXT)
 	$(LINK) $(trivialleak_LDFLAGS) $(trivialleak_OBJECTS) $(trivialleak_LDADD) $(LIBS)
+vcpu_bz2$(EXEEXT): $(vcpu_bz2_OBJECTS) $(vcpu_bz2_DEPENDENCIES) 
+	@rm -f vcpu_bz2$(EXEEXT)
+	$(LINK) $(vcpu_bz2_LDFLAGS) $(vcpu_bz2_OBJECTS) $(vcpu_bz2_LDADD) $(LIBS)
+vcpu_fbench$(EXEEXT): $(vcpu_fbench_OBJECTS) $(vcpu_fbench_DEPENDENCIES) 
+	@rm -f vcpu_fbench$(EXEEXT)
+	$(LINK) $(vcpu_fbench_LDFLAGS) $(vcpu_fbench_OBJECTS) $(vcpu_fbench_LDADD) $(LIBS)
+vcpu_fnfns$(EXEEXT): $(vcpu_fnfns_OBJECTS) $(vcpu_fnfns_DEPENDENCIES) 
+	@rm -f vcpu_fnfns$(EXEEXT)
+	$(LINK) $(vcpu_fnfns_LDFLAGS) $(vcpu_fnfns_OBJECTS) $(vcpu_fnfns_LDADD) $(LIBS)
+wrap1$(EXEEXT): $(wrap1_OBJECTS) $(wrap1_DEPENDENCIES) 
+	@rm -f wrap1$(EXEEXT)
+	$(LINK) $(wrap1_LDFLAGS) $(wrap1_OBJECTS) $(wrap1_LDADD) $(LIBS)
+wrap2$(EXEEXT): $(wrap2_OBJECTS) $(wrap2_DEPENDENCIES) 
+	@rm -f wrap2$(EXEEXT)
+	$(LINK) $(wrap2_LDFLAGS) $(wrap2_OBJECTS) $(wrap2_LDADD) $(LIBS)
+wrap3$(EXEEXT): $(wrap3_OBJECTS) $(wrap3_DEPENDENCIES) 
+	@rm -f wrap3$(EXEEXT)
+	$(LINK) $(wrap3_LDFLAGS) $(wrap3_OBJECTS) $(wrap3_LDADD) $(LIBS)
+wrap4$(EXEEXT): $(wrap4_OBJECTS) $(wrap4_DEPENDENCIES) 
+	@rm -f wrap4$(EXEEXT)
+	$(LINK) $(wrap4_LDFLAGS) $(wrap4_OBJECTS) $(wrap4_LDADD) $(LIBS)
+wrap5$(EXEEXT): $(wrap5_OBJECTS) $(wrap5_DEPENDENCIES) 
+	@rm -f wrap5$(EXEEXT)
+	$(LINK) $(wrap5_LDFLAGS) $(wrap5_OBJECTS) $(wrap5_LDADD) $(LIBS)
+wrap6$(EXEEXT): $(wrap6_OBJECTS) $(wrap6_DEPENDENCIES) 
+	@rm -f wrap6$(EXEEXT)
+	$(LINK) $(wrap6_LDFLAGS) $(wrap6_OBJECTS) $(wrap6_LDADD) $(LIBS)
+wrap7$(EXEEXT): $(wrap7_OBJECTS) $(wrap7_DEPENDENCIES) 
+	@rm -f wrap7$(EXEEXT)
+	$(LINK) $(wrap7_LDFLAGS) $(wrap7_OBJECTS) $(wrap7_LDADD) $(LIBS)
+wrap7so.so$(EXEEXT): $(wrap7so_so_OBJECTS) $(wrap7so_so_DEPENDENCIES) 
+	@rm -f wrap7so.so$(EXEEXT)
+	$(LINK) $(wrap7so_so_LDFLAGS) $(wrap7so_so_OBJECTS) $(wrap7so_so_LDADD) $(LIBS)
+wrap8$(EXEEXT): $(wrap8_OBJECTS) $(wrap8_DEPENDENCIES) 
+	@rm -f wrap8$(EXEEXT)
+	$(LINK) $(wrap8_LDFLAGS) $(wrap8_OBJECTS) $(wrap8_LDADD) $(LIBS)
 writev$(EXEEXT): $(writev_OBJECTS) $(writev_DEPENDENCIES) 
 	@rm -f writev$(EXEEXT)
 	$(LINK) $(writev_LDFLAGS) $(writev_OBJECTS) $(writev_LDADD) $(LIBS)
@@ -874,6 +1201,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buflen_check.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/clientperm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/custom_alloc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/deep_templates-deep_templates.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/describe-block.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/doublefree.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/erringfds.Po@am__quote@
@@ -889,12 +1217,15 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/inline.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/leak-0.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/leak-cycle.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/leak-pool.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/leak-regroot.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/leak-tree.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/leakotron.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/long_namespace_xml.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/malloc1.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/malloc2.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/malloc3.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/malloc_free_fill.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/malloc_usable.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/manuel1.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/manuel2.Po@am__quote@
@@ -908,19 +1239,25 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mismatches.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mmaptest.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nanoleak.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nanoleak2.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/new_nothrow.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/new_override.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/noisy_child.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/null_socket.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/oset_test-oset_test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/overlap-overlap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/partial_load.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/partiallydefinedeq.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pdb-realloc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pdb-realloc2.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pipe.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pointer-trace.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/post-syscall.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/realloc1.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/realloc2.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/realloc3.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sh-mem-random.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sh-mem.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sigaltstack.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sigkill.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/signal2.Po@am__quote@
@@ -932,6 +1269,18 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/supp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/suppfree.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/trivialleak.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vcpu_bz2-vcpu_bz2.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vcpu_fbench-vcpu_fbench.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vcpu_fnfns-vcpu_fnfns.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wrap1.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wrap2.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wrap3.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wrap4.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wrap5.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wrap6-wrap6.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wrap7.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wrap7so_so-wrap7so.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wrap8.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/writev.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xml1.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/zeropage.Po@am__quote@
@@ -1006,6 +1355,76 @@ str_tester-str_tester.obj: str_tester.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(str_tester_CFLAGS) $(CFLAGS) -c -o str_tester-str_tester.obj `if test -f 'str_tester.c'; then $(CYGPATH_W) 'str_tester.c'; else $(CYGPATH_W) '$(srcdir)/str_tester.c'; fi`
 
+vcpu_bz2-vcpu_bz2.o: vcpu_bz2.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(vcpu_bz2_CFLAGS) $(CFLAGS) -MT vcpu_bz2-vcpu_bz2.o -MD -MP -MF "$(DEPDIR)/vcpu_bz2-vcpu_bz2.Tpo" -c -o vcpu_bz2-vcpu_bz2.o `test -f 'vcpu_bz2.c' || echo '$(srcdir)/'`vcpu_bz2.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vcpu_bz2-vcpu_bz2.Tpo" "$(DEPDIR)/vcpu_bz2-vcpu_bz2.Po"; else rm -f "$(DEPDIR)/vcpu_bz2-vcpu_bz2.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='vcpu_bz2.c' object='vcpu_bz2-vcpu_bz2.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(vcpu_bz2_CFLAGS) $(CFLAGS) -c -o vcpu_bz2-vcpu_bz2.o `test -f 'vcpu_bz2.c' || echo '$(srcdir)/'`vcpu_bz2.c
+
+vcpu_bz2-vcpu_bz2.obj: vcpu_bz2.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(vcpu_bz2_CFLAGS) $(CFLAGS) -MT vcpu_bz2-vcpu_bz2.obj -MD -MP -MF "$(DEPDIR)/vcpu_bz2-vcpu_bz2.Tpo" -c -o vcpu_bz2-vcpu_bz2.obj `if test -f 'vcpu_bz2.c'; then $(CYGPATH_W) 'vcpu_bz2.c'; else $(CYGPATH_W) '$(srcdir)/vcpu_bz2.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vcpu_bz2-vcpu_bz2.Tpo" "$(DEPDIR)/vcpu_bz2-vcpu_bz2.Po"; else rm -f "$(DEPDIR)/vcpu_bz2-vcpu_bz2.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='vcpu_bz2.c' object='vcpu_bz2-vcpu_bz2.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(vcpu_bz2_CFLAGS) $(CFLAGS) -c -o vcpu_bz2-vcpu_bz2.obj `if test -f 'vcpu_bz2.c'; then $(CYGPATH_W) 'vcpu_bz2.c'; else $(CYGPATH_W) '$(srcdir)/vcpu_bz2.c'; fi`
+
+vcpu_fbench-vcpu_fbench.o: vcpu_fbench.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(vcpu_fbench_CFLAGS) $(CFLAGS) -MT vcpu_fbench-vcpu_fbench.o -MD -MP -MF "$(DEPDIR)/vcpu_fbench-vcpu_fbench.Tpo" -c -o vcpu_fbench-vcpu_fbench.o `test -f 'vcpu_fbench.c' || echo '$(srcdir)/'`vcpu_fbench.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vcpu_fbench-vcpu_fbench.Tpo" "$(DEPDIR)/vcpu_fbench-vcpu_fbench.Po"; else rm -f "$(DEPDIR)/vcpu_fbench-vcpu_fbench.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='vcpu_fbench.c' object='vcpu_fbench-vcpu_fbench.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(vcpu_fbench_CFLAGS) $(CFLAGS) -c -o vcpu_fbench-vcpu_fbench.o `test -f 'vcpu_fbench.c' || echo '$(srcdir)/'`vcpu_fbench.c
+
+vcpu_fbench-vcpu_fbench.obj: vcpu_fbench.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(vcpu_fbench_CFLAGS) $(CFLAGS) -MT vcpu_fbench-vcpu_fbench.obj -MD -MP -MF "$(DEPDIR)/vcpu_fbench-vcpu_fbench.Tpo" -c -o vcpu_fbench-vcpu_fbench.obj `if test -f 'vcpu_fbench.c'; then $(CYGPATH_W) 'vcpu_fbench.c'; else $(CYGPATH_W) '$(srcdir)/vcpu_fbench.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vcpu_fbench-vcpu_fbench.Tpo" "$(DEPDIR)/vcpu_fbench-vcpu_fbench.Po"; else rm -f "$(DEPDIR)/vcpu_fbench-vcpu_fbench.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='vcpu_fbench.c' object='vcpu_fbench-vcpu_fbench.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(vcpu_fbench_CFLAGS) $(CFLAGS) -c -o vcpu_fbench-vcpu_fbench.obj `if test -f 'vcpu_fbench.c'; then $(CYGPATH_W) 'vcpu_fbench.c'; else $(CYGPATH_W) '$(srcdir)/vcpu_fbench.c'; fi`
+
+vcpu_fnfns-vcpu_fnfns.o: vcpu_fnfns.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(vcpu_fnfns_CFLAGS) $(CFLAGS) -MT vcpu_fnfns-vcpu_fnfns.o -MD -MP -MF "$(DEPDIR)/vcpu_fnfns-vcpu_fnfns.Tpo" -c -o vcpu_fnfns-vcpu_fnfns.o `test -f 'vcpu_fnfns.c' || echo '$(srcdir)/'`vcpu_fnfns.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vcpu_fnfns-vcpu_fnfns.Tpo" "$(DEPDIR)/vcpu_fnfns-vcpu_fnfns.Po"; else rm -f "$(DEPDIR)/vcpu_fnfns-vcpu_fnfns.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='vcpu_fnfns.c' object='vcpu_fnfns-vcpu_fnfns.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(vcpu_fnfns_CFLAGS) $(CFLAGS) -c -o vcpu_fnfns-vcpu_fnfns.o `test -f 'vcpu_fnfns.c' || echo '$(srcdir)/'`vcpu_fnfns.c
+
+vcpu_fnfns-vcpu_fnfns.obj: vcpu_fnfns.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(vcpu_fnfns_CFLAGS) $(CFLAGS) -MT vcpu_fnfns-vcpu_fnfns.obj -MD -MP -MF "$(DEPDIR)/vcpu_fnfns-vcpu_fnfns.Tpo" -c -o vcpu_fnfns-vcpu_fnfns.obj `if test -f 'vcpu_fnfns.c'; then $(CYGPATH_W) 'vcpu_fnfns.c'; else $(CYGPATH_W) '$(srcdir)/vcpu_fnfns.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vcpu_fnfns-vcpu_fnfns.Tpo" "$(DEPDIR)/vcpu_fnfns-vcpu_fnfns.Po"; else rm -f "$(DEPDIR)/vcpu_fnfns-vcpu_fnfns.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='vcpu_fnfns.c' object='vcpu_fnfns-vcpu_fnfns.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(vcpu_fnfns_CFLAGS) $(CFLAGS) -c -o vcpu_fnfns-vcpu_fnfns.obj `if test -f 'vcpu_fnfns.c'; then $(CYGPATH_W) 'vcpu_fnfns.c'; else $(CYGPATH_W) '$(srcdir)/vcpu_fnfns.c'; fi`
+
+wrap6-wrap6.o: wrap6.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(wrap6_CFLAGS) $(CFLAGS) -MT wrap6-wrap6.o -MD -MP -MF "$(DEPDIR)/wrap6-wrap6.Tpo" -c -o wrap6-wrap6.o `test -f 'wrap6.c' || echo '$(srcdir)/'`wrap6.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/wrap6-wrap6.Tpo" "$(DEPDIR)/wrap6-wrap6.Po"; else rm -f "$(DEPDIR)/wrap6-wrap6.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='wrap6.c' object='wrap6-wrap6.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(wrap6_CFLAGS) $(CFLAGS) -c -o wrap6-wrap6.o `test -f 'wrap6.c' || echo '$(srcdir)/'`wrap6.c
+
+wrap6-wrap6.obj: wrap6.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(wrap6_CFLAGS) $(CFLAGS) -MT wrap6-wrap6.obj -MD -MP -MF "$(DEPDIR)/wrap6-wrap6.Tpo" -c -o wrap6-wrap6.obj `if test -f 'wrap6.c'; then $(CYGPATH_W) 'wrap6.c'; else $(CYGPATH_W) '$(srcdir)/wrap6.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/wrap6-wrap6.Tpo" "$(DEPDIR)/wrap6-wrap6.Po"; else rm -f "$(DEPDIR)/wrap6-wrap6.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='wrap6.c' object='wrap6-wrap6.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(wrap6_CFLAGS) $(CFLAGS) -c -o wrap6-wrap6.obj `if test -f 'wrap6.c'; then $(CYGPATH_W) 'wrap6.c'; else $(CYGPATH_W) '$(srcdir)/wrap6.c'; fi`
+
+wrap7so_so-wrap7so.o: wrap7so.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(wrap7so_so_CFLAGS) $(CFLAGS) -MT wrap7so_so-wrap7so.o -MD -MP -MF "$(DEPDIR)/wrap7so_so-wrap7so.Tpo" -c -o wrap7so_so-wrap7so.o `test -f 'wrap7so.c' || echo '$(srcdir)/'`wrap7so.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/wrap7so_so-wrap7so.Tpo" "$(DEPDIR)/wrap7so_so-wrap7so.Po"; else rm -f "$(DEPDIR)/wrap7so_so-wrap7so.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='wrap7so.c' object='wrap7so_so-wrap7so.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(wrap7so_so_CFLAGS) $(CFLAGS) -c -o wrap7so_so-wrap7so.o `test -f 'wrap7so.c' || echo '$(srcdir)/'`wrap7so.c
+
+wrap7so_so-wrap7so.obj: wrap7so.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(wrap7so_so_CFLAGS) $(CFLAGS) -MT wrap7so_so-wrap7so.obj -MD -MP -MF "$(DEPDIR)/wrap7so_so-wrap7so.Tpo" -c -o wrap7so_so-wrap7so.obj `if test -f 'wrap7so.c'; then $(CYGPATH_W) 'wrap7so.c'; else $(CYGPATH_W) '$(srcdir)/wrap7so.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/wrap7so_so-wrap7so.Tpo" "$(DEPDIR)/wrap7so_so-wrap7so.Po"; else rm -f "$(DEPDIR)/wrap7so_so-wrap7so.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='wrap7so.c' object='wrap7so_so-wrap7so.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(wrap7so_so_CFLAGS) $(CFLAGS) -c -o wrap7so_so-wrap7so.obj `if test -f 'wrap7so.c'; then $(CYGPATH_W) 'wrap7so.c'; else $(CYGPATH_W) '$(srcdir)/wrap7so.c'; fi`
+
 .cpp.o:
 @am__fastdepCXX_TRUE@	if $(CXXCOMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
 @am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/$*.Tpo" "$(DEPDIR)/$*.Po"; else rm -f "$(DEPDIR)/$*.Tpo"; exit 1; fi
@@ -1019,6 +1438,20 @@ str_tester-str_tester.obj: str_tester.c
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+
+deep_templates-deep_templates.o: deep_templates.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(deep_templates_CXXFLAGS) $(CXXFLAGS) -MT deep_templates-deep_templates.o -MD -MP -MF "$(DEPDIR)/deep_templates-deep_templates.Tpo" -c -o deep_templates-deep_templates.o `test -f 'deep_templates.cpp' || echo '$(srcdir)/'`deep_templates.cpp; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/deep_templates-deep_templates.Tpo" "$(DEPDIR)/deep_templates-deep_templates.Po"; else rm -f "$(DEPDIR)/deep_templates-deep_templates.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='deep_templates.cpp' object='deep_templates-deep_templates.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(deep_templates_CXXFLAGS) $(CXXFLAGS) -c -o deep_templates-deep_templates.o `test -f 'deep_templates.cpp' || echo '$(srcdir)/'`deep_templates.cpp
+
+deep_templates-deep_templates.obj: deep_templates.cpp
+@am__fastdepCXX_TRUE@	if $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(deep_templates_CXXFLAGS) $(CXXFLAGS) -MT deep_templates-deep_templates.obj -MD -MP -MF "$(DEPDIR)/deep_templates-deep_templates.Tpo" -c -o deep_templates-deep_templates.obj `if test -f 'deep_templates.cpp'; then $(CYGPATH_W) 'deep_templates.cpp'; else $(CYGPATH_W) '$(srcdir)/deep_templates.cpp'; fi`; \
+@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/deep_templates-deep_templates.Tpo" "$(DEPDIR)/deep_templates-deep_templates.Po"; else rm -f "$(DEPDIR)/deep_templates-deep_templates.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='deep_templates.cpp' object='deep_templates-deep_templates.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(deep_templates_CXXFLAGS) $(CXXFLAGS) -c -o deep_templates-deep_templates.obj `if test -f 'deep_templates.cpp'; then $(CYGPATH_W) 'deep_templates.cpp'; else $(CYGPATH_W) '$(srcdir)/deep_templates.cpp'; fi`
 uninstall-info-am:
 
 # This directory's subdirectories are mostly independent; you can cd
@@ -1154,6 +1587,7 @@ distclean-tags:
 	-rm -f TAGS ID GTAGS GRTAGS GSYMS GPATH tags
 
 distdir: $(DISTFILES)
+	$(mkdir_p) $(distdir)/../..
 	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
 	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's|.|.|g'`; \
 	list='$(DISTFILES)'; for file in $$list; do \
@@ -1289,6 +1723,11 @@ uninstall-info: uninstall-info-recursive
 	mostlyclean-recursive pdf pdf-am ps ps-am tags tags-recursive \
 	uninstall uninstall-am uninstall-info-am
 
+
+@VGP_PPC32_AIX5_TRUE@@VGP_PPC64_AIX5_FALSE@ # persuade the AIX linker not to junk apparently unused
+@VGP_PPC32_AIX5_TRUE@@VGP_PPC64_AIX5_FALSE@ # function descriptors.  Unfortunately -Wl,-G -Wl,-bnogc
+@VGP_PPC32_AIX5_TRUE@@VGP_PPC64_AIX5_FALSE@ # produces a link error on 64-bit AIX, hence only 32-bit
+@VGP_PPC32_AIX5_TRUE@@VGP_PPC64_AIX5_FALSE@ # gets these flags.
 
 # Valgrind unit self-tests
 #hello_LDFLAGS		= -Wl,-defsym,valt_load_address=0x50000000 \

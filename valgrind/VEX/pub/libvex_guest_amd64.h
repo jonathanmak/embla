@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2005 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -144,6 +144,14 @@ typedef
          ignored forever thereafter. */
       ULong guest_TISTART;
       ULong guest_TILEN;
+
+      /* Used to record the unredirected guest address at the start of
+         a translation whose start has been redirected.  By reading
+         this pseudo-register shortly afterwards, the translation can
+         find out what the corresponding no-redirection address was.
+         Note, this is only set for wrap-style redirects, not for
+         replace-style ones. */
+      ULong guest_NRADDR;
 
       /* Padding to make it have an 8-aligned size */
       /* UInt   padding; */

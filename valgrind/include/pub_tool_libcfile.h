@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2005 Julian Seward
+   Copyright (C) 2000-2007 Julian Seward
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -35,6 +35,8 @@
    File-related functions.
    ------------------------------------------------------------------ */
 
+/* To use this file you must first include pub_tool_vki.h. */
+
 extern SysRes VG_(open)   ( const Char* pathname, Int flags, Int mode );
 extern void   VG_(close)  ( Int fd );
 extern Int    VG_(read)   ( Int fd, void* buf, Int count);
@@ -48,11 +50,12 @@ extern SysRes VG_(dup)    ( Int oldfd );
 extern Int    VG_(rename) ( Char* old_name, Char* new_name );
 extern Int    VG_(unlink) ( Char* file_name );
 
-// Returns False on failure (eg. if the buffer isn't big enough).
-extern Bool   VG_(getcwd) ( Char* buf, SizeT size );
-
 extern Int    VG_(readlink)( Char* path, Char* buf, UInt bufsize );
 extern Int    VG_(getdents)( UInt fd, struct vki_dirent *dirp, UInt count );
+
+/* Copy the working directory at startup into buf[0 .. size-1], or return
+   False if buf is too small. */
+extern Bool VG_(get_startup_wd) ( Char* buf, SizeT size );
 
 #endif   // __PUB_TOOL_LIBCFILE_H
 

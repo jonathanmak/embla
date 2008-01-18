@@ -1,9 +1,9 @@
-<html xmlns:cf="http://docbook.sourceforge.net/xmlns/chunkfast/1.0">
+<html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
 <title>7. README_DEVELOPERS</title>
 <link rel="stylesheet" href="vg_basic.css" type="text/css">
-<meta name="generator" content="DocBook XSL Stylesheets V1.69.0">
+<meta name="generator" content="DocBook XSL Stylesheets V1.69.1">
 <link rel="start" href="index.html" title="Valgrind Documentation">
 <link rel="up" href="dist.html" title="Valgrind Distribution Documents">
 <link rel="prev" href="dist.readme-missing.html" title="6. README_MISSING_SYSCALL_OR_IOCTL">
@@ -24,7 +24,6 @@
       <br>
 Building and not installing it<br>
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~<br>
-<br>
 To run Valgrind without having to install it, run coregrind/valgrind<br>
 with the VALGRIND_LIB environment variable set, where &lt;dir&gt; is the root<br>
 of the source tree (and must be an absolute path).  Eg:<br>
@@ -33,6 +32,8 @@ of the source tree (and must be an absolute path).  Eg:<br>
 <br>
 This allows you to compile and run with "make" instead of "make install",<br>
 saving you time.<br>
+<br>
+Or, you can use the 'vg-in-place' script which does that for you.<br>
 <br>
 I recommend compiling with "make --quiet" to further reduce the amount of<br>
 output spewed out during compilation, letting you actually see any errors,<br>
@@ -56,6 +57,30 @@ file.  Eg:<br>
   perl tests/vg_regtest memcheck/tests/badfree<br>
 <br>
 <br>
+Running the performance tests<br>
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~<br>
+To build and run all the performance tests, run "make [--quiet] perf".<br>
+<br>
+To run a subset of the performance suite, execute:<br>
+<br>
+  perl perf/vg_perf &lt;name&gt;<br>
+<br>
+where &lt;name&gt; is a directory (all tests within will be run) or a single<br>
+.vgperf test file, or the name of a program which has a like-named .vgperf<br>
+file.  Eg:<br>
+<br>
+  perl perf/vg_perf perf/<br>
+  perl perf/vg_perf perf/bz2.vgperf<br>
+  perl perf/vg_perf perf/bz2<br>
+<br>
+To compare multiple versions of Valgrind, use the --vg= option multiple<br>
+times.  For example, if you have two Valgrinds next to each other, one in<br>
+trunk1/ and one in trunk2/, from within either trunk1/ or trunk2/ do this to<br>
+compare them on all the performance tests:<br>
+<br>
+  perl perf/vg_perf --vg=../trunk1 --vg=../trunk2 perf/<br>
+<br>
+<br>
 Debugging Valgrind with GDB<br>
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~<br>
 To debug the valgrind launcher program (&lt;prefix&gt;/bin/valgrind) just<br>
@@ -65,13 +90,21 @@ Debugging the main body of the valgrind code (and/or the code for<br>
 a particular tool) requires a bit more trickery but can be achieved<br>
 without too much problem by following these steps:<br>
 <br>
-(1) Set VALGRIND_LAUNCHER to &lt;prefix&gt;/bin/valgrind:<br>
+(1) Set VALGRIND_LAUNCHER to point to the valgrind executable.  Eg:<br>
 <br>
-    export VALGRIND_LAUNCHER=/usr/local/bin/valgrind<br>
+      export VALGRIND_LAUNCHER=/usr/local/bin/valgrind<br>
 <br>
-(2) Run "gdb &lt;prefix&gt;/lib/valgrind/&lt;platform&gt;/&lt;tool&gt;":<br>
+    or for an uninstalled version in a source directory $DIR:<br>
 <br>
-    gdb /usr/local/lib/valgrind/ppc32-linux/lackey<br>
+      export VALGRIND_LAUNCHER=$DIR/coregrind/valgrind<br>
+<br>
+(2) Run gdb on the tool executable.  Eg:<br>
+<br>
+      gdb /usr/local/lib/valgrind/ppc32-linux/lackey<br>
+<br>
+    or<br>
+<br>
+      gdb $DIR/.in_place/x86-linux/memcheck<br>
 <br>
 (3) Do "handle SIGSEGV SIGILL nostop noprint" in GDB to prevent GDB from<br>
     stopping on a SIGSEGV or SIGILL:<br>
@@ -88,6 +121,8 @@ without too much problem by following these steps:<br>
 <br>
     (gdb) run pwd<br>
 <br>
+Steps (1)--(3) can be put in a .gdbinit file, but any directory names must<br>
+be fully expanded (ie. not an environment variable).<br>
 <br>
 Self-hosting<br>
 ~~~~~~~~~~~~<br>
@@ -118,6 +153,9 @@ which helps a lot.<br>
 At the time of writing the allocator is not annotated with client requests<br>
 so Memcheck is not as useful as it could be.  It also has not been tested<br>
 much, so don't be surprised if you hit problems.<br>
+<br>
+When using self-hosting with an outer callgrind tool, use '--pop-on-jump'<br>
+(on the outer). Otherwise, callgrind has much higher memory requirements. <br>
 <br>
 <br>
 Printing out problematic blocks<br>
