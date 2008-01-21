@@ -1,13 +1,13 @@
 include $(top_srcdir)/Makefile.tool.am
 
 noinst_PROGRAMS = 
-if VG_X86_LINUX
+if VGP_X86_LINUX
 noinst_PROGRAMS += embla-x86-linux
 endif
-if VG_AMD64_LINUX
+if VGP_AMD64_LINUX
 noinst_PROGRAMS += embla-amd64-linux
 endif
-if VG_PPC32_LINUX
+if VGP_PPC32_LINUX
 noinst_PROGRAMS += embla-ppc32-linux
 endif
 
