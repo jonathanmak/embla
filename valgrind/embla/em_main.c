@@ -43,19 +43,26 @@
 #define  DO_CHECK           1
 #define  INSTR_LVL_DEPS     1
 #define  TRACE_REG_DEPS     0
+#define  RECORD_CF_EDGES    1
 
-#define  DEBUG_PRINT        0
+#define  DEBUG_PRINT        1
 #define  EMPTY_RECORD       0
 #define  DO_NOT_INSTRUMENT  0
 #define  MOCK_RTENTRY       0
 #define  FULL_CONTOURS      0
-#define INSTRUMENT_GC       0
+#define  INSTRUMENT_GC      0
+#define  DUMP_TRACE_PILE    0
+
+// Temporary definitions
+
+unsigned interesting_address=0;
 
 
 //
 // Other includes and definitions
 //
 
+#include "pub_tool_vki.h"
 #include "pub_tool_basics.h"
 #include "pub_tool_debuginfo.h"
 #include "pub_tool_libcfile.h"
@@ -78,6 +85,7 @@
 
 #define  RT_IDX_BITS                        3
 #define  RT_ENTRIES_PER_LINE (1<<RT_IDX_BITS)  // must be power of 2
+#define  PRED_ENTRIES_PER_LINE 4
 
 #define  BITS_PER_REF      0
 #define  BITS_PER_FRAG    12
@@ -113,7 +121,7 @@
 
 // #define IFINS(n,s) if( instructions == n ) { s; }
 #define IFINS(n,s)                    // empty
-#define IFINS1(s) if( instructions == 19306337 ) { s; }
+#define IFINS1(s) // if( instructions == 19306337 ) { s; }
 
 #if INSTR_LVL_DEPS
 #define N_INSTR_DEPS 4
@@ -148,13 +156,14 @@ static unsigned did_gc=0;
 #define DF_GET_TFLAG(k) (k%DF_N_EFLAGS)
 
 #define  CONT_LEN         1024
-#define  FULL_CONTOURS    0
 
 #define N_SMARKS          1000000
 #define N_STACK_FRAMES    1000000
 #define N_TRACE_RECS     40000000
 
+#if FULL_CONTOURS
 static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
+#endif
 
 #define  SF_HIDDEN        1   // The function owning the frame is HIDDEN
 #define  SF_STR_HIDDEN    2   // STRongly HIDDEN; callees inherit the property
@@ -202,9 +211,9 @@ static StatData
 
 static unsigned int translations = 0;
 static ICount instructions = 0;
-static unsigned millions;
 
 const char * trace_file_name = "embla.trace";
+const char * edge_file_name = "embla.edges";
 
 typedef
    struct _RTEntry {
@@ -228,16 +237,33 @@ static RTEntry mock_rtentry = {"mock", "", 0, 'o', 0, 0, 'c', 'c', 0, 0, 0, NULL
  * Statment, instruction and line info                                          *
  *                                                                              *
  ********************************************************************************/
+#if RECORD_CF_EDGES
+typedef struct _LineList {
+   struct _LineInfo *line;
+   struct _LineList *next;
+} LineList;
+#endif
 
 typedef struct _LineInfo {
    RTEntry  *entries[RT_ENTRIES_PER_LINE];
+#if RECORD_CF_EDGES
+   LineList *pred[PRED_ENTRIES_PER_LINE];
+#endif
    unsigned line;
    char    *file;
    char    *func;
    struct _LineInfo *next;
 } LineInfo;
 
+#if RECORD_CF_EDGES
+
+static LineInfo dummy_line_info = { { }, { }, 0, "", "", NULL };
+
+#else
+
 static LineInfo dummy_line_info = { { }, 0, "", "", NULL };
+
+#endif
 
 #if INSTR_LVL_DEPS
 typedef struct _InstrInfoList {
@@ -380,13 +406,22 @@ typedef
      // struct _StackFrame *parent;
      TraceRec *call_header;
      StackMark *stack_mark;
+#if RECORD_CF_EDGES
+     LineInfo *current_line;
+#endif
    }
    StackFrame;
 
 static StackFrame stack_base[N_STACK_FRAMES] =
        {
-         {(unsigned int) -1, /* 0, */ 0, 0, NULL, smarks} // initializing the first
+         // initializing the first
+         {(unsigned int) -1, /* 0, */ 0, 0, NULL, smarks
+#if RECORD_CF_EDGES
+         , NULL
+#endif
+         } 
        };
+
 static StackFrame * current_stack_frame = stack_base;
 
 /* Relation between the trace pile and the stack:
@@ -635,6 +670,18 @@ static void getDebugInfo(Addr32 addr, Char file[FILE_LEN], Char fn[FN_LEN], UInt
    }
 }
 
+#if 0
+static void logTranslation( Addr32 addr )
+{
+  Char file[FILE_LEN], func[FN_LEN];
+  UInt line;
+
+  getDebugInfo( addr, file, func, &line );
+
+  DPRINT3( "%llu: %s %u\n", instructions, file, line );
+}
+#endif
+
 static LineInfo *line_table[RESULT_ENTRIES];
 
 static LineInfo *mk_line_info( Addr32 i_addr )
@@ -662,6 +709,11 @@ static LineInfo *mk_line_info( Addr32 i_addr )
       for( i=0; i<RT_ENTRIES_PER_LINE; i++ ) {
          info->entries[i] = NULL;
       }
+#if RECORD_CF_EDGES
+      for( i=0; i<PRED_ENTRIES_PER_LINE; i++ ) {
+         info->pred[i] = NULL;
+      }
+#endif
       info->line = line;
       info->file = i_file;
       info->func = intern_string( func );
@@ -689,10 +741,12 @@ static InstrInfo *mk_i_info(InstrInfo *curr, Addr32 i_addr, unsigned i_len)
    ii_chunk[ii_idx].line      = mk_line_info( i_addr );
 
 #if INSTR_LVL_DEPS
-   int i;
+   {
+       int i;
 
-   for( i=0; i<N_INSTR_DEPS; i++ ) {
-      ii_chunk[ii_idx].i_deps[i] = NULL;
+       for( i=0; i<N_INSTR_DEPS; i++ ) {
+          ii_chunk[ii_idx].i_deps[i] = NULL;
+       }
    }
 #endif
 
@@ -709,10 +763,13 @@ static Bool em_process_cmd_line_option(Char* arg)
 {
   VG_STR_CLO(arg, "--trace-file", trace_file_name)
   else
+  VG_STR_CLO(arg, "--edge-file", edge_file_name)
+  else
     return False;
-  
+#if 0
   tl_assert(trace_file_name);
   tl_assert(trace_file_name[0]);
+#endif
   return True;
 }
 
@@ -720,6 +777,7 @@ static void em_print_usage(void)
 {  
    VG_(printf)(
 "    --trace-file=<name>       store trace data in <name> [embla.trace]\n"
+"    --edge-file=<name>        store control flow data in <name> [embla.edges]\n"
    );
 }
 
@@ -731,6 +789,7 @@ static void em_print_debug_usage(void)
  * Stack mark handling                                *
  ******************************************************/
 
+#if 0
 static void adjust_shadow_sp(Addr32 sp)
 {
     if( lowest_shadow_sp > sp ) {
@@ -740,6 +799,7 @@ static void adjust_shadow_sp(Addr32 sp)
         highest_shadow_sp = sp;
     }
 }
+#endif
 
 #if EMPTY_RECORD
 
@@ -835,6 +895,8 @@ static void checkIfHidden(StackFrame *frame, Addr32 addr, Bool no_recheck)
     }
 }
 
+#if FULL_CONTOURS
+
 static int copyFnName(Char *cont, int idx, Addr32 addr, int hidden) 
 {
 
@@ -862,6 +924,8 @@ static void addNULL(Char *cont, int idx)
 {
     cont[idx] = 0;
 }
+
+#endif
 
 /**********************************
  * Compaction routines            *
@@ -1181,6 +1245,8 @@ static void compact(void)
    
 }
 
+#if DUMP_TRACE_PILE
+
 static void dump_trace_pile(void)
 {
    TraceRec *rec;
@@ -1228,6 +1294,7 @@ static void dump_trace_pile(void)
    }
 }
          
+#endif
 
 #define N_LEAST 4000000
 static unsigned max_use = N_TRACE_RECS - 100000,
@@ -1413,6 +1480,10 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
 
    // IFDID( BONK( "chain... " ); )
 
+//   if( instructions >= 11467289 && instructions <= 11467290 ) {
+//      BONK( "Got here!\n" );
+//   }
+
    while( entry!=NULL && ( entry->t_line != t_line || entry->code != code ) ) {
       PROFILE( getResultEntry_entry++; )       // counting
       entry = entry->next;
@@ -1436,6 +1507,12 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
        entry->n_waw  = 0;
        entry->next = h_info->line->entries[hash_value];
        h_info->line->entries[hash_value] = entry;
+
+       // if( instructions >= 11467289 && instructions <= 11467290 ) {
+       //     DPRINT3( "Made new entry: %u <-%c- %u ", entry->h_line, entry->d_inf, entry->t_line );
+       //     DPRINT2( "in %s (%s)\n", entry->h_file, entry->h_fn );
+       // }
+
    }
    // BONK( makeTitle( entry ) );
    // if( h_info->line->file != t_info->line->file ||
@@ -1738,12 +1815,19 @@ void recordLoad(StmInfo *s_info, Addr32 addr )
     RTEntry     *res_entry;
     int          size = s_info->size;
     InstrInfo   *i_info = s_info->i_info;
+#if TRACE_REG_DEPS
     int          static_sr = ( s_info->flags & SI_SAVE_REST ) != 0;
+#endif
 
     // BONK( "L" );
     // validateRegisterMap( );
     IFINS1( BONK( "Load\n" ) )
 
+    if( addr == interesting_address ) {
+      DPRINT3( "Loaded at %s:&u by instruction %llu.\n", 
+                i_info->line->file, i_info->line->line, instructions );
+      interesting_address = 0;
+    }
 
     // save/restore info in flags; if flags&SI_SAVE_REST == 1 we have a potential restore
 
@@ -1819,7 +1903,9 @@ void recordStore( StmInfo *s_info, Addr32 addr )
 {
     int          size   = s_info->size;
     InstrInfo   *i_info = s_info->i_info;
+#if TRACE_REG_DEPS
     int          static_sr = s_info->flags & SI_SAVE_REST;
+#endif
     RefInfo     *refp;
     RTEntry     *res_entry;
     EventList   *ev_list, *ev_next;
@@ -2126,6 +2212,9 @@ void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target)
     newFrame->flags       = 0;
     newFrame->call_header = newTR;
     newFrame->stack_mark  = smarks+topMark;
+#if RECORD_CF_EDGES
+    newFrame->current_line = NULL;
+#endif
 
     current_stack_frame = newFrame;
 
@@ -2199,39 +2288,77 @@ void recordRet(Addr32 sp, Addr32 target)
 
 }
 
+#if RECORD_CF_EDGES
+
+static VG_REGPARM(1)
+void recordEdge( LineInfo *line ) // Need to know line, the line of the current instruction
+{
+    static LineList *free_edge = NULL;
+    static int       n_free_edges = 0;
+    const int        block_size = 100000;
+
+    LineList *ll, **llp;
+    LineInfo *prev_line = current_stack_frame->current_line;
+
+    if( line == prev_line ) return;
+    current_stack_frame->current_line = line;
+    if( prev_line == NULL ) return;
+    
+    llp = &( line->pred[prev_line->line & (PRED_ENTRIES_PER_LINE-1)] );
+    for( ll = *llp; ll != NULL && ll->line != prev_line; ll = ll->next ) ;
+
+    if( ll == NULL ) {
+        if( n_free_edges == 0 ) {
+            free_edge = (LineList *) VG_(calloc)( block_size, sizeof(LineList) );
+            check( free_edge != NULL, "Out of memory for CF edges!\n" );
+            n_free_edges = block_size;
+        }
+        ll = free_edge;
+        free_edge++;
+        n_free_edges--;
+
+        ll->next = *llp;
+        ll->line = prev_line;
+        *llp = ll;
+    }
+
+}
+
+#endif
+
 #endif
 
 //
 // Utility functions for emitting assignments and dirty helper calls
 //
 
-static IRExpr* emitIRAssign(IRBB *bbOut, IRExpr *exp)
+static IRExpr* emitIRAssign(IRSB *bbOut, IRExpr *exp)
 {
     IRTemp t = newIRTemp( bbOut->tyenv, Ity_I32 );
-    addStmtToIRBB( bbOut, IRStmt_Tmp( t, exp ) );
-    return IRExpr_Tmp( t );
+    addStmtToIRSB( bbOut, IRStmt_WrTmp( t, exp ) );
+    return IRExpr_RdTmp( t );
 }
 
-static void emitDC_1(IRBB *bbOut, HChar *hname, void *haddr, IRExpr *exp1)
+static void emitDC_1(IRSB *bbOut, HChar *hname, void *haddr, IRExpr *exp1)
 {
     IRExpr **args = mkIRExprVec_1( exp1 );
     IRDirty *dy = unsafeIRDirty_0_N( 1, hname, haddr, args );
-    addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
+    addStmtToIRSB( bbOut, IRStmt_Dirty(dy) );
 }
 
-static void emitDC_2(IRBB *bbOut, HChar *hname, void *haddr, IRExpr *exp1, IRExpr *exp2)
+static void emitDC_2(IRSB *bbOut, HChar *hname, void *haddr, IRExpr *exp1, IRExpr *exp2)
 {
     IRExpr **args = mkIRExprVec_2( exp1, exp2 );
     IRDirty *dy = unsafeIRDirty_0_N( 2, hname, haddr, args );
-    addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
+    addStmtToIRSB( bbOut, IRStmt_Dirty(dy) );
 }
 
-static void emitDC_3(IRBB *bbOut, HChar *hname, void *haddr, IRExpr *exp1, IRExpr *exp2,
+static void emitDC_3(IRSB *bbOut, HChar *hname, void *haddr, IRExpr *exp1, IRExpr *exp2,
                      IRExpr *exp3)
 {
     IRExpr **args = mkIRExprVec_3( exp1, exp2, exp3 );
     IRDirty *dy = unsafeIRDirty_0_N( 3, hname, haddr, args );
-    addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
+    addStmtToIRSB( bbOut, IRStmt_Dirty(dy) );
 }
 
 static IRExpr* const32( unsigned val )
@@ -2243,13 +2370,14 @@ static IRExpr* const32( unsigned val )
 // Code instrumentation functions
 //
 
-static int sizeofIRExpr( IRBB *bb, IRExpr *exp )
+#if 0
+static int sizeofIRExpr( IRSB *bb, IRExpr *exp )
 {
-    return sizeofIRType( typeOfIRExpr( bb, exp ) );
+    return sizeofIRType( typeOfIRExpr( bb->tyenv, exp ) );
 }
+#endif
 
-
-static void instrumentLoad( IRBB *bbOut, InstrInfo *i_info, IRExpr *exp_addr, 
+static void instrumentLoad( IRSB *bbOut, InstrInfo *i_info, IRExpr *exp_addr, 
                             UChar size, UChar flags )
 {
     StmInfo *s_info = mkStmInfo( i_info, 0, size, flags );
@@ -2258,7 +2386,7 @@ static void instrumentLoad( IRBB *bbOut, InstrInfo *i_info, IRExpr *exp_addr,
     emitDC_2( bbOut, "recordLoad", &recordLoad, exp_si, exp_addr );
 }
 
-static void instrumentStore( IRBB *bbOut, InstrInfo *i_info, IRExpr *exp_addr, UChar size,
+static void instrumentStore( IRSB *bbOut, InstrInfo *i_info, IRExpr *exp_addr, UChar size,
                              UChar flags )
 {
     StmInfo *s_info = mkStmInfo( i_info, 0, size, flags );
@@ -2268,21 +2396,21 @@ static void instrumentStore( IRBB *bbOut, InstrInfo *i_info, IRExpr *exp_addr, U
 
 #if TRACE_REG_DEPS
 
-static void instrumentGet( IRBB *bbOut, InstrInfo *i_info, int offset, int size, UChar flags )
+static void instrumentGet( IRSB *bbOut, InstrInfo *i_info, int offset, int size, UChar flags )
 {
     StmInfo *s_info = mkStmInfo( i_info, offset, size, flags );
     IRExpr *exp_si  = const32( (UInt) s_info );
     emitDC_1( bbOut, "recordGet", &recordGet, exp_si );
 }
 
-static void instrumentPut( IRBB *bbOut, InstrInfo *i_info, int offset, int size, UChar flags )
+static void instrumentPut( IRSB *bbOut, InstrInfo *i_info, int offset, int size, UChar flags )
 {
     StmInfo *s_info = mkStmInfo( i_info, offset, size, flags );
     IRExpr *exp_si  = const32( (UInt) s_info );
     emitDC_1( bbOut, "recordPut", &recordPut, exp_si );
 }
 
-static void instrumentGetI( IRBB *bbOut, InstrInfo *i_info, IRExpr *exp, Int size, UChar flags )
+static void instrumentGetI( IRSB *bbOut, InstrInfo *i_info, IRExpr *exp, Int size, UChar flags )
 {
     IRArray    *arr = exp->Iex.GetI.descr;
     int        bias = exp->Iex.GetI.bias;
@@ -2292,7 +2420,7 @@ static void instrumentGetI( IRBB *bbOut, InstrInfo *i_info, IRExpr *exp, Int siz
     emitDC_2( bbOut, "recordGetI", &recordGetI, exp_si, exp->Iex.GetI.ix );
 }
 
-static void instrumentPutI( IRBB *bbOut, InstrInfo *i_info, IRStmt *stm, Int size, UChar flags )
+static void instrumentPutI( IRSB *bbOut, InstrInfo *i_info, IRStmt *stm, Int size, UChar flags )
 {
     IRArray    *arr = stm->Ist.PutI.descr;
     int        bias = stm->Ist.PutI.bias;
@@ -2308,48 +2436,48 @@ static void instrumentPutI( IRBB *bbOut, InstrInfo *i_info, IRStmt *stm, Int siz
 
 #if 0
 
-static void emitIncrementGlobal(IRBB *bbOut, void *addr, unsigned int amount)
+static void emitIncrementGlobal(IRSB *bbOut, void *addr, unsigned int amount)
 {
     IRTemp tmp_instrs_old = newIRTemp( bbOut->tyenv, Ity_I32 );
     IRTemp tmp_instrs_new = newIRTemp( bbOut->tyenv, Ity_I32 );
-    IRExpr *exp_instrs_new = IRExpr_Tmp( tmp_instrs_new );
+    IRExpr *exp_instrs_new = IRExpr_RdTmp( tmp_instrs_new );
 
     IRExpr *exp_instr_addr = IRExpr_Const( IRConst_U32( (UInt) addr ) );
     IRExpr *exp_instrs = IRExpr_Load( Iend_LE, Ity_I32, exp_instr_addr );
     IRExpr *exp_amount = IRExpr_Const( IRConst_U32( amount ) );
-    IRExpr *exp_add = IRExpr_Binop( Iop_Add32, IRExpr_Tmp( tmp_instrs_old ), exp_amount );
+    IRExpr *exp_add = IRExpr_Binop( Iop_Add32, IRExpr_RdTmp( tmp_instrs_old ), exp_amount );
 
-    addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_instrs_old, exp_instrs ) );
-    addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_instrs_new, exp_add ) );
-    addStmtToIRBB( bbOut, IRStmt_Store( Iend_LE, exp_instr_addr, exp_instrs_new ) );
+    addStmtToIRSB( bbOut, IRStmt_WrTmp( tmp_instrs_old, exp_instrs ) );
+    addStmtToIRSB( bbOut, IRStmt_WrTmp( tmp_instrs_new, exp_add ) );
+    addStmtToIRSB( bbOut, IRStmt_Store( Iend_LE, exp_instr_addr, exp_instrs_new ) );
 }
 
 #else
 
-static void emitIncrementGlobal(IRBB *bbOut, void *addr, unsigned int amount)
+static void emitIncrementGlobal(IRSB *bbOut, void *addr, unsigned int amount)
 {
     IRExpr *exp_load = IRExpr_Load( Iend_LE, Ity_I32, const32( (UInt) addr ) );
     IRExpr *exp_ocnt = emitIRAssign( bbOut, exp_load );
     IRExpr *exp_add  = IRExpr_Binop( Iop_Add32, exp_ocnt, const32( amount ) );
     IRExpr *exp_ncnt = emitIRAssign( bbOut, exp_add );
-    addStmtToIRBB( bbOut, IRStmt_Store( Iend_LE, const32( (UInt) addr ), exp_ncnt ) );
+    addStmtToIRSB( bbOut, IRStmt_Store( Iend_LE, const32( (UInt) addr ), exp_ncnt ) );
 }
 
 #endif
 
-static void emitSpChange(IRBB *bbOut)
+static void emitSpChange(IRSB *bbOut)
 {
     HChar *hname = "recordSpChange";
     void  *haddr = &recordSpChange;
 
     IRTemp tmp_sp = newIRTemp(bbOut->tyenv, Ity_I32);
-    IRExpr *exp_sp = IRExpr_Tmp( tmp_sp );
+    IRExpr *exp_sp = IRExpr_RdTmp( tmp_sp );
     IRExpr *exp_get_sp = IRExpr_Get( OFFSET_x86_ESP, Ity_I32 );
     IRExpr **args = mkIRExprVec_1( exp_sp );
     IRDirty *dy = unsafeIRDirty_0_N( 1, hname, haddr, args );
     
-    addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_sp, exp_get_sp ) );
-    addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
+    addStmtToIRSB( bbOut, IRStmt_WrTmp( tmp_sp, exp_get_sp ) );
+    addStmtToIRSB( bbOut, IRStmt_Dirty(dy) );
 }
 
 
@@ -2357,7 +2485,7 @@ static void emitSpChange(IRBB *bbOut)
 // instrumentExit is called when we find and Exit in the block AND for the
 // implicit Exit at the end of each block
 
-static void instrumentExit(IRBB *bbOut, IRJumpKind jk, InstrInfo *i_info, IRExpr *tgt,
+static void instrumentExit(IRSB *bbOut, IRJumpKind jk, InstrInfo *i_info, IRExpr *tgt,
                            unsigned int loc_instr)
 {
     switch( jk ) {
@@ -2378,8 +2506,8 @@ static void instrumentExit(IRBB *bbOut, IRJumpKind jk, InstrInfo *i_info, IRExpr
              void  *haddr = &recordRet;
              IRTemp tmp_sp = newIRTemp(bbOut->tyenv, Ity_I32);
              IRTemp tmp_pc = newIRTemp(bbOut->tyenv, Ity_I32);
-             IRExpr *exp_sp = IRExpr_Tmp( tmp_sp );
-             IRExpr *exp_pc = IRExpr_Tmp( tmp_pc );
+             IRExpr *exp_sp = IRExpr_RdTmp( tmp_sp );
+             IRExpr *exp_pc = IRExpr_RdTmp( tmp_pc );
              IRExpr *exp_get_sp = IRExpr_Get( OFFSET_x86_ESP, Ity_I32 );
              IRExpr **args = mkIRExprVec_2( exp_sp, exp_pc );
              IRDirty *dy = unsafeIRDirty_0_N( 2, hname, haddr, args );
@@ -2388,9 +2516,9 @@ static void instrumentExit(IRBB *bbOut, IRJumpKind jk, InstrInfo *i_info, IRExpr
                 VG_(tool_panic)("Ret not at end of BB!");
              }
 
-             addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_sp, exp_get_sp ) );
-             addStmtToIRBB( bbOut, IRStmt_Tmp( tmp_pc, tgt ) );
-             addStmtToIRBB( bbOut, IRStmt_Dirty(dy) );
+             addStmtToIRSB( bbOut, IRStmt_WrTmp( tmp_sp, exp_get_sp ) );
+             addStmtToIRSB( bbOut, IRStmt_WrTmp( tmp_pc, tgt ) );
+             addStmtToIRSB( bbOut, IRStmt_Dirty(dy) );
           }
           break;
 
@@ -2416,7 +2544,7 @@ static int tempUsed( IRExpr *expr, IRTemp t )
     switch( expr->tag ) {
       case Iex_Get:   return 0;
       case Iex_GetI:  return 0;
-      case Iex_Tmp:   return t == expr->Iex.Tmp.tmp;
+      case Iex_RdTmp:   return t == expr->Iex.RdTmp.tmp;
       case Iex_Binop: return tempUsed( expr->Iex.Binop.arg1, t ) 
                           || tempUsed( expr->Iex.Binop.arg2, t );
       case Iex_Unop:  return tempUsed( expr->Iex.Unop.arg, t );
@@ -2443,7 +2571,7 @@ static int tempUsed( IRExpr *expr, IRTemp t )
 
 // We need to deal with SR_MOV_SP as well!!!
 
-static int sr_check( IRBB* bbIn, int bbIn_idx, IRTemp t, SRCode sr_code, int size )
+static int sr_check( IRSB* bbIn, int bbIn_idx, IRTemp t, SRCode sr_code, int size )
 {
     int          i;
     IRStmt  *stIn;
@@ -2470,11 +2598,11 @@ static int sr_check( IRBB* bbIn, int bbIn_idx, IRTemp t, SRCode sr_code, int siz
               break;
           case Ist_Put:
               tmpExp = stIn->Ist.Put.data;
-              if( state==2 && tmpExp->tag == Iex_Tmp && tmpExp->Iex.Tmp.tmp == t
+              if( state==2 && tmpExp->tag == Iex_RdTmp && tmpExp->Iex.RdTmp.tmp == t
                   && sizeofIRType( typeOfIRExpr( bbIn->tyenv, tmpExp ) ) == size ) {
                   state = 4;
                   offset = i;
-              } else if( state==5 && tmpExp->tag == Iex_Tmp && tmpExp->Iex.Tmp.tmp == t
+              } else if( state==5 && tmpExp->tag == Iex_RdTmp && tmpExp->Iex.RdTmp.tmp == t
                      && sizeofIRType( typeOfIRExpr( bbIn->tyenv, tmpExp ) ) == size ) {
                   state = 6;
                   offset = i;
@@ -2484,7 +2612,7 @@ static int sr_check( IRBB* bbIn, int bbIn_idx, IRTemp t, SRCode sr_code, int siz
               break;
           case Ist_PutI:
               tmpExp = stIn->Ist.PutI.data;
-              if( state==2 && tmpExp->tag == Iex_Tmp && tmpExp->Iex.Tmp.tmp == t 
+              if( state==2 && tmpExp->tag == Iex_RdTmp && tmpExp->Iex.RdTmp.tmp == t 
                   && sizeofIRType( typeOfIRExpr( bbIn->tyenv, tmpExp ) ) == size ) {
                   state = 4;
                   offset = i;
@@ -2492,14 +2620,14 @@ static int sr_check( IRBB* bbIn, int bbIn_idx, IRTemp t, SRCode sr_code, int siz
                   return 0;
               }
               break;
-          case Ist_Tmp:
-              if( tempUsed( stIn->Ist.Tmp.data, t ) ) {
+          case Ist_WrTmp:
+              if( tempUsed( stIn->Ist.WrTmp.data, t ) ) {
                   return 0;
               }
               break;
           case Ist_Store:
               tmpExp = stIn->Ist.Store.data;
-              if( state==1 && tmpExp->tag == Iex_Tmp && tmpExp->Iex.Tmp.tmp == t 
+              if( state==1 && tmpExp->tag == Iex_RdTmp && tmpExp->Iex.RdTmp.tmp == t 
                   && sizeofIRType( typeOfIRExpr( bbIn->tyenv, tmpExp ) ) == size ) {
                   state = 3;
                   offset = i;
@@ -2520,7 +2648,7 @@ static int sr_check( IRBB* bbIn, int bbIn_idx, IRTemp t, SRCode sr_code, int siz
               return 0;
 #endif
               break;
-          case Ist_MFence:
+          case Ist_MBE:
               break;
           case Ist_Exit:
               if( tempUsed( stIn->Ist.Exit.guard, t ) ) {
@@ -2534,21 +2662,24 @@ static int sr_check( IRBB* bbIn, int bbIn_idx, IRTemp t, SRCode sr_code, int siz
 
 #endif
 
-static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
+static IRSB* em_instrument(IRSB* bbIn, VexGuestLayout* layout,
 			   Addr64 orig_addr_noredir, VexGuestExtents * vge,
                            IRType gWordTy, IRType hWordTy)
 {
-    IRBB      *bbOut;
+    IRSB      *bbOut;
     int       bbIn_idx;
     IRStmt    *stIn;
     Addr32    guestIAddr = 0;
     Int       guestILen  = 0;
     unsigned int loc_instr = 0;
-    InstrInfo *currII;
+    InstrInfo *currII=NULL;
     SRCode     sr_code = SR_NONE;
     int        sr_index = -1; 
     IRExpr    *tmpExpr;
-    int       ref_size, offset;
+    int       ref_size;
+#if TRACE_REG_DEPS
+    int       offset;
+#endif
     UChar     flags = 0;
 
 #if TRACE_REG_DEPS
@@ -2557,9 +2688,9 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
 
     translations++;
 
-    bbOut           = emptyIRBB();                     // from libvex_ir.h
-    bbOut->tyenv    = dopyIRTypeEnv(bbIn->tyenv);      // d:o
-    bbOut->next     = dopyIRExpr(bbIn->next);          // d:o
+    bbOut           = emptyIRSB();                     // from libvex_ir.h
+    bbOut->tyenv    = deepCopyIRTypeEnv(bbIn->tyenv);      // d:o
+    bbOut->next     = deepCopyIRExpr(bbIn->next);          // d:o
     bbOut->jumpkind = bbIn->jumpkind;
 
     // BONK( "." );
@@ -2582,6 +2713,11 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
              loc_instr++;
 #if PRECISE_ICOUNT
              emitIncrementGlobal( bbOut, &instructions, 1 );
+#endif
+
+#if RECORD_CF_EDGES
+             emitDC_1( bbOut, "recordEdge", recordEdge, 
+                       const32( (UInt) mk_line_info(guestIAddr) ) );
 #endif
              currII = NULL;
              break;
@@ -2627,10 +2763,10 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
              instrumentPut( bbOut, currII, stIn, ref_size, flags );
 #endif
              break;
-         case Ist_Tmp:
+         case Ist_WrTmp:
              // This is an assignment to a temp, so it should be instrumented
              // if the rhs is a Load, GET or GETI
-             tmpExpr = stIn->Ist.Tmp.data;
+             tmpExpr = stIn->Ist.WrTmp.data;
              switch( tmpExpr->tag ) {
                case Iex_Load:
                  currII = mk_i_info( currII, guestIAddr, guestILen );
@@ -2638,7 +2774,7 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
 #if TRACE_REG_DEPS
                  flags = 0;
                  if( sr_index == -1 ) {
-                    IRTemp t = stIn->Ist.Tmp.tmp;
+                    IRTemp t = stIn->Ist.WrTmp.tmp;
                     offset = sr_check( bbIn, bbIn_idx, t, SR_RESTORE, ref_size );
                     if( offset!=0 ) { 
                        sr_index = offset;
@@ -2656,7 +2792,7 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
                  flags = 0;
                  // We never SAVE the stack pointer!
                  if( sr_index == -1 ) {
-		    IRTemp t = stIn->Ist.Tmp.tmp;
+		    IRTemp t = stIn->Ist.WrTmp.tmp;
                     SRCode code = tmpExpr->Iex.Get.offset==OFFSET_x86_ESP ? SR_MOV_SP:SR_SAVE;
                     offset = sr_check( bbIn, bbIn_idx, t, code, ref_size );
                     if( offset != 0 ) { 
@@ -2672,7 +2808,7 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
                  ref_size = sizeofIRType( tmpExpr->Iex.GetI.descr->elemTy );
                  flags = 0;
                  if( sr_index == -1 ) {
-		    IRTemp t = stIn->Ist.Tmp.tmp;
+		    IRTemp t = stIn->Ist.WrTmp.tmp;
                     offset = sr_check( bbIn, bbIn_idx, t, SR_SAVE, ref_size );
                     if( offset != 0 ) { 
                       sr_index = offset;
@@ -2700,7 +2836,7 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
          case Ist_Dirty:
              // This should maybe be instrumented, but we'll leave it for later
              break;
-         case Ist_MFence:
+         case Ist_MBE:
              break;
          default:
              VG_(tool_panic)("Unknown statement type!");
@@ -2708,7 +2844,7 @@ static IRBB* em_instrument(IRBB* bbIn, VexGuestLayout* layout,
 
        }
 #endif
-       addStmtToIRBB( bbOut, stIn );
+       addStmtToIRSB( bbOut, stIn );
     }
 #if !DO_NOT_INSTRUMENT
 #if !PRECISE_ICOUNT
@@ -2732,19 +2868,20 @@ static void printResultTable(const Char * traceFileName)
    RTEntry * result_array = VG_(malloc)(sizeof(RTEntry) * results_buf_size);
    SizeT num_results = 0;
    int fd = -1;
+   LineInfo *line_info;
 
    tl_assert(result_array);
    for( i=0; i<RESULT_ENTRIES; i++ ) {
      // DPRINT1( "%d", i );
-     if( line_table[i] != NULL )
+     for( line_info = line_table[i]; line_info != NULL; line_info = line_info->next )
        for( j=0; j<RT_ENTRIES_PER_LINE; j++ ) {
          // BONK( "|" );
-         for( entry=line_table[i]->entries[j]; entry != NULL; entry=entry->next ) {
+         for( entry=line_info->entries[j]; entry != NULL; entry=entry->next ) {
            // BONK( "." );
+           // DPRINT1( "%s\n", ( makeTitle( entry ) ) );
            if ((VG_(strcmp)(entry->h_file, "???") != 0) &&
 	       (VG_(strcmp)(entry->h_fn, "???") != 0))
            {
-             // DPRINT1( "%s\n", ( makeTitle( entry ) ) );
              ++num_results;
              if (num_results >= results_buf_size)
              {
@@ -2773,7 +2910,7 @@ static void printResultTable(const Char * traceFileName)
        VG_(message)(Vg_UserMsg, "Trace file could not be opened");
        return;
      }
-     fd = sres.val;
+     fd = sres.res;
    }
    for (i = 0; i < num_results; ++i)
    {
@@ -2787,6 +2924,90 @@ static void printResultTable(const Char * traceFileName)
    }
    if (VG_(strcmp)(traceFileName, "-") != 0)
      VG_(close)( fd );
+   VG_(free)( result_array );
+}
+
+typedef struct {
+   LineInfo *from,*to;
+} CFEdge;
+
+static Int cf_edge_compare( CFEdge *a, CFEdge *b )
+{
+   int x;
+
+   x = VG_(strcmp)( a->from->file, b->from->file );
+   if( x != 0 ) return x;
+
+   x = a->from->line - b->from->line;
+   if( x != 0 ) return x;
+
+   return a->to->line - b->to->line;
+}
+
+static void printCFG(const Char * cfgFileName)
+{
+   int      i,j;
+   SizeT results_buf_size = 100;
+   CFEdge * result_array = (CFEdge *) VG_(malloc)(sizeof(CFEdge) * results_buf_size);
+   SizeT num_results = 0;
+   int fd = -1;
+   LineInfo *line_info;
+   LineList *ll;
+
+   tl_assert(result_array);
+   for( i=0; i<RESULT_ENTRIES; i++ ) {
+
+     for( line_info = line_table[i]; line_info != NULL; line_info = line_info->next )
+       for( j=0; j<PRED_ENTRIES_PER_LINE; j++ ) {
+
+         for( ll = line_info->pred[j]; ll != NULL; ll = ll->next ) {
+           LineInfo *pred_line = ll->line;
+           if ((VG_(strcmp)(pred_line->file, "???") != 0) &&
+	       (VG_(strcmp)(pred_line->func, "???") != 0))
+           {
+             ++num_results;
+             if (num_results >= results_buf_size)
+             {
+               results_buf_size *= 2;
+               result_array = (CFEdge *) VG_(realloc)(result_array,
+                                                      sizeof(CFEdge) * results_buf_size);
+               tl_assert(result_array);
+             }
+             result_array[num_results - 1].from = pred_line;
+             result_array[num_results - 1].to   = line_info;
+           }
+         }
+       }
+
+   }
+
+   VG_(ssort)((void *) result_array, num_results, sizeof(CFEdge),
+	      (Int (*)(void *, void *)) cf_edge_compare);
+
+   if (VG_(strcmp)(cfgFileName, "-") != 0)
+   {
+      SysRes sres;
+      sres = VG_(open)((Char *) cfgFileName, 
+		       VKI_O_CREAT | VKI_O_TRUNC | VKI_O_WRONLY,
+		       VKI_S_IRUSR | VKI_S_IWUSR | VKI_S_IRGRP);
+     if( sres.isError ) {
+       VG_(message)(Vg_UserMsg, "Edge file could not be opened");
+       return;
+     }
+     fd = sres.res;
+   }
+   for (i = 0; i < num_results; ++i)
+   {
+     CFEdge *e = result_array + i;
+     VG_(sprintf)( buf, "%s %d %d\n", e->from->file, e->from->line, e->to->line );
+     if( fd != -1 )
+       VG_(write)( fd, buf, VG_(strlen)( buf ) );
+     else
+       VG_(printf)("%s", buf);
+   }
+   if( fd != -1 )
+     VG_(close)( fd );
+
 }
 
 #define smdiv(x,y) (y==0 ? 0 : x/y)
@@ -2797,6 +3018,13 @@ static void em_fini(Int exitcode)
    VG_(message)(Vg_UserMsg, "Dependency trace has finished, storing in %s",
 		trace_file_name);
    printResultTable( trace_file_name );
+
+#if RECORD_CF_EDGES
+   VG_(message)(Vg_UserMsg, "Control flow graph stored in %s",
+		edge_file_name);
+   printCFG( edge_file_name );
+#endif
+
 #if DO_PROFILE
    VG_(message)(Vg_UserMsg, "Max mem frags:    %10u (%10u bytes)", 
                             mem_table_frags, 
