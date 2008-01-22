@@ -65,8 +65,8 @@ if BUILD_MPIWRAP_PRI
 noinst_PROGRAMS       += libmpiwrap-@VG_PLATFORM_PRI@.so
 libmpiwrap-@VG_PLATFORM_PRI@.so: libmpiwrap.c
 	$(MPI_CC) $(HACKY_FLAGS_PRI) \
-		-I../include \
-		-o libmpiwrap-@VG_PLATFORM_PRI@.so libmpiwrap.c
+		-I $(srcdir)/../include \
+		-o libmpiwrap-@VG_PLATFORM_PRI@.so $(srcdir)/libmpiwrap.c
 endif
 if BUILD_MPIWRAP_SEC
 noinst_PROGRAMS       += libmpiwrap-@VG_PLATFORM_SEC@.so
