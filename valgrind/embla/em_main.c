@@ -2662,8 +2662,9 @@ static int sr_check( IRSB* bbIn, int bbIn_idx, IRTemp t, SRCode sr_code, int siz
 
 #endif
 
-static IRSB* em_instrument(IRSB* bbIn, VexGuestLayout* layout,
-			   Addr64 orig_addr_noredir, VexGuestExtents * vge,
+static IRSB* em_instrument(VgCallbackClosure* closure,
+                           IRSB* bbIn, VexGuestLayout* layout,
+			   VexGuestExtents * vge,
                            IRType gWordTy, IRType hWordTy)
 {
     IRSB      *bbOut;
@@ -2688,14 +2689,24 @@ static IRSB* em_instrument(IRSB* bbIn, VexGuestLayout* layout,
 
     translations++;
 
+
+    bbOut = deepCopyIRSBExceptStmts( bbIn );
+
+#if 0
     bbOut           = emptyIRSB();                     // from libvex_ir.h
     bbOut->tyenv    = deepCopyIRTypeEnv(bbIn->tyenv);      // d:o
     bbOut->next     = deepCopyIRExpr(bbIn->next);          // d:o
     bbOut->jumpkind = bbIn->jumpkind;
+#endif
 
     // BONK( "." );
 
     for( bbIn_idx = 0; bbIn_idx < bbIn->stmts_used; bbIn_idx++ ) {
+       if( bbIn->stmts[bbIn_idx]->tag == Ist_IMark ) break;
+       addStmtToIRSB( bbOut, bbIn->stmts[bbIn_idx] );
+    }
+
+    for( ; bbIn_idx < bbIn->stmts_used; bbIn_idx++ ) {
        stIn = bbIn->stmts[bbIn_idx];
 
 #if !DO_NOT_INSTRUMENT       
