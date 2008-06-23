@@ -44,6 +44,8 @@
 #define  INSTR_LVL_DEPS     1
 #define  TRACE_REG_DEPS     0
 #define  RECORD_CF_EDGES    1
+#define  CHECK_DIRTY_FRAGS  1
+#define  GENERATIONAL_COMPACT 1
 
 #define  DEBUG_PRINT        1
 #define  EMPTY_RECORD       0
@@ -51,7 +53,9 @@
 #define  MOCK_RTENTRY       0
 #define  FULL_CONTOURS      0
 #define  INSTRUMENT_GC      0
+#define  LIGHT_IGC          1
 #define  DUMP_TRACE_PILE    0
+#define  DUMP_MEMORY_MAP    0
 
 // Temporary definitions
 
@@ -88,14 +92,36 @@ unsigned interesting_address=0;
 #define  PRED_ENTRIES_PER_LINE 4
 
 #define  BITS_PER_REF      0
-#define  BITS_PER_FRAG    12
+#define  BITS_PER_FRAG     8
 #define  BITS_PER_ADDRESS 32
 #define  REFS_PER_FRAG    (1 << (BITS_PER_FRAG-BITS_PER_REF))
 #define  FRAGS_IN_MAP     (1 << (BITS_PER_ADDRESS-BITS_PER_FRAG))
 #define  FRAG_MASK        ((1 << BITS_PER_FRAG) - 1)
 
-#define  GET_FRAG_PTR(m,a)   m[a>>BITS_PER_FRAG]
+#define  GET_FRAG_PTR(m,a)   m[ GET_FRAG_IDX( a ) ]
+#define  GET_FRAG_IDX(a)     ( (unsigned) (a) >> BITS_PER_FRAG )
 #define  GET_REF_ADDR(fp,a)  ( &( fp->refs[(a&FRAG_MASK) >> BITS_PER_REF] ) )
+
+//
+// Dirty bits for the memory map
+//
+
+#define  FRAGS_PER_BIT            64
+#define  BITS_PER_WORD            ( sizeof( int ) * 8 )
+#define  FRAGS_PER_WORD           ( FRAGS_PER_BIT * BITS_PER_WORD )
+
+#define  FIRST_FRAG_FOR_BIT(w,b)  ( (w) * FRAGS_PER_WORD + (b) * FRAGS_PER_BIT )
+#define  WORD_OF_FRAG(f)          ( (unsigned) f / FRAGS_PER_WORD )
+#define  BIT_IN_WORD(f)           ( 1 << ( ( (unsigned) f / FRAGS_PER_BIT ) % BITS_PER_WORD ) )
+
+#define  DIRTY_WORDS              ( FRAGS_IN_MAP / FRAGS_PER_WORD )
+
+static unsigned int * dirty_map;
+
+
+//
+// Debug macros
+//
 
 #if DEBUG_PRINT
 
@@ -139,7 +165,7 @@ static void check(int c, Char *s)
 #endif
 
 
-#define IFDID( c ) {if( did_gc>0 ) { c } }
+#define IFDID( c ) {if( did_gc>1 ) { c } }
 static unsigned did_gc=0;
 
 #define DF_DIRECT 0
@@ -207,7 +233,9 @@ static StatData
    mem_table_frags = 0,
    stack_frames = 0,
    read_list_elements = 0,
-   max_read_list_elements = 0;
+   max_read_list_elements = 0,
+   dirty_frags=0,
+   all_frags=0;
 
 static unsigned int translations = 0;
 static ICount instructions = 0;
@@ -374,6 +402,7 @@ typedef
 
 static TraceRec *trace_pile;
 static TraceRec *last_trace_rec;
+static TraceRec *first_new_tr;
 
 static unsigned long int n_calls_to_newTR= 0; 
 
@@ -548,6 +577,9 @@ typedef
 typedef
    struct {
      RefInfo refs[REFS_PER_FRAG];
+#if CHECK_DIRTY_FRAGS
+     int     flag;
+#endif
    }
    MapFragment;
 
@@ -927,6 +959,34 @@ static void addNULL(Char *cont, int idx)
 
 #endif
 
+
+/**************************
+ * Dumping the memory map *
+ **************************/
+
+#if DUMP_MEMORY_MAP
+
+static void dumpMemoryMap(void)
+{
+   int        f,i;
+   EventList *p;
+
+   for( f = 0; f < FRAGS_IN_MAP; f++ ) {
+     if( map[f] != NULL ) {
+       for( i = 0; i < REFS_PER_FRAG; i++ ) {
+         DPRINT1( "%x", map[f]->refs[i].lastWrite );
+         for( p = map[f]->refs[i].lastRead; p != NULL; p = p->next ) {
+           DPRINT1( " %x", p->ev );
+         }
+         BONK( "\n" );
+       }
+     }
+   }
+}
+
+#endif
+
+
 /**********************************
  * Compaction routines            *
  **********************************/
@@ -937,7 +997,7 @@ static Event forward( Event e, int delta )
 {
    // 'e' is part of memory table
 
-   TraceRec *tp = ToTrP( e ); // tp now points at a trace rec in the pile
+   TraceRec *otp = NULL, *tp = ToTrP( e ); // tp now points at a trace rec in the pile
    TaggedPtr fp = tp->link;
    unsigned tp_flags = TP_GET_FLAGS( fp );
 
@@ -946,11 +1006,16 @@ static Event forward( Event e, int delta )
    // while( ( (1<<TPT_REG) | (1<<TPT_CLOSED) ) & ( 1<<tp_flags ) ) {
    while( tp_flags == TPT_REG || tp_flags == TPT_CLOSED ) {
       PROFILE( forward_iters++; )     // counting
+      otp = tp;
       tp = ToTrP( tp->link );
       tp_flags = TP_GET_FLAGS( tp->link );
    }
    // ToTrP(fp)->link = mkTaggedPtr2( tp, TPT_REG );
-   return mkTaggedPtr2( ToTrP( tp->link ) - delta, TP_GET_FLAGS( e ) );
+   if( tp < first_new_tr ) {
+      return mkTaggedPtr2( otp, TP_GET_FLAGS( e ) );
+   } else {
+      return mkTaggedPtr2( ToTrP( tp->link ) - delta, TP_GET_FLAGS( e ) );
+   }
 }
 
 #define N_READ_TABLE_BITS 12
@@ -1019,13 +1084,81 @@ static EventList * compactReads( EventList *in_p, int delta )
    return new_p;
 }
 
+typedef struct _OpenCalls {
+   TraceRec          *call;
+   struct _OpenCalls *next;
+} OpenCalls;
+
+OpenCalls *global_open_calls = NULL;
+
+static int numClosedSinceLast(OpenCalls *open_calls) 
+{
+   OpenCalls *c;
+   int        n=0;
+
+   // Find number of open calls closed since last compaction
+   for( c = open_calls; c != NULL && TP_GET_FLAGS( c->call->link ) == TPT_CLOSED; c = c->next ) {
+      n++;
+   }
+   check( c==NULL || TP_GET_FLAGS( c->call->link ) == TPT_OPEN, "Funny tag in open calls" );
+   return n;
+}
+
+static OpenCalls *makeReturns(OpenCalls *open_calls, int numCalls, TraceRec *new_tr)
+{
+   OpenCalls *c = open_calls, *old;
+   int        n;
+
+   for( n = 0; n < numCalls; n++ ) {
+      new_tr[n].link = mkTaggedPtr2( c->call, TPT_RET );
+      new_tr[n].i_info = NULL;
+      old = c;
+      c = c->next;
+      VG_(free)( old );
+   }
+   return c;
+}
+
+static OpenCalls *rebuildOpenCalls( OpenCalls *open_calls, StackFrame *top, TraceRec *new_tr )
+{
+   StackFrame *mid;
+   OpenCalls  *oc = open_calls;
+
+   for( mid = top; mid >= stack_base && mid->call_header >= new_tr; mid-- ) {
+   }
+   mid++; // should point at the first new stack frame
+
+   while( mid <= top ) {
+      OpenCalls *c = (OpenCalls *) VG_(calloc)( 1, sizeof(OpenCalls) );
+      check( c != NULL, "Out of memory for open calls" );
+      c->call = mid->call_header;
+      c->next = oc;
+      oc = c;
+      mid++;
+   }
+   return oc;
+}
+
+static OpenCalls *deleteOpenCalls( OpenCalls *open_calls )
+{
+   OpenCalls *p = open_calls, *q;
+
+   while( p != NULL ) {
+     q = p->next;
+     VG_(free)( p );
+     p = q;
+   }
+
+   return NULL;
+}
+
 static void compact(void)
 {
 
    TraceRec   *tp,*ap,*last_open,*last_closed;
    StackFrame *sp;
    StackMark  *mp;
-   int         delta, i, j;
+   int         delta, i, j, k, l, ff, num_closed_since;
    RefInfo    *info;
 
    // Phase 1: Determine live trace recs and find new locations. Backwards
@@ -1043,7 +1176,7 @@ static void compact(void)
    ap = last_trace_rec;
    sp = current_stack_frame;
    mp = smarks+topMark;
-   while( tp >= trace_pile ) {
+   while( tp >= first_new_tr ) {
       if( tp->i_info != NULL ) {
         switch( TP_GET_FLAGS( tp->link ) ) {
           // Regular
@@ -1071,27 +1204,39 @@ static void compact(void)
         }
       } else {
 	// Return
+        // If tp->link < first_new_tr (the call happened before the previous 
+        // compaction) we cannot just jump to the call, but instead we 
+        // must continue in order to find other returns with early calls
+
         tp->link = mkTaggedPtr2( ToTrP( tp->link ), TPT_RET_LIVE );
         tp = ToTrP( tp->link );
         check( TP_GET_FLAGS( tp->link ) == TPT_CLOSED,
                "Return header not pointing at closed call in phase 1" );
-        tp->link = mkTaggedPtr2( ap-1, TPT_REG_OR_CLOSED_LIVE );
-        ap-=2; // Return is also saved
+        if( tp >= first_new_tr ) {
+           tp->link = mkTaggedPtr2( ap-1, TPT_REG_OR_CLOSED_LIVE );
+           ap-=2; // Return is also saved
+        } else {
+           // do nothing ?
+           // terminate on next iter
+        }
       }
       tp--;
    }
-   delta = ap + 1 - trace_pile;
+   delta = ap + 1 - first_new_tr;  // I believe this
+   num_closed_since = numClosedSinceLast( global_open_calls );
+   delta -= num_closed_since;
 
    GCBONK( "done\n  Phase 2 (" ); 
    
    // Phase 2:
-   for( sp=stack_base; sp <= current_stack_frame; sp++ ) {
+   for( sp=current_stack_frame; sp >= stack_base && sp->call_header >= first_new_tr; sp-- ) {
      check( TP_GET_FLAGS( sp->call_header->link ) == TPT_OPEN, 
             "Wrong header pointed to by sp->call_header" );
      sp->call_header = ToTrP( sp->call_header->link ) - delta;
    }
    GCBONK( "stack, " );
    for( mp=smarks; mp<=smarks+topMark; mp++ ) {
+    if( mp->tr >= first_new_tr ) {
      int flag = TP_GET_FLAGS( mp->tr->link );
      InstrInfo *i_info = mp->tr->i_info;
      if( flag!=TPT_OPEN && 
@@ -1105,38 +1250,64 @@ static void compact(void)
      } else {
         mp->tr = ToTrP( mp->tr->link ) - delta;
      }
+    }
    }
    GCBONK( "marks, " );
 
 #if TRACE_REG_DEPS
    // need to do the registers as well ...
+   // must be updated to reflect generational compaction
    for( i=0; i<registerMapSize; i++ ) {
      registerMap[i].lastWrite = forward( registerMap[i].lastWrite, delta );
    }
    GCBONK( "registers, " );
 #endif
 
-   for( i=0; i<FRAGS_IN_MAP; i++ ) {
-     if( map[i] != NULL ) {
-       for( j=0; j<REFS_PER_FRAG; j++ ) {
-         info = map[i]->refs + j;
-         info->lastWrite = forward( info->lastWrite, delta );
-         info->lastRead = compactReads( info->lastRead, delta );
-#if TRACE_REG_DEPS
-         if( info->saveDesc != NULL ) {
-           SaveDesc *sd = info->saveDesc;
-           sd->frame = ToTrP( forward( (Event) sd->frame, delta ) );
-           sd->regLastWrite = forward( sd->regLastWrite, delta );
-         }
+   for( k=0; k<DIRTY_WORDS; k++ ) {
+     if( dirty_map[k] != 0 ) {
+       for( l=0; l<BITS_PER_WORD; l++ ) {
+         if( dirty_map[k] & ( 1 << l ) ) {
+           ff = FIRST_FRAG_FOR_BIT(k,l);
+           for( i = ff; i < ff+FRAGS_PER_BIT; i++ ) {
+             if( map[i] != NULL ) {
+#if CHECK_DIRTY_FRAGS
+              all_frags ++;
+              if( map[i]->flag != 0 || first_new_tr == trace_pile )
 #endif
+              {
+#if CHECK_DIRTY_FRAGS
+               dirty_frags += map[i]->flag;
+               map[i]->flag = 0;
+#endif
+               j=0;
+               while( j<REFS_PER_FRAG ) {
+                 info = map[i]->refs + j;
+                 info->lastWrite = forward( info->lastWrite, delta );
+                 info->lastRead = compactReads( info->lastRead, delta );
+#if TRACE_REG_DEPS
+                 if( info->saveDesc != NULL ) {
+                   SaveDesc *sd = info->saveDesc;
+                   sd->frame = ToTrP( forward( (Event) sd->frame, delta ) );
+                   sd->regLastWrite = forward( sd->regLastWrite, delta );
+                 }
+#endif
+                 // check( info->offsize > 0, "Negative offsize in compact" );
+                 j += info->offsize;
+               }
+             }
+            }
+           }
+         }
        }
      }
    }
    GCBONK( "map)\n  Phase 3... " ); 
+
+   // Possibly build the returns here
    
    // Phase 3:
    tp = last_trace_rec;
-   while( tp >= trace_pile ) {
+   while( tp >= first_new_tr ) {
       if( tp->i_info != NULL ) {
         switch( TP_GET_FLAGS( tp->link ) ) {
           // Dead trace recs
@@ -1154,6 +1325,7 @@ static void compact(void)
           // Live regular or closed header
           case TPT_REG_OR_CLOSED_LIVE:
             // Certainly a regular since it was not pointed at by return
+            // Do we have to distinguish TPT_REG and TPT_CLOSED?
             tp->link = mkTaggedPtr2( NULL, TPT_REG );
             break;
         }
@@ -1162,15 +1334,23 @@ static void compact(void)
         TraceRec *h_ptr = ToTrP( tp->link );
         check( TP_GET_FLAGS( tp->link ) == TPT_RET_LIVE, 
                "Return header with funny tag in phase 3" );
-        check( TP_GET_FLAGS( h_ptr->link ) == TPT_REG_OR_CLOSED_LIVE,
-               "Return header target with funny tag in phase 3" );
-        check( h_ptr < tp, "TPT_RET_LIVE pointing up in phase 3" );
-        if( h_ptr+1 != tp ) {
-          h_ptr[1].link = mkTaggedPtr2( tp, TPT_BRIDGE );
-          h_ptr[1].i_info = NULL;
+        // here we check that the call is not before previous compact
+        if( h_ptr >= first_new_tr ) {
+          check( TP_GET_FLAGS( h_ptr->link ) == TPT_REG_OR_CLOSED_LIVE,
+                 "Return header target with funny tag in phase 3" );
+          check( h_ptr < tp, "TPT_RET_LIVE pointing up in phase 3" );
+          if( h_ptr+1 != tp ) { 
+            h_ptr[1].link = mkTaggedPtr2( tp, TPT_BRIDGE ); 
+            h_ptr[1].i_info = NULL;                         
+          }
+          h_ptr->link = mkTaggedPtr2( NULL, TPT_CLOSED ); 
+        } else {
+          if( first_new_tr + num_closed_since < tp+1 ) {
+            first_new_tr[ num_closed_since ].link = mkTaggedPtr2( tp+1, TPT_BRIDGE ); 
+            first_new_tr[ num_closed_since ].i_info = NULL;
+          }
         }
-        h_ptr->link = mkTaggedPtr2( NULL, TPT_CLOSED );
-        tp = h_ptr;
+        tp = h_ptr;                                     // do it, and we'll terminate next iter
       }
       tp--;
    }
@@ -1178,11 +1358,16 @@ static void compact(void)
    GCBONK( "done\n  Phase 4... " ); 
    
    // Phase 4:
-   tp = trace_pile;
-   ap = trace_pile;
-   last_open = NULL;
-   last_closed=NULL;
-   sp = stack_base;
+   // First make new returns
+   global_open_calls = makeReturns( global_open_calls, num_closed_since, first_new_tr );
+
+   GCBONK( "made returns ... " );
+
+   tp = first_new_tr + num_closed_since;
+   ap = tp;
+   last_open = global_open_calls == NULL ? NULL : global_open_calls->call; 
+   last_closed = NULL; // yes, it can be null since we have placed the returns
+   sp = global_open_calls == NULL ? stack_base : ToStP( global_open_calls->call->link ) + 1; 
    while( tp <= last_trace_rec ) {
       if( tp->i_info != NULL ) {
         switch( TP_GET_FLAGS( tp->link ) ) {
@@ -1220,7 +1405,7 @@ static void compact(void)
         tp++;
       } else {
 	// Return or bridge
-        switch( TP_GET_FLAGS( tp->link ) ) {
+        switch( TP_GET_FLAGS( tp->link ) ) { // needs to be changed!
           case TPT_RET_LIVE:
             check( last_closed != NULL, "last_closed == NULL at TPT_RET_LIVE" );
             ap->link = mkTaggedPtr2( last_closed, TPT_RET );
@@ -1241,6 +1426,11 @@ static void compact(void)
       }
    }
    last_trace_rec = ap-1;
+
+   GCBONK( "compacted ... " );
+   // Rebuild the open call list
+   global_open_calls = rebuildOpenCalls( global_open_calls, current_stack_frame, first_new_tr );
+   first_new_tr = ap;
    GCBONK( "done\n" );
    
 }
@@ -1300,27 +1490,59 @@ static void dump_trace_pile(void)
 static unsigned max_use = N_TRACE_RECS - 100000,
                 heap_limit = N_LEAST;
 
+static unsigned new_gen_size = 100000;
+
+// Policy for generational compaction
+// - Always have at least 1000 tr's between compactions
+// - Allocate at least twice as many tr's as words in dirty frags
+// - Minimize 2*dw+mtr/rtr where dw is words in dirty frags, 
+//   mtr is number of moved trace recs and rtr is reclaimed tr's
+
+// First simple policy: Use all available space, make a complete compaction when 
+// less than half of the space is free
+
 static void gc(void) 
 {
    unsigned n_used = last_trace_rec - trace_pile;
+   unsigned frag_tmp = dirty_frags;
+
+   TraceRec  *tmp = first_new_tr;
 
    if( n_used > heap_limit ) {
-#if INSTRUMENT_GC
-      DPRINT2("[ %llu  %u\n", instructions, n_used);
+#if INSTRUMENT_GC || LIGHT_IGC
+      DPRINT3("[ %12llu  %8u  %8u  ", instructions, n_used, last_trace_rec - first_new_tr );
 #endif
-      // dump_trace_pile( );
+#if INSTRUMENT_GC
+      BONK( "\n" );
+#endif
+#if DUMP_TRACE_PILE
+      dump_trace_pile( );
+#endif
 
       did_gc++;
       compact( );
-#if INSTRUMENT_GC
-      DPRINT1("%u ]\n", last_trace_rec - trace_pile );
+#if INSTRUMENT_GC || LIGHT_IGC
+      DPRINT2("%8u %10u ]\n", last_trace_rec - tmp, REFS_PER_FRAG * ( dirty_frags - frag_tmp ) );
 #endif
-      heap_limit = N_LEAST + 10 * (last_trace_rec - trace_pile);
+      heap_limit = max_use;
+      // heap_limit = tmp + N_LEAST + 10 * (last_trace_rec - tmp);
+      // heap_limit = 4000000 + (last_trace_rec - trace_pile);
       // heap_limit = 1 + (last_trace_rec - trace_pile);
       if( heap_limit > max_use ) {
          heap_limit = max_use;
       }
-      // dump_trace_pile( );
+      // Generation management
+      if( !GENERATIONAL_COMPACT || last_trace_rec - trace_pile > N_TRACE_RECS / 2 ) {
+         global_open_calls = deleteOpenCalls( global_open_calls );
+         first_new_tr = trace_pile;
+      }
+#if DUMP_TRACE_PILE
+      dump_trace_pile( );
+#endif
+#if DUMP_MEMORY_MAP
+      DPRINT1( "\nGC %d\n", did_gc );
+      dumpMemoryMap( );
+#endif
    }
 }
 
@@ -1389,31 +1611,25 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
 
 #else
 
-static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
+int nnn = 0;
+
+static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
                                Event old_event,
                                Addr32 ref_addr)
 {
    TraceRec   *old_tr = ToTrP( old_event ),
               *nca_tr = ToTrP( old_tr->link );
-   // Addr32      h_addr, t_addr;
+
    InstrInfo  *h_info, *t_info;
-   // Int         h_ind, t_ind;
+
    UInt        hash_value, h_code, t_code, r_code, code;
    UInt        t_line;
    RTEntry    *entry;
-   // static int cnt = 0;
+
+
+   IFDID( nnn++; );
 
    PROFILE( getResultEntry_calls++; )    // counting
-
-   // if( ++cnt % 0x00100 == 0 ) { 
-     // DPRINT1( "ninstrs=%llu\n", instructions );
-   // }
-
-   // if( instructions > 19306330 && instructions % 1 == 0 ) {
-   //    DPRINT1( "I=%llu\n", instructions );
-   // }
-
-   // IFINS( 95047, DPRINT1( "Calling getResultEntry with ninstrs=%llu ... ", instructions ) )
 
    // The tail (source) of the dependence is related to the old reference
    // The head (sink)   of the dependence is related to the new reference
@@ -1424,23 +1640,14 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
    //     in nca, or
    //   the address of the call site in the nca
 
-   // IFDID( BONK( "getResultEntry... " ); )
-
-   // DPRINT1( "%u ", last_trace_rec - trace_pile + 1 );
-   // DPRINT2( "curr: %s:%d ", curr_info->line->file, curr_info->line->line );
-   // DPRINT1( "ref: %u ", (unsigned) ref_addr );
-   // DPRINT2( "old: %s:%d ", old_tr->i_info->line->file, old_tr->i_info->line->line );
-
-   while( TP_GET_FLAGS( nca_tr->link ) != TPT_OPEN ) { // tag 1 is open header
-       PROFILE( getResultEntry_nca++; )  // counting
+   while( TP_GET_FLAGS( nca_tr->link ) != TPT_OPEN ) {   // tag 1 is open header
+       PROFILE( getResultEntry_nca++; )                  // counting
        old_tr = nca_tr;
        nca_tr = ToTrP( nca_tr->link );
    }
+
    // nca_tr now points to call header for NCA
    // old_tr now points to the relevant trace record in the NCA
-
-   // DPRINT1( "nca: %u ", nca_tr-trace_pile );
-   // DPRINT2( "%s:%d ", nca_tr->i_info->line->file, nca_tr->i_info->line->line ); 
 
    if( TP_GET_FLAGS( old_tr->link ) == TPT_CLOSED ) {
      // The tail is indirect
@@ -1472,22 +1679,16 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
    code = DF_MK_KEY( r_code, h_code, t_code );
 
    // We now have all necessary info to look up the dependence
-   // IFDID( BONK( "finding entry... " ); )
 
    t_line = t_info->line->line;
    hash_value = ( t_line + code ) & ( RT_ENTRIES_PER_LINE-1 );
    entry = h_info->line->entries[hash_value];
 
-   // IFDID( BONK( "chain... " ); )
-
-//   if( instructions >= 11467289 && instructions <= 11467290 ) {
-//      BONK( "Got here!\n" );
-//   }
-
    while( entry!=NULL && ( entry->t_line != t_line || entry->code != code ) ) {
       PROFILE( getResultEntry_entry++; )       // counting
       entry = entry->next;
    }
+
    if( entry == NULL ) {
        LineInfo *h_line_info = h_info->line;
        entry = (RTEntry *) VG_(calloc)( 1, sizeof(RTEntry) );
@@ -1508,24 +1709,26 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
        entry->next = h_info->line->entries[hash_value];
        h_info->line->entries[hash_value] = entry;
 
-       // if( instructions >= 11467289 && instructions <= 11467290 ) {
-       //     DPRINT3( "Made new entry: %u <-%c- %u ", entry->h_line, entry->d_inf, entry->t_line );
-       //     DPRINT2( "in %s (%s)\n", entry->h_file, entry->h_fn );
-       // }
-
    }
-   // BONK( makeTitle( entry ) );
-   // if( h_info->line->file != t_info->line->file ||
-   //     h_info->line->func != t_info->line->func ) {
-   //     DPRINT2( "<%u,%u>", h_info->line->file, t_info->line->file );
-   //     DPRINT2( "<%u,%u>", h_info->line->func, t_info->line->func );
-   // }
-   // BONK( "\n" );
-
-   // IFINS( 95047, BONK( "... return\n" ) )
 
    return entry;
 
+}
+
+static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
+                               Event old_event,
+                               Addr32 ref_addr)
+{
+    RTEntry *e;
+
+    // IFDID( BONK( "{" ); );
+    e = XXgetResultEntry(curr_ctx, curr_info, old_event, ref_addr);
+    // IFDID( BONK( "}" ); );
+    // if( nnn>30 ) check( 0, "Found an exit" );
+
+
+
+    return e;
 }
 
 #endif
@@ -1539,11 +1742,13 @@ static void em_post_clo_init(void)
    VG_(message)(Vg_UserMsg, "Initalising dependency profiling");
 
    map = (MapFragment **) VG_(calloc)(FRAGS_IN_MAP, sizeof(MapFragment*));
+   dirty_map = (unsigned int *) VG_(calloc)( DIRTY_WORDS, sizeof( unsigned int ) );
    trace_pile = (TraceRec *) VG_(calloc)( N_TRACE_RECS, sizeof( TraceRec ) );
 
-   if( map==NULL || trace_pile==NULL ) {
+   if( map==NULL || trace_pile==NULL || dirty_map==NULL ) {
        VG_(tool_panic)("Out of memory!");
    }
+   first_new_tr = trace_pile;
 
    opt.elim_stack_alias = 1;
 
@@ -1700,8 +1905,10 @@ static void splitAccessUnit(RefInfo *item, int size)
 static RefInfo* getRefInfo(Addr32 addr)
 {
     MapFragment *frag = GET_FRAG_PTR(map,addr);
-    int          i;
+    int          i,f;
     const int init_size = 8;
+
+    // IFDID( BONK( "[" ); );
 
     if( frag==NULL ) {
         frag = (MapFragment *) VG_(calloc)(1, sizeof(MapFragment));
@@ -1722,8 +1929,14 @@ static RefInfo* getRefInfo(Addr32 addr)
             frag->refs[i].saveDesc = NULL;
 #endif
         }
+        f = GET_FRAG_IDX( addr );
+        dirty_map[ WORD_OF_FRAG( f ) ] |= BIT_IN_WORD( f );
     }
 
+#if CHECK_DIRTY_FRAGS
+    frag->flag = 1;
+#endif
+    // IFDID( BONK( "]" ); );
     return GET_REF_ADDR(frag,addr);
 }
 
@@ -1996,6 +2209,8 @@ void recordStore( StmInfo *s_info, Addr32 addr )
 #endif // TRACE_REG_DEPS
 
     gc( );
+
+    // if( nnn>29 ) check( 0, "Found an exit" );
 
 }
 
@@ -3047,6 +3262,7 @@ static void em_fini(Int exitcode)
                             max_read_list_elements,
                             max_read_list_elements*sizeof( EventList ) );
    VG_(message)(Vg_UserMsg, "Instructions:   %12llu", instructions);
+   VG_(message)(Vg_UserMsg, "# GC:   %lu", did_gc);
 
    VG_(message)(Vg_UserMsg, "inStack %llu %llu (%llu)", 
                             inStack_calls, inStack_iters, 
@@ -3057,6 +3273,9 @@ static void em_fini(Int exitcode)
    VG_(message)(Vg_UserMsg, "compactReads %llu %llu (%llu)", 
                             compactReads_items, compactReads_iters, 
                             smdiv(10*compactReads_iters, compactReads_items));
+   VG_(message)(Vg_UserMsg, "allAndDirtyFrags %lu %lu (%lu)", 
+                            all_frags, dirty_frags, 
+                            smdiv(10*dirty_frags, all_frags));
    VG_(message)(Vg_UserMsg, "getResultEntry %llu nca:%llu(%llu) entry:%llu(%llu)", 
                             getResultEntry_calls, getResultEntry_nca, 
                             smdiv(10*getResultEntry_nca, getResultEntry_calls),
