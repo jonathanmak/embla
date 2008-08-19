@@ -57,6 +57,10 @@
 #define  DUMP_TRACE_PILE    0
 #define  DUMP_MEMORY_MAP    0
 
+// Major modes
+
+int measure_span = 0;   // By default, collect dependencies
+
 // Temporary definitions
 
 unsigned interesting_address=0;
@@ -799,6 +803,8 @@ static Bool em_process_cmd_line_option(Char* arg)
   else
   VG_STR_CLO(arg, "--edge-file", edge_file_name)
   else
+  VG_XACT_CLO(arg, "--span", measure_span)
+  else
     return False;
 #if 0
   tl_assert(trace_file_name);
@@ -812,6 +818,7 @@ static void em_print_usage(void)
    VG_(printf)(
 "    --trace-file=<name>       store trace data in <name> [embla.trace]\n"
 "    --edge-file=<name>        store control flow data in <name> [embla.edges]\n"
+"    --span                    measure critical path instead of collecting deps\n"
    );
 }
 
