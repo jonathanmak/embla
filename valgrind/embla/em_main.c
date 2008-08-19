@@ -1875,7 +1875,13 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
 
 #endif
 
-static void em_post_clo_init(void)
+static void em_post_clo_init_span(void)
+{
+  VG_(message)(Vg_UserMsg, "Initializing span measurement");
+}
+
+
+static void em_post_clo_init_deps(void)
 {
    VG_(clo_vex_control).iropt_level = 0;
    VG_(clo_vex_control).iropt_unroll_thresh = 0;
@@ -1913,6 +1919,16 @@ static void em_post_clo_init(void)
    init_read_table( );
 
 }
+
+static void em_post_clo_init(void)
+{
+   if( measure_span ) {
+      em_post_clo_init_span( );
+   } else {
+      em_post_clo_init_deps( );
+   }
+}
+
 
 
 /***********************************
@@ -3019,10 +3035,18 @@ static int sr_check( IRSB* bbIn, int bbIn_idx, IRTemp t, SRCode sr_code, int siz
 
 #endif
 
-static IRSB* em_instrument(VgCallbackClosure* closure,
-                           IRSB* bbIn, VexGuestLayout* layout,
-			   VexGuestExtents * vge,
-                           IRType gWordTy, IRType hWordTy)
+static IRSB* em_instrument_span(VgCallbackClosure* closure,
+                                IRSB* bbIn, VexGuestLayout* layout,
+			        VexGuestExtents * vge,
+                                IRType gWordTy, IRType hWordTy)
+{
+    return bbIn;
+}
+
+static IRSB* em_instrument_deps(VgCallbackClosure* closure,
+                                IRSB* bbIn, VexGuestLayout* layout,
+			        VexGuestExtents * vge,
+                                IRType gWordTy, IRType hWordTy)
 {
     IRSB      *bbOut;
     int       bbIn_idx;
@@ -3228,6 +3252,19 @@ static IRSB* em_instrument(VgCallbackClosure* closure,
     return bbOut;
 }
 
+static IRSB* em_instrument(VgCallbackClosure* closure,
+                           IRSB* bbIn, VexGuestLayout* layout,
+			   VexGuestExtents * vge,
+                           IRType gWordTy, IRType hWordTy)
+{
+   if( measure_span ) {
+      return em_instrument_span( closure, bbIn, layout, vge, gWordTy, hWordTy );
+   } else {
+      return em_instrument_deps( closure, bbIn, layout, vge, gWordTy, hWordTy );
+   }
+}
+
+
 static void printResultTable(const Char * traceFileName)
 {
   int      i,j;
@@ -3380,7 +3417,12 @@ static void printCFG(const Char * cfgFileName)
 
 #define smdiv(x,y) (y==0 ? 0 : x/y)
 
-static void em_fini(Int exitcode)
+static void em_fini_span(Int exitcode)
+{
+   VG_(message)(Vg_UserMsg, "Span measurement finished" );
+}
+
+static void em_fini_deps(Int exitcode)
 {
 
    VG_(message)(Vg_UserMsg, "Dependency trace has finished, storing in %s",
@@ -3426,6 +3468,15 @@ static void em_fini(Int exitcode)
 #endif
 }
 
+static void em_fini(Int exitcode)
+{
+   if( measure_span ) {
+      em_fini_span( exitcode );
+   } else {
+      em_fini_deps( exitcode );
+}
+
+}
 static void em_pre_clo_init(void)
 {
    VG_(details_name)            ((Char *) "Embla");
