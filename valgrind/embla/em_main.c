@@ -52,7 +52,7 @@
 #define  DO_NOT_INSTRUMENT  0
 #define  MOCK_RTENTRY       0
 #define  FULL_CONTOURS      0
-#define  INSTRUMENT_GC      0
+#define  INSTRUMENT_GC      1
 #define  LIGHT_IGC          1
 #define  DUMP_TRACE_PILE    0
 #define  DUMP_MEMORY_MAP    0
@@ -207,7 +207,7 @@ static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
 // Tags with i_info == NULL
 //
 #define  TPT_RET          0   // A return header
-#define  TPT_BRIDGE       1   // Bridging a gap of dead nodes
+#define  TPT_BRIDGE       1   // Bridging a gap between live nodes
 #define  TPT_RET_LIVE     2   // A live return header (important for phase 2)
 
 #define SAVE_RESTORE_TRACKING 1
@@ -305,6 +305,7 @@ typedef struct {
    Addr32   i_addr;
    unsigned i_len;
    LineInfo *line;
+   struct _TraceRec *aeon;
 #if INSTR_LVL_DEPS
    InstrInfoList *(i_deps[N_INSTR_DEPS]);
 #endif
@@ -316,7 +317,7 @@ typedef struct {
 #define DUMMY_II_INITIALIZER  /* */
 #endif
 
-static InstrInfo dummy_instr_info = {1, 0, &dummy_line_info DUMMY_II_INITIALIZER};
+static InstrInfo dummy_instr_info = {1, 0, &dummy_line_info, NULL DUMMY_II_INITIALIZER};
 
 #define SI_SAVE_REST  1
 #define SI_MOV_SP     2
@@ -394,7 +395,7 @@ static TaggedPtr mkTaggedPtr(void *ptr, unsigned flag1, unsigned flag2)
 #define EQUAL_EVENT(x,y) ( x == y )
 
 typedef 
-   struct {
+   struct _TraceRec {
       InstrInfo *i_info;
       TaggedPtr  link;
    }
@@ -770,6 +771,7 @@ static InstrInfo *mk_i_info(InstrInfo *curr, Addr32 i_addr, unsigned i_len)
    
    ii_chunk[ii_idx].i_addr    = i_addr;
    ii_chunk[ii_idx].i_len     = i_len;
+   ii_chunk[ii_idx].aeon      = NULL;
    ii_chunk[ii_idx].line      = mk_line_info( i_addr );
 
 #if INSTR_LVL_DEPS
@@ -1152,10 +1154,116 @@ static OpenCalls *deleteOpenCalls( OpenCalls *open_calls )
    return NULL;
 }
 
+typedef struct _AeonItem {
+   InstrInfo        *i_info;
+   TraceRec         *t_rec;
+   struct _AeonItem *next;
+} AeonItem;
+
+static AeonItem *freeAeonItem = NULL;
+
+static AeonItem *mkAeonItem( InstrInfo *i_info, TraceRec *t_rec, AeonItem *next )
+{
+  const int N = 1000;
+  int i;
+  AeonItem *tmp;
+
+  if( freeAeonItem == NULL ) {
+    freeAeonItem = (AeonItem *) VG_(calloc)( N, sizeof( AeonItem ) );
+    check( freeAeonItem != NULL, "Out of memory for aeon list" );
+    for( i = 1; i < N; i++ ) {
+       freeAeonItem[i-1].next = freeAeonItem + i;
+    }
+    freeAeonItem[N-1].next = NULL;
+  }
+
+  tmp = freeAeonItem;
+  freeAeonItem = tmp->next;
+  tmp->i_info  = i_info;
+  tmp->t_rec   = t_rec;
+  tmp->next    = next;
+
+  return tmp;
+}
+
+static AeonItem **aeon_map = NULL;
+
+const int AE_BITS = 15;
+
+static AeonItem *lookupAI( InstrInfo *i_info )
+{
+
+  const int N_AE = 1 << AE_BITS;
+  unsigned idx = ((unsigned) i_info) / 8, i;
+  AeonItem *item;
+  
+  if( aeon_map == NULL ) {
+    aeon_map = (AeonItem **) VG_(calloc)( N_AE, sizeof( AeonItem * ) );
+    check( aeon_map != NULL, "Out of memory for aeon_map" );
+    for( i = 0; i < N_AE; i++ ) {
+      aeon_map[i] = NULL;
+    }
+  }
+
+  item = aeon_map[ idx & (N_AE-1) ];
+  while( item == NULL && item->i_info != i_info ) {
+    item = item->next;
+  }
+  if( item==NULL ) {
+    aeon_map[ idx & (N_AE-1) ] = item = mkAeonItem( i_info, NULL, aeon_map[ idx & (N_AE-1) ] );
+  }
+  return item;
+}
+
+static TraceRec *remapTR( InstrInfo *i_info, TraceRec *eoae, TraceRec *curr )
+{
+   AeonItem *ai = lookupAI( i_info );
+
+   if( 1 || ai->t_rec == NULL || ai->t_rec >= eoae ) {
+     ai->t_rec = curr;
+     return NULL;
+   } else {
+     return ToTrP( ai->t_rec->link );
+   }
+}
+
+static void deleteAeonMap( void )
+{
+   int       i;
+   AeonItem *p,*q;
+
+   for( i = 0; i < (1 << AE_BITS); i++ ) {
+     p = aeon_map[ i ];
+     while( p != NULL ) {
+       q = p->next;
+       p->next = freeAeonItem;
+       freeAeonItem = p;
+       p = q;
+     }
+     aeon_map[ i ] = NULL;
+   }
+}
+
+static TraceRec *forwardTR( TraceRec *ap, TraceRec *tp, TraceRec *ecae )
+{
+   TraceRec *tmp = remapTR( tp->i_info, ecae, tp );
+
+   BONK( "+" );
+   if( tmp == NULL ) {
+      tp->link = mkTaggedPtr2( ap, TPT_REG_OR_CLOSED_LIVE );
+      return ap-1;
+   } else {
+      tp->link = mkTaggedPtr2( tmp, TPT_REG_OR_CLOSED_LIVE );
+      return ap;
+   }
+}
+      
+
+
 static void compact(void)
 {
 
-   TraceRec   *tp,*ap,*last_open,*last_closed;
+   TraceRec   *tp,*ap,*last_open,*last_closed, *ecae, *tr_tmp, *lp;
    StackFrame *sp;
    StackMark  *mp;
    int         delta, i, j, k, l, ff, num_closed_since;
@@ -1172,29 +1280,38 @@ static void compact(void)
 
    // Phase 1:
    GCBONK( "  Phase 1... " );
+   ecae = last_trace_rec+1; // that's were the next (nonexisting) aeon starts
    tp = last_trace_rec;
    ap = last_trace_rec;
    sp = current_stack_frame;
    mp = smarks+topMark;
    while( tp >= first_new_tr ) {
+      BONK( "." );
+      // Maybe start a new aeon
+      if( mp->tr >= tp ) {
+        ecae = tp+1;
+        BONK( "s" );
+      }
+      BONK( "," );
       if( tp->i_info != NULL ) {
         switch( TP_GET_FLAGS( tp->link ) ) {
           // Regular
           case TPT_REG:
-            tp->link = mkTaggedPtr2( ap, TPT_REG_OR_CLOSED_LIVE );
-            ap--;
+            ap = forwardTR( ap, tp, ecae );
             break;
 
           // Open header
           case TPT_OPEN:
             tp->link = mkTaggedPtr2( ap, TPT_OPEN );
             ap--;
+            // Start new aeon
+            ecae = tp;
+            BONK( "o" );
             break;
 
           // Closed header
           case TPT_CLOSED:
-            tp->link = mkTaggedPtr2( ap, TPT_REG_OR_CLOSED_LIVE );
-            ap--;
+            ap = forwardTR( ap, tp, ecae );
             break;
 
           // Unused
@@ -1213,8 +1330,8 @@ static void compact(void)
         check( TP_GET_FLAGS( tp->link ) == TPT_CLOSED,
                "Return header not pointing at closed call in phase 1" );
         if( tp >= first_new_tr ) {
-           tp->link = mkTaggedPtr2( ap-1, TPT_REG_OR_CLOSED_LIVE );
-           ap-=2; // Return is also saved
+           tr_tmp = forwardTR( ap-1, tp, ecae );
+           ap = ap-1 == tr_tmp ? ap : tr_tmp;
         } else {
            // do nothing ?
            // terminate on next iter
@@ -1225,6 +1342,8 @@ static void compact(void)
    delta = ap + 1 - first_new_tr;  // I believe this
    num_closed_since = numClosedSinceLast( global_open_calls );
    delta -= num_closed_since;
+
+   deleteAeonMap( );
 
    GCBONK( "done\n  Phase 2 (" ); 
    
@@ -1303,30 +1422,36 @@ static void compact(void)
    }
    GCBONK( "map)\n  Phase 3... " ); 
 
-   // Possibly build the returns here
-   
    // Phase 3:
    tp = last_trace_rec;
+   lp = NULL;
+   ap = NULL;
    while( tp >= first_new_tr ) {
       if( tp->i_info != NULL ) {
         switch( TP_GET_FLAGS( tp->link ) ) {
           // Dead trace recs
           case TPT_REG:
           case TPT_CLOSED:
-            tp->link = mkTaggedPtr2( tp+1, TPT_BRIDGE );
+            tp->link = mkTaggedPtr2( lp, TPT_BRIDGE );
             tp->i_info = NULL;
             break;
 
           // Open header
           case TPT_OPEN:
-            // Nothing needs to be done
+            // Nothing needs to be done, except updating ap and lp
+            ap--;
+            check( ap == ToTrP( tp->link ), "ap out of sync in phase 3 of compact" );
+            lp = tp;
             break;
 
           // Live regular or closed header
           case TPT_REG_OR_CLOSED_LIVE:
             // Certainly a regular since it was not pointed at by return
             // Do we have to distinguish TPT_REG and TPT_CLOSED?
+            ap--;
+            check( ap == ToTrP( tp->link ), "ap out of sync in phase 3 of compact" );
             tp->link = mkTaggedPtr2( NULL, TPT_REG );
+            lp = tp;
             break;
         }
       } else {
@@ -1339,14 +1464,24 @@ static void compact(void)
           check( TP_GET_FLAGS( h_ptr->link ) == TPT_REG_OR_CLOSED_LIVE,
                  "Return header target with funny tag in phase 3" );
           check( h_ptr < tp, "TPT_RET_LIVE pointing up in phase 3" );
-          if( h_ptr+1 != tp ) { 
-            h_ptr[1].link = mkTaggedPtr2( tp, TPT_BRIDGE ); 
-            h_ptr[1].i_info = NULL;                         
+          if( ToTrP( h_ptr->link ) != ap-2 ) {
+            // This is an indirection to a set leader
+            // Just skip it
+          } else {
+            if( h_ptr+1 != tp ) { 
+              // Gap between return and matching call
+              h_ptr[1].link = mkTaggedPtr2( tp, TPT_BRIDGE ); 
+              h_ptr[1].i_info = NULL;                         
+            }
+            ap -= 2;  // We're going to allocate these (call and ret)
+            check( ap == ToTrP( h_ptr->link ), "ap out of sync in phase 3 of compact" ); 
+            h_ptr->link = mkTaggedPtr2( NULL, TPT_CLOSED ); 
+            lp = h_ptr;
           }
-          h_ptr->link = mkTaggedPtr2( NULL, TPT_CLOSED ); 
         } else {
+          // If this leaves a gap to first_new_tr, close it with a bridge
           if( first_new_tr + num_closed_since < tp+1 ) {
-            first_new_tr[ num_closed_since ].link = mkTaggedPtr2( tp+1, TPT_BRIDGE ); 
+            first_new_tr[ num_closed_since ].link = mkTaggedPtr2( lp, TPT_BRIDGE ); 
             first_new_tr[ num_closed_since ].i_info = NULL;
           }
         }
