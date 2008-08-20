@@ -3035,12 +3035,146 @@ static int sr_check( IRSB* bbIn, int bbIn_idx, IRTemp t, SRCode sr_code, int siz
 
 #endif
 
+typedef long long unsigned int TimeStamp;
+
+typedef struct _LineInfoTimes {
+  TimeStamp time;
+  LineInfo *line;
+  struct _LineInfoTimes *next;
+} LineInfoTimes;
+
+static LineInfoTimes *LITfree = NULL;
+
+typedef struct {
+  LineInfoTimes **table;
+  int             idx_bits, 
+                  n_items;
+} LITTable;
+
+static LineInfoTimes* newLineInfoTimes(void)
+{
+  int LITblocksize = 1000;
+  LineInfoTimes *p;
+
+  if( LITfree == NULL ) {
+     int i;
+     LITfree = (LineInfoTimes *) VG_(calloc)( LITblocksize, sizeof( LineInfoTimes ) );
+     check( LITfree != NULL, "Out of memory for LITblock" );
+     for( i=0; i < LITblocksize-1; i++ ) {
+        LITfree[i].next = LITfree + i + 1;
+     }
+     LITfree[ LITblocksize-1 ].next = NULL;
+  }
+  p = LITfree;
+  LITfree = LITfree->next;
+  return p;
+}
+
+static void freeLineInfoTimes( LineInfoTimes *p )
+{
+  p->next = LITfree;
+  LITfree = p;
+}
+
+static TimeStamp getTimeStamp( LITTable *lit, LineInfo *line )
+{
+  LineInfoTimes **table = lit->table;
+  int idx_bits = lit->idx_bits;
+  int idx = ( line->line ) & ( 1 << idx_bits );
+  LineInfoTimes *p = table[ idx ];
+
+  while( p != NULL && p->line != line ) {
+     p = p->next;
+  }
+  return p==NULL ? 0 : p->time;
+}
+
+static void doubleLITtable( LITTable *lit )
+{
+   int i, idx_bits = lit->idx_bits;
+   LineInfoTimes **qable 
+              = (LineInfoTimes **) VG_(calloc)( 1 << (idx_bits+1), sizeof(LineInfoTimes *) );
+
+   check( qable != NULL, "Out of memory" );
+
+   for( i=0; i < (1 << idx_bits); i++ ) {
+      LineInfoTimes *q = lit->table[i], *next;
+      while( q != NULL ) {
+         int n_idx = q->line->line & ( ( 1 << (idx_bits+1) ) - 1 );
+         next = q->next;
+         q->next = qable[ n_idx ];
+         qable[ n_idx ] = q;
+         q = next;
+      }
+   }
+   VG_(free)( lit->table );
+   lit->idx_bits++;
+   lit->table = qable;
+} 
+
+static void setTimeStamp( LITTable *lit, LineInfo *line, TimeStamp time )
+{
+  LineInfoTimes **table = lit->table;
+  int idx_bits = lit->idx_bits;
+  int idx = ( line->line ) & ( ( 1 << idx_bits ) - 1 );
+  LineInfoTimes *p = table[ idx ];
+
+  while( p != NULL && p->line != line ) {
+     p = p->next;
+  }
+
+  if( p == NULL ) {
+     if( lit->n_items > ( 1 << idx_bits ) ) {
+       doubleLITtable( lit );
+       table = lit->table;
+       idx_bits = lit->idx_bits;
+       idx = ( line->line ) & ( ( 1 << idx_bits ) - 1 );
+     }
+     p = newLineInfoTimes( );
+     p->next = table[ idx ];
+     p->line = line;
+     table[ idx ] = p;
+  }
+
+  p->time = time;
+}
+
+static unsigned long long int line_instrs = 0;
+
+static VG_REGPARM(2)
+void recordInstr(InstrInfo *i_info, Word n)  // n is the number of skipped instructions
+{
+    if( i_info->line == current_stack_frame->current_line ) {
+       current_stack_frame->span += n+1;
+    } else {
+       //
+    }
+}
+
+
 static IRSB* em_instrument_span(VgCallbackClosure* closure,
                                 IRSB* bbIn, VexGuestLayout* layout,
 			        VexGuestExtents * vge,
                                 IRType gWordTy, IRType hWordTy)
 {
-    return bbIn;
+    IRSB     *bbOut = deepCopyIRSBExceptStmts( bbIn );
+    int       i_idx = 0;
+
+    while( i_idx<bbIn->stmts_used && bbIn->stmts[i_idx]->tag != Ist_IMark ) {
+       addStmtToIRSB( bbOut, bbIn->stmts[i_idx] );
+       i_idx++;
+    }
+    for( ; i_idx < bbIn->stmts_used; i_idx ++ ) {
+       IRStmt *stIn = bbIn->stmts[i_idx];
+
+       switch( stIn->tag ) {
+    
+          default : ; /* do nothing */
+       }
+       addStmtToIRSB( bbOut, stIn );
+    }
+
+    return bbOut;
 }
 
 static IRSB* em_instrument_deps(VgCallbackClosure* closure,
@@ -3072,15 +3206,6 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
 
 
     bbOut = deepCopyIRSBExceptStmts( bbIn );
-
-#if 0
-    bbOut           = emptyIRSB();                     // from libvex_ir.h
-    bbOut->tyenv    = deepCopyIRTypeEnv(bbIn->tyenv);      // d:o
-    bbOut->next     = deepCopyIRExpr(bbIn->next);          // d:o
-    bbOut->jumpkind = bbIn->jumpkind;
-#endif
-
-    // BONK( "." );
 
     for( bbIn_idx = 0; bbIn_idx < bbIn->stmts_used; bbIn_idx++ ) {
        if( bbIn->stmts[bbIn_idx]->tag == Ist_IMark ) break;
