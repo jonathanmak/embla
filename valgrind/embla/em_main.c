@@ -246,6 +246,7 @@ static ICount instructions = 0;
 
 const char * trace_file_name = "embla.trace";
 const char * edge_file_name = "embla.edges";
+const char * dep_file_name = "embla.deps";
 
 typedef
    struct _RTEntry {
@@ -432,6 +433,25 @@ typedef struct {
 static StackMark smarks[N_SMARKS];
 static int topMark=0;
 
+typedef long long unsigned int TimeStamp;
+
+typedef struct _LineInfoTimes {
+  TimeStamp time;
+  LineInfo *line;
+  struct _LineInfoTimes *next;
+} LineInfoTimes;
+
+static LineInfoTimes *LITfree = NULL;
+
+typedef struct {
+  LineInfoTimes **table;
+  int             idx_bits, 
+                  n_items;
+} LITTable;
+
+static LineInfoTimes *line_info_times_ptr = NULL;
+
+static LITTable initial_LIT_table = { &line_info_times_ptr, 0, 0 };
 
 typedef
    struct _StackFrame {
@@ -443,6 +463,8 @@ typedef
 #if RECORD_CF_EDGES
      LineInfo *current_line;
 #endif
+     TimeStamp span;
+     LITTable  stamps;
    }
    StackFrame;
 
@@ -451,8 +473,9 @@ static StackFrame stack_base[N_STACK_FRAMES] =
          // initializing the first
          {(unsigned int) -1, /* 0, */ 0, 0, NULL, smarks
 #if RECORD_CF_EDGES
-         , NULL
+         , &dummy_line_info
 #endif
+         , 0, { &line_info_times_ptr, 0, 0 }
          } 
        };
 
@@ -721,14 +744,11 @@ static void logTranslation( Addr32 addr )
 
 static LineInfo *line_table[RESULT_ENTRIES];
 
-static LineInfo *mk_line_info( Addr32 i_addr )
+static LineInfo *mk_line_info_l( char *file, unsigned line )
 {
-   char file[FILE_LEN], func[FN_LEN], buffer[BUF_SIZE], *i_file;
-   unsigned line;
+   char     *i_file, buffer[BUF_SIZE];
    LineInfo *info,**info_p;
 
-   getDebugInfo( i_addr, file, func, &line );
-   IFINS1( DPRINT1( "%s\n", file ) );
    i_file = intern_string( file );
 
    VG_(sprintf)( buffer, "%d %s", line, file );
@@ -753,13 +773,24 @@ static LineInfo *mk_line_info( Addr32 i_addr )
 #endif
       info->line = line;
       info->file = i_file;
-      info->func = intern_string( func );
+      info->func = intern_string( "???" );
       info->next = *info_p;
       *info_p = info;
    }
    return info;
 }
       
+static LineInfo *mk_line_info( Addr32 i_addr )
+{
+   char file[FILE_LEN], func[FN_LEN];
+   unsigned line;
+
+   getDebugInfo( i_addr, file, func, &line );
+   IFINS1( DPRINT1( "%s\n", file ) );
+
+   return mk_line_info_l( file, line );
+}
+
 static InstrInfo *ii_chunk = NULL;
 static unsigned   ii_idx = II_CHUNK_SIZE;
 
@@ -803,6 +834,8 @@ static Bool em_process_cmd_line_option(Char* arg)
   else
   VG_STR_CLO(arg, "--edge-file", edge_file_name)
   else
+  VG_STR_CLO(arg, "--dep-file", dep_file_name)
+  else
   VG_XACT_CLO(arg, "--span", measure_span)
   else
     return False;
@@ -818,6 +851,7 @@ static void em_print_usage(void)
    VG_(printf)(
 "    --trace-file=<name>       store trace data in <name> [embla.trace]\n"
 "    --edge-file=<name>        store control flow data in <name> [embla.edges]\n"
+"    --dep-file=<name>         read dependencies for span calculation from <name> [embla.deps]\n"
 "    --span                    measure critical path instead of collecting deps\n"
    );
 }
@@ -1632,7 +1666,7 @@ static void dump_trace_pile(void)
 static unsigned max_use = N_TRACE_RECS - 100000,
                 heap_limit = N_LEAST;
 
-static unsigned new_gen_size = 100000;
+// static unsigned new_gen_size = 100000;
 
 // Policy for generational compaction
 // - Always have at least 1000 tr's between compactions
@@ -1874,61 +1908,6 @@ static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
 }
 
 #endif
-
-static void em_post_clo_init_span(void)
-{
-  VG_(message)(Vg_UserMsg, "Initializing span measurement");
-}
-
-
-static void em_post_clo_init_deps(void)
-{
-   VG_(clo_vex_control).iropt_level = 0;
-   VG_(clo_vex_control).iropt_unroll_thresh = 0;
-   VG_(clo_vex_control).guest_chase_thresh = 0;
-
-   VG_(message)(Vg_UserMsg, "Initalising dependency profiling");
-
-   map = (MapFragment **) VG_(calloc)(FRAGS_IN_MAP, sizeof(MapFragment*));
-   dirty_map = (unsigned int *) VG_(calloc)( DIRTY_WORDS, sizeof( unsigned int ) );
-   trace_pile = (TraceRec *) VG_(calloc)( N_TRACE_RECS, sizeof( TraceRec ) );
-
-   if( map==NULL || trace_pile==NULL || dirty_map==NULL ) {
-       VG_(tool_panic)("Out of memory!");
-   }
-   first_new_tr = trace_pile;
-
-   opt.elim_stack_alias = 1;
-
-   questions = intern_string( "???" );
-   dummy_line_info.file = questions;
-   dummy_line_info.func = questions;
-
-   smarks[0].sp = (Addr32) 0xffffffff;
-   smarks[0].tr = trace_pile+1;
-
-   trace_pile[0].i_info = &dummy_instr_info;
-   trace_pile[0].link = mkTaggedPtr2(stack_base, TPT_OPEN);
-
-   trace_pile[1].i_info = &dummy_instr_info;
-   trace_pile[1].link = mkTaggedPtr2(trace_pile, TPT_REG);
-
-   last_trace_rec = trace_pile+1;
-   stack_base->call_header = trace_pile;
-
-   init_read_table( );
-
-}
-
-static void em_post_clo_init(void)
-{
-   if( measure_span ) {
-      em_post_clo_init_span( );
-   } else {
-      em_post_clo_init_deps( );
-   }
-}
-
 
 
 /***********************************
@@ -2588,7 +2567,7 @@ void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target)
 #if RECORD_CF_EDGES
     newFrame->current_line = NULL;
 #endif
-
+    newFrame->span        = 0;
     current_stack_frame = newFrame;
 
     // Set hiddenness (recheck)
@@ -2663,13 +2642,33 @@ void recordRet(Addr32 sp, Addr32 target)
 
 #if RECORD_CF_EDGES
 
-static VG_REGPARM(1)
-void recordEdge( LineInfo *line ) // Need to know line, the line of the current instruction
+static LineList * consLL( LineInfo *line, LineList *next )
 {
     static LineList *free_edge = NULL;
     static int       n_free_edges = 0;
     const int        block_size = 100000;
 
+    LineList *ll;
+
+    if( n_free_edges == 0 ) {
+        free_edge = (LineList *) VG_(calloc)( block_size, sizeof(LineList) );
+        check( free_edge != NULL, "Out of memory for CF edges!\n" );
+        n_free_edges = block_size;
+    }
+    ll = free_edge;
+    free_edge++;
+    n_free_edges--;
+
+    ll->next = next;
+    ll->line = line;
+
+    return ll;
+}
+
+
+static VG_REGPARM(1)
+void recordEdge( LineInfo *line ) // Need to know line, the line of the current instruction
+{
     LineList *ll, **llp;
     LineInfo *prev_line = current_stack_frame->current_line;
 
@@ -2681,20 +2680,8 @@ void recordEdge( LineInfo *line ) // Need to know line, the line of the current 
     for( ll = *llp; ll != NULL && ll->line != prev_line; ll = ll->next ) ;
 
     if( ll == NULL ) {
-        if( n_free_edges == 0 ) {
-            free_edge = (LineList *) VG_(calloc)( block_size, sizeof(LineList) );
-            check( free_edge != NULL, "Out of memory for CF edges!\n" );
-            n_free_edges = block_size;
-        }
-        ll = free_edge;
-        free_edge++;
-        n_free_edges--;
-
-        ll->next = *llp;
-        ll->line = prev_line;
-        *llp = ll;
+        *llp = consLL( prev_line, *llp );
     }
-
 }
 
 #endif
@@ -3035,22 +3022,6 @@ static int sr_check( IRSB* bbIn, int bbIn_idx, IRTemp t, SRCode sr_code, int siz
 
 #endif
 
-typedef long long unsigned int TimeStamp;
-
-typedef struct _LineInfoTimes {
-  TimeStamp time;
-  LineInfo *line;
-  struct _LineInfoTimes *next;
-} LineInfoTimes;
-
-static LineInfoTimes *LITfree = NULL;
-
-typedef struct {
-  LineInfoTimes **table;
-  int             idx_bits, 
-                  n_items;
-} LITTable;
-
 static LineInfoTimes* newLineInfoTimes(void)
 {
   int LITblocksize = 1000;
@@ -3076,16 +3047,36 @@ static void freeLineInfoTimes( LineInfoTimes *p )
   LITfree = p;
 }
 
+static void clearLITTable( LITTable *lit )
+{
+   int i, n = 1 << lit->idx_bits;
+   LineInfoTimes *l,*t;
+
+   for( i=0; i<n; i++ ) {
+     for( l = lit->table[i]; l != NULL; l = t ) {
+        t = l->next;
+        freeLineInfoTimes( l );
+     }
+   }
+   if( lit->table != &line_info_times_ptr ) VG_(free)( lit->table );
+   lit->idx_bits = 0;
+   lit->n_items = 0;
+   lit->table = &line_info_times_ptr;
+}
+
 static TimeStamp getTimeStamp( LITTable *lit, LineInfo *line )
 {
   LineInfoTimes **table = lit->table;
   int idx_bits = lit->idx_bits;
-  int idx = ( line->line ) & ( 1 << idx_bits );
+  int idx = ( line->line ) & ( ( 1 << idx_bits ) - 1 );
   LineInfoTimes *p = table[ idx ];
 
   while( p != NULL && p->line != line ) {
      p = p->next;
   }
+
+  // DPRINT3( "GET %s %u %llu\n", line->file, line->line, p==NULL ? 0 : p->time );
+
   return p==NULL ? 0 : p->time;
 }
 
@@ -3097,6 +3088,10 @@ static void doubleLITtable( LITTable *lit )
 
    check( qable != NULL, "Out of memory" );
 
+   for( i=0; i < (2 << idx_bits); i++ ) {
+      qable[i] = NULL;
+   }
+
    for( i=0; i < (1 << idx_bits); i++ ) {
       LineInfoTimes *q = lit->table[i], *next;
       while( q != NULL ) {
@@ -3107,7 +3102,7 @@ static void doubleLITtable( LITTable *lit )
          q = next;
       }
    }
-   VG_(free)( lit->table );
+   if( lit->table != &line_info_times_ptr ) VG_(free)( lit->table );
    lit->idx_bits++;
    lit->table = qable;
 } 
@@ -3116,41 +3111,181 @@ static void setTimeStamp( LITTable *lit, LineInfo *line, TimeStamp time )
 {
   LineInfoTimes **table = lit->table;
   int idx_bits = lit->idx_bits;
-  int idx = ( line->line ) & ( ( 1 << idx_bits ) - 1 );
-  LineInfoTimes *p = table[ idx ];
+  int idx;
+  LineInfoTimes *p;
+
+  // DPRINT3( "SET %s %u %llu\n", line->file, line->line, time );
+
+  idx = ( line->line ) & ( ( 1 << idx_bits ) - 1 );
+  p = table[ idx ];
 
   while( p != NULL && p->line != line ) {
      p = p->next;
   }
 
   if( p == NULL ) {
-     if( lit->n_items > ( 1 << idx_bits ) ) {
+     if( lit->n_items + 2 > ( 1 << idx_bits ) ) {
        doubleLITtable( lit );
        table = lit->table;
        idx_bits = lit->idx_bits;
        idx = ( line->line ) & ( ( 1 << idx_bits ) - 1 );
      }
      p = newLineInfoTimes( );
+
      p->next = table[ idx ];
      p->line = line;
      table[ idx ] = p;
+     lit->n_items++;
   }
 
   p->time = time;
 }
 
-static unsigned long long int line_instrs = 0;
-
 static VG_REGPARM(2)
 void recordInstr(InstrInfo *i_info, Word n)  // n is the number of skipped instructions
 {
+    instructions += n+1;
+
+    // if( i_info->line->file != questions ) {
+    //    DPRINT2( "E   %s %u\n", i_info->line->file, i_info->line->line );
+    // }
+
     if( i_info->line == current_stack_frame->current_line ) {
        current_stack_frame->span += n+1;
     } else {
-       //
+       LineList *ll;
+       StackFrame *sp = current_stack_frame;
+       TimeStamp max_t = 0;
+
+       setTimeStamp( &( sp->stamps ), sp->current_line, sp->span+n );
+       for( ll = i_info->line->pred[0]; ll != NULL; ll = ll->next ) {
+          TimeStamp t = getTimeStamp( &( sp->stamps ), ll->line );
+          if( t > max_t ) max_t = t;
+       }
+       sp->current_line = i_info->line;
+       sp->span = max_t+1; // We've started executing a new instruction
     }
 }
 
+static VG_REGPARM(3)
+void recordCall_span( InstrInfo *i_info, Addr32 sp, Addr32 target )
+{
+    StackFrame * newFrame = current_stack_frame + 1;
+    Addr32 ca = i_info->i_addr, 
+           ra = ca + i_info->i_len;
+
+    // BONK( "Call\n" );
+
+    if( newFrame==stack_base+N_STACK_FRAMES ) {
+        VG_(tool_panic)("Out of memory!");
+    }
+    PROFILE( bumpCounter( &stack_frames, 1, NULL, NULL ); )
+
+    newFrame->sp          = sp;
+    newFrame->ret_addr    = ra;
+    newFrame->flags       = 0;
+    newFrame->call_header = NULL;
+    newFrame->stack_mark  = smarks+topMark;
+#if RECORD_CF_EDGES
+    newFrame->current_line = mk_line_info( target ); 
+#endif
+    newFrame->span        = 0;
+    newFrame->stamps      = initial_LIT_table;
+    current_stack_frame = newFrame;
+}
+
+static TimeStamp computeSpan( StackFrame *sp ) 
+{
+   int i, n = 1 << sp->stamps.idx_bits;
+   LineInfoTimes **tab = sp->stamps.table;
+   TimeStamp max = 0;
+
+   for( i = 0; i < n; i++ ) {
+      LineInfoTimes *ll;
+      for( ll = tab[i]; ll != NULL; ll = ll->next ) {
+         if( ll->time > max ) max = ll->time;
+      }
+   }
+   if( sp->span > max ) max = sp->span;
+
+   return max;
+}
+
+
+static void pop_stack_frame_span(void)
+{
+   // Find the maximum span in the current stack frame
+
+   if( current_stack_frame > stack_base ) {
+      current_stack_frame--;
+      current_stack_frame->span += computeSpan( current_stack_frame + 1 );
+      clearLITTable( &( current_stack_frame[1].stamps) );
+   }
+}
+
+static VG_REGPARM(2)
+void recordRet_span( Addr32 sp, Addr32 target ) 
+{
+
+   // Should check that we are really returning to the next stack frame
+   // and in that case make it the current stack frame
+   
+   if( current_stack_frame < stack_base ) return;
+
+   // the sp in the StackFrame struct is the sp *after* pushing the 
+   // return address; hence adding 4 bytes should yield the sp 
+   // after the return has popped
+   // This logic is x86 specific!
+
+   while( current_stack_frame-1 >= stack_base && current_stack_frame[-1].sp + 4 < sp ) {
+     // we need to unwind the stack
+     pop_stack_frame_span( );
+   }
+   // we have found the right stack frame
+
+   if( current_stack_frame->sp+4 > sp ) {
+     // this return does not correspond to the appropriate call
+     // do nothing
+   } else {
+     // we have returned and possibly popped a few more words off of the stack
+     if( current_stack_frame->ret_addr != target ) {
+       // we're not returning to the scene of the crime, sorry, call
+       
+     }
+     // we will not need this retrun address any more
+     pop_stack_frame_span( );
+   }
+
+   if( current_stack_frame < stack_base ) {
+     VG_(tool_panic)( "Shadow stack underflow" );
+   }
+
+}
+
+
+static void instrumentExit_span( IRSB *bbOut, InstrInfo *i_info, IRJumpKind jk, IRExpr *dst )
+{
+
+    switch( jk ) {
+
+       case Ijk_Call :
+            {
+              IRExpr *exp_ii = const32( (UInt) i_info );
+              IRExpr *exp_sp = emitIRAssign( bbOut, IRExpr_Get(OFFSET_x86_ESP, Ity_I32) );
+              emitDC_3( bbOut, "recordCall_span", &recordCall_span, exp_ii, exp_sp, dst );
+              break;
+            }
+       case Ijk_Ret  :
+            {
+              IRExpr *exp_sp = emitIRAssign( bbOut, IRExpr_Get(OFFSET_x86_ESP, Ity_I32) );
+              emitDC_2( bbOut, "recordRet_span", &recordRet_span, exp_sp, dst );
+              break;
+            }
+       default       : ;
+          /* do nothing */
+    }
+
+}
 
 static IRSB* em_instrument_span(VgCallbackClosure* closure,
                                 IRSB* bbIn, VexGuestLayout* layout,
@@ -3159,6 +3294,9 @@ static IRSB* em_instrument_span(VgCallbackClosure* closure,
 {
     IRSB     *bbOut = deepCopyIRSBExceptStmts( bbIn );
     int       i_idx = 0;
+    Addr32    guestIAddr;
+    unsigned  guestILen;
+    InstrInfo *currII = NULL;
 
     while( i_idx<bbIn->stmts_used && bbIn->stmts[i_idx]->tag != Ist_IMark ) {
        addStmtToIRSB( bbOut, bbIn->stmts[i_idx] );
@@ -3168,11 +3306,27 @@ static IRSB* em_instrument_span(VgCallbackClosure* closure,
        IRStmt *stIn = bbIn->stmts[i_idx];
 
        switch( stIn->tag ) {
+
+          case Ist_IMark: 
+              guestIAddr = (Addr32) stIn->Ist.IMark.addr;
+              guestILen  = stIn->Ist.IMark.len;
+
+              currII = mk_i_info( NULL, guestIAddr, guestILen );
+	      emitDC_2( bbOut, "recordInstr", &recordInstr, 
+                        const32( (UInt) currII ), const32( 0 ) );
+
+              break;
+
+          case Ist_Exit:
+              instrumentExit_span( bbOut, currII, stIn->Ist.Exit.jk, 
+                                   IRExpr_Const( stIn->Ist.Exit.dst ) );
+              break;
     
           default : ; /* do nothing */
        }
        addStmtToIRSB( bbOut, stIn );
     }
+    instrumentExit_span( bbOut, currII, bbOut->jumpkind, bbOut->next );
 
     return bbOut;
 }
@@ -3390,6 +3544,189 @@ static IRSB* em_instrument(VgCallbackClosure* closure,
 }
 
 
+
+/*********************************************
+ * Initialization routines                   *
+ *********************************************/
+
+#define read_buf_size 4096
+
+typedef struct {
+   Int fd;
+   Char *read_ptr, *end_ptr, buf[read_buf_size];
+} ReadHandle;
+
+static ReadHandle* openRH( const Char* name )
+{
+   SysRes sr = VG_(open)( name, VKI_O_RDONLY, 0 );
+   int    fd = sr.res;
+
+   ReadHandle *rh = (ReadHandle *) VG_(calloc)( 1, sizeof(ReadHandle) );
+
+   check( fd >= 0, "Cannot open file" );
+   check( rh != NULL, "Cannot allocate read handle" );
+
+   rh->fd = fd;
+   rh->read_ptr = rh->buf;
+   rh->end_ptr = rh->buf;
+
+   return rh;
+}
+
+static void closeRH( ReadHandle *rh )
+{
+   VG_(close)( rh->fd );
+   VG_(free)( rh );
+}
+
+static Bool eofRH( ReadHandle *rh )
+{
+   if( rh->read_ptr >= rh->end_ptr ) {
+      rh->end_ptr = rh->buf + VG_(read)( rh->fd, rh->buf, read_buf_size );
+      rh->read_ptr = rh->buf;
+      if( rh->end_ptr == rh->buf ) return 1;
+   }
+   return 0;
+}
+
+static Char getcRH( ReadHandle *rh )
+{
+   if( eofRH( rh ) ) return 0;
+   return *( (rh->read_ptr)++ );
+}
+   
+
+// A word ends on a space or on the end of input. 
+// The return value signifies length of word read with 0 indicating eof.
+// The first character in the word returned is not a space.
+
+
+static Int readWord( ReadHandle* rh, Char *o_buf, Int len )
+{
+   Char c = 0;
+   Bool e;
+   Int  n = len;
+
+   while( !( e = eofRH( rh ) ) && VG_(isspace)( c = getcRH( rh ) ) ) ;
+
+   if( !e ) {
+      do {
+         *( o_buf++ ) = c; 
+         len--;
+         if( eofRH( rh ) ) break;
+         c = getcRH( rh );
+      } while( ! VG_(isspace)( c ) && len > 1 );
+   }
+   *o_buf = 0;
+   return n-len;
+}
+
+
+static void readDeps( void )
+{
+   const int bs = 1000;
+   Char fn[bs];
+   Char s1[bs];
+   Char s2[bs];
+   ReadHandle *rh;
+   
+
+   rh = openRH( dep_file_name );
+   
+   while( 1 ) {
+      int n1 = readWord( rh, fn, bs );
+      int n2 = readWord( rh, s1, bs );
+      int n3 = readWord( rh, s2, bs );
+      LineInfo *li1, *li2;
+      long l1,l2;
+
+      if( !n1 || !n2 || !n3 ) break;
+
+      l1 = VG_(atoll)( s1 );
+      l2 = VG_(atoll)( s2 );
+      li1 = mk_line_info_l( fn, l1 );
+      li2 = mk_line_info_l( fn, l2 );
+
+      li1->pred[0] = consLL( li2, li1->pred[0] );
+   }
+
+   closeRH( rh );
+}
+
+static void em_post_clo_init_span( void )
+{
+   VG_(clo_vex_control).iropt_level = 0;
+   VG_(clo_vex_control).iropt_unroll_thresh = 0;
+   VG_(clo_vex_control).guest_chase_thresh = 0;
+
+   questions = intern_string( "???" );
+   dummy_line_info.file = questions;
+   dummy_line_info.func = questions;
+
+   VG_(message)(Vg_UserMsg, "Initializing span measurement");
+
+   stack_base->call_header = NULL;
+
+   readDeps( );
+
+}
+
+
+static void em_post_clo_init_deps(void)
+{
+   VG_(clo_vex_control).iropt_level = 0;
+   VG_(clo_vex_control).iropt_unroll_thresh = 0;
+   VG_(clo_vex_control).guest_chase_thresh = 0;
+
+   VG_(message)(Vg_UserMsg, "Initalising dependency profiling");
+
+   map = (MapFragment **) VG_(calloc)(FRAGS_IN_MAP, sizeof(MapFragment*));
+   dirty_map = (unsigned int *) VG_(calloc)( DIRTY_WORDS, sizeof( unsigned int ) );
+   trace_pile = (TraceRec *) VG_(calloc)( N_TRACE_RECS, sizeof( TraceRec ) );
+
+   if( map==NULL || trace_pile==NULL || dirty_map==NULL ) {
+       VG_(tool_panic)("Out of memory!");
+   }
+   first_new_tr = trace_pile;
+
+   opt.elim_stack_alias = 1;
+
+   questions = intern_string( "???" );
+   dummy_line_info.file = questions;
+   dummy_line_info.func = questions;
+
+   smarks[0].sp = (Addr32) 0xffffffff;
+   smarks[0].tr = trace_pile+1;
+
+   trace_pile[0].i_info = &dummy_instr_info;
+   trace_pile[0].link = mkTaggedPtr2(stack_base, TPT_OPEN);
+
+   trace_pile[1].i_info = &dummy_instr_info;
+   trace_pile[1].link = mkTaggedPtr2(trace_pile, TPT_REG);
+
+   last_trace_rec = trace_pile+1;
+   stack_base->call_header = trace_pile;
+
+   init_read_table( );
+
+}
+
+static void em_post_clo_init(void)
+{
+   if( measure_span ) {
+      em_post_clo_init_span( );
+   } else {
+      em_post_clo_init_deps( );
+   }
+}
+
+
+
+/*****************************************************
+ * Finalization routines                             *
+ *****************************************************/
+
+
 static void printResultTable(const Char * traceFileName)
 {
   int      i,j;
@@ -3544,7 +3881,18 @@ static void printCFG(const Char * cfgFileName)
 
 static void em_fini_span(Int exitcode)
 {
+   TimeStamp span;
    VG_(message)(Vg_UserMsg, "Span measurement finished" );
+
+   while( current_stack_frame > stack_base ) {
+      current_stack_frame --;
+      current_stack_frame->span += computeSpan( current_stack_frame + 1 );
+   }
+   span = computeSpan( stack_base );
+
+   VG_(message)(Vg_UserMsg, "Instructions:        %12llu", instructions);
+   VG_(message)(Vg_UserMsg, "Span:                %12llu", span);
+   VG_(message)(Vg_UserMsg, "Average parallelism: %g", (double) instructions / (double) span);
 }
 
 static void em_fini_deps(Int exitcode)
