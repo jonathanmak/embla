@@ -464,6 +464,8 @@ typedef
      LineInfo *current_line;
 #endif
      TimeStamp span;
+     TimeStamp seq_span;
+     LineInfo  *entry_line;
      LITTable  stamps;
    }
    StackFrame;
@@ -475,7 +477,7 @@ static StackFrame stack_base[N_STACK_FRAMES] =
 #if RECORD_CF_EDGES
          , &dummy_line_info
 #endif
-         , 0, { &line_info_times_ptr, 0, 0 }
+	  , 0, 0, &dummy_line_info, { &line_info_times_ptr, 0, 0 }
          } 
        };
 
@@ -744,7 +746,7 @@ static void logTranslation( Addr32 addr )
 
 static LineInfo *line_table[RESULT_ENTRIES];
 
-static LineInfo *mk_line_info_l( char *file, unsigned line )
+static LineInfo *mk_line_info_l( char *file, unsigned line, char *func )
 {
    char     *i_file, buffer[BUF_SIZE];
    LineInfo *info,**info_p;
@@ -773,7 +775,7 @@ static LineInfo *mk_line_info_l( char *file, unsigned line )
 #endif
       info->line = line;
       info->file = i_file;
-      info->func = intern_string( "???" );
+      info->func = intern_string( func == NULL ? "???" : func );
       info->next = *info_p;
       *info_p = info;
    }
@@ -786,9 +788,8 @@ static LineInfo *mk_line_info( Addr32 i_addr )
    unsigned line;
 
    getDebugInfo( i_addr, file, func, &line );
-   IFINS1( DPRINT1( "%s\n", file ) );
 
-   return mk_line_info_l( file, line );
+   return mk_line_info_l( file, line, func );
 }
 
 static InstrInfo *ii_chunk = NULL;
@@ -2568,6 +2569,8 @@ void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target)
     newFrame->current_line = NULL;
 #endif
     newFrame->span        = 0;
+    newFrame->seq_span    = 0;
+    newFrame->entry_line  = NULL;
     current_stack_frame = newFrame;
 
     // Set hiddenness (recheck)
@@ -3144,14 +3147,16 @@ static void setTimeStamp( LITTable *lit, LineInfo *line, TimeStamp time )
 static VG_REGPARM(2)
 void recordInstr(InstrInfo *i_info, Word n)  // n is the number of skipped instructions
 {
+
     instructions += n+1;
+    current_stack_frame->seq_span += n+1;
 
     // if( i_info->line->file != questions ) {
     //    DPRINT2( "E   %s %u\n", i_info->line->file, i_info->line->line );
     // }
 
     if( i_info->line == current_stack_frame->current_line ) {
-       current_stack_frame->span += n+1;
+       current_stack_frame->span     += n+1;
     } else {
        LineList *ll;
        StackFrame *sp = current_stack_frame;
@@ -3190,6 +3195,8 @@ void recordCall_span( InstrInfo *i_info, Addr32 sp, Addr32 target )
     newFrame->current_line = mk_line_info( target ); 
 #endif
     newFrame->span        = 0;
+    newFrame->seq_span    = 0;
+    newFrame->entry_line  = newFrame->current_line; // mk_line_info( target ); NEW!!!
     newFrame->stamps      = initial_LIT_table;
     current_stack_frame = newFrame;
 }
@@ -3211,15 +3218,52 @@ static TimeStamp computeSpan( StackFrame *sp )
    return max;
 }
 
+typedef struct _SPTEntry {
+   TimeStamp seq, par;
+   LineInfo  *line;
+   struct _SPTEntry *next;
+} SPTEntry;
+
+#define SEQ_PAR_TABLE_BITS 12
+
+static SPTEntry *seq_par_table[ 1<SEQ_PAR_TABLE_BITS ];
+
+static void addSeqParSpan( LineInfo *line, TimeStamp seq, TimeStamp par )
+{
+   int idx = (unsigned) line & ( ( 1 << SEQ_PAR_TABLE_BITS ) - 1 );
+   SPTEntry *ll;
+
+   // DPRINT3( "Add (%d) %llu %llu\n", line->line, seq, par );
+
+   for( ll = seq_par_table[ idx ]; ll != NULL && ll->line != line; ll = ll->next ) ;
+
+   if( ll == NULL ) {
+     // First time this function
+     ll = (SPTEntry *) VG_(calloc)( 1, sizeof( SPTEntry ) );
+     check( ll != NULL, "Out of memory" );
+     ll->seq = 0;
+     ll->par = 0;
+     ll->line = line;
+     ll->next = seq_par_table[ idx ];
+     seq_par_table[ idx ] = ll;
+   }
+   ll->seq += seq;
+   ll->par += seq - par;
+}
 
 static void pop_stack_frame_span(void)
 {
    // Find the maximum span in the current stack frame
 
    if( current_stack_frame > stack_base ) {
+      TimeStamp     span = computeSpan( current_stack_frame );
+
+      addSeqParSpan( current_stack_frame->entry_line, current_stack_frame->seq_span, span );
+      clearLITTable( &( current_stack_frame->stamps ) );
+
       current_stack_frame--;
-      current_stack_frame->span += computeSpan( current_stack_frame + 1 );
-      clearLITTable( &( current_stack_frame[1].stamps) );
+      current_stack_frame->span     += span;
+      current_stack_frame->seq_span += span;
    }
 }
 
@@ -3357,6 +3401,8 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
 #endif
 
     translations++;
+
+    // BONK( "em_instrument_deps\n" );
 
 
     bbOut = deepCopyIRSBExceptStmts( bbIn );
@@ -3644,8 +3690,8 @@ static void readDeps( void )
 
       l1 = VG_(atoll)( s1 );
       l2 = VG_(atoll)( s2 );
-      li1 = mk_line_info_l( fn, l1 );
-      li2 = mk_line_info_l( fn, l2 );
+      li1 = mk_line_info_l( fn, l1, NULL );
+      li2 = mk_line_info_l( fn, l2, NULL );
 
       li1->pred[0] = consLL( li2, li1->pred[0] );
    }
@@ -3821,6 +3867,8 @@ static void printCFG(const Char * cfgFileName)
    LineInfo *line_info;
    LineList *ll;
 
+   // BONK( "printCFG\n" );
+
    tl_assert(result_array);
    for( i=0; i<RESULT_ENTRIES; i++ ) {
 
@@ -3877,6 +3925,20 @@ static void printCFG(const Char * cfgFileName)
 
 }
 
+static void printSPT( void )
+{
+   SPTEntry *ll;
+   int        i;
+
+   for( i=0; i < 1 << SEQ_PAR_TABLE_BITS; i++ ) {
+     for( ll = seq_par_table[ i ]; ll != NULL; ll = ll->next ) {
+       VG_(printf)( "%8s %4d %10llu %2llu\n", ll->line->file, ll->line->line,
+                     ll->par,
+                     100 * ll->par / instructions );
+     }
+   }
+}
+
 #define smdiv(x,y) (y==0 ? 0 : x/y)
 
 static void em_fini_span(Int exitcode)
@@ -3890,9 +3952,11 @@ static void em_fini_span(Int exitcode)
    }
    span = computeSpan( stack_base );
 
+   printSPT( );
+
    VG_(message)(Vg_UserMsg, "Instructions:        %12llu", instructions);
    VG_(message)(Vg_UserMsg, "Span:                %12llu", span);
-   VG_(message)(Vg_UserMsg, "Average parallelism: %g", (double) instructions / (double) span);
+   VG_(message)(Vg_UserMsg, "Average parallelism: %12llu", instructions /  span);
 }
 
 static void em_fini_deps(Int exitcode)
