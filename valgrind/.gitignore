@@ -1,3 +1,8 @@
+
+
+/.in_place
 /autom4te.cache
-
-
+/default.supp
+/stamp-h1
+/valgrind.pc
+/valgrind.spec
