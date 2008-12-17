@@ -2,6 +2,8 @@
 
 /.in_place
 /autom4te.cache
+/config.h.in
+/configure
 /default.supp
 /stamp-h1
 /valgrind.pc
