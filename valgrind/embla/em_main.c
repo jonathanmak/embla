@@ -54,7 +54,7 @@
 #define  FULL_CONTOURS      0
 #define  INSTRUMENT_GC      1
 #define  LIGHT_IGC          1
-#define  DUMP_TRACE_PILE    0
+#define  DUMP_TRACE_PILE    1
 #define  DUMP_MEMORY_MAP    0
 
 // Major modes
@@ -259,11 +259,13 @@ typedef
      char h_inf;
      char t_inf;
      UInt n_raw, n_war, n_waw;
+     struct _TraceRec * h_tr;
+     struct _TraceRec * t_tr;
      struct _RTEntry *next;
    }
    RTEntry;
 
-static RTEntry mock_rtentry = {"mock", "", 0, 'o', 0, 0, 'c', 'c', 0, 0, 0, NULL};
+static RTEntry mock_rtentry = {"mock", "", 0, 'o', 0, 0, 'c', 'c', 0, 0, 0, NULL, NULL, NULL};
 
 /********************************************************************************
  *                                                                              *
@@ -1642,7 +1644,7 @@ static void dump_trace_pile(void)
                break;
          }
          i_idx = rec->i_info == &dummy_instr_info ? -1 : rec->i_info - ii_chunk;
-         DPRINT2( "%s %d", tag, i_idx );
+         DPRINT3( "%s %d(%d)", tag, i_idx, rec->i_info->i_addr );
          DPRINT3( "(%s %d) %d\n", rec->i_info->line->file, rec->i_info->line->line, off );
       } else {
          switch( TP_GET_FLAGS( rec->link ) ) {
@@ -1795,7 +1797,8 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
                                Addr32 ref_addr)
 {
    TraceRec   *old_tr = ToTrP( old_event ),
-              *nca_tr = ToTrP( old_tr->link );
+              *nca_tr = ToTrP( old_tr->link ),
+              *new_tr;
 
    InstrInfo  *h_info, *t_info;
 
@@ -1842,6 +1845,7 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
      h_info = curr_info;
      h_code = DF_DIRECT;
    }
+   new_tr = ToStP( nca_tr->link )[1].call_header;
 
    if( ref_addr >= lowest_shadow_sp && ref_addr <= highest_shadow_sp ) {
       r_code = inStack( ref_addr, old_tr );
@@ -1861,7 +1865,7 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
    hash_value = ( t_line + code ) & ( RT_ENTRIES_PER_LINE-1 );
    entry = h_info->line->entries[hash_value];
 
-   while( entry!=NULL && ( entry->t_line != t_line || entry->code != code ) ) {
+   while( entry!=NULL && ( entry->t_line != t_line || entry->code != code || entry->t_tr != old_tr || entry->h_tr != new_tr ) ) {
       PROFILE( getResultEntry_entry++; )       // counting
       entry = entry->next;
    }
@@ -1883,6 +1887,8 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
        entry->n_raw  = 0;
        entry->n_war  = 0;
        entry->n_waw  = 0;
+       entry->h_tr = new_tr;
+       entry->t_tr = old_tr;
        entry->next = h_info->line->entries[hash_value];
        h_info->line->entries[hash_value] = entry;
 
@@ -3783,6 +3789,10 @@ static void printResultTable(const Char * traceFileName)
    int fd = -1;
    LineInfo *line_info;
 
+#if DUMP_TRACE_PILE
+   dump_trace_pile( );
+#endif
+
    tl_assert(result_array);
    for( i=0; i<RESULT_ENTRIES; i++ ) {
      // DPRINT1( "%d", i );
@@ -3827,9 +3837,11 @@ static void printResultTable(const Char * traceFileName)
    }
    for (i = 0; i < num_results; ++i)
    {
-     VG_(sprintf)( buf, "%s %d %d %d\n", 
+     VG_(sprintf)( buf, "%s %d %d %d %d %d\n", 
 		   makeTitle(& result_array[i]), result_array[i].n_raw,
-		   result_array[i].n_war, result_array[i].n_waw );
+		   result_array[i].n_war, result_array[i].n_waw,
+//                   result_array[i].h_tr->i_info->i_addr, result_array[i].t_tr->i_info->i_addr );
+                   result_array[i].h_tr - trace_pile, result_array[i].t_tr - trace_pile );
      if (VG_(strcmp)(traceFileName, "-") != 0)
        VG_(write)( fd, buf, VG_(strlen)( buf ) );
      else
