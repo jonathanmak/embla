@@ -56,6 +56,7 @@
 #define  LIGHT_IGC          1
 #define  DUMP_TRACE_PILE    1
 #define  DUMP_MEMORY_MAP    0
+#define  CRITPATH_ANALYSIS  1
 
 // Major modes
 
@@ -91,7 +92,7 @@ unsigned interesting_address=0;
 #define  II_CHUNK_SIZE      1000000
 // #define  STRING_TABLE         10007  // smallest prime >= 10000
 
-#define  RT_IDX_BITS                        3
+#define  RT_IDX_BITS                        8
 #define  RT_ENTRIES_PER_LINE (1<<RT_IDX_BITS)  // must be power of 2
 #define  PRED_ENTRIES_PER_LINE 4
 
@@ -133,6 +134,7 @@ static unsigned int * dirty_map;
 #define  DPRINT1(s,x)     { VG_(sprintf)( dbuf, s, x );       BONK( dbuf ); }
 #define  DPRINT2(s,x,y)   { VG_(sprintf)( dbuf, s, x, y );    BONK( dbuf ); }
 #define  DPRINT3(s,x,y,z) { VG_(sprintf)( dbuf, s, x, y, z ); BONK( dbuf ); }
+#define  DPRINT4(s,w,x,y,z) { VG_(sprintf)( dbuf, s, w, x, y, z ); BONK( dbuf ); }
 
 #else
 
@@ -140,6 +142,7 @@ static unsigned int * dirty_map;
 #define DPRINT1(s,x) { }
 #define DPRINT2(s,x,y) { }
 #define DPRINT3(s,x,y,z) { }
+#define DPRINT4(s,w,x,y,z) { }
 
 #endif
 
@@ -222,6 +225,14 @@ static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
 #else
 #define PROFILE( c ) 
 #endif
+
+//
+// For Critical Path Analysis
+//
+#define  N_FRAMES         1000  // Nesting level
+#define  TRACK_RAW        1     // Track RAW dependencies
+#define  TRACK_WAR        1     // Track WAR dependencies
+#define  TRACK_WAW        1     // Track WAW dependencies
 
 typedef enum { SR_NONE, SR_SAVE, SR_RESTORE, SR_MOV_SP } SRCode;
 
@@ -369,6 +380,141 @@ static StmInfo *mkStmInfo( InstrInfo *i_info, UShort offset, UChar size, UChar f
     return mkStmInfoI( i_info, offset, 0, 0, size, flags );
 }
 
+/**********************************************************************
+ * Critical path analysis
+ **********************************************************************/
+
+#if CRITPATH_ANALYSIS
+
+typedef struct _INode {
+  int nodeId;
+  int cost;
+  struct _INodeList *deps;
+  int cpLength;
+  struct _INode *cp;
+} INode;
+
+typedef struct _INodeList {
+  INode *node;
+  struct _INodeList *next;
+} INodeList;
+
+typedef struct _FrameGraph {
+  INodeList *allNodes;
+  INodeList *roots;
+  INode *lastRegNode;
+  INode *callerNode;
+} FrameGraph;
+
+static FrameGraph *firstFrame;
+static FrameGraph *currFrame;
+
+static INodeList *consINode(INodeList *tail, INode *head) {
+  INodeList *newList = VG_(malloc)(sizeof(INodeList));
+  if (newList == NULL) {
+    VG_(tool_panic)( "Out of space for INodeLists." );
+  }
+  newList->node = head;
+  newList->next = tail;
+  return newList;
+}
+
+static INode *new_INode(int id) {
+   INode *inode = VG_(malloc)(sizeof (INode));
+   if(inode == NULL) {
+     VG_(tool_panic)( "Out of space for INodes." );
+   }
+   inode->nodeId = id;
+   inode->cost = -9999999; // Just to make sure we notice if cost has not been set
+   inode->cpLength = -9999999;
+   inode->deps = NULL;
+   inode->cp = NULL;
+   if (currFrame->lastRegNode != NULL) {
+     currFrame->lastRegNode->deps = consINode(currFrame->lastRegNode->deps, inode);
+   } else {
+     currFrame->roots = consINode(currFrame->roots, inode);
+   }
+   currFrame->allNodes = consINode(currFrame->allNodes, inode);
+   return inode;
+}
+
+static void newNodeFrame(INode *callerNode) {
+  currFrame++;
+  if (currFrame - N_FRAMES >= firstFrame) {
+    VG_(tool_panic)( "Frame roots stack overflow." );
+  }
+  currFrame->allNodes = NULL;
+  currFrame->roots = NULL;
+  currFrame->lastRegNode = NULL;
+  currFrame->callerNode = callerNode;
+}
+
+static void regEventNode(INode *inode) {
+  inode->cost = 1;
+  currFrame->lastRegNode = inode;
+}
+
+static int critPath(INode *inode) {
+  int depCpLength;
+  INodeList *dep;
+  if (inode->cp != NULL) {
+    return inode->cpLength;
+  }
+  inode->cpLength = inode->cost;
+  for (dep = inode->deps; dep != NULL; dep = dep->next) {
+    depCpLength = critPath(dep->node);
+    if (depCpLength + inode->cost > inode->cpLength) {
+      inode->cpLength = depCpLength + inode->cost;
+      inode->cp = dep->node;
+    }
+  }
+  return inode->cpLength;
+}
+
+static INode *critPathNodes(INodeList *inodes) {
+  INode *currMaxCp = NULL;
+  int currMaxCpLength = -9999999, cpLength;
+  for (; inodes != NULL; inodes = inodes->next) {
+    cpLength = critPath(inodes->node);
+    if (cpLength > currMaxCpLength) {
+      currMaxCp = inodes->node;
+      currMaxCpLength = cpLength;
+    }
+  }
+  return currMaxCp;
+}
+
+static void freeNodeList(INodeList *nL) {
+  INodeList *tmp;
+
+  for (; nL != NULL; nL = tmp) {
+    tmp = nL->next;
+    VG_(free)(nL);
+  }
+}
+
+static void retNode(INode *inode) {
+  INodeList *nodeList;
+
+  if (inode != NULL) {
+    inode->cost = 1;
+  }
+
+  currFrame->callerNode->cost = 1+critPathNodes(currFrame->roots)->cpLength;
+//  VG_(message)(Vg_UserMsg, "CP of frame %d = %d", currFrame->callerNode->nodeId, currFrame->callerNode->cost);
+
+  for (nodeList = currFrame->allNodes; nodeList != NULL; nodeList = nodeList->next) {
+    freeNodeList (nodeList->node->deps);
+    VG_(free)(nodeList->node);
+  }
+  freeNodeList(currFrame->roots);
+  freeNodeList(currFrame->allNodes);
+  
+  currFrame--;
+}
+
+#endif
+
 /********************************************************************************
  *                                                                              *
  * Other stuff                                                                  *
@@ -405,6 +551,9 @@ typedef
    struct _TraceRec {
       InstrInfo *i_info;
       TaggedPtr  link;
+#if CRITPATH_ANALYSIS
+      INode *inode;
+#endif
    }
    TraceRec;
 
@@ -424,8 +573,19 @@ static TraceRec * newTraceRec(InstrInfo *i_info, TaggedPtr link)
    last_trace_rec++;
    last_trace_rec->i_info = i_info;
    last_trace_rec->link   = link;
+#if CRITPATH_ANALYSIS
+   last_trace_rec->inode = new_INode(last_trace_rec - trace_pile);
+#endif
    return last_trace_rec;
 }
+
+#if CRITPATH_ANALYSIS
+static void addNodeDependency(TraceRec *old_tr, TraceRec *new_tr) {
+   INode *oldINode = old_tr->inode;
+   INode *newINode = new_tr->inode;
+   oldINode->deps = consINode(oldINode->deps, newINode);
+}
+#endif
 
 typedef struct {
    Addr32    sp;
@@ -511,6 +671,10 @@ static TaggedPtr newRegularEvent(StackFrame *frame, InstrInfo *i_info)
 {
    TraceRec  *tr   = newTraceRec( i_info, mkTaggedPtr2( frame->call_header, TPT_REG ) );
    unsigned  hflag = ( frame->flags & SF_HIDDEN ) != 0 ? 1 : 0;
+
+#if CRITPATH_ANALYSIS
+   regEventNode (tr->inode);
+#endif
 
    return mkTaggedPtr( tr, hflag, 0 );
 }
@@ -824,7 +988,6 @@ static InstrInfo *mk_i_info(InstrInfo *curr, Addr32 i_addr, unsigned i_len)
 
    return ii_chunk + ii_idx++;
 }
-
 
 
 /***********************************************************************
@@ -1644,7 +1807,7 @@ static void dump_trace_pile(void)
                break;
          }
          i_idx = rec->i_info == &dummy_instr_info ? -1 : rec->i_info - ii_chunk;
-         DPRINT3( "%s %d(%d)", tag, i_idx, rec->i_info->i_addr );
+         DPRINT4( "%s %d(0x%x, %d)", tag, i_idx, rec->i_info->i_addr, rec->i_info->i_len );
          DPRINT3( "(%s %d) %d\n", rec->i_info->line->file, rec->i_info->line->line, off );
       } else {
          switch( TP_GET_FLAGS( rec->link ) ) {
@@ -1752,6 +1915,11 @@ static Int result_entry_compare(const RTEntry * e1, const RTEntry * e2)
   tl_assert(e1);
   tl_assert(e2);
 
+  if (e1->h_tr != e2->h_tr)
+    return e1->h_tr - e2->h_tr;
+  if (e1->t_tr != e2->t_tr)
+    return e1->t_tr - e2->t_tr;
+
   result = VG_(strcmp)(e1->h_file, e2->h_file);
   if (result != 0)
     return result;
@@ -1783,7 +1951,7 @@ unsigned long long getResultEntry_calls, getResultEntry_nca, getResultEntry_entr
 
 static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
                                Event old_event,
-                               Addr32 ref_addr)
+                               Addr32 ref_addr, Event new_event, int addNodeDep)
 {
    return &mock_rtentry;
 }
@@ -1794,7 +1962,7 @@ int nnn = 0;
 
 static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
                                Event old_event,
-                               Addr32 ref_addr)
+                               Addr32 ref_addr, Event new_event, int addNodeDep)
 {
    TraceRec   *old_tr = ToTrP( old_event ),
               *nca_tr = ToTrP( old_tr->link ),
@@ -1841,11 +2009,12 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
      // The head is indirect
      h_info = ToStP( nca_tr->link )[1].call_header->i_info;
      h_code = curr_ctx->flags & SF_HIDDEN ? DF_HIDDEN : DF_INDIRECT;
+     new_tr = ToStP( nca_tr->link )[1].call_header;
    } else {
      h_info = curr_info;
      h_code = DF_DIRECT;
+     new_tr = ToTrP( new_event );
    }
-   new_tr = ToStP( nca_tr->link )[1].call_header;
 
    if( ref_addr >= lowest_shadow_sp && ref_addr <= highest_shadow_sp ) {
       r_code = inStack( ref_addr, old_tr );
@@ -1862,10 +2031,11 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
    // We now have all necessary info to look up the dependence
 
    t_line = t_info->line->line;
-   hash_value = ( t_line + code ) & ( RT_ENTRIES_PER_LINE-1 );
+   hash_value = ( t_line + code + (int) old_tr + (int) new_tr ) & ( RT_ENTRIES_PER_LINE-1 );
    entry = h_info->line->entries[hash_value];
 
    while( entry!=NULL && ( entry->t_line != t_line || entry->code != code || entry->t_tr != old_tr || entry->h_tr != new_tr ) ) {
+//   while( entry!=NULL && ( entry->t_line != t_line || entry->code != code ) ) {
       PROFILE( getResultEntry_entry++; )       // counting
       entry = entry->next;
    }
@@ -1894,18 +2064,24 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
 
    }
 
+#if CRITPATH_ANALYSIS
+   if (addNodeDep) {
+       addNodeDependency(old_tr, new_tr);
+   }
+#endif
+
    return entry;
 
 }
 
 static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
                                Event old_event,
-                               Addr32 ref_addr)
+                               Addr32 ref_addr, Event new_event, int addNodeDep)
 {
     RTEntry *e;
 
     // IFDID( BONK( "{" ); );
-    e = XXgetResultEntry(curr_ctx, curr_info, old_event, ref_addr);
+    e = XXgetResultEntry(curr_ctx, curr_info, old_event, ref_addr, new_event, addNodeDep);
     // IFDID( BONK( "}" ); );
     // if( nnn>30 ) check( 0, "Found an exit" );
 
@@ -2106,6 +2282,11 @@ void recordRet(Addr32 sp, Addr32 target)
 {
 }
 
+static VG_REGPARM(1)
+void recordOp( StmInfo *s_info )
+{
+}
+
 #if TRACE_REG_DEPS
 
 static VG_REGPARM(1)
@@ -2175,6 +2356,7 @@ void recordLoad(StmInfo *s_info, Addr32 addr )
 #if TRACE_REG_DEPS
     int          static_sr = ( s_info->flags & SI_SAVE_REST ) != 0;
 #endif
+    Event        new_event;
 
     // BONK( "L" );
     // validateRegisterMap( );
@@ -2191,10 +2373,15 @@ void recordLoad(StmInfo *s_info, Addr32 addr )
     refp = getRefInfo( addr );
 
     if( refp->offsize == size ) {
+        new_event = newRegularEvent( current_stack_frame, i_info );
+        refp->lastRead = consEvent( new_event, refp->lastRead );
+
         res_entry = getResultEntry( current_stack_frame,
                                     i_info, 
                                     refp->lastWrite, 
-                                    addr );
+                                    addr,
+                                    new_event,
+                                    TRACK_RAW );
     
         res_entry->n_raw++;
 
@@ -2205,9 +2392,6 @@ void recordLoad(StmInfo *s_info, Addr32 addr )
           saved_save_desc = refp->saveDesc;
         }
 #endif
-        refp->lastRead = consEvent( newRegularEvent( current_stack_frame, i_info ), 
-                                    refp->lastRead );
-
     } else {
 
         Addr32 l_addr = addr;
@@ -2226,17 +2410,17 @@ void recordLoad(StmInfo *s_info, Addr32 addr )
             num_bytes = maybeSplitBlock( refp, l_addr, l_size );
 
             for( i = 0; i < num_bytes; i += refp[i].offsize ) {
-
+                new_event = newRegularEvent( current_stack_frame, i_info );
+                refp[i].lastRead = consEvent( new_event, refp[i].lastRead );
 
                 res_entry = getResultEntry( current_stack_frame,
                                             i_info, 
                                             refp[i].lastWrite, 
-                                            addr );
+                                            addr,
+                                            new_event,
+                                            TRACK_RAW );
                 res_entry->n_raw++;
 
-                refp[i].lastRead 
-                        = consEvent( newRegularEvent( current_stack_frame, i_info ), 
-                                     refp[i].lastRead );
             }
 
             // BONK( "done\n" );
@@ -2266,7 +2450,8 @@ void recordStore( StmInfo *s_info, Addr32 addr )
     RefInfo     *refp;
     RTEntry     *res_entry;
     EventList   *ev_list, *ev_next;
-    int         l_addr = addr, l_size = size, iters = 0;;
+    int         l_addr = addr, l_size = size, iters = 0;
+    Event        new_event;
 
     // BONK( "S" );
     IFINS1( DPRINT3( "Store, addr=%u, size=%u, sr=%u\n", addr, size, static_sr ) )
@@ -2288,6 +2473,7 @@ void recordStore( StmInfo *s_info, Addr32 addr )
             num_bytes = maybeSplitBlock( refp, l_addr, l_size );
         }
 
+        new_event = newRegularEvent( current_stack_frame, i_info );
         for( i = 0; i < num_bytes; i += refp[i].offsize ) {
 
             // If the access unit in the memory table is smaller than the access size,
@@ -2300,7 +2486,9 @@ void recordStore( StmInfo *s_info, Addr32 addr )
                 res_entry = getResultEntry( current_stack_frame,
                                             i_info, 
                                             refp[i].lastWrite, 
-                                            addr );
+                                            addr,
+                                            new_event,
+                                            TRACK_WAW );
                 res_entry->n_waw++;
             } else {
                 // last reference was a read: a WAR
@@ -2308,7 +2496,9 @@ void recordStore( StmInfo *s_info, Addr32 addr )
                     res_entry = getResultEntry( current_stack_frame,
                                                 i_info, 
                                                 ev_list->ev, 
-                                                addr );
+                                                addr,
+                                                new_event,
+                                                TRACK_WAR );
                     res_entry->n_war++;
                 }
             }
@@ -2326,7 +2516,7 @@ void recordStore( StmInfo *s_info, Addr32 addr )
 #endif
             
         }
-        refp->lastWrite = newRegularEvent( current_stack_frame, i_info );
+        refp->lastWrite = new_event;
         // merge
         for( i=refp->offsize; i<num_bytes; i++ ) {
             refp[i].offsize = -i;
@@ -2355,6 +2545,17 @@ void recordStore( StmInfo *s_info, Addr32 addr )
     gc( );
 
     // if( nnn>29 ) check( 0, "Found an exit" );
+
+}
+
+static VG_REGPARM(1)
+void recordOp(StmInfo *s_info)
+{
+    InstrInfo *i_info = s_info->i_info;
+
+    newRegularEvent( current_stack_frame, i_info );
+    
+    gc( );
 
 }
 
@@ -2583,11 +2784,14 @@ void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target)
     checkIfHidden( current_stack_frame, target, 0 );
     // call trace record insertion goes here 
 
+#if CRITPATH_ANALYSIS
+    newNodeFrame(newTR->inode);
+#endif
     gc( );
 
 }
 
-static void pop_stack_frame(void)
+static TraceRec *pop_stack_frame(void)
 {
    // Change call header to point to parent call header rather than stack
    // thus making it a closed call header
@@ -2597,18 +2801,23 @@ static void pop_stack_frame(void)
                * prev_call = current_stack_frame[-1].call_header;
                  // The TR for the returning call and previous call
 
+      TraceRec *ret_tr;
+
       this_call->link = mkTaggedPtr2( prev_call, TPT_CLOSED );
-      (void) newTraceRec( 0, mkTaggedPtr2( this_call, TPT_RET ) );
+      ret_tr = newTraceRec( 0, mkTaggedPtr2( this_call, TPT_RET ) );
 
       current_stack_frame--;
 
       // return trace record insterion goes here
+      return ret_tr;
    }
+   return NULL;
 }
 
 static VG_REGPARM(2)
 void recordRet(Addr32 sp, Addr32 target) 
 {
+   TraceRec *tr = NULL;
     // BONK( "Ret\n" );
     // validateRegisterMap( );
 
@@ -2623,7 +2832,7 @@ void recordRet(Addr32 sp, Addr32 target)
 
    while( current_stack_frame-1 >= stack_base && current_stack_frame[-1].sp + 4 < sp ) {
      // we need to unwind the stack
-     pop_stack_frame( );
+     tr = pop_stack_frame( );
    }
    // we have found the right stack frame
 
@@ -2637,7 +2846,7 @@ void recordRet(Addr32 sp, Addr32 target)
        
      }
      // we will not need this retrun address any more
-     pop_stack_frame( );
+     tr = pop_stack_frame( );
    }
 
    if( current_stack_frame < stack_base ) {
@@ -2645,6 +2854,15 @@ void recordRet(Addr32 sp, Addr32 target)
    }
 
    recordSpChange( sp );
+
+#if CRITPATH_ANALYSIS
+   if (tr == NULL) {
+     retNode(NULL);
+   } else {
+     retNode(tr->inode);
+   }
+#endif
+
    gc( );
 
 }
@@ -2761,6 +2979,14 @@ static void instrumentStore( IRSB *bbOut, InstrInfo *i_info, IRExpr *exp_addr, U
     StmInfo *s_info = mkStmInfo( i_info, 0, size, flags );
     IRExpr  *exp_si = const32( (UInt) s_info );
     emitDC_2( bbOut, "recordStore", &recordStore, exp_si, exp_addr );
+}
+
+static void instrumentOp( IRSB *bbOut, InstrInfo *i_info, IRExpr *exp, int size,
+                             UChar flags )
+{
+    StmInfo *s_info = mkStmInfo( i_info, 0, size, flags );
+    IRExpr  *exp_si = const32( (UInt) s_info );
+    emitDC_1( bbOut, "recordOp", &recordOp, exp_si );
 }
 
 #if TRACE_REG_DEPS
@@ -3381,6 +3607,8 @@ static IRSB* em_instrument_span(VgCallbackClosure* closure,
     return bbOut;
 }
 
+extern UInt vex_printf ( HChar *format, ... );
+
 static IRSB* em_instrument_deps(VgCallbackClosure* closure,
                                 IRSB* bbIn, VexGuestLayout* layout,
 			        VexGuestExtents * vge,
@@ -3412,6 +3640,10 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
 
 
     bbOut = deepCopyIRSBExceptStmts( bbIn );
+
+//    vex_printf("BBIN_START\n");
+//    ppIRSB( bbIn);
+//    vex_printf("BBIN_END\n");
 
     for( bbIn_idx = 0; bbIn_idx < bbIn->stmts_used; bbIn_idx++ ) {
        if( bbIn->stmts[bbIn_idx]->tag == Ist_IMark ) break;
@@ -3531,7 +3763,7 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
                  ref_size = sizeofIRType( tmpExpr->Iex.GetI.descr->elemTy );
                  flags = 0;
                  if( sr_index == -1 ) {
-		    IRTemp t = stIn->Ist.WrTmp.tmp;
+                      IRTemp t = stIn->Ist.WrTmp.tmp;
                     offset = sr_check( bbIn, bbIn_idx, t, SR_SAVE, ref_size );
                     if( offset != 0 ) { 
                       sr_index = offset;
@@ -3542,6 +3774,17 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
                  instrumentGetI( bbOut, currII, tmpExpr, ref_size, flags );
                  break;
 #endif
+               case Iex_Qop:
+               case Iex_Triop:
+               case Iex_Binop:
+               case Iex_Unop:
+               case Iex_Mux0X:
+                 currII = mk_i_info( currII, guestIAddr, guestILen );
+//                 ref_size = sizeofIRType( typeOfIRExpr( bbIn->tyenv, stIn->Ist.WrTmp.data ) );
+                 ref_size = 4;
+                 flags = 0;
+                 instrumentOp( bbOut, currII, tmpExpr, ref_size, flags );
+                 break;
                default:
                  break;
              }
@@ -3580,6 +3823,9 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
     currII = mk_i_info( currII, guestIAddr, guestILen );
     instrumentExit( bbOut, bbIn->jumpkind, currII, bbIn->next, loc_instr );
 #endif
+//    vex_printf("BBOUT_START\n");
+//    ppIRSB( bbOut);
+//    vex_printf("BBOUT_END\n");
     return bbOut;
 }
 
@@ -3735,11 +3981,21 @@ static void em_post_clo_init_deps(void)
    map = (MapFragment **) VG_(calloc)(FRAGS_IN_MAP, sizeof(MapFragment*));
    dirty_map = (unsigned int *) VG_(calloc)( DIRTY_WORDS, sizeof( unsigned int ) );
    trace_pile = (TraceRec *) VG_(calloc)( N_TRACE_RECS, sizeof( TraceRec ) );
+#if CRITPATH_ANALYSIS
+   firstFrame = (FrameGraph *) VG_(calloc)( N_FRAMES, sizeof( FrameGraph ) );
+#endif
 
    if( map==NULL || trace_pile==NULL || dirty_map==NULL ) {
        VG_(tool_panic)("Out of memory!");
    }
    first_new_tr = trace_pile;
+
+#if CRITPATH_ANALYSIS
+   if( firstFrame==NULL ) {
+       VG_(tool_panic)("Out of memory!");
+   }
+   currFrame = firstFrame;
+#endif
 
    opt.elim_stack_alias = 1;
 
@@ -3755,6 +4011,14 @@ static void em_post_clo_init_deps(void)
 
    trace_pile[1].i_info = &dummy_instr_info;
    trace_pile[1].link = mkTaggedPtr2(trace_pile, TPT_REG);
+
+#if CRITPATH_ANALYSIS
+   trace_pile[0].inode = new_INode(0);
+   newNodeFrame(trace_pile[0].inode);
+
+   trace_pile[1].inode = new_INode(1);
+   regEventNode(trace_pile[1].inode);
+#endif
 
    last_trace_rec = trace_pile+1;
    stack_base->call_header = trace_pile;
@@ -3778,6 +4042,20 @@ static void em_post_clo_init(void)
  * Finalization routines                             *
  *****************************************************/
 
+#if CRITPATH_ANALYSIS
+
+static void finaliseCritPath(void) {
+  int cpLength;
+
+  while (currFrame > firstFrame) {
+    retNode(NULL);
+  }
+  cpLength = critPathNodes(firstFrame->roots)->cpLength;
+  VG_(message)(Vg_UserMsg, "No. of instructions is %d", last_trace_rec - trace_pile + 1);
+  VG_(message)(Vg_UserMsg, "Length of Critical path is %d.", cpLength);
+}
+
+#endif
 
 static void printResultTable(const Char * traceFileName)
 {
@@ -3802,9 +4080,9 @@ static void printResultTable(const Char * traceFileName)
          for( entry=line_info->entries[j]; entry != NULL; entry=entry->next ) {
            // BONK( "." );
            // DPRINT1( "%s\n", ( makeTitle( entry ) ) );
-           if ((VG_(strcmp)(entry->h_file, "???") != 0) &&
-	       (VG_(strcmp)(entry->h_fn, "???") != 0))
-           {
+//           if ((VG_(strcmp)(entry->h_file, "???") != 0) &&
+//	       (VG_(strcmp)(entry->h_fn, "???") != 0))
+//           {
              ++num_results;
              if (num_results >= results_buf_size)
              {
@@ -3814,7 +4092,7 @@ static void printResultTable(const Char * traceFileName)
                tl_assert(result_array);
              }
              result_array[num_results - 1] = * entry;
-           }
+//           }
          }
        }
      // BONK( "\n" );
@@ -3841,7 +4119,7 @@ static void printResultTable(const Char * traceFileName)
 		   makeTitle(& result_array[i]), result_array[i].n_raw,
 		   result_array[i].n_war, result_array[i].n_waw,
 //                   result_array[i].h_tr->i_info->i_addr, result_array[i].t_tr->i_info->i_addr );
-                   result_array[i].h_tr - trace_pile, result_array[i].t_tr - trace_pile );
+                   result_array[i].h_tr - trace_pile, result_array[i].t_tr - trace_pile);
      if (VG_(strcmp)(traceFileName, "-") != 0)
        VG_(write)( fd, buf, VG_(strlen)( buf ) );
      else
@@ -3982,6 +4260,10 @@ static void em_fini_deps(Int exitcode)
    VG_(message)(Vg_UserMsg, "Control flow graph stored in %s",
 		edge_file_name);
    printCFG( edge_file_name );
+#endif
+
+#if CRITPATH_ANALYSIS
+   finaliseCritPath();
 #endif
 
 #if DO_PROFILE
