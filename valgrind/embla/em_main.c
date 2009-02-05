@@ -56,7 +56,8 @@
 #define  LIGHT_IGC          1
 #define  DUMP_TRACE_PILE    1
 #define  DUMP_MEMORY_MAP    0
-#define  CRITPATH_ANALYSIS  1
+#define  CRITPATH_ANALYSIS  0
+#define  PRINT_RESULTS_TABLE 1
 
 // Major modes
 
@@ -231,8 +232,8 @@ static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
 //
 #define  N_FRAMES         1000  // Nesting level
 #define  TRACK_RAW        1     // Track RAW dependencies
-#define  TRACK_WAR        1     // Track WAR dependencies
-#define  TRACK_WAW        1     // Track WAW dependencies
+#define  TRACK_WAR        0     // Track WAR dependencies
+#define  TRACK_WAW        0     // Track WAW dependencies
 
 typedef enum { SR_NONE, SR_SAVE, SR_RESTORE, SR_MOV_SP } SRCode;
 
@@ -291,7 +292,9 @@ typedef struct _LineList {
 #endif
 
 typedef struct _LineInfo {
+#if PRINT_RESULTS_TABLE
    RTEntry  *entries[RT_ENTRIES_PER_LINE];
+#endif
 #if RECORD_CF_EDGES
    LineList *pred[PRED_ENTRIES_PER_LINE];
 #endif
@@ -302,13 +305,17 @@ typedef struct _LineInfo {
 } LineInfo;
 
 #if RECORD_CF_EDGES
-
+#if PRINT_RESULTS_TABLE
 static LineInfo dummy_line_info = { { }, { }, 0, "", "", NULL };
-
 #else
-
 static LineInfo dummy_line_info = { { }, 0, "", "", NULL };
-
+#endif
+#else
+#if PRINT_RESULTS_TABLE
+static LineInfo dummy_line_info = { { }, 0, "", "", NULL };
+#else
+static LineInfo dummy_line_info = { 0, "", "", NULL };
+#endif
 #endif
 
 #if INSTR_LVL_DEPS
@@ -931,9 +938,11 @@ static LineInfo *mk_line_info_l( char *file, unsigned line, char *func )
       int i;
       info = (LineInfo *) VG_(calloc)( 1, sizeof(LineInfo) );
       check( info != NULL, "Out of memory for line info" );
+#if PRINT_RESULTS_TABLE
       for( i=0; i<RT_ENTRIES_PER_LINE; i++ ) {
          info->entries[i] = NULL;
       }
+#endif
 #if RECORD_CF_EDGES
       for( i=0; i<PRED_ENTRIES_PER_LINE; i++ ) {
          info->pred[i] = NULL;
@@ -1892,6 +1901,7 @@ static void gc(void)
  *  Result entry routines        *
  *********************************/
 
+#if PRINT_RESULTS_TABLE
 static const Char * makeTitle(const RTEntry * e)
 {
   static Char result[BUF_SIZE];
@@ -1940,6 +1950,7 @@ static Int result_entry_compare(const RTEntry * e1, const RTEntry * e2)
 
 #undef tmp_compare_field
 }
+#endif
 
 /********************************
  * Main getResultEntry routine  *
@@ -1970,9 +1981,12 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
 
    InstrInfo  *h_info, *t_info;
 
-   UInt        hash_value, h_code, t_code, r_code, code;
+   UInt        h_code, t_code, r_code, code;
+#if PRINT_RESULTS_TABLE
+   UInt        hash_value;
    UInt        t_line;
    RTEntry    *entry;
+#endif
 
 
    IFDID( nnn++; );
@@ -2030,6 +2044,7 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
 
    // We now have all necessary info to look up the dependence
 
+#if PRINT_RESULTS_TABLE
    t_line = t_info->line->line;
    hash_value = ( t_line + code + (int) old_tr + (int) new_tr ) & ( RT_ENTRIES_PER_LINE-1 );
    entry = h_info->line->entries[hash_value];
@@ -2063,6 +2078,7 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
        h_info->line->entries[hash_value] = entry;
 
    }
+#endif
 
 #if CRITPATH_ANALYSIS
    if (addNodeDep) {
@@ -2070,7 +2086,11 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
    }
 #endif
 
+#if PRINT_RESULTS_TABLE
    return entry;
+#else
+   return NULL;
+#endif
 
 }
 
@@ -2383,7 +2403,9 @@ void recordLoad(StmInfo *s_info, Addr32 addr )
                                     new_event,
                                     TRACK_RAW );
     
+#if PRINT_RESULTS_TABLE
         res_entry->n_raw++;
+#endif
 
 #if TRACE_REG_DEPS
         if( static_sr ) {
@@ -2419,7 +2441,9 @@ void recordLoad(StmInfo *s_info, Addr32 addr )
                                             addr,
                                             new_event,
                                             TRACK_RAW );
+#if PRINT_RESULTS_TABLE
                 res_entry->n_raw++;
+#endif
 
             }
 
@@ -2489,7 +2513,9 @@ void recordStore( StmInfo *s_info, Addr32 addr )
                                             addr,
                                             new_event,
                                             TRACK_WAW );
+#if PRINT_RESULTS_TABLE
                 res_entry->n_waw++;
+#endif
             } else {
                 // last reference was a read: a WAR
                 for( ev_list = refp[i].lastRead; ev_list!=NULL; ev_list = ev_list->next ) {
@@ -2499,7 +2525,9 @@ void recordStore( StmInfo *s_info, Addr32 addr )
                                                 addr,
                                                 new_event,
                                                 TRACK_WAR );
+#if PRINT_RESULTS_TABLE
                     res_entry->n_war++;
+#endif
                 }
             }
 
@@ -2649,7 +2677,9 @@ void recordGet(StmInfo *s_info)
                                     i_info,
                                     regp->lastWrite,
                                     0 ); // will not be part of the stack
+#if PRINT_RESULTS_TABLE
         res_entry->n_raw++;
+#endif
     }
 
     if( static_sr && regp->offsize == size ) {
@@ -2736,7 +2766,9 @@ void recordGetI(StmInfo *s_info, Int ix)
                                     i_info,
                                     regp->lastWrite,
                                     0 ); // will not be part of the stack
+#if PRINT_RESULTS_TABLE
         res_entry->n_raw++;
+#endif
     }
 
     if( static_sr && regp->offsize == size ) {
@@ -4057,6 +4089,7 @@ static void finaliseCritPath(void) {
 
 #endif
 
+#if PRINT_RESULTS_TABLE
 static void printResultTable(const Char * traceFileName)
 {
   int      i,j;
@@ -4129,6 +4162,7 @@ static void printResultTable(const Char * traceFileName)
      VG_(close)( fd );
    VG_(free)( result_array );
 }
+#endif
 
 typedef struct {
    LineInfo *from,*to;
@@ -4252,9 +4286,11 @@ static void em_fini_span(Int exitcode)
 static void em_fini_deps(Int exitcode)
 {
 
+#if PRINT_RESULTS_TABLE
    VG_(message)(Vg_UserMsg, "Dependency trace has finished, storing in %s",
 		trace_file_name);
    printResultTable( trace_file_name );
+#endif
 
 #if RECORD_CF_EDGES
    VG_(message)(Vg_UserMsg, "Control flow graph stored in %s",
