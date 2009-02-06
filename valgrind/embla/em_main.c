@@ -1248,7 +1248,7 @@ static AeonItem *lookupAI( InstrInfo *i_info )
   }
 
   item = aeon_map[ idx & (N_AE-1) ];
-  while( item == NULL && item->i_info != i_info ) {
+  while( item != NULL && item->i_info != i_info ) {
     item = item->next;
   }
   if( item==NULL ) {
@@ -1467,7 +1467,7 @@ static void compact(void)
    // Phase 3:
    tp = last_trace_rec;
    lp = NULL;
-   ap = NULL;
+   ap = tp+1;//NULL;
    while( tp >= first_new_tr ) {
       if( tp->i_info != NULL ) {
         switch( TP_GET_FLAGS( tp->link ) ) {
