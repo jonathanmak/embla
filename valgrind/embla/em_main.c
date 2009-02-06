@@ -2047,6 +2047,7 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
 #if PRINT_RESULTS_TABLE
    t_line = t_info->line->line;
    hash_value = ( t_line + code + (int) old_tr + (int) new_tr ) & ( RT_ENTRIES_PER_LINE-1 );
+//   hash_value = ( t_line + code ) & ( RT_ENTRIES_PER_LINE-1 );
    entry = h_info->line->entries[hash_value];
 
    while( entry!=NULL && ( entry->t_line != t_line || entry->code != code || entry->t_tr != old_tr || entry->h_tr != new_tr ) ) {
@@ -4083,7 +4084,8 @@ static void finaliseCritPath(void) {
     retNode(NULL);
   }
   cpLength = critPathNodes(firstFrame->roots)->cpLength;
-  VG_(message)(Vg_UserMsg, "No. of instructions is %d", last_trace_rec - trace_pile + 1);
+  // To take account of the first 2 manually created TraceRecs
+  VG_(message)(Vg_UserMsg, "No. of instructions is %d", n_calls_to_newTR+2);
   VG_(message)(Vg_UserMsg, "Length of Critical path is %d.", cpLength);
 }
 
