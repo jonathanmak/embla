@@ -54,10 +54,10 @@
 #define  FULL_CONTOURS      0
 #define  INSTRUMENT_GC      1
 #define  LIGHT_IGC          1
-#define  DUMP_TRACE_PILE    1
+#define  DUMP_TRACE_PILE    0
 #define  DUMP_MEMORY_MAP    0
-#define  CRITPATH_ANALYSIS  0
-#define  PRINT_RESULTS_TABLE 1
+#define  CRITPATH_ANALYSIS  1
+#define  PRINT_RESULTS_TABLE 0
 
 // Major modes
 
@@ -1330,6 +1330,7 @@ static OpenCalls *makeReturns(OpenCalls *open_calls, int numCalls, TraceRec *new
    for( n = 0; n < numCalls; n++ ) {
       new_tr[n].link = mkTaggedPtr2( c->call, TPT_RET );
       new_tr[n].i_info = NULL;
+      new_tr[n].inode = NULL;
       old = c;
       c = c->next;
       VG_(free)( old );
@@ -1422,7 +1423,7 @@ static AeonItem *lookupAI( InstrInfo *i_info )
   }
 
   item = aeon_map[ idx & (N_AE-1) ];
-  while( item == NULL && item->i_info != i_info ) {
+  while( item != NULL && item->i_info != i_info ) {
     item = item->next;
   }
   if( item==NULL ) {
@@ -1475,6 +1476,57 @@ static TraceRec *forwardTR( TraceRec *ap, TraceRec *tp, TraceRec *ecae )
 }
       
 
+#if DUMP_TRACE_PILE
+
+static void dump_trace_pile(void)
+{
+   TraceRec *rec;
+   char     *tag;
+   int       off,i_idx;
+
+   for( rec=trace_pile; rec <= last_trace_rec; rec++ ) {
+      DPRINT1( "%u: ", rec - trace_pile );
+      if( rec->i_info != NULL ) {
+         switch( TP_GET_FLAGS( rec->link ) ) {
+            case TPT_REG:
+               tag = "REG   ";
+               off = ToTrP( rec->link ) - trace_pile;
+               break;
+            case TPT_OPEN:
+               tag = "OPEN  ";
+               off = ToStP( rec->link ) - stack_base;
+               break;
+            case TPT_CLOSED:
+               tag = "CLOSED";
+               off = ToTrP( rec->link ) - trace_pile;
+               break;
+            default:
+               tag = "FUNNY ";
+               off = ToTrP( rec->link ) - trace_pile;
+               break;
+         }
+         i_idx = rec->i_info == &dummy_instr_info ? -1 : rec->i_info - ii_chunk;
+         DPRINT4( "%s %d(0x%x, %d)", tag, i_idx, rec->i_info->i_addr, rec->i_info->i_len );
+         DPRINT4( "(%s %d) %d %x\n", rec->i_info->line->file, rec->i_info->line->line, off,
+             rec->inode );
+      } else {
+         switch( TP_GET_FLAGS( rec->link ) ) {
+            case TPT_RET:
+               tag = "RET   ";
+               off = ToTrP( rec->link ) - trace_pile;
+               break;
+            default:
+               tag = "FUNNY ";
+               off = ToTrP( rec->link ) - trace_pile;
+               break;
+
+         }
+         DPRINT2( "%s %d\n", tag, off );
+      }
+   }
+}
+         
+#endif
 
 static void compact(void)
 {
@@ -1561,6 +1613,10 @@ static void compact(void)
 
    deleteAeonMap( );
 
+#if DUMP_TRACE_PILE
+      GCBONK("\n");
+      dump_trace_pile( );
+#endif
    GCBONK( "done\n  Phase 2 (" ); 
    
    // Phase 2:
@@ -1637,11 +1693,15 @@ static void compact(void)
      }
    }
    GCBONK( "map)\n  Phase 3... " ); 
+#if DUMP_TRACE_PILE
+      GCBONK("\n");
+      dump_trace_pile( );
+#endif
 
    // Phase 3:
    tp = last_trace_rec;
    lp = NULL;
-   ap = NULL;
+   ap = tp+1;//NULL;
    while( tp >= first_new_tr ) {
       if( tp->i_info != NULL ) {
         switch( TP_GET_FLAGS( tp->link ) ) {
@@ -1707,6 +1767,10 @@ static void compact(void)
    }
 
    GCBONK( "done\n  Phase 4... " ); 
+#if DUMP_TRACE_PILE
+      GCBONK("\n");
+      dump_trace_pile( );
+#endif
    
    // Phase 4:
    // First make new returns
@@ -1726,6 +1790,7 @@ static void compact(void)
           case TPT_REG:
             ap->link = mkTaggedPtr2( last_open, TPT_REG );
             ap->i_info = tp->i_info;
+            ap->inode = tp->inode;
             ap++;
             break;
 
@@ -1735,6 +1800,7 @@ static void compact(void)
             last_closed = ap;
             ap->link = mkTaggedPtr2( last_open, TPT_CLOSED );
             ap->i_info = tp->i_info;
+            ap->inode = tp->inode;
             ap++;
             break;
 
@@ -1744,6 +1810,7 @@ static void compact(void)
             last_open = ap;
             ap->link = mkTaggedPtr2( sp, TPT_OPEN );
             ap->i_info = tp->i_info;
+            ap->inode = tp->inode;
             ap++;
             sp++;
             break;
@@ -1761,6 +1828,7 @@ static void compact(void)
             check( last_closed != NULL, "last_closed == NULL at TPT_RET_LIVE" );
             ap->link = mkTaggedPtr2( last_closed, TPT_RET );
             ap->i_info = NULL;
+            ap->inode = NULL;
             last_closed = NULL;
             ap++;
             tp++;
@@ -1783,59 +1851,13 @@ static void compact(void)
    global_open_calls = rebuildOpenCalls( global_open_calls, current_stack_frame, first_new_tr );
    first_new_tr = ap;
    GCBONK( "done\n" );
+#if DUMP_TRACE_PILE
+      GCBONK("\n");
+      dump_trace_pile( );
+#endif
    
 }
 
-#if DUMP_TRACE_PILE
-
-static void dump_trace_pile(void)
-{
-   TraceRec *rec;
-   char     *tag;
-   int       off,i_idx;
-
-   for( rec=trace_pile; rec <= last_trace_rec; rec++ ) {
-      DPRINT1( "%u: ", rec - trace_pile );
-      if( rec->i_info != NULL ) {
-         switch( TP_GET_FLAGS( rec->link ) ) {
-            case TPT_REG:
-               tag = "REG   ";
-               off = ToTrP( rec->link ) - trace_pile;
-               break;
-            case TPT_OPEN:
-               tag = "OPEN  ";
-               off = ToStP( rec->link ) - stack_base;
-               break;
-            case TPT_CLOSED:
-               tag = "CLOSED";
-               off = ToTrP( rec->link ) - trace_pile;
-               break;
-            default:
-               tag = "FUNNY ";
-               off = ToTrP( rec->link ) - trace_pile;
-               break;
-         }
-         i_idx = rec->i_info == &dummy_instr_info ? -1 : rec->i_info - ii_chunk;
-         DPRINT4( "%s %d(0x%x, %d)", tag, i_idx, rec->i_info->i_addr, rec->i_info->i_len );
-         DPRINT3( "(%s %d) %d\n", rec->i_info->line->file, rec->i_info->line->line, off );
-      } else {
-         switch( TP_GET_FLAGS( rec->link ) ) {
-            case TPT_RET:
-               tag = "RET   ";
-               off = ToTrP( rec->link ) - trace_pile;
-               break;
-            default:
-               tag = "FUNNY ";
-               off = ToTrP( rec->link ) - trace_pile;
-               break;
-
-         }
-         DPRINT2( "%s %d\n", tag, off );
-      }
-   }
-}
-         
-#endif
 
 #define N_LEAST 4000000
 static unsigned max_use = N_TRACE_RECS - 100000,
