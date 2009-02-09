@@ -52,7 +52,7 @@
 #define  DO_NOT_INSTRUMENT  0
 #define  MOCK_RTENTRY       0
 #define  FULL_CONTOURS      0
-#define  INSTRUMENT_GC      1
+#define  INSTRUMENT_GC      0
 #define  LIGHT_IGC          1
 #define  DUMP_TRACE_PILE    0
 #define  DUMP_MEMORY_MAP    0
@@ -193,7 +193,7 @@ static unsigned did_gc=0;
 
 #define N_SMARKS          1000000
 #define N_STACK_FRAMES    1000000
-#define N_TRACE_RECS     40000000
+#define N_TRACE_RECS     10000000
 
 #if FULL_CONTOURS
 static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
@@ -399,6 +399,7 @@ typedef struct _INode {
   struct _INodeList *deps;
   int cpLength;
   struct _INode *cp;
+  int numParents; // For Critical Path Analysis only
 } INode;
 
 typedef struct _INodeList {
@@ -426,6 +427,11 @@ static INodeList *consINode(INodeList *tail, INode *head) {
   return newList;
 }
 
+static void addDep(INode *fromNode, INode *toNode) {
+  fromNode->deps = consINode(fromNode->deps, toNode);
+  toNode->numParents++;
+}
+
 static INode *new_INode(int id) {
    INode *inode = VG_(malloc)(sizeof (INode));
    if(inode == NULL) {
@@ -435,9 +441,10 @@ static INode *new_INode(int id) {
    inode->cost = -9999999; // Just to make sure we notice if cost has not been set
    inode->cpLength = -9999999;
    inode->deps = NULL;
+   inode->numParents = 0;
    inode->cp = NULL;
    if (currFrame->lastRegNode != NULL) {
-     currFrame->lastRegNode->deps = consINode(currFrame->lastRegNode->deps, inode);
+     addDep(currFrame->lastRegNode, inode);
    } else {
      currFrame->roots = consINode(currFrame->roots, inode);
    }
@@ -461,6 +468,8 @@ static void regEventNode(INode *inode) {
   currFrame->lastRegNode = inode;
 }
 
+// RECURSIVE VERSION - MAY OVERFLOW THE STACK
+/*
 static int critPath(INode *inode) {
   int depCpLength;
   INodeList *dep;
@@ -478,7 +487,7 @@ static int critPath(INode *inode) {
   return inode->cpLength;
 }
 
-static INode *critPathNodes(INodeList *inodes) {
+static int critPathNodes(INodeList *inodes) {
   INode *currMaxCp = NULL;
   int currMaxCpLength = -9999999, cpLength;
   for (; inodes != NULL; inodes = inodes->next) {
@@ -488,8 +497,69 @@ static INode *critPathNodes(INodeList *inodes) {
       currMaxCpLength = cpLength;
     }
   }
-  return currMaxCp;
+  return currMaxCp->cpLength;
 }
+*/
+
+// NON-RECURSIVE VERSION - PROBABLY SLOWER
+//
+static int critPathNodes(INodeList *roots) {
+  INodeList *nodeIter;
+  int arrCap = 100, stackSize = 0;
+  INode *currNode, *currDep;
+  INode **workStack = (INode **) VG_(malloc)(arrCap * sizeof(INode*));
+  int currCpLength = -999999;
+
+  tl_assert(workStack);
+  // Add all roots to workStack
+  for (nodeIter = roots; nodeIter != NULL; nodeIter = nodeIter->next) {
+    currNode = nodeIter->node;
+    // Just double checking the root hasn't got any parents
+    if (currNode->numParents == 0) {
+      currNode->cpLength = currNode->cost;
+      currNode->cp = NULL;
+      if (stackSize >= arrCap) {
+        arrCap *= 2;
+        workStack = VG_(realloc)(workStack, arrCap * sizeof(INode*));
+        tl_assert(workStack);
+      }
+      workStack[stackSize] = currNode;
+      stackSize++;
+    }
+  }
+
+  // Keep going through workStack
+  while (stackSize > 0) {
+    stackSize--;
+    currNode = workStack[stackSize];
+    // Look at its CP
+    if (currNode->cpLength > currCpLength) {
+      currCpLength = currNode->cpLength;
+    }
+
+    for (nodeIter = currNode->deps; nodeIter != NULL; nodeIter = nodeIter->next) {
+      currDep = nodeIter->node;
+      if (currNode->cpLength + currDep->cost > currDep->cpLength) {
+        currDep->cpLength = currNode->cpLength + currDep->cost;
+        currDep->cp = currNode;
+      }
+      currDep->numParents--;
+      if (currDep->numParents == 0) {
+        if (stackSize >= arrCap) {
+          arrCap *= 2;
+          workStack = VG_(realloc)(workStack, arrCap * sizeof(INode*));
+          tl_assert(workStack);
+        }
+        workStack[stackSize] = currDep;
+        stackSize++;
+      }
+    }
+  }
+  
+  VG_(free)(workStack);
+  return currCpLength;
+}
+//
 
 static void freeNodeList(INodeList *nL) {
   INodeList *tmp;
@@ -507,7 +577,7 @@ static void retNode(INode *inode) {
     inode->cost = 1;
   }
 
-  currFrame->callerNode->cost = 1+critPathNodes(currFrame->roots)->cpLength;
+  currFrame->callerNode->cost = 1+critPathNodes(currFrame->roots);//->cpLength;
 //  VG_(message)(Vg_UserMsg, "CP of frame %d = %d", currFrame->callerNode->nodeId, currFrame->callerNode->cost);
 
   for (nodeList = currFrame->allNodes; nodeList != NULL; nodeList = nodeList->next) {
@@ -590,7 +660,7 @@ static TraceRec * newTraceRec(InstrInfo *i_info, TaggedPtr link)
 static void addNodeDependency(TraceRec *old_tr, TraceRec *new_tr) {
    INode *oldINode = old_tr->inode;
    INode *newINode = new_tr->inode;
-   oldINode->deps = consINode(oldINode->deps, newINode);
+   addDep(oldINode, newINode);
 }
 #endif
 
@@ -1465,7 +1535,7 @@ static TraceRec *forwardTR( TraceRec *ap, TraceRec *tp, TraceRec *ecae )
 {
    TraceRec *tmp = remapTR( tp->i_info, ecae, tp );
 
-   BONK( "+" );
+   GCBONK( "+" );
    if( tmp == NULL ) {
       tp->link = mkTaggedPtr2( ap, TPT_REG_OR_CLOSED_LIVE );
       return ap-1;
@@ -1554,13 +1624,13 @@ static void compact(void)
    sp = current_stack_frame;
    mp = smarks+topMark;
    while( tp >= first_new_tr ) {
-      BONK( "." );
+      GCBONK( "." );
       // Maybe start a new aeon
       if( mp->tr >= tp ) {
         ecae = tp+1;
-        BONK( "s" );
+        GCBONK( "s" );
       }
-      BONK( "," );
+      GCBONK( "," );
       if( tp->i_info != NULL ) {
         switch( TP_GET_FLAGS( tp->link ) ) {
           // Regular
@@ -1574,7 +1644,7 @@ static void compact(void)
             ap--;
             // Start new aeon
             ecae = tp;
-            BONK( "o" );
+            GCBONK( "o" );
             break;
 
           // Closed header
@@ -1916,6 +1986,7 @@ static void gc(void)
       DPRINT1( "\nGC %d\n", did_gc );
       dumpMemoryMap( );
 #endif
+      DPRINT1( "heap_limit = %d\n", heap_limit);
    }
 }
 
@@ -4105,7 +4176,7 @@ static void finaliseCritPath(void) {
   while (currFrame > firstFrame) {
     retNode(NULL);
   }
-  cpLength = critPathNodes(firstFrame->roots)->cpLength;
+  cpLength = critPathNodes(firstFrame->roots);//->cpLength;
   // To take account of the first 2 manually created TraceRecs
   VG_(message)(Vg_UserMsg, "No. of instructions is %d", n_calls_to_newTR+2);
   VG_(message)(Vg_UserMsg, "Length of Critical path is %d.", cpLength);
@@ -4309,7 +4380,6 @@ static void em_fini_span(Int exitcode)
 
 static void em_fini_deps(Int exitcode)
 {
-
 #if PRINT_RESULTS_TABLE
    VG_(message)(Vg_UserMsg, "Dependency trace has finished, storing in %s",
 		trace_file_name);
