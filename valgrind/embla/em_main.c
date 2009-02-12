@@ -54,7 +54,7 @@
 #define  FULL_CONTOURS      0
 #define  INSTRUMENT_GC      0
 #define  LIGHT_IGC          1
-#define  DUMP_TRACE_PILE    0
+#define  DUMP_TRACE_PILE    1
 #define  DUMP_MEMORY_MAP    0
 #define  CRITPATH_ANALYSIS  1
 #define  PRINT_RESULTS_TABLE 0
@@ -1683,7 +1683,7 @@ static void compact(void)
 
    deleteAeonMap( );
 
-#if DUMP_TRACE_PILE
+#if DUMP_TRACE_PILE && INSTRUMENT_GC
       GCBONK("\n");
       dump_trace_pile( );
 #endif
@@ -1763,7 +1763,7 @@ static void compact(void)
      }
    }
    GCBONK( "map)\n  Phase 3... " ); 
-#if DUMP_TRACE_PILE
+#if DUMP_TRACE_PILE && INSTRUMENT_GC
       GCBONK("\n");
       dump_trace_pile( );
 #endif
@@ -1837,7 +1837,7 @@ static void compact(void)
    }
 
    GCBONK( "done\n  Phase 4... " ); 
-#if DUMP_TRACE_PILE
+#if DUMP_TRACE_PILE && INSTRUMENT_GC
       GCBONK("\n");
       dump_trace_pile( );
 #endif
@@ -1921,7 +1921,7 @@ static void compact(void)
    global_open_calls = rebuildOpenCalls( global_open_calls, current_stack_frame, first_new_tr );
    first_new_tr = ap;
    GCBONK( "done\n" );
-#if DUMP_TRACE_PILE
+#if DUMP_TRACE_PILE && INSTRUMENT_GC
       GCBONK("\n");
       dump_trace_pile( );
 #endif
