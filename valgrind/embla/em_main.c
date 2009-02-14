@@ -41,7 +41,7 @@
 #define  DO_PROFILE         1
 #define  PRECISE_ICOUNT     1
 #define  DO_CHECK           1
-#define  INSTR_LVL_DEPS     1
+#define  INSTR_LVL_DEPS     0
 #define  TRACE_REG_DEPS     0
 #define  RECORD_CF_EDGES    1
 #define  CHECK_DIRTY_FRAGS  1
@@ -193,7 +193,7 @@ static unsigned did_gc=0;
 
 #define N_SMARKS          1000000
 #define N_STACK_FRAMES    1000000
-#define N_TRACE_RECS     10000000
+#define N_TRACE_RECS     40000000
 
 #if FULL_CONTOURS
 static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
@@ -394,7 +394,8 @@ static StmInfo *mkStmInfo( InstrInfo *i_info, UShort offset, UChar size, UChar f
 #if CRITPATH_ANALYSIS
 
 typedef struct _INode {
-  int nodeId;
+  LineInfo *line;
+  Bool callNode;
   int cost;
   struct _INodeList *deps;
   int cpLength;
@@ -408,14 +409,15 @@ typedef struct _INodeList {
 } INodeList;
 
 typedef struct _FrameGraph {
-  INodeList *allNodes;
   INodeList *roots;
-  INode *lastRegNode;
+  INode *currNode;
+  INode *lastNonCallNode;
   INode *callerNode;
 } FrameGraph;
 
 static FrameGraph *firstFrame;
 static FrameGraph *currFrame;
+static int totalOps;
 
 static INodeList *consINode(INodeList *tail, INode *head) {
   INodeList *newList = VG_(malloc)(sizeof(INodeList));
@@ -428,44 +430,62 @@ static INodeList *consINode(INodeList *tail, INode *head) {
 }
 
 static void addDep(INode *fromNode, INode *toNode) {
-  fromNode->deps = consINode(fromNode->deps, toNode);
-  toNode->numParents++;
+  // If they're the same node don't bother
+  if (fromNode != toNode) {
+    INodeList *iter, *last = NULL;
+    // deps is sorted so find the right place first
+    for (iter = fromNode->deps; iter != NULL && iter->node < toNode; iter = iter->next) {
+      last = iter;
+    }
+    if (iter == NULL || iter->node != toNode) {
+      INodeList *newList = VG_(malloc)(sizeof(INodeList));
+      if (newList == NULL) {
+        VG_(tool_panic)( "Out of space for INodeLists." );
+      }
+      newList->node = toNode;
+      newList->next = iter;
+      toNode->numParents++;
+      if (last == NULL) {
+        // Insert as the first element of the list
+        fromNode->deps = newList;
+      } else {
+        last->next = newList;
+      }
+    }
+  }
 }
 
-static INode *new_INode(int id) {
+static INode *new_INode(LineInfo *line) {
    INode *inode = VG_(malloc)(sizeof (INode));
    if(inode == NULL) {
      VG_(tool_panic)( "Out of space for INodes." );
    }
-   inode->nodeId = id;
-   inode->cost = -9999999; // Just to make sure we notice if cost has not been set
-   inode->cpLength = -9999999;
+   inode->line = line;
+   inode->callNode = False; // Set to true later if we encounter a call on this line
+   inode->cost = 0;
    inode->deps = NULL;
-   inode->numParents = 0;
+   inode->cpLength = -9999999;
    inode->cp = NULL;
-   if (currFrame->lastRegNode != NULL) {
-     addDep(currFrame->lastRegNode, inode);
+   inode->numParents = 0;
+   if (currFrame->lastNonCallNode != NULL) {
+     addDep(currFrame->lastNonCallNode, inode);
    } else {
      currFrame->roots = consINode(currFrame->roots, inode);
    }
-   currFrame->allNodes = consINode(currFrame->allNodes, inode);
+   currFrame->currNode = inode;
    return inode;
 }
 
 static void newNodeFrame(INode *callerNode) {
+  callerNode->callNode = True;
   currFrame++;
   if (currFrame - N_FRAMES >= firstFrame) {
     VG_(tool_panic)( "Frame roots stack overflow." );
   }
-  currFrame->allNodes = NULL;
   currFrame->roots = NULL;
-  currFrame->lastRegNode = NULL;
+  currFrame->currNode = NULL;
+  currFrame->lastNonCallNode = NULL;
   currFrame->callerNode = callerNode;
-}
-
-static void regEventNode(INode *inode) {
-  inode->cost = 1;
-  currFrame->lastRegNode = inode;
 }
 
 // RECURSIVE VERSION - MAY OVERFLOW THE STACK
@@ -502,9 +522,10 @@ static int critPathNodes(INodeList *inodes) {
 */
 
 // NON-RECURSIVE VERSION - PROBABLY SLOWER
+// DESTRUCTIVE - IT FREES EVERYTHING!
 //
 static int critPathNodes(INodeList *roots) {
-  INodeList *nodeIter;
+  INodeList *nodeIter, *tail;
   int arrCap = 100, stackSize = 0;
   INode *currNode, *currDep;
   INode **workStack = (INode **) VG_(malloc)(arrCap * sizeof(INode*));
@@ -512,7 +533,7 @@ static int critPathNodes(INodeList *roots) {
 
   tl_assert(workStack);
   // Add all roots to workStack
-  for (nodeIter = roots; nodeIter != NULL; nodeIter = nodeIter->next) {
+  for (nodeIter = roots; nodeIter != NULL; nodeIter = tail) {
     currNode = nodeIter->node;
     // Just double checking the root hasn't got any parents
     if (currNode->numParents == 0) {
@@ -526,6 +547,8 @@ static int critPathNodes(INodeList *roots) {
       workStack[stackSize] = currNode;
       stackSize++;
     }
+    tail = nodeIter->next;
+    VG_(free)(nodeIter);
   }
 
   // Keep going through workStack
@@ -537,7 +560,7 @@ static int critPathNodes(INodeList *roots) {
       currCpLength = currNode->cpLength;
     }
 
-    for (nodeIter = currNode->deps; nodeIter != NULL; nodeIter = nodeIter->next) {
+    for (nodeIter = currNode->deps; nodeIter != NULL; nodeIter = tail) {
       currDep = nodeIter->node;
       if (currNode->cpLength + currDep->cost > currDep->cpLength) {
         currDep->cpLength = currNode->cpLength + currDep->cost;
@@ -553,7 +576,10 @@ static int critPathNodes(INodeList *roots) {
         workStack[stackSize] = currDep;
         stackSize++;
       }
+      tail = nodeIter->next;
+      VG_(free)(nodeIter);
     }
+    VG_(free)(currNode);
   }
   
   VG_(free)(workStack);
@@ -561,33 +587,36 @@ static int critPathNodes(INodeList *roots) {
 }
 //
 
-static void freeNodeList(INodeList *nL) {
-  INodeList *tmp;
+static void retNode(void) {
+//  VG_(message)(Vg_UserMsg, "Cost of line %s:%d = %d", currFrame->currNode->line->file, currFrame->currNode->line->line, currFrame->currNode->cost);
+  currFrame->callerNode->cost += critPathNodes(currFrame->roots);
 
-  for (; nL != NULL; nL = tmp) {
-    tmp = nL->next;
-    VG_(free)(nL);
+  currFrame--;
+}
+
+static void newINodeIfNewLine(LineInfo *line) {
+  INode *node = currFrame->currNode;
+  if (node != NULL && line != node->line) {
+//  VG_(message)(Vg_UserMsg, "Cost of line %s:%d = %d", node->line->file, node->line->line, node->cost);
+    // Finalise old node
+    if (!(node->callNode)) {
+      currFrame->lastNonCallNode = node;
+    }
+
+    // Starting a new node
+    currFrame->currNode = NULL;
   }
 }
 
-static void retNode(INode *inode) {
-  INodeList *nodeList;
-
-  if (inode != NULL) {
-    inode->cost = 1;
+static INode *getAndIncINode(LineInfo *line) {
+  INode *node = currFrame->currNode;
+  if (node == NULL) {
+    node = new_INode(line);
+    currFrame->currNode = node;
   }
-
-  currFrame->callerNode->cost = 1+critPathNodes(currFrame->roots);//->cpLength;
-//  VG_(message)(Vg_UserMsg, "CP of frame %d = %d", currFrame->callerNode->nodeId, currFrame->callerNode->cost);
-
-  for (nodeList = currFrame->allNodes; nodeList != NULL; nodeList = nodeList->next) {
-    freeNodeList (nodeList->node->deps);
-    VG_(free)(nodeList->node);
-  }
-  freeNodeList(currFrame->roots);
-  freeNodeList(currFrame->allNodes);
-  
-  currFrame--;
+  node->cost++;
+  totalOps++;
+  return node;
 }
 
 #endif
@@ -651,7 +680,9 @@ static TraceRec * newTraceRec(InstrInfo *i_info, TaggedPtr link)
    last_trace_rec->i_info = i_info;
    last_trace_rec->link   = link;
 #if CRITPATH_ANALYSIS
-   last_trace_rec->inode = new_INode(last_trace_rec - trace_pile);
+   if (i_info != NULL) {
+     last_trace_rec->inode = getAndIncINode(i_info->line);
+   }
 #endif
    return last_trace_rec;
 }
@@ -748,10 +779,6 @@ static TaggedPtr newRegularEvent(StackFrame *frame, InstrInfo *i_info)
 {
    TraceRec  *tr   = newTraceRec( i_info, mkTaggedPtr2( frame->call_header, TPT_REG ) );
    unsigned  hflag = ( frame->flags & SF_HIDDEN ) != 0 ? 1 : 0;
-
-#if CRITPATH_ANALYSIS
-   regEventNode (tr->inode);
-#endif
 
    return mkTaggedPtr( tr, hflag, 0 );
 }
@@ -1400,7 +1427,9 @@ static OpenCalls *makeReturns(OpenCalls *open_calls, int numCalls, TraceRec *new
    for( n = 0; n < numCalls; n++ ) {
       new_tr[n].link = mkTaggedPtr2( c->call, TPT_RET );
       new_tr[n].i_info = NULL;
+#if CRITPATH_ANALYSIS
       new_tr[n].inode = NULL;
+#endif
       old = c;
       c = c->next;
       VG_(free)( old );
@@ -1555,6 +1584,7 @@ static void dump_trace_pile(void)
    int       off,i_idx;
 
    for( rec=trace_pile; rec <= last_trace_rec; rec++ ) {
+      if (rec->i_info != NULL && TP_GET_FLAGS( rec->link ) == TPT_REG) continue;// jchm2
       DPRINT1( "%u: ", rec - trace_pile );
       if( rec->i_info != NULL ) {
          switch( TP_GET_FLAGS( rec->link ) ) {
@@ -1577,8 +1607,7 @@ static void dump_trace_pile(void)
          }
          i_idx = rec->i_info == &dummy_instr_info ? -1 : rec->i_info - ii_chunk;
          DPRINT4( "%s %d(0x%x, %d)", tag, i_idx, rec->i_info->i_addr, rec->i_info->i_len );
-         DPRINT4( "(%s %d) %d %x\n", rec->i_info->line->file, rec->i_info->line->line, off,
-             rec->inode );
+         DPRINT3( "(%s %d) %d\n", rec->i_info->line->file, rec->i_info->line->line, off );
       } else {
          switch( TP_GET_FLAGS( rec->link ) ) {
             case TPT_RET:
@@ -1860,7 +1889,9 @@ static void compact(void)
           case TPT_REG:
             ap->link = mkTaggedPtr2( last_open, TPT_REG );
             ap->i_info = tp->i_info;
+#if CRITPATH_ANALYSIS
             ap->inode = tp->inode;
+#endif
             ap++;
             break;
 
@@ -1870,7 +1901,9 @@ static void compact(void)
             last_closed = ap;
             ap->link = mkTaggedPtr2( last_open, TPT_CLOSED );
             ap->i_info = tp->i_info;
+#if CRITPATH_ANALYSIS
             ap->inode = tp->inode;
+#endif
             ap++;
             break;
 
@@ -1880,7 +1913,9 @@ static void compact(void)
             last_open = ap;
             ap->link = mkTaggedPtr2( sp, TPT_OPEN );
             ap->i_info = tp->i_info;
+#if CRITPATH_ANALYSIS
             ap->inode = tp->inode;
+#endif
             ap++;
             sp++;
             break;
@@ -1898,7 +1933,9 @@ static void compact(void)
             check( last_closed != NULL, "last_closed == NULL at TPT_RET_LIVE" );
             ap->link = mkTaggedPtr2( last_closed, TPT_RET );
             ap->i_info = NULL;
+#if CRITPATH_ANALYSIS
             ap->inode = NULL;
+#endif
             last_closed = NULL;
             ap++;
             tp++;
@@ -1929,7 +1966,7 @@ static void compact(void)
 }
 
 
-#define N_LEAST 4000000
+#define N_LEAST 39800000
 static unsigned max_use = N_TRACE_RECS - 100000,
                 heap_limit = N_LEAST;
 
@@ -1959,7 +1996,7 @@ static void gc(void)
       BONK( "\n" );
 #endif
 #if DUMP_TRACE_PILE
-      dump_trace_pile( );
+//      dump_trace_pile( );
 #endif
 
       did_gc++;
@@ -2391,15 +2428,17 @@ void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target)
 {
 }
 
-static VG_REGPARM(2)
-void recordRet(Addr32 sp, Addr32 target) 
+static VG_REGPARM(3)
+void recordRet(Addr32 sp, InstrInfo *i_info, Addr32 target) 
 {
 }
 
+#if CRITPATH_ANALYSIS
 static VG_REGPARM(1)
 void recordOp( StmInfo *s_info )
 {
 }
+#endif
 
 #if TRACE_REG_DEPS
 
@@ -2670,16 +2709,14 @@ void recordStore( StmInfo *s_info, Addr32 addr )
 
 }
 
+#if CRITPATH_ANALYSIS
 static VG_REGPARM(1)
 void recordOp(StmInfo *s_info)
 {
     InstrInfo *i_info = s_info->i_info;
-
-    newRegularEvent( current_stack_frame, i_info );
-    
-    gc( );
-
+    getAndIncINode (i_info->line);
 }
+#endif
 
 #if TRACE_REG_DEPS
 
@@ -2917,7 +2954,7 @@ void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target)
 
 }
 
-static TraceRec *pop_stack_frame(void)
+static TraceRec *pop_stack_frame(InstrInfo *i_info)
 {
    // Change call header to point to parent call header rather than stack
    // thus making it a closed call header
@@ -2931,6 +2968,9 @@ static TraceRec *pop_stack_frame(void)
 
       this_call->link = mkTaggedPtr2( prev_call, TPT_CLOSED );
       ret_tr = newTraceRec( 0, mkTaggedPtr2( this_call, TPT_RET ) );
+#if CRITPATH_ANALYSIS
+      ret_tr->inode = getAndIncINode(i_info->line);
+#endif
 
       current_stack_frame--;
 
@@ -2940,8 +2980,8 @@ static TraceRec *pop_stack_frame(void)
    return NULL;
 }
 
-static VG_REGPARM(2)
-void recordRet(Addr32 sp, Addr32 target) 
+static VG_REGPARM(3)
+void recordRet(Addr32 sp, InstrInfo *i_info, Addr32 target) 
 {
    TraceRec *tr = NULL;
     // BONK( "Ret\n" );
@@ -2958,7 +2998,7 @@ void recordRet(Addr32 sp, Addr32 target)
 
    while( current_stack_frame-1 >= stack_base && current_stack_frame[-1].sp + 4 < sp ) {
      // we need to unwind the stack
-     tr = pop_stack_frame( );
+     tr = pop_stack_frame( i_info );
    }
    // we have found the right stack frame
 
@@ -2972,7 +3012,7 @@ void recordRet(Addr32 sp, Addr32 target)
        
      }
      // we will not need this retrun address any more
-     tr = pop_stack_frame( );
+     tr = pop_stack_frame( i_info );
    }
 
    if( current_stack_frame < stack_base ) {
@@ -2982,11 +3022,7 @@ void recordRet(Addr32 sp, Addr32 target)
    recordSpChange( sp );
 
 #if CRITPATH_ANALYSIS
-   if (tr == NULL) {
-     retNode(NULL);
-   } else {
-     retNode(tr->inode);
-   }
+     retNode();
 #endif
 
    gc( );
@@ -3024,6 +3060,10 @@ void recordEdge( LineInfo *line ) // Need to know line, the line of the current 
 {
     LineList *ll, **llp;
     LineInfo *prev_line = current_stack_frame->current_line;
+
+#if CRITPATH_ANALYSIS
+    newINodeIfNewLine(line);
+#endif
 
     if( line == prev_line ) return;
     current_stack_frame->current_line = line;
@@ -3107,6 +3147,7 @@ static void instrumentStore( IRSB *bbOut, InstrInfo *i_info, IRExpr *exp_addr, U
     emitDC_2( bbOut, "recordStore", &recordStore, exp_si, exp_addr );
 }
 
+#if CRITPATH_ANALYSIS
 static void instrumentOp( IRSB *bbOut, InstrInfo *i_info, IRExpr *exp, int size,
                              UChar flags )
 {
@@ -3114,6 +3155,7 @@ static void instrumentOp( IRSB *bbOut, InstrInfo *i_info, IRExpr *exp, int size,
     IRExpr  *exp_si = const32( (UInt) s_info );
     emitDC_1( bbOut, "recordOp", &recordOp, exp_si );
 }
+#endif
 
 #if TRACE_REG_DEPS
 
@@ -3230,8 +3272,8 @@ static void instrumentExit(IRSB *bbOut, IRJumpKind jk, InstrInfo *i_info, IRExpr
              IRExpr *exp_sp = IRExpr_RdTmp( tmp_sp );
              IRExpr *exp_pc = IRExpr_RdTmp( tmp_pc );
              IRExpr *exp_get_sp = IRExpr_Get( OFFSET_x86_ESP, Ity_I32 );
-             IRExpr **args = mkIRExprVec_2( exp_sp, exp_pc );
-             IRDirty *dy = unsafeIRDirty_0_N( 2, hname, haddr, args );
+             IRExpr **args = mkIRExprVec_3( exp_sp, const32( (UInt) i_info), exp_pc );
+             IRDirty *dy = unsafeIRDirty_0_N( 3, hname, haddr, args );
              
              if( tgt==NULL ) {
                 VG_(tool_panic)("Ret not at end of BB!");
@@ -3800,6 +3842,7 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
              emitDC_1( bbOut, "recordEdge", recordEdge, 
                        const32( (UInt) mk_line_info(guestIAddr) ) );
 #endif
+
              currII = NULL;
              break;
 
@@ -3900,6 +3943,7 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
                  instrumentGetI( bbOut, currII, tmpExpr, ref_size, flags );
                  break;
 #endif
+#if CRITPATH_ANALYSIS
                case Iex_Qop:
                case Iex_Triop:
                case Iex_Binop:
@@ -3911,6 +3955,7 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
                  flags = 0;
                  instrumentOp( bbOut, currII, tmpExpr, ref_size, flags );
                  break;
+#endif
                default:
                  break;
              }
@@ -4139,11 +4184,10 @@ static void em_post_clo_init_deps(void)
    trace_pile[1].link = mkTaggedPtr2(trace_pile, TPT_REG);
 
 #if CRITPATH_ANALYSIS
-   trace_pile[0].inode = new_INode(0);
+   trace_pile[0].inode = getAndIncINode(trace_pile[0].i_info->line);
    newNodeFrame(trace_pile[0].inode);
 
-   trace_pile[1].inode = new_INode(1);
-   regEventNode(trace_pile[1].inode);
+   trace_pile[1].inode = getAndIncINode(trace_pile[1].i_info->line);
 #endif
 
    last_trace_rec = trace_pile+1;
@@ -4174,11 +4218,11 @@ static void finaliseCritPath(void) {
   int cpLength;
 
   while (currFrame > firstFrame) {
-    retNode(NULL);
+    retNode();
   }
   cpLength = critPathNodes(firstFrame->roots);//->cpLength;
   // To take account of the first 2 manually created TraceRecs
-  VG_(message)(Vg_UserMsg, "No. of instructions is %d", n_calls_to_newTR+2);
+  VG_(message)(Vg_UserMsg, "No. of instructions is %d", totalOps);
   VG_(message)(Vg_UserMsg, "Length of Critical path is %d.", cpLength);
 }
 
