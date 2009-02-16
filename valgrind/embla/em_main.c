@@ -54,7 +54,7 @@
 #define  FULL_CONTOURS      0
 #define  INSTRUMENT_GC      0
 #define  LIGHT_IGC          1
-#define  DUMP_TRACE_PILE    1
+#define  DUMP_TRACE_PILE    0
 #define  DUMP_MEMORY_MAP    0
 #define  CRITPATH_ANALYSIS  1
 #define  PRINT_RESULTS_TABLE 0
@@ -397,7 +397,7 @@ typedef struct _INode {
   LineInfo *line;
   Bool callNode;
   int cost;
-  struct _INodeList *deps;
+  struct _INodeSet *deps;
   int cpLength;
   struct _INode *cp;
   int numParents; // For Critical Path Analysis only
@@ -408,6 +408,14 @@ typedef struct _INodeList {
   struct _INodeList *next;
 } INodeList;
 
+// HashSet
+#define INODE_SET_INIT_SIZE 2
+typedef struct _INodeSet {
+  int size;
+  int numBuckets; // Must be power of 2
+  INodeList **buckets;
+} INodeSet;
+       
 typedef struct _FrameGraph {
   INodeList *roots;
   INode *currNode;
@@ -429,29 +437,62 @@ static INodeList *consINode(INodeList *tail, INode *head) {
   return newList;
 }
 
+static INodeSet *newINodeSet(void) {
+  INodeSet *newSet = VG_(malloc)(sizeof(INodeSet));
+  if (newSet == NULL) {
+    VG_(tool_panic)( "Out of space for INodeSets." );
+  }
+  newSet->size=0;
+  newSet->numBuckets=INODE_SET_INIT_SIZE;
+  newSet->buckets = (INodeList **) VG_(calloc)(INODE_SET_INIT_SIZE, sizeof(INodeList*));
+  if (newSet->buckets == NULL) {
+    VG_(tool_panic)( "Out of space for INodeSet's buckets." );
+  }
+  return newSet;
+}
+
 static void addDep(INode *fromNode, INode *toNode) {
-  // If they're the same node don't bother
-  if (fromNode != toNode) {
-    INodeList *iter, *last = NULL;
-    // deps is sorted so find the right place first
-    for (iter = fromNode->deps; iter != NULL && iter->node < toNode; iter = iter->next) {
-      last = iter;
+  INodeSet *deps = fromNode->deps;
+  INodeList *iter, *last;
+
+  if (fromNode == toNode) {
+    return;
+  }
+
+  int index = ((int) toNode >> 2) & (deps->numBuckets-1);
+  for (iter = deps->buckets[index]; iter != NULL ; iter = iter->next) {
+    if (iter->node == toNode) {
+      return;
     }
-    if (iter == NULL || iter->node != toNode) {
-      INodeList *newList = VG_(malloc)(sizeof(INodeList));
-      if (newList == NULL) {
-        VG_(tool_panic)( "Out of space for INodeLists." );
-      }
-      newList->node = toNode;
-      newList->next = iter;
-      toNode->numParents++;
-      if (last == NULL) {
-        // Insert as the first element of the list
-        fromNode->deps = newList;
-      } else {
-        last->next = newList;
+    last = iter;
+  }
+
+  // Node doesn't already exist - add it
+  deps->size++;
+  deps->buckets[index] = consINode(deps->buckets[index], toNode);
+  toNode->numParents++;
+  
+  // Check if we need to expand hashtable
+
+  if (deps->numBuckets < ((deps->size * 5) / 4)) {
+    INodeList **oldBuckets = deps->buckets;
+    int oldNumBuckets = deps->numBuckets;
+    deps->numBuckets = oldNumBuckets * 2;
+    deps->buckets = (INodeList **) VG_(calloc)(deps->numBuckets, sizeof(INodeList*));
+    if (deps->buckets == NULL) {
+      VG_(tool_panic)( "Out of space for reallocating INodeSet's buckets." );
+    }
+    int i;
+    for (i=0; i<oldNumBuckets; i++) {
+      for (iter = oldBuckets[i]; iter != NULL; iter = last) {
+        INode *node = iter->node;
+        index = ((int) node >> 2) & (deps->numBuckets-1);
+        deps->buckets[index] = consINode(deps->buckets[index], node);
+        last = iter->next;
+        VG_(free)(iter);
       }
     }
+     VG_(free)(oldBuckets);
   }
 }
 
@@ -463,7 +504,7 @@ static INode *new_INode(LineInfo *line) {
    inode->line = line;
    inode->callNode = False; // Set to true later if we encounter a call on this line
    inode->cost = 0;
-   inode->deps = NULL;
+   inode->deps = newINodeSet();
    inode->cpLength = -9999999;
    inode->cp = NULL;
    inode->numParents = 0;
@@ -525,11 +566,12 @@ static int critPathNodes(INodeList *inodes) {
 // DESTRUCTIVE - IT FREES EVERYTHING!
 //
 static int critPathNodes(INodeList *roots) {
+  INodeSet *deps;
   INodeList *nodeIter, *tail;
   int arrCap = 100, stackSize = 0;
   INode *currNode, *currDep;
   INode **workStack = (INode **) VG_(malloc)(arrCap * sizeof(INode*));
-  int currCpLength = -999999;
+  int currCpLength = -999999, i;
 
   tl_assert(workStack);
   // Add all roots to workStack
@@ -560,25 +602,30 @@ static int critPathNodes(INodeList *roots) {
       currCpLength = currNode->cpLength;
     }
 
-    for (nodeIter = currNode->deps; nodeIter != NULL; nodeIter = tail) {
-      currDep = nodeIter->node;
-      if (currNode->cpLength + currDep->cost > currDep->cpLength) {
-        currDep->cpLength = currNode->cpLength + currDep->cost;
-        currDep->cp = currNode;
-      }
-      currDep->numParents--;
-      if (currDep->numParents == 0) {
-        if (stackSize >= arrCap) {
-          arrCap *= 2;
-          workStack = VG_(realloc)(workStack, arrCap * sizeof(INode*));
-          tl_assert(workStack);
+    deps = currNode->deps;
+    for (i=0; i<deps->numBuckets; i++) {
+      for (nodeIter = deps->buckets[i]; nodeIter != NULL; nodeIter = tail) {
+        currDep = nodeIter->node;
+        if (currNode->cpLength + currDep->cost > currDep->cpLength) {
+          currDep->cpLength = currNode->cpLength + currDep->cost;
+          currDep->cp = currNode;
         }
-        workStack[stackSize] = currDep;
-        stackSize++;
+        currDep->numParents--;
+        if (currDep->numParents == 0) {
+          if (stackSize >= arrCap) {
+            arrCap *= 2;
+            workStack = VG_(realloc)(workStack, arrCap * sizeof(INode*));
+            tl_assert(workStack);
+          }
+          workStack[stackSize] = currDep;
+          stackSize++;
+        }
+        tail = nodeIter->next;
+        VG_(free)(nodeIter);
       }
-      tail = nodeIter->next;
-      VG_(free)(nodeIter);
     }
+    VG_(free)(deps->buckets);
+    VG_(free)(deps);
     VG_(free)(currNode);
   }
   
