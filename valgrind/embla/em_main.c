@@ -52,12 +52,12 @@
 #define  DO_NOT_INSTRUMENT  0
 #define  MOCK_RTENTRY       0
 #define  FULL_CONTOURS      0
-#define  INSTRUMENT_GC      0
+#define  INSTRUMENT_GC      1
 #define  LIGHT_IGC          1
-#define  DUMP_TRACE_PILE    0
-#define  DUMP_MEMORY_MAP    0
+#define  DUMP_TRACE_PILE    1
+#define  DUMP_MEMORY_MAP    1
 #define  CRITPATH_ANALYSIS  1
-#define  PRINT_RESULTS_TABLE 0
+#define  PRINT_RESULTS_TABLE 1
 
 // Major modes
 
@@ -232,8 +232,14 @@ static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
 //
 #define  N_FRAMES         1000  // Nesting level
 #define  TRACK_RAW        1     // Track RAW dependencies
-#define  TRACK_WAR        0     // Track WAR dependencies
-#define  TRACK_WAW        0     // Track WAW dependencies
+#define  TRACK_WAR        1     // Track ALL WAR dependencies...
+#define  TRACK_WAW        1     // Track ALL WAW dependencies...
+#define  TRACK_STACK_NAME_DEPS   0 // ...including/except WAR/WAW dependencies on stack
+#define  TRACK_HIDDEN     0     // Track HIDDEN dependencies
+
+#define  MASK_RAW        1
+#define  MASK_WAR        2
+#define  MASK_WAW        4
 
 typedef enum { SR_NONE, SR_SAVE, SR_RESTORE, SR_MOV_SP } SRCode;
 
@@ -454,12 +460,13 @@ static INodeSet *newINodeSet(void) {
 static void addDep(INode *fromNode, INode *toNode) {
   INodeSet *deps = fromNode->deps;
   INodeList *iter, *last;
+  int index, i;
 
   if (fromNode == toNode) {
     return;
   }
 
-  int index = ((int) toNode >> 2) & (deps->numBuckets-1);
+  index = ((int) toNode >> 2) & (deps->numBuckets-1);
   for (iter = deps->buckets[index]; iter != NULL ; iter = iter->next) {
     if (iter->node == toNode) {
       return;
@@ -482,7 +489,6 @@ static void addDep(INode *fromNode, INode *toNode) {
     if (deps->buckets == NULL) {
       VG_(tool_panic)( "Out of space for reallocating INodeSet's buckets." );
     }
-    int i;
     for (i=0; i<oldNumBuckets; i++) {
       for (iter = oldBuckets[i]; iter != NULL; iter = last) {
         INode *node = iter->node;
@@ -2013,7 +2019,7 @@ static void compact(void)
 }
 
 
-#define N_LEAST 39800000
+#define N_LEAST 9800000
 static unsigned max_use = N_TRACE_RECS - 100000,
                 heap_limit = N_LEAST;
 
@@ -2150,7 +2156,7 @@ int nnn = 0;
 
 static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
                                Event old_event,
-                               Addr32 ref_addr, Event new_event, int addNodeDep)
+                               Addr32 ref_addr, Event new_event, int depType)
 {
    TraceRec   *old_tr = ToTrP( old_event ),
               *nca_tr = ToTrP( old_tr->link ),
@@ -2164,7 +2170,6 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
    UInt        t_line;
    RTEntry    *entry;
 #endif
-
 
    IFDID( nnn++; );
 
@@ -2223,12 +2228,12 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
 
 #if PRINT_RESULTS_TABLE
    t_line = t_info->line->line;
-   hash_value = ( t_line + code + (int) old_tr + (int) new_tr ) & ( RT_ENTRIES_PER_LINE-1 );
-//   hash_value = ( t_line + code ) & ( RT_ENTRIES_PER_LINE-1 );
+//   hash_value = ( t_line + code + (int) old_tr + (int) new_tr ) & ( RT_ENTRIES_PER_LINE-1 );
+   hash_value = ( t_line + code ) & ( RT_ENTRIES_PER_LINE-1 );
    entry = h_info->line->entries[hash_value];
 
-   while( entry!=NULL && ( entry->t_line != t_line || entry->code != code || entry->t_tr != old_tr || entry->h_tr != new_tr ) ) {
-//   while( entry!=NULL && ( entry->t_line != t_line || entry->code != code ) ) {
+//   while( entry!=NULL && ( entry->t_line != t_line || entry->code != code || entry->t_tr != old_tr || entry->h_tr != new_tr ) ) {
+   while( entry!=NULL && ( entry->t_line != t_line || entry->code != code ) ) {
       PROFILE( getResultEntry_entry++; )       // counting
       entry = entry->next;
    }
@@ -2259,8 +2264,20 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
 #endif
 
 #if CRITPATH_ANALYSIS
-   if (addNodeDep) {
-       addNodeDependency(old_tr, new_tr);
+   // Exclude hidden dependencies?
+   if (TRACK_HIDDEN || h_code != DF_HIDDEN || t_code != DF_HIDDEN) {
+       if (TRACK_RAW && (depType & MASK_RAW)) {
+           // RAW dependency
+           addNodeDependency(old_tr, new_tr);
+       } else if ((TRACK_WAR && (depType & MASK_WAR)) || (TRACK_WAW && (depType & MASK_WAW))) {
+           // WAR/WAW dependency
+
+           // Exclude WAR/WAW dependencies on the stack?
+           // Already excluded by DF_FALSE it seems......
+           if (TRACK_STACK_NAME_DEPS || r_code != DF_STACK) {
+                   addNodeDependency(old_tr, new_tr);
+           }
+       }
    }
 #endif
 
@@ -2274,12 +2291,12 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
 
 static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
                                Event old_event,
-                               Addr32 ref_addr, Event new_event, int addNodeDep)
+                               Addr32 ref_addr, Event new_event, int depType)
 {
     RTEntry *e;
 
     // IFDID( BONK( "{" ); );
-    e = XXgetResultEntry(curr_ctx, curr_info, old_event, ref_addr, new_event, addNodeDep);
+    e = XXgetResultEntry(curr_ctx, curr_info, old_event, ref_addr, new_event, depType);
     // IFDID( BONK( "}" ); );
     // if( nnn>30 ) check( 0, "Found an exit" );
 
@@ -2581,7 +2598,7 @@ void recordLoad(StmInfo *s_info, Addr32 addr )
                                     refp->lastWrite, 
                                     addr,
                                     new_event,
-                                    TRACK_RAW );
+                                    MASK_RAW );
     
 #if PRINT_RESULTS_TABLE
         res_entry->n_raw++;
@@ -2620,7 +2637,7 @@ void recordLoad(StmInfo *s_info, Addr32 addr )
                                             refp[i].lastWrite, 
                                             addr,
                                             new_event,
-                                            TRACK_RAW );
+                                            MASK_RAW );
 #if PRINT_RESULTS_TABLE
                 res_entry->n_raw++;
 #endif
@@ -2692,7 +2709,7 @@ void recordStore( StmInfo *s_info, Addr32 addr )
                                             refp[i].lastWrite, 
                                             addr,
                                             new_event,
-                                            TRACK_WAW );
+                                            MASK_WAW );
 #if PRINT_RESULTS_TABLE
                 res_entry->n_waw++;
 #endif
@@ -2704,7 +2721,7 @@ void recordStore( StmInfo *s_info, Addr32 addr )
                                                 ev_list->ev, 
                                                 addr,
                                                 new_event,
-                                                TRACK_WAR );
+                                                MASK_WAR );
 #if PRINT_RESULTS_TABLE
                     res_entry->n_war++;
 #endif
