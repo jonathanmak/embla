@@ -54,8 +54,8 @@
 #define  FULL_CONTOURS      0
 #define  INSTRUMENT_GC      1
 #define  LIGHT_IGC          1
-#define  DUMP_TRACE_PILE    1
-#define  DUMP_MEMORY_MAP    1
+#define  DUMP_TRACE_PILE    0
+#define  DUMP_MEMORY_MAP    0
 #define  CRITPATH_ANALYSIS  1
 #define  PRINT_RESULTS_TABLE 1
 
@@ -193,7 +193,7 @@ static unsigned did_gc=0;
 
 #define N_SMARKS          1000000
 #define N_STACK_FRAMES    1000000
-#define N_TRACE_RECS     40000000
+static unsigned n_trace_recs = 40000000;
 
 #if FULL_CONTOURS
 static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
@@ -231,11 +231,11 @@ static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
 // For Critical Path Analysis
 //
 #define  N_FRAMES         1000  // Nesting level
-#define  TRACK_RAW        1     // Track RAW dependencies
-#define  TRACK_WAR        1     // Track ALL WAR dependencies...
-#define  TRACK_WAW        1     // Track ALL WAW dependencies...
-#define  TRACK_STACK_NAME_DEPS   0 // ...including/except WAR/WAW dependencies on stack
-#define  TRACK_HIDDEN     0     // Track HIDDEN dependencies
+static int track_raw =      0;     // Track RAW dependencies
+static int track_war =      0;     // Track ALL WAR dependencies...
+static int track_waw =      0;     // Track ALL WAW dependencies...
+static int track_stack_name_deps = 0; // ...including/except WAR/WAW dependencies on stack
+static int track_hidden =   0;     // Track HIDDEN dependencies
 
 #define  MASK_RAW        1
 #define  MASK_WAR        2
@@ -612,6 +612,7 @@ static int critPathNodes(INodeList *roots) {
     for (i=0; i<deps->numBuckets; i++) {
       for (nodeIter = deps->buckets[i]; nodeIter != NULL; nodeIter = tail) {
         currDep = nodeIter->node;
+//        VG_(printf)("%d->%d; ", currNode->line->line, currDep->line->line);
         if (currNode->cpLength + currDep->cost > currDep->cpLength) {
           currDep->cpLength = currNode->cpLength + currDep->cost;
           currDep->cp = currNode;
@@ -641,8 +642,9 @@ static int critPathNodes(INodeList *roots) {
 //
 
 static void retNode(void) {
-//  VG_(message)(Vg_UserMsg, "Cost of line %s:%d = %d", currFrame->currNode->line->file, currFrame->currNode->line->line, currFrame->currNode->cost);
-  currFrame->callerNode->cost += critPathNodes(currFrame->roots);
+  int cpLength = critPathNodes(currFrame->roots);
+  currFrame->callerNode->cost += cpLength;
+//  VG_(printf)("%s:%d=%d\n", currFrame->callerNode->line->file, currFrame->callerNode->line->line, cpLength);
 
   currFrame--;
 }
@@ -725,7 +727,7 @@ static unsigned long int n_calls_to_newTR= 0;
 static TraceRec * newTraceRec(InstrInfo *i_info, TaggedPtr link)
 {
    n_calls_to_newTR++;
-   if( last_trace_rec >= trace_pile + N_TRACE_RECS ) {
+   if( last_trace_rec >= trace_pile + n_trace_recs ) {
      // DPRINT1( "Bailing out after %u calls\n", n_calls_to_newTR );
        VG_(tool_panic)( "Trace pile overflow" );
    }
@@ -1163,6 +1165,18 @@ static Bool em_process_cmd_line_option(Char* arg)
   else
   VG_XACT_CLO(arg, "--span", measure_span)
   else
+  VG_XACT_CLO(arg, "--track-raw", track_raw)
+  else
+  VG_XACT_CLO(arg, "--track-war", track_war)
+  else
+  VG_XACT_CLO(arg, "--track-waw", track_waw)
+  else
+  VG_XACT_CLO(arg, "--track-stack-name-deps", track_stack_name_deps)
+  else
+  VG_XACT_CLO(arg, "--track-hidden", track_hidden)
+  else
+  VG_NUM_CLO(arg, "--n_trace_recs", n_trace_recs)
+  else
     return False;
 #if 0
   tl_assert(trace_file_name);
@@ -1178,6 +1192,11 @@ static void em_print_usage(void)
 "    --edge-file=<name>        store control flow data in <name> [embla.edges]\n"
 "    --dep-file=<name>         read dependencies for span calculation from <name> [embla.deps]\n"
 "    --span                    measure critical path instead of collecting deps\n"
+"    --track-raw               track RAW dependencies\n"
+"    --track-war               track WAR dependencies\n"
+"    --track-waw               track WAW dependencies\n"
+"    --track-stack-name-deps   track WAR/WAW dependencies on stack\n"
+"    --track-hidden            track hidden dependencies\n"
    );
 }
 
@@ -2020,7 +2039,7 @@ static void compact(void)
 
 
 #define N_LEAST 9800000
-static unsigned max_use = N_TRACE_RECS - 100000,
+static unsigned max_use = 0,
                 heap_limit = N_LEAST;
 
 // static unsigned new_gen_size = 100000;
@@ -2041,6 +2060,9 @@ static void gc(void)
 
    TraceRec  *tmp = first_new_tr;
 
+   if (max_use <= 0) {
+     max_use = n_trace_recs - 100000;
+   }
    if( n_used > heap_limit ) {
 #if INSTRUMENT_GC || LIGHT_IGC
       DPRINT3("[ %12llu  %8u  %8u  ", instructions, n_used, last_trace_rec - first_new_tr );
@@ -2065,7 +2087,7 @@ static void gc(void)
          heap_limit = max_use;
       }
       // Generation management
-      if( !GENERATIONAL_COMPACT || last_trace_rec - trace_pile > N_TRACE_RECS / 2 ) {
+      if( !GENERATIONAL_COMPACT || last_trace_rec - trace_pile > n_trace_recs / 2 ) {
          global_open_calls = deleteOpenCalls( global_open_calls );
          first_new_tr = trace_pile;
       }
@@ -2265,16 +2287,16 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
 
 #if CRITPATH_ANALYSIS
    // Exclude hidden dependencies?
-   if (TRACK_HIDDEN || h_code != DF_HIDDEN || t_code != DF_HIDDEN) {
-       if (TRACK_RAW && (depType & MASK_RAW)) {
+   if (track_hidden || h_code != DF_HIDDEN || t_code != DF_HIDDEN) {
+       if (track_raw && (depType & MASK_RAW)) {
            // RAW dependency
            addNodeDependency(old_tr, new_tr);
-       } else if ((TRACK_WAR && (depType & MASK_WAR)) || (TRACK_WAW && (depType & MASK_WAW))) {
+       } else if ((track_war && (depType & MASK_WAR)) || (track_waw && (depType & MASK_WAW))) {
            // WAR/WAW dependency
 
            // Exclude WAR/WAW dependencies on the stack?
            // Already excluded by DF_FALSE it seems......
-           if (TRACK_STACK_NAME_DEPS || r_code != DF_STACK) {
+           if (track_stack_name_deps || r_code != DF_STACK) {
                    addNodeDependency(old_tr, new_tr);
            }
        }
@@ -3034,6 +3056,7 @@ static TraceRec *pop_stack_frame(InstrInfo *i_info)
       ret_tr = newTraceRec( 0, mkTaggedPtr2( this_call, TPT_RET ) );
 #if CRITPATH_ANALYSIS
       ret_tr->inode = getAndIncINode(i_info->line);
+      retNode();
 #endif
 
       current_stack_frame--;
@@ -3084,10 +3107,6 @@ void recordRet(Addr32 sp, InstrInfo *i_info, Addr32 target)
    }
 
    recordSpChange( sp );
-
-#if CRITPATH_ANALYSIS
-     retNode();
-#endif
 
    gc( );
 
@@ -4058,9 +4077,9 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
     currII = mk_i_info( currII, guestIAddr, guestILen );
     instrumentExit( bbOut, bbIn->jumpkind, currII, bbIn->next, loc_instr );
 #endif
-//    vex_printf("BBOUT_START\n");
-//    ppIRSB( bbOut);
-//    vex_printf("BBOUT_END\n");
+    vex_printf("BBOUT_START\n");
+    ppIRSB( bbOut);
+    vex_printf("BBOUT_END\n");
     return bbOut;
 }
 
@@ -4215,7 +4234,7 @@ static void em_post_clo_init_deps(void)
 
    map = (MapFragment **) VG_(calloc)(FRAGS_IN_MAP, sizeof(MapFragment*));
    dirty_map = (unsigned int *) VG_(calloc)( DIRTY_WORDS, sizeof( unsigned int ) );
-   trace_pile = (TraceRec *) VG_(calloc)( N_TRACE_RECS, sizeof( TraceRec ) );
+   trace_pile = (TraceRec *) VG_(calloc)( n_trace_recs, sizeof( TraceRec ) );
 #if CRITPATH_ANALYSIS
    firstFrame = (FrameGraph *) VG_(calloc)( N_FRAMES, sizeof( FrameGraph ) );
 #endif
@@ -4282,6 +4301,7 @@ static void finaliseCritPath(void) {
   int cpLength;
 
   while (currFrame > firstFrame) {
+    getAndIncINode(dummy_instr_info.line);
     retNode();
   }
   cpLength = critPathNodes(firstFrame->roots);//->cpLength;
