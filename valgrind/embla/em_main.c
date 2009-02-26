@@ -1290,7 +1290,7 @@ static TraceRec *forwardTR( TraceRec *ap, TraceRec *tp, TraceRec *ecae )
 {
    TraceRec *tmp = remapTR( tp->i_info, ecae, tp );
 
-   BONK( "+" );
+   GCBONK( "+" );
    if( tmp == NULL ) {
       tp->link = mkTaggedPtr2( ap, TPT_REG_OR_CLOSED_LIVE );
       return ap-1;
@@ -1328,13 +1328,13 @@ static void compact(void)
    sp = current_stack_frame;
    mp = smarks+topMark;
    while( tp >= first_new_tr ) {
-      BONK( "." );
+      GCBONK( "." );
       // Maybe start a new aeon
       if( mp->tr >= tp ) {
         ecae = tp+1;
-        BONK( "s" );
+        GCBONK( "s" );
       }
-      BONK( "," );
+      GCBONK( "," );
       if( tp->i_info != NULL ) {
         switch( TP_GET_FLAGS( tp->link ) ) {
           // Regular
@@ -1348,7 +1348,7 @@ static void compact(void)
             ap--;
             // Start new aeon
             ecae = tp;
-            BONK( "o" );
+            GCBONK( "o" );
             break;
 
           // Closed header
@@ -1367,6 +1367,7 @@ static void compact(void)
         // compaction) we cannot just jump to the call, but instead we 
         // must continue in order to find other returns with early calls
 
+        // Link field stores the offset from the top
         tp->link = mkTaggedPtr2( ToTrP( tp->link ), TPT_RET_LIVE );
         tp = ToTrP( tp->link );
         check( TP_GET_FLAGS( tp->link ) == TPT_CLOSED,
@@ -1387,6 +1388,23 @@ static void compact(void)
 
    deleteAeonMap( );
 
+   // At this point:
+   // -All trace recs less than first_new_trace remain unchanged
+   // -Of the trace recs from first_new_trace forwards:
+   //   -REGs and CLOSEDs within CLOSED calls remain unchanged
+   //   -RETs which point to CLOSEDs within CLOSED calls remain unchanged
+   //   -REGS and CLOSEDs within OPEN calls would point to what their new location would be
+   //    if compaction was towards the right rather than the left, and have tag
+   //    changed to TPT_REG_OR_CLOSED_LIVE
+   //    Their final location would be ToTrP(link)-delta
+   //   -OPENs would point to what their new location would be
+   //    if compaction was towards the right rather than the left
+   //    Their final location would be ToTrP(link)-delta
+   //   -RETs which point to CLOSEDs within OPEN calls would still point to the
+   //    same caller, but have their tag chaned to TPT_RET_LIVE
+   // -Delta is the number of trace recs to be deleted, which is also the size
+   //  of the hole on the left if compaction was towards the right
+
    GCBONK( "done\n  Phase 2 (" ); 
    
    // Phase 2:
@@ -1404,10 +1422,15 @@ static void compact(void)
          flag!=TPT_REG_OR_CLOSED_LIVE && 
          (flag!=TPT_RET_LIVE || i_info!=NULL) ) 
      { 
+        VG_(tool_panic)("jchm2: We've found an example!");
         mp->tr = mp==smarks ? trace_pile : (mp-1)->tr;
      } else if( flag==TPT_RET_LIVE && i_info==NULL ) {
         TraceRec * header = ToTrP( mp->tr->link );
-        mp->tr = ToTrP( header->link ) - delta + 1;
+        if (header >= first_new_tr) {
+          mp->tr = ToTrP( header->link ) - delta + 1;
+        } else {
+          mp->tr = first_new_tr + num_closed_since - 1;
+        }
      } else {
         mp->tr = ToTrP( mp->tr->link ) - delta;
      }
@@ -1463,6 +1486,10 @@ static void compact(void)
      }
    }
    GCBONK( "map)\n  Phase 3... " ); 
+
+   // At this point:
+   // All the smarks, stack_frames and map entries should point to the new
+   // locations for each trace rec
 
    // Phase 3:
    tp = last_trace_rec;
@@ -1531,6 +1558,24 @@ static void compact(void)
       }
       tp--;
    }
+
+   // At this point
+   // -All trace recs less than first_new_trace remain unchanged
+   // -Of the trace recs from first_new_trace forwards:
+   //   -REGs and CLOSEDs within CLOSED calls remain unchanged
+   //    EXCEPT the first non-RET (if it exists) TR in a CLOSED call in an OPEN
+   //    call, which would now point to corresponding RET_LIVE TR, and have 
+   //    TPT_BRIDGE tag.
+   //   -The first_new_tr+num_closed_since TR would point to the old location
+   //    of the next live TR
+   //   -RETs which point to CLOSEDs within CLOSED calls remain unchanged
+   //   -REGS and CLOSEDs within OPEN calls would point to NULL, and have the
+   //    original tag restored.
+   //   -OPENs would point to what their new location would be
+   //    if compaction was towards the right rather than the left
+   //    Their final location would be ToTrP(link)-delta
+   //   -RETs which point to CLOSEDs within OPEN calls would still point to the
+   //    same caller, but have their tag changed to TPT_RET_LIVE
 
    GCBONK( "done\n  Phase 4... " ); 
    
