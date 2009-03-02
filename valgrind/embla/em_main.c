@@ -52,12 +52,12 @@
 #define  DO_NOT_INSTRUMENT  0
 #define  MOCK_RTENTRY       0
 #define  FULL_CONTOURS      0
-#define  INSTRUMENT_GC      1
+#define  INSTRUMENT_GC      0
 #define  LIGHT_IGC          1
 #define  DUMP_TRACE_PILE    0
 #define  DUMP_MEMORY_MAP    0
 #define  CRITPATH_ANALYSIS  1
-#define  PRINT_RESULTS_TABLE 1
+#define  PRINT_RESULTS_TABLE 0
 
 // Major modes
 
@@ -93,7 +93,8 @@ unsigned interesting_address=0;
 #define  II_CHUNK_SIZE      1000000
 // #define  STRING_TABLE         10007  // smallest prime >= 10000
 
-#define  RT_IDX_BITS                        8
+//#define  RT_IDX_BITS                        8
+#define  RT_IDX_BITS                        3
 #define  RT_ENTRIES_PER_LINE (1<<RT_IDX_BITS)  // must be power of 2
 #define  PRED_ENTRIES_PER_LINE 4
 
@@ -240,6 +241,10 @@ static int track_hidden =   0;     // Track HIDDEN dependencies
 #define  MASK_RAW        1
 #define  MASK_WAR        2
 #define  MASK_WAW        4
+
+static int sample_freq =    0;
+static int sample_count =   0;
+static int sample_threshold = 0;
 
 typedef enum { SR_NONE, SR_SAVE, SR_RESTORE, SR_MOV_SP } SRCode;
 
@@ -644,7 +649,16 @@ static int critPathNodes(INodeList *roots) {
 static void retNode(void) {
   int cpLength = critPathNodes(currFrame->roots);
   currFrame->callerNode->cost += cpLength;
-//  VG_(printf)("%s:%d=%d\n", currFrame->callerNode->line->file, currFrame->callerNode->line->line, cpLength);
+  if (sample_freq > 0) {
+    sample_count--;
+    if (sample_count == 0) {
+      VG_(printf)("%s:%d=%d\n", currFrame->callerNode->line->file, currFrame->callerNode->line->line, cpLength);
+      sample_count = sample_freq;
+    }
+  }
+  if (sample_threshold > 0 && cpLength >= sample_threshold) {
+      VG_(printf)("!%s:%d=%d\n", currFrame->callerNode->line->file, currFrame->callerNode->line->line, cpLength);
+  }
 
   currFrame--;
 }
@@ -1177,6 +1191,10 @@ static Bool em_process_cmd_line_option(Char* arg)
   else
   VG_NUM_CLO(arg, "--n_trace_recs", n_trace_recs)
   else
+  VG_NUM_CLO(arg, "--sample_freq", sample_freq)
+  else
+  VG_NUM_CLO(arg, "--sample_threshold", sample_threshold)
+  else
     return False;
 #if 0
   tl_assert(trace_file_name);
@@ -1197,6 +1215,9 @@ static void em_print_usage(void)
 "    --track-waw               track WAW dependencies\n"
 "    --track-stack-name-deps   track WAR/WAW dependencies on stack\n"
 "    --track-hidden            track hidden dependencies\n"
+"    --n_trace_recs=<n>        maximum number of trace records allowed\n"
+"    --sample_freq=<n>         frequency for outputting critical paths. 0 means never output\n"
+"    --sample_threshold=<n>    output critical paths above this threshold. 0 means never output\n"
    );
 }
 
@@ -1764,6 +1785,7 @@ static void compact(void)
         // compaction) we cannot just jump to the call, but instead we 
         // must continue in order to find other returns with early calls
 
+        // Link field stores the offset from the top
         tp->link = mkTaggedPtr2( ToTrP( tp->link ), TPT_RET_LIVE );
         tp = ToTrP( tp->link );
         check( TP_GET_FLAGS( tp->link ) == TPT_CLOSED,
@@ -1783,6 +1805,23 @@ static void compact(void)
    delta -= num_closed_since;
 
    deleteAeonMap( );
+
+   // At this point:
+   // -All trace recs less than first_new_trace remain unchanged
+   // -Of the trace recs from first_new_trace forwards:
+   //   -REGs and CLOSEDs within CLOSED calls remain unchanged
+   //   -RETs which point to CLOSEDs within CLOSED calls remain unchanged
+   //   -REGS and CLOSEDs within OPEN calls would point to what their new location would be
+   //    if compaction was towards the right rather than the left, and have tag
+   //    changed to TPT_REG_OR_CLOSED_LIVE
+   //    Their final location would be ToTrP(link)-delta
+   //   -OPENs would point to what their new location would be
+   //    if compaction was towards the right rather than the left
+   //    Their final location would be ToTrP(link)-delta
+   //   -RETs which point to CLOSEDs within OPEN calls would still point to the
+   //    same caller, but have their tag chaned to TPT_RET_LIVE
+   // -Delta is the number of trace recs to be deleted, which is also the size
+   //  of the hole on the left if compaction was towards the right
 
 #if DUMP_TRACE_PILE && INSTRUMENT_GC
       GCBONK("\n");
@@ -1805,10 +1844,15 @@ static void compact(void)
          flag!=TPT_REG_OR_CLOSED_LIVE && 
          (flag!=TPT_RET_LIVE || i_info!=NULL) ) 
      { 
+        VG_(tool_panic)("jchm2: We've found an example!");
         mp->tr = mp==smarks ? trace_pile : (mp-1)->tr;
      } else if( flag==TPT_RET_LIVE && i_info==NULL ) {
         TraceRec * header = ToTrP( mp->tr->link );
-        mp->tr = ToTrP( header->link ) - delta + 1;
+        if (header >= first_new_tr) {
+          mp->tr = ToTrP( header->link ) - delta + 1;
+        } else {
+          mp->tr = first_new_tr + num_closed_since - 1;
+        }
      } else {
         mp->tr = ToTrP( mp->tr->link ) - delta;
      }
@@ -1864,6 +1908,11 @@ static void compact(void)
      }
    }
    GCBONK( "map)\n  Phase 3... " ); 
+
+   // At this point:
+   // All the smarks, stack_frames and map entries should point to the new
+   // locations for each trace rec
+
 #if DUMP_TRACE_PILE && INSTRUMENT_GC
       GCBONK("\n");
       dump_trace_pile( );
@@ -1936,6 +1985,24 @@ static void compact(void)
       }
       tp--;
    }
+
+   // At this point
+   // -All trace recs less than first_new_trace remain unchanged
+   // -Of the trace recs from first_new_trace forwards:
+   //   -REGs and CLOSEDs within CLOSED calls remain unchanged
+   //    EXCEPT the first non-RET (if it exists) TR in a CLOSED call in an OPEN
+   //    call, which would now point to corresponding RET_LIVE TR, and have 
+   //    TPT_BRIDGE tag.
+   //   -The first_new_tr+num_closed_since TR would point to the old location
+   //    of the next live TR
+   //   -RETs which point to CLOSEDs within CLOSED calls remain unchanged
+   //   -REGS and CLOSEDs within OPEN calls would point to NULL, and have the
+   //    original tag restored.
+   //   -OPENs would point to what their new location would be
+   //    if compaction was towards the right rather than the left
+   //    Their final location would be ToTrP(link)-delta
+   //   -RETs which point to CLOSEDs within OPEN calls would still point to the
+   //    same caller, but have their tag changed to TPT_RET_LIVE
 
    GCBONK( "done\n  Phase 4... " ); 
 #if DUMP_TRACE_PILE && INSTRUMENT_GC
@@ -4077,9 +4144,9 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
     currII = mk_i_info( currII, guestIAddr, guestILen );
     instrumentExit( bbOut, bbIn->jumpkind, currII, bbIn->next, loc_instr );
 #endif
-    vex_printf("BBOUT_START\n");
-    ppIRSB( bbOut);
-    vex_printf("BBOUT_END\n");
+//    vex_printf("BBOUT_START\n");
+//    ppIRSB( bbOut);
+//    vex_printf("BBOUT_END\n");
     return bbOut;
 }
 
@@ -4278,6 +4345,7 @@ static void em_post_clo_init_deps(void)
 
    init_read_table( );
 
+   sample_count = sample_freq;
 }
 
 static void em_post_clo_init(void)
