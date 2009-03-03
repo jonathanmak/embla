@@ -2198,7 +2198,8 @@ static int maybeSplitBlock( RefInfo *refp, Addr32 addr, int size )
 
         splitAccessUnit( block, or_gpd );
 
-        return or_gpd - ( addr & (b_size-1) );
+//        return or_gpd - ( addr & (b_size-1) );
+        return size <= b_size - ( addr & (b_size-1) ) ? size : b_size - ( addr & (b_size-1) );
 
     }
 
