@@ -57,7 +57,8 @@
 #define  DUMP_TRACE_PILE    0
 #define  DUMP_MEMORY_MAP    0
 #define  CRITPATH_ANALYSIS  1
-#define  PRINT_RESULTS_TABLE 0
+#define  PRINT_RESULTS_TABLE 1
+#define  PRINT_BB           0
 
 // Major modes
 
@@ -282,13 +283,13 @@ typedef
      char h_inf;
      char t_inf;
      UInt n_raw, n_war, n_waw;
-     struct _TraceRec * h_tr;
-     struct _TraceRec * t_tr;
+//     struct _TraceRec * h_tr;
+//     struct _TraceRec * t_tr;
      struct _RTEntry *next;
    }
    RTEntry;
 
-static RTEntry mock_rtentry = {"mock", "", 0, 'o', 0, 0, 'c', 'c', 0, 0, 0, NULL, NULL, NULL};
+static RTEntry mock_rtentry = {"mock", "", 0, 'o', 0, 0, 'c', 'c', 0, 0, 0, /*NULL, NULL,*/ NULL};
 
 /********************************************************************************
  *                                                                              *
@@ -1309,7 +1310,8 @@ static int howHidden( Addr32 addr )
         if( ! VG_(strcmp)( fname, "malloc" ) ||
             ! VG_(strcmp)( fname, "calloc" ) ||
             ! VG_(strcmp)( fname, "realloc" ) ||
-            ! VG_(strcmp)( fname, "free" ) ) 
+            ! VG_(strcmp)( fname, "free" ) ||
+            ! VG_(strcmp)( fname, "rand" ) ) 
         {
             return SF_SEEN | SF_HIDDEN | SF_STR_HIDDEN;
         } else if ( ! VG_(strncmp)( fname, "_dl", 3 ) ) {
@@ -2197,10 +2199,10 @@ static Int result_entry_compare(const RTEntry * e1, const RTEntry * e2)
   tl_assert(e1);
   tl_assert(e2);
 
-  if (e1->h_tr != e2->h_tr)
-    return e1->h_tr - e2->h_tr;
-  if (e1->t_tr != e2->t_tr)
-    return e1->t_tr - e2->t_tr;
+//  if (e1->h_tr != e2->h_tr)
+//    return e1->h_tr - e2->h_tr;
+//  if (e1->t_tr != e2->t_tr)
+//    return e1->t_tr - e2->t_tr;
 
   result = VG_(strcmp)(e1->h_file, e2->h_file);
   if (result != 0)
@@ -2344,8 +2346,8 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
        entry->n_raw  = 0;
        entry->n_war  = 0;
        entry->n_waw  = 0;
-       entry->h_tr = new_tr;
-       entry->t_tr = old_tr;
+//       entry->h_tr = new_tr;
+//       entry->t_tr = old_tr;
        entry->next = h_info->line->entries[hash_value];
        h_info->line->entries[hash_value] = entry;
 
@@ -2646,7 +2648,8 @@ static int maybeSplitBlock( RefInfo *refp, Addr32 addr, int size )
 
         splitAccessUnit( block, or_gpd );
 
-        return or_gpd - ( addr & (b_size-1) );
+//        return or_gpd - ( addr & (b_size-1) );
+        return size <= b_size - ( addr & (b_size-1) ) ? size : b_size - ( addr & (b_size-1) );
 
     }
 
@@ -3959,9 +3962,11 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
 
     bbOut = deepCopyIRSBExceptStmts( bbIn );
 
-//    vex_printf("BBIN_START\n");
-//    ppIRSB( bbIn);
-//    vex_printf("BBIN_END\n");
+#if PRINT_BB
+    vex_printf("BBIN_START\n");
+    ppIRSB( bbIn);
+    vex_printf("BBIN_END\n");
+#endif
 
     for( bbIn_idx = 0; bbIn_idx < bbIn->stmts_used; bbIn_idx++ ) {
        if( bbIn->stmts[bbIn_idx]->tag == Ist_IMark ) break;
@@ -4144,9 +4149,11 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
     currII = mk_i_info( currII, guestIAddr, guestILen );
     instrumentExit( bbOut, bbIn->jumpkind, currII, bbIn->next, loc_instr );
 #endif
-//    vex_printf("BBOUT_START\n");
-//    ppIRSB( bbOut);
-//    vex_printf("BBOUT_END\n");
+#if PRINT_BB
+    vex_printf("BBOUT_START\n");
+    ppIRSB( bbOut);
+    vex_printf("BBOUT_END\n");
+#endif
     return bbOut;
 }
 
@@ -4404,9 +4411,9 @@ static void printResultTable(const Char * traceFileName)
          for( entry=line_info->entries[j]; entry != NULL; entry=entry->next ) {
            // BONK( "." );
            // DPRINT1( "%s\n", ( makeTitle( entry ) ) );
-//           if ((VG_(strcmp)(entry->h_file, "???") != 0) &&
-//	       (VG_(strcmp)(entry->h_fn, "???") != 0))
-//           {
+           if ((VG_(strcmp)(entry->h_file, "???") != 0) &&
+	       (VG_(strcmp)(entry->h_fn, "???") != 0))
+           {
              ++num_results;
              if (num_results >= results_buf_size)
              {
@@ -4416,7 +4423,7 @@ static void printResultTable(const Char * traceFileName)
                tl_assert(result_array);
              }
              result_array[num_results - 1] = * entry;
-//           }
+           }
          }
        }
      // BONK( "\n" );
@@ -4441,9 +4448,9 @@ static void printResultTable(const Char * traceFileName)
    {
      VG_(sprintf)( buf, "%s %d %d %d %d %d\n", 
 		   makeTitle(& result_array[i]), result_array[i].n_raw,
-		   result_array[i].n_war, result_array[i].n_waw,
+		   result_array[i].n_war, result_array[i].n_waw);//,
 //                   result_array[i].h_tr->i_info->i_addr, result_array[i].t_tr->i_info->i_addr );
-                   result_array[i].h_tr - trace_pile, result_array[i].t_tr - trace_pile);
+//                   result_array[i].h_tr - trace_pile, result_array[i].t_tr - trace_pile);
      if (VG_(strcmp)(traceFileName, "-") != 0)
        VG_(write)( fd, buf, VG_(strlen)( buf ) );
      else
