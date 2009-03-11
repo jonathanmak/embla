@@ -58,7 +58,7 @@
 #define  DUMP_MEMORY_MAP    0
 #define  CRITPATH_ANALYSIS  1
 #define  PRINT_RESULTS_TABLE 1
-#define  PRINT_BB           1
+#define  PRINT_BB           0
 
 // Major modes
 
@@ -296,7 +296,7 @@ static RTEntry mock_rtentry = {"mock", "", 0, 'o', 0, 0, 'c', 'c', 0, 0, 0, /*NU
  * Statment, instruction and line info                                          *
  *                                                                              *
  ********************************************************************************/
-#if RECORD_CF_EDGES || CRITPATH_ANALYSIS
+#if RECORD_CF_EDGES
 typedef struct _LineList {
    struct _LineInfo *line;
    struct _LineList *next;
@@ -431,15 +431,13 @@ typedef struct _INodeSet {
 typedef struct _FrameGraph {
   INodeList *roots;
   INode *currNode;
-  INodeList *lastNonCallNode;
+  INode *lastNonCallNode;
   INode *callerNode;
-  LineList *loopHeaderLines;
 } FrameGraph;
 
 static FrameGraph *firstFrame;
 static FrameGraph *currFrame;
 static int totalOps;
-static int new_iteration = 0;
 
 static INodeList *consINode(INodeList *tail, INode *head) {
   INodeList *newList = VG_(malloc)(sizeof(INodeList));
@@ -522,31 +520,10 @@ static INode *new_INode(LineInfo *line) {
    inode->cpLength = -9999999;
    inode->cp = NULL;
    inode->numParents = 0;
-   if (currFrame->loopHeaderLines != NULL && currFrame->loopHeaderLines->line == line) {
-     VG_(printf)("MARKER 1, line = %s:%s(%d)\n", line->file, line->func, line->line);
-     // Return from loop iteration
-     INodeList *tempNL;
-     LineList *tempLL;
-
-     tempNL = currFrame->lastNonCallNode;
-     tl_assert(tempNL->next); // This should not be NULL
-     currFrame->lastNonCallNode = tempNL->next;
-     VG_(free)(tempNL);
-
-     tempLL = currFrame->loopHeaderLines;
-     currFrame->loopHeaderLines = tempLL->next;
-     VG_(free)(tempLL);
-   }
-   if (currFrame->lastNonCallNode->node != NULL) {
-     addDep(currFrame->lastNonCallNode->node, inode);
+   if (currFrame->lastNonCallNode != NULL) {
+     addDep(currFrame->lastNonCallNode, inode);
    } else {
      currFrame->roots = consINode(currFrame->roots, inode);
-   }
-   if (new_iteration) {
-     VG_(printf)("MARKER 2 %x\n", currFrame->lastNonCallNode->node);
-     // Add one loop nesting level
-     currFrame->lastNonCallNode = consINode(currFrame->lastNonCallNode, NULL);
-     new_iteration = 0;
    }
    currFrame->currNode = inode;
    return inode;
@@ -560,9 +537,8 @@ static void newNodeFrame(INode *callerNode) {
   }
   currFrame->roots = NULL;
   currFrame->currNode = NULL;
-  currFrame->lastNonCallNode = consINode(NULL, NULL);
+  currFrame->lastNonCallNode = NULL;
   currFrame->callerNode = callerNode;
-  currFrame->loopHeaderLines = NULL;
 }
 
 // RECURSIVE VERSION - MAY OVERFLOW THE STACK
@@ -674,9 +650,6 @@ static int critPathNodes(INodeList *roots) {
 static void retNode(void) {
   int cpLength = critPathNodes(currFrame->roots);
   currFrame->callerNode->cost += cpLength;
-  tl_assert(!(currFrame->lastNonCallNode->next));
-  VG_(free)(currFrame->lastNonCallNode);
-  tl_assert(!new_iteration);
   if (sample_freq > 0) {
     sample_count--;
     if (sample_count == 0) {
@@ -697,7 +670,7 @@ static void newINodeIfNewLine(LineInfo *line) {
 //  VG_(message)(Vg_UserMsg, "Cost of line %s:%d = %d", node->line->file, node->line->line, node->cost);
     // Finalise old node
     if (!(node->callNode)) {
-      currFrame->lastNonCallNode->node = node;
+      currFrame->lastNonCallNode = node;
     }
 
     // Starting a new node
@@ -2616,11 +2589,6 @@ void recordRet(Addr32 sp, InstrInfo *i_info, Addr32 target)
 }
 
 #if CRITPATH_ANALYSIS
-static VG_REGPARM(2)
-void recordBoringJump( InstrInfo *i_info, Addr32 target)
-{
-}
-
 static VG_REGPARM(1)
 void recordOp( StmInfo *s_info )
 {
@@ -2898,25 +2866,6 @@ void recordStore( StmInfo *s_info, Addr32 addr )
 }
 
 #if CRITPATH_ANALYSIS
-static VG_REGPARM(2)
-void recordBoringJump( InstrInfo *i_info, Addr32 target)
-{
-    if (target < i_info->i_addr &&
-        (VG_(strcmp)(i_info->line->file, "???") != 0)) { // Exclude loops in library
-      // Backward jump - assume this is a loop
-      LineList *head;
-
-      VG_(printf)("MARKER 3 %x, %x, %x, %d\n", target, i_info->i_addr, i_info, i_info->line->line);
-      new_iteration = 1;
-      // Just to ensure we have a new node for the next instruction no matter what
-      head = VG_(malloc)(sizeof(LineList));
-      head->line = i_info->line;
-      head->next = currFrame->loopHeaderLines;
-      currFrame->loopHeaderLines = head;
-      newINodeIfNewLine(&dummy_line_info);
-    }
-}
-
 static VG_REGPARM(1)
 void recordOp(StmInfo *s_info)
 {
@@ -3125,7 +3074,6 @@ void recordGetI(StmInfo *s_info, Int ix)
 static VG_REGPARM(3)
 void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target) 
 {
-    VG_(printf)("MARKER 4, %x\n", target);
     StackFrame * newFrame = current_stack_frame + 1;
     Addr32 ca = i_info->i_addr, ra = ca + i_info->i_len;
     TraceRec * newTR = newTraceRec( i_info, mkTaggedPtr2( newFrame, TPT_OPEN ) );
@@ -3454,7 +3402,7 @@ static void emitSpChange(IRSB *bbOut)
 // implicit Exit at the end of each block
 
 static void instrumentExit(IRSB *bbOut, IRJumpKind jk, InstrInfo *i_info, IRExpr *tgt,
-                           unsigned int loc_instr, IRExpr *guard)
+                           unsigned int loc_instr)
 {
     switch( jk ) {
 
@@ -3486,20 +3434,6 @@ static void instrumentExit(IRSB *bbOut, IRJumpKind jk, InstrInfo *i_info, IRExpr
 
              addStmtToIRSB( bbOut, IRStmt_WrTmp( tmp_sp, exp_get_sp ) );
              addStmtToIRSB( bbOut, IRStmt_WrTmp( tmp_pc, tgt ) );
-             addStmtToIRSB( bbOut, IRStmt_Dirty(dy) );
-          }
-          break;
-
-      case Ijk_Boring:
-          {
-             HChar *hname = "recordBoringJump";
-             void  *haddr = &recordBoringJump;
-             IRExpr *exp_tgt = emitIRAssign( bbOut, tgt );
-             IRExpr **args = mkIRExprVec_2( const32( (UInt) i_info ), exp_tgt );
-             IRDirty *dy = unsafeIRDirty_0_N( 2, hname, haddr, args );
-             if (guard != NULL) {
-               dy->guard = guard;
-             }
              addStmtToIRSB( bbOut, IRStmt_Dirty(dy) );
           }
           break;
@@ -4070,7 +4004,7 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
          case Ist_Exit: 
              currII = mk_i_info( currII, guestIAddr, guestILen );
 	     instrumentExit( bbOut, stIn->Ist.Exit.jk, currII, 
-                             IRExpr_Const( stIn->Ist.Exit.dst ), loc_instr, stIn->Ist.Exit.guard );
+                             IRExpr_Const( stIn->Ist.Exit.dst ), loc_instr );
 #if !PRECISE_ICOUNT
              emitIncrementGlobal( bbOut, &instructions, loc_instr );
              loc_instr = 0;
@@ -4213,7 +4147,7 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
        stack_modified = 0;
     }
     currII = mk_i_info( currII, guestIAddr, guestILen );
-    instrumentExit( bbOut, bbIn->jumpkind, currII, bbIn->next, loc_instr, NULL );
+    instrumentExit( bbOut, bbIn->jumpkind, currII, bbIn->next, loc_instr );
 #endif
 #if PRINT_BB
     vex_printf("BBOUT_START\n");
@@ -4389,7 +4323,6 @@ static void em_post_clo_init_deps(void)
        VG_(tool_panic)("Out of memory!");
    }
    currFrame = firstFrame;
-   currFrame->lastNonCallNode = consINode(NULL, NULL);
 #endif
 
    opt.elim_stack_alias = 1;
