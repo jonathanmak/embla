@@ -408,9 +408,9 @@ static StmInfo *mkStmInfo( InstrInfo *i_info, UShort offset, UChar size, UChar f
 typedef struct _INode {
   LineInfo *line;
   Bool callNode;
-  int cost;
+  long long int cost;
   struct _INodeSet *deps;
-  int cpLength;
+  long long int cpLength;
   struct _INode *cp;
   int numParents; // For Critical Path Analysis only
 } INode;
@@ -437,7 +437,7 @@ typedef struct _FrameGraph {
 
 static FrameGraph *firstFrame;
 static FrameGraph *currFrame;
-static int totalOps;
+static long long int totalOps;
 
 static INodeList *consINode(INodeList *tail, INode *head) {
   INodeList *newList = VG_(malloc)(sizeof(INodeList));
@@ -577,13 +577,14 @@ static int critPathNodes(INodeList *inodes) {
 // NON-RECURSIVE VERSION - PROBABLY SLOWER
 // DESTRUCTIVE - IT FREES EVERYTHING!
 //
-static int critPathNodes(INodeList *roots) {
+static long long int critPathNodes(INodeList *roots) {
   INodeSet *deps;
   INodeList *nodeIter, *tail;
   int arrCap = 100, stackSize = 0;
   INode *currNode, *currDep;
   INode **workStack = (INode **) VG_(malloc)(arrCap * sizeof(INode*));
-  int currCpLength = -999999, i;
+  long long int currCpLength = -999999;
+  int i;
 
   tl_assert(workStack);
   // Add all roots to workStack
@@ -648,17 +649,17 @@ static int critPathNodes(INodeList *roots) {
 //
 
 static void retNode(void) {
-  int cpLength = critPathNodes(currFrame->roots);
+  long long int cpLength = critPathNodes(currFrame->roots);
   currFrame->callerNode->cost += cpLength;
   if (sample_freq > 0) {
     sample_count--;
     if (sample_count == 0) {
-      VG_(printf)("%s:%d=%d\n", currFrame->callerNode->line->file, currFrame->callerNode->line->line, cpLength);
+      VG_(printf)("%s:%d=%lld\n", currFrame->callerNode->line->file, currFrame->callerNode->line->line, cpLength);
       sample_count = sample_freq;
     }
   }
   if (sample_threshold > 0 && cpLength >= sample_threshold) {
-      VG_(printf)("!%s:%d=%d\n", currFrame->callerNode->line->file, currFrame->callerNode->line->line, cpLength);
+      VG_(printf)("!%s:%d=%lld\n", currFrame->callerNode->line->file, currFrame->callerNode->line->line, cpLength);
   }
 
   currFrame--;
@@ -4373,7 +4374,7 @@ static void em_post_clo_init(void)
 #if CRITPATH_ANALYSIS
 
 static void finaliseCritPath(void) {
-  int cpLength;
+  long long int cpLength;
 
   while (currFrame > firstFrame) {
     getAndIncINode(dummy_instr_info.line);
@@ -4381,8 +4382,8 @@ static void finaliseCritPath(void) {
   }
   cpLength = critPathNodes(firstFrame->roots);//->cpLength;
   // To take account of the first 2 manually created TraceRecs
-  VG_(message)(Vg_UserMsg, "No. of instructions is %d", totalOps);
-  VG_(message)(Vg_UserMsg, "Length of Critical path is %d.", cpLength);
+  VG_(message)(Vg_UserMsg, "No. of instructions is %lld", totalOps);
+  VG_(message)(Vg_UserMsg, "Length of Critical path is %lld.", cpLength);
 }
 
 #endif
