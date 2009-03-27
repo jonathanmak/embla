@@ -238,6 +238,7 @@ static int track_war =      0;     // Track ALL WAR dependencies...
 static int track_waw =      0;     // Track ALL WAW dependencies...
 static int track_stack_name_deps = 0; // ...including/except WAR/WAW dependencies on stack
 static int track_hidden =   0;     // Track HIDDEN dependencies
+static int para_non_calls = 0;     // Allows lines to be executed in parallel even if they don't contain function calls
 
 #define  MASK_RAW        1
 #define  MASK_WAR        2
@@ -520,7 +521,7 @@ static INode *new_INode(LineInfo *line) {
    inode->cpLength = -9999999;
    inode->cp = NULL;
    inode->numParents = 0;
-   if (currFrame->lastNonCallNode != NULL) {
+   if (!para_non_calls && currFrame->lastNonCallNode != NULL) {
      addDep(currFrame->lastNonCallNode, inode);
    } else {
      currFrame->roots = consINode(currFrame->roots, inode);
@@ -1196,6 +1197,8 @@ static Bool em_process_cmd_line_option(Char* arg)
   VG_NUM_CLO(arg, "--sample_freq", sample_freq)
   else
   VG_NUM_CLO(arg, "--sample_threshold", sample_threshold)
+  else
+  VG_XACT_CLO(arg, "--para-non-calls", para_non_calls)
   else
     return False;
 #if 0
