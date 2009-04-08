@@ -542,54 +542,33 @@ static void newNodeFrame(INode *callerNode) {
   currFrame->callerNode = callerNode;
 }
 
-// RECURSIVE VERSION - MAY OVERFLOW THE STACK
-/*
-static int critPath(INode *inode) {
-  int depCpLength;
-  INodeList *dep;
-  if (inode->cp != NULL) {
-    return inode->cpLength;
-  }
-  inode->cpLength = inode->cost;
-  for (dep = inode->deps; dep != NULL; dep = dep->next) {
-    depCpLength = critPath(dep->node);
-    if (depCpLength + inode->cost > inode->cpLength) {
-      inode->cpLength = depCpLength + inode->cost;
-      inode->cp = dep->node;
-    }
-  }
-  return inode->cpLength;
-}
+#define PRINT_CP(currNode, currCp, countdown) \
+        for (currNode = currCp; currNode != NULL; currNode = currNode->cp) { \
+          VG_(printf)("%d(%lld), ", currNode->line->line, currNode->cost); \
+          if (--countdown == 0) { \
+            VG_(printf)("\n"); \
+            countdown = 10; \
+          } \
+        } \
+        VG_(printf)("\n");
 
-static int critPathNodes(INodeList *inodes) {
-  INode *currMaxCp = NULL;
-  int currMaxCpLength = -9999999, cpLength;
-  for (; inodes != NULL; inodes = inodes->next) {
-    cpLength = critPath(inodes->node);
-    if (cpLength > currMaxCpLength) {
-      currMaxCp = inodes->node;
-      currMaxCpLength = cpLength;
-    }
-  }
-  return currMaxCp->cpLength;
-}
-*/
-
-// NON-RECURSIVE VERSION - PROBABLY SLOWER
+// NON-RECURSIVE (BREADTH FIRST) VERSION - PROBABLY SLOWER
 // DESTRUCTIVE - IT FREES EVERYTHING!
 //
-static long long int critPathNodes(INodeList *roots) {
+// Calculates critical path for current frame
+static long long int critPathNodes(void) {
   INodeSet *deps;
-  INodeList *nodeIter, *tail;
+  INodeList *nodeIter, *tail, *allNodes = NULL;
   int arrCap = 100, stackSize = 0;
   INode *currNode, *currDep;
   INode **workStack = (INode **) VG_(malloc)(arrCap * sizeof(INode*));
   long long int currCpLength = -999999;
+  INode *currCp = NULL;
   int i;
 
   tl_assert(workStack);
   // Add all roots to workStack
-  for (nodeIter = roots; nodeIter != NULL; nodeIter = tail) {
+  for (nodeIter = currFrame->roots; nodeIter != NULL; nodeIter = tail) {
     currNode = nodeIter->node;
     // Just double checking the root hasn't got any parents
     if (currNode->numParents == 0) {
@@ -602,6 +581,7 @@ static long long int critPathNodes(INodeList *roots) {
       }
       workStack[stackSize] = currNode;
       stackSize++;
+      allNodes = consINode(allNodes, currNode);
     }
     tail = nodeIter->next;
     VG_(free)(nodeIter);
@@ -614,6 +594,7 @@ static long long int critPathNodes(INodeList *roots) {
     // Look at its CP
     if (currNode->cpLength > currCpLength) {
       currCpLength = currNode->cpLength;
+      currCp = currNode;
     }
 
     deps = currNode->deps;
@@ -634,6 +615,7 @@ static long long int critPathNodes(INodeList *roots) {
           }
           workStack[stackSize] = currDep;
           stackSize++;
+          allNodes = consINode(allNodes, currDep);
         }
         tail = nodeIter->next;
         VG_(free)(nodeIter);
@@ -641,7 +623,31 @@ static long long int critPathNodes(INodeList *roots) {
     }
     VG_(free)(deps->buckets);
     VG_(free)(deps);
-    VG_(free)(currNode);
+//    VG_(free)(currNode);
+  }
+
+  // Prints out the critical path
+  if (currFrame->callerNode != NULL) {
+    if (sample_freq > 0) {
+      sample_count--;
+      if (sample_count == 0) {
+        int countdown = 10;
+        VG_(printf)("%s:%d(%s)=%lld: ", currFrame->callerNode->line->file, currFrame->callerNode->line->line, currCp->line->file, currCpLength);
+        PRINT_CP(currNode, currCp, countdown);
+        sample_count = sample_freq;
+      }
+    }
+    if (sample_threshold > 0 && currCpLength >= sample_threshold) {
+        int countdown = 10;
+        VG_(printf)("!%s:%d(%s)=%lld: ", currFrame->callerNode->line->file, currFrame->callerNode->line->line, currCp->line->file, currCpLength);
+        PRINT_CP(currNode, currCp, countdown);
+    }
+  }
+
+  for (nodeIter = allNodes; nodeIter != NULL; nodeIter = tail) {
+    tail = nodeIter->next;
+    VG_(free)(nodeIter->node);
+    VG_(free)(nodeIter);
   }
   
   VG_(free)(workStack);
@@ -650,19 +656,8 @@ static long long int critPathNodes(INodeList *roots) {
 //
 
 static void retNode(void) {
-  long long int cpLength = critPathNodes(currFrame->roots);
+  long long int cpLength = critPathNodes();
   currFrame->callerNode->cost += cpLength;
-  if (sample_freq > 0) {
-    sample_count--;
-    if (sample_count == 0) {
-      VG_(printf)("%s:%d=%lld\n", currFrame->callerNode->line->file, currFrame->callerNode->line->line, cpLength);
-      sample_count = sample_freq;
-    }
-  }
-  if (sample_threshold > 0 && cpLength >= sample_threshold) {
-      VG_(printf)("!%s:%d=%lld\n", currFrame->callerNode->line->file, currFrame->callerNode->line->line, cpLength);
-  }
-
   currFrame--;
 }
 
@@ -1223,6 +1218,7 @@ static void em_print_usage(void)
 "    --n_trace_recs=<n>        maximum number of trace records allowed\n"
 "    --sample_freq=<n>         frequency for outputting critical paths. 0 means never output\n"
 "    --sample_threshold=<n>    output critical paths above this threshold. 0 means never output\n"
+"    --para-non-calls          consider parallelism even for lines without function calls\n"
    );
 }
 
@@ -1683,7 +1679,7 @@ static void dump_trace_pile(void)
    int       off,i_idx;
 
    for( rec=trace_pile; rec <= last_trace_rec; rec++ ) {
-      if (rec->i_info != NULL && TP_GET_FLAGS( rec->link ) == TPT_REG) continue;// jchm2
+//      if (rec->i_info != NULL && TP_GET_FLAGS( rec->link ) == TPT_REG) continue;// jchm2
       DPRINT1( "%u: ", rec - trace_pile );
       if( rec->i_info != NULL ) {
          switch( TP_GET_FLAGS( rec->link ) ) {
@@ -1850,7 +1846,8 @@ static void compact(void)
          flag!=TPT_REG_OR_CLOSED_LIVE && 
          (flag!=TPT_RET_LIVE || i_info!=NULL) ) 
      { 
-        VG_(tool_panic)("jchm2: We've found an example!");
+       // jchm2: Does this ever happen?
+        VG_(tool_panic)("We've found an example!");
         mp->tr = mp==smarks ? trace_pile : (mp-1)->tr;
      } else if( flag==TPT_RET_LIVE && i_info==NULL ) {
         TraceRec * header = ToTrP( mp->tr->link );
@@ -4383,7 +4380,7 @@ static void finaliseCritPath(void) {
     getAndIncINode(dummy_instr_info.line);
     retNode();
   }
-  cpLength = critPathNodes(firstFrame->roots);//->cpLength;
+  cpLength = critPathNodes();//->cpLength;
   // To take account of the first 2 manually created TraceRecs
   VG_(message)(Vg_UserMsg, "No. of instructions is %lld", totalOps);
   VG_(message)(Vg_UserMsg, "Length of Critical path is %lld.", cpLength);
