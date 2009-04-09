@@ -31,6 +31,8 @@
    Things that should be changed include, but are not limited to, the following:
    - There is an assumption throughout that we run code for a LE 32 bit machine.
    - spChange and adjust_shadow_sp are maybe not both needed
+
+   Now Jon's code is here!
 */
 
 //
