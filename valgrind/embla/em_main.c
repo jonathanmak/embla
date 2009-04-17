@@ -272,6 +272,7 @@ static ICount instructions = 0;
 const char * trace_file_name = "embla.trace";
 const char * edge_file_name = "embla.edges";
 const char * dep_file_name = "embla.deps";
+const char * hidden_func_file_name = "embla.hidden-funcs";
 
 typedef
    struct _RTEntry {
@@ -1175,6 +1176,8 @@ static Bool em_process_cmd_line_option(Char* arg)
   else
   VG_STR_CLO(arg, "--dep-file", dep_file_name)
   else
+  VG_STR_CLO(arg, "--hidden-func-file", hidden_func_file_name)
+  else
   VG_XACT_CLO(arg, "--span", measure_span)
   else
   VG_XACT_CLO(arg, "--track-raw", track_raw)
@@ -1209,6 +1212,7 @@ static void em_print_usage(void)
 "    --trace-file=<name>       store trace data in <name> [embla.trace]\n"
 "    --edge-file=<name>        store control flow data in <name> [embla.edges]\n"
 "    --dep-file=<name>         read dependencies for span calculation from <name> [embla.deps]\n"
+"    --hidden-func-file=<name> read names of hidden functions <name> [embla.hidden-funcs]\n"
 "    --span                    measure critical path instead of collecting deps\n"
 "    --track-raw               track RAW dependencies\n"
 "    --track-war               track WAR dependencies\n"
@@ -1302,19 +1306,21 @@ static unsigned inStack( Addr32 oldAddr, TraceRec *oldTR )
  * Hidden function handling                        *
  ***************************************************/
 
+static int numHiddenFuncs;
+static Char **hiddenFuncs;
+
 static int howHidden( Addr32 addr )
 {
     Char fname[FN_LEN];
+    int i;
 
     if( VG_(get_fnname)(addr, fname, FN_LEN) ) {
-        if( ! VG_(strcmp)( fname, "malloc" ) ||
-            ! VG_(strcmp)( fname, "calloc" ) ||
-            ! VG_(strcmp)( fname, "realloc" ) ||
-            ! VG_(strcmp)( fname, "free" ) ||
-            ! VG_(strcmp)( fname, "rand" ) ) 
-        {
+        for (i=0; i<numHiddenFuncs; i++) {
+          if ( ! VG_(strcmp)( fname, hiddenFuncs[i])) {
             return SF_SEEN | SF_HIDDEN | SF_STR_HIDDEN;
-        } else if ( ! VG_(strncmp)( fname, "_dl", 3 ) ) {
+          }
+        }
+        if ( ! VG_(strncmp)( fname, "_dl", 3 ) ) {
             return SF_SEEN | SF_HIDDEN;
         } else {
             return SF_SEEN;
@@ -4170,6 +4176,9 @@ static IRSB* em_instrument(VgCallbackClosure* closure,
    }
 }
 
+static void em_track_new_mem_heap(void) {
+   VG_(printf)("em_track_new_mem_heap called.\n");
+}
 
 
 /*********************************************
@@ -4190,7 +4199,7 @@ static ReadHandle* openRH( const Char* name )
 
    ReadHandle *rh = (ReadHandle *) VG_(calloc)( 1, sizeof(ReadHandle) );
 
-   check( fd >= 0, "Cannot open file" );
+   check( fd > 0, "Cannot open file" );
    check( rh != NULL, "Cannot allocate read handle" );
 
    rh->fd = fd;
@@ -4298,6 +4307,32 @@ static void em_post_clo_init_span( void )
 
 }
 
+static void readHiddenFuncs( void)
+{
+   const int bs = 1000;
+   const int guess_size = 1000;
+   Char fn[bs];
+   ReadHandle *rh;
+
+   numHiddenFuncs = 0;
+   hiddenFuncs = VG_(malloc)(guess_size * sizeof(Char *));
+   rh = openRH( hidden_func_file_name );
+   
+   while( 1 ) {
+      int n = readWord( rh, fn, bs );
+
+      if( !n ) break;
+
+      hiddenFuncs[numHiddenFuncs] = VG_(malloc)(bs * sizeof(Char));
+      VG_(strcpy)(hiddenFuncs[numHiddenFuncs], fn);
+      numHiddenFuncs++;
+
+   }
+
+   closeRH( rh );
+
+   VG_(realloc)(hiddenFuncs, numHiddenFuncs);
+}
 
 static void em_post_clo_init_deps(void)
 {
@@ -4354,6 +4389,8 @@ static void em_post_clo_init_deps(void)
    init_read_table( );
 
    sample_count = sample_freq;
+
+   readHiddenFuncs( );
 }
 
 static void em_post_clo_init(void)
