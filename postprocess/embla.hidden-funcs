@@ -1,0 +1,8 @@
+malloc
+calloc
+realloc
+free
+rand
+printf
+puts
+sscanf
