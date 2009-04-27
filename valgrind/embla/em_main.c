@@ -439,7 +439,7 @@ typedef struct _FrameGraph {
 
 static FrameGraph *firstFrame;
 static FrameGraph *currFrame;
-static long long int totalOps;
+static long long int totalCost;
 
 static INodeList *consINode(INodeList *tail, INode *head) {
   INodeList *newList = VG_(malloc)(sizeof(INodeList));
@@ -654,7 +654,6 @@ static long long int critPathNodes(void) {
   VG_(free)(workStack);
   return currCpLength;
 }
-//
 
 static void retNode(void) {
   long long int cpLength = critPathNodes();
@@ -662,8 +661,10 @@ static void retNode(void) {
   currFrame--;
 }
 
-static void newINodeIfNewLine(LineInfo *line) {
+static void newInstr(LineInfo *line) {
   INode *node = currFrame->currNode;
+
+  // Reset field if this is a new line
   if (node != NULL && line != node->line) {
 //  VG_(message)(Vg_UserMsg, "Cost of line %s:%d = %d", node->line->file, node->line->line, node->cost);
     // Finalise old node
@@ -674,17 +675,22 @@ static void newINodeIfNewLine(LineInfo *line) {
     // Starting a new node
     currFrame->currNode = NULL;
   }
-}
 
-static INode *getAndIncINode(LineInfo *line) {
-  INode *node = currFrame->currNode;
+  // Start a new node if field is NULL (due to either new line or new function call)
+  node = currFrame->currNode;
   if (node == NULL) {
     node = new_INode(line);
     currFrame->currNode = node;
   }
+
+  // Incrememt cost
   node->cost++;
-  totalOps++;
-  return node;
+  totalCost++;
+}
+
+static INode *getINode(void) {
+  tl_assert(currFrame->currNode);
+  return currFrame->currNode;
 }
 
 #endif
@@ -748,9 +754,7 @@ static TraceRec * newTraceRec(InstrInfo *i_info, TaggedPtr link)
    last_trace_rec->i_info = i_info;
    last_trace_rec->link   = link;
 #if CRITPATH_ANALYSIS
-   if (i_info != NULL) {
-     last_trace_rec->inode = getAndIncINode(i_info->line);
-   }
+   last_trace_rec->inode = getINode();
 #endif
    return last_trace_rec;
 }
@@ -2595,13 +2599,6 @@ void recordRet(Addr32 sp, InstrInfo *i_info, Addr32 target)
 {
 }
 
-#if CRITPATH_ANALYSIS
-static VG_REGPARM(1)
-void recordOp( StmInfo *s_info )
-{
-}
-#endif
-
 #if TRACE_REG_DEPS
 
 static VG_REGPARM(1)
@@ -2872,15 +2869,6 @@ void recordStore( StmInfo *s_info, Addr32 addr )
 
 }
 
-#if CRITPATH_ANALYSIS
-static VG_REGPARM(1)
-void recordOp(StmInfo *s_info)
-{
-    InstrInfo *i_info = s_info->i_info;
-    getAndIncINode (i_info->line);
-}
-#endif
-
 #if TRACE_REG_DEPS
 
 static void splitReg( RegisterInfo *regp, int size )
@@ -3132,7 +3120,6 @@ static TraceRec *pop_stack_frame(InstrInfo *i_info)
       this_call->link = mkTaggedPtr2( prev_call, TPT_CLOSED );
       ret_tr = newTraceRec( 0, mkTaggedPtr2( this_call, TPT_RET ) );
 #if CRITPATH_ANALYSIS
-      ret_tr->inode = getAndIncINode(i_info->line);
       retNode();
 #endif
 
@@ -3222,7 +3209,7 @@ void recordEdge( LineInfo *line ) // Need to know line, the line of the current 
     LineInfo *prev_line = current_stack_frame->current_line;
 
 #if CRITPATH_ANALYSIS
-    newINodeIfNewLine(line);
+    newInstr(line);
 #endif
 
     if( line == prev_line ) return;
@@ -3306,16 +3293,6 @@ static void instrumentStore( IRSB *bbOut, InstrInfo *i_info, IRExpr *exp_addr, U
     IRExpr  *exp_si = const32( (UInt) s_info );
     emitDC_2( bbOut, "recordStore", &recordStore, exp_si, exp_addr );
 }
-
-#if CRITPATH_ANALYSIS
-static void instrumentOp( IRSB *bbOut, InstrInfo *i_info, IRExpr *exp, int size,
-                             UChar flags )
-{
-    StmInfo *s_info = mkStmInfo( i_info, 0, size, flags );
-    IRExpr  *exp_si = const32( (UInt) s_info );
-    emitDC_1( bbOut, "recordOp", &recordOp, exp_si );
-}
-#endif
 
 #if TRACE_REG_DEPS
 
@@ -4105,19 +4082,6 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
                  instrumentGetI( bbOut, currII, tmpExpr, ref_size, flags );
                  break;
 #endif
-#if CRITPATH_ANALYSIS
-               case Iex_Qop:
-               case Iex_Triop:
-               case Iex_Binop:
-               case Iex_Unop:
-               case Iex_Mux0X:
-                 currII = mk_i_info( currII, guestIAddr, guestILen );
-//                 ref_size = sizeofIRType( typeOfIRExpr( bbIn->tyenv, stIn->Ist.WrTmp.data ) );
-                 ref_size = 4;
-                 flags = 0;
-                 instrumentOp( bbOut, currII, tmpExpr, ref_size, flags );
-                 break;
-#endif
                default:
                  break;
              }
@@ -4372,10 +4336,12 @@ static void em_post_clo_init_deps(void)
    trace_pile[1].link = mkTaggedPtr2(trace_pile, TPT_REG);
 
 #if CRITPATH_ANALYSIS
-   trace_pile[0].inode = getAndIncINode(trace_pile[0].i_info->line);
+   newInstr(trace_pile[0].i_info->line);
+   trace_pile[0].inode = getINode();
    newNodeFrame(trace_pile[0].inode);
 
-   trace_pile[1].inode = getAndIncINode(trace_pile[1].i_info->line);
+   newInstr(trace_pile[1].i_info->line);
+   trace_pile[1].inode = getINode();
 #endif
 
    last_trace_rec = trace_pile+1;
@@ -4409,12 +4375,12 @@ static void finaliseCritPath(void) {
   long long int cpLength;
 
   while (currFrame > firstFrame) {
-    getAndIncINode(dummy_instr_info.line);
+    newInstr(dummy_instr_info.line);
     retNode();
   }
   cpLength = critPathNodes();//->cpLength;
   // To take account of the first 2 manually created TraceRecs
-  VG_(message)(Vg_UserMsg, "No. of instructions is %lld", totalOps);
+  VG_(message)(Vg_UserMsg, "No. of instructions is %lld", totalCost);
   VG_(message)(Vg_UserMsg, "Length of Critical path is %lld.", cpLength);
 }
 
