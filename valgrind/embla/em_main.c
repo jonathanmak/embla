@@ -4176,10 +4176,6 @@ static IRSB* em_instrument(VgCallbackClosure* closure,
    }
 }
 
-static void em_track_new_mem_heap(void) {
-   VG_(printf)("em_track_new_mem_heap called.\n");
-}
-
 
 /*********************************************
  * Initialization routines                   *
@@ -4309,9 +4305,8 @@ static void em_post_clo_init_span( void )
 
 static void readHiddenFuncs( void)
 {
-   const int bs = 1000;
    const int guess_size = 1000;
-   Char fn[bs];
+   Char fn[FN_LEN];
    ReadHandle *rh;
 
    numHiddenFuncs = 0;
@@ -4319,11 +4314,11 @@ static void readHiddenFuncs( void)
    rh = openRH( hidden_func_file_name );
    
    while( 1 ) {
-      int n = readWord( rh, fn, bs );
+      int n = readWord( rh, fn, FN_LEN );
 
       if( !n ) break;
 
-      hiddenFuncs[numHiddenFuncs] = VG_(malloc)(bs * sizeof(Char));
+      hiddenFuncs[numHiddenFuncs] = VG_(malloc)(FN_LEN * sizeof(Char));
       VG_(strcpy)(hiddenFuncs[numHiddenFuncs], fn);
       numHiddenFuncs++;
 
