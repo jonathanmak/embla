@@ -3763,7 +3763,7 @@ typedef struct _SPTEntry {
 
 #define SEQ_PAR_TABLE_BITS 12
 
-static SPTEntry *seq_par_table[ 1<SEQ_PAR_TABLE_BITS ];
+static SPTEntry *seq_par_table[ 1<<SEQ_PAR_TABLE_BITS ];
 
 static void addSeqParSpan( LineInfo *line, TimeStamp seq, TimeStamp par )
 {
