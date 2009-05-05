@@ -1,0 +1,552 @@
+#LyX 1.4.3 created this file. For more info see http://www.lyx.org/
+\lyxformat 245
+\begin_document
+\begin_header
+\textclass article
+\language english
+\inputencoding auto
+\fontscheme default
+\graphics default
+\paperfontsize default
+\papersize default
+\use_geometry false
+\use_amsmath 1
+\cite_engine basic
+\use_bibtopic false
+\paperorientation portrait
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\defskip medskip
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+Embla---extensions and experiments
+\end_layout
+
+\begin_layout Section
+Parallelism measurement
+\end_layout
+
+\begin_layout Standard
+In this text we look at an approach to parallelism measurement that takes
+ source lines as the unit of measure, although weighted by instructions.
+ It is good to do this since source lines are the units of parallelization
+ of the program and since they are the same between different executions.
+ Thus we can collect dependencies from several executions and use them to
+ drive (virtual) parallelization of an additional execution.
+ 
+\end_layout
+
+\begin_layout Standard
+In theory, we could perform the virtual parallelization of an 
+\emph on
+instruction weighted line trace
+\emph default
+ (IWLT) which is a trace containing line identifiers (pairs of filename
+ and line number) weightd by the number of instruction executions that are
+ associated with that particular line execution.
+ Calls and returns are marked.
+ The parallelism measurement assigns an earliest completion time to every
+ item in the IWLT as follows:
+\end_layout
+
+\begin_layout Itemize
+Initialise the stack 
+\begin_inset Formula $S$
+\end_inset
+
+ to 
+\begin_inset Formula $[]$
+\end_inset
+
+ and 
+\begin_inset Formula $T$
+\end_inset
+
+ to 
+\begin_inset Formula $l\mapsto0$
+\end_inset
+
+ and 
+\begin_inset Formula $c$
+\end_inset
+
+ to 0
+\end_layout
+
+\begin_layout Itemize
+An item 
+\begin_inset Formula $(l,w)$
+\end_inset
+
+ that is not a call or return is assigned the maximum of the times computed
+ as follows:
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+For each dependence edge 
+\begin_inset Formula $l'\rightarrow l$
+\end_inset
+
+, find 
+\begin_inset Formula $T(l')+w$
+\end_inset
+
+.
+ Not that the edge may be a data or control edge.
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $c+w$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Let 
+\begin_inset Formula $t$
+\end_inset
+
+ be the time thus computed; set 
+\begin_inset Formula $T(l)$
+\end_inset
+
+ to 
+\begin_inset Formula $t$
+\end_inset
+
+.
+\end_layout
+
+\end_deeper
+\begin_layout Itemize
+For a call, compute 
+\begin_inset Formula $t$
+\end_inset
+
+ and update 
+\begin_inset Formula $T$
+\end_inset
+
+ as above.
+ Then push 
+\begin_inset Formula $T$
+\end_inset
+
+ on 
+\begin_inset Formula $S$
+\end_inset
+
+.
+ Then set 
+\begin_inset Formula $T$
+\end_inset
+
+ to 
+\begin_inset Formula $l\mapsto0$
+\end_inset
+
+ and 
+\begin_inset Formula $c$
+\end_inset
+
+ to 
+\begin_inset Formula $t$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Itemize
+For a return, compute 
+\begin_inset Formula $t$
+\end_inset
+
+ and update 
+\begin_inset Formula $T$
+\end_inset
+
+ as above.
+ Then pop 
+\begin_inset Formula $T$
+\end_inset
+
+ from 
+\begin_inset Formula $S$
+\end_inset
+
+.
+ Then set 
+\begin_inset Formula $T(l')$
+\end_inset
+
+ to 
+\begin_inset Formula $t$
+\end_inset
+
+ where 
+\begin_inset Formula $l'$
+\end_inset
+
+ is the line of the call corresponding to the return.
+\end_layout
+
+\begin_layout Standard
+We have to compute control dependence edges, which is done as follows: This
+ simplest approximation is to say that the latest conditional branch is
+ a control dependence, or the latest conditional branch or control flow
+ join.
+ Otherwise, the standard (?) definition of control dependence is that
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $b$
+\end_inset
+
+ is control dependent on 
+\begin_inset Formula $a$
+\end_inset
+
+ iff there is a control flow path from 
+\begin_inset Formula $a$
+\end_inset
+
+ to 
+\begin_inset Formula $b$
+\end_inset
+
+ but 
+\begin_inset Formula $b$
+\end_inset
+
+ does not post dominate 
+\begin_inset Formula $a$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+Or perhaps a more detailed definition.
+\end_layout
+
+\begin_layout Section
+Structural analysis
+\end_layout
+
+\begin_layout Standard
+Data dependencies are not enough to determine the amount of parallelism
+ available.
+ There are also contraints from the structure of the program; it is not
+ possible (or useful) to execute both brances of an if-statement in parallel.
+ On the other hand, the entire if-statement might be moved relative to other
+ statements in the same block, if data dependencies permit.
+ Hence we want to identify such chunks of code and the (control) dependencies
+ between them.
+\end_layout
+
+\begin_layout Standard
+In the absence of labels and gotos, we are basically allowed to reorder
+ the statements in a block (sequence).
+ We can identify such a sequence in the control flow information as follows:
+\end_layout
+
+\begin_layout Itemize
+The whole sequence is an interval of lines 
+\begin_inset Formula $L_{S}$
+\end_inset
+
+to 
+\begin_inset Formula $L_{E}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Itemize
+There are lines 
+\begin_inset Formula $L_{1}\ldots L_{n}$
+\end_inset
+
+ (where 
+\begin_inset Formula $L_{1}=L_{S}$
+\end_inset
+
+ and 
+\begin_inset Formula $L_{n}=L_{E}$
+\end_inset
+
+) such that for each control edge 
+\begin_inset Formula $a\rightarrow b$
+\end_inset
+
+ we have
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+\begin_inset Formula $a<b$
+\end_inset
+
+ (a forwards jump) and 
+\begin_inset Formula $L_{i}\leq a$
+\end_inset
+
+ and 
+\begin_inset Formula $b\leq L_{i+1}$
+\end_inset
+
+(within the 
+\begin_inset Formula $L_{i}$
+\end_inset
+
+ to 
+\begin_inset Formula $L_{i+1}$
+\end_inset
+
+interval) for some 
+\begin_inset Formula $i$
+\end_inset
+
+ or
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $a>b$
+\end_inset
+
+ (a backwards jump) and 
+\begin_inset Formula $L_{i}\leq b$
+\end_inset
+
+ and 
+\begin_inset Formula $a<L_{i+1}$
+\end_inset
+
+ for some 
+\begin_inset Formula $i$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $a\not\in[L_{S},L_{E}]$
+\end_inset
+
+ and 
+\begin_inset Formula $b\not\in[L_{S},L_{E}]$
+\end_inset
+
+ 
+\end_layout
+
+\end_deeper
+\begin_layout Standard
+Then the line intervals 
+\begin_inset Formula $[L_{i},L_{i+1}-1]$
+\end_inset
+
+, 
+\begin_inset Formula $1\leq i<n$
+\end_inset
+
+ can be executed in parallel if data dependencies allow.
+ If the sequence consists of only one interval 
+\begin_inset Formula $[L_{S},L_{E}]$
+\end_inset
+
+, then the sequence is degenerate.
+ Each interval might contain nested sequences.
+\end_layout
+
+\begin_layout Subsection
+The structure tree
+\end_layout
+
+\begin_layout Standard
+Structural analysis yields a tree we call the 
+\emph on
+structure tree
+\emph default
+.
+ 
+\end_layout
+
+\begin_layout Itemize
+The leaves of the tree are source lines; interior nodes correspond to statements
+ (roughly).
+\end_layout
+
+\begin_layout Itemize
+Each interior node in the structure tree has an ordered set of children.
+ 
+\end_layout
+
+\begin_layout Standard
+Conceptually, the structure tree of a routine can be built by starting from
+ the control flow information for the whole body and construct an interval
+ sequence.
+ That is:
+\end_layout
+
+\begin_layout Enumerate
+Construct all intervals satisfying the above interval condition, including
+ intervals nested inside other intervals.
+\end_layout
+
+\begin_layout Enumerate
+Build the tree according to the nesting of the intervals.
+ For each interval, construct control dependencies between the subtrees
+ as follows:
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+If 
+\begin_inset Formula $t_{i}$
+\end_inset
+
+ has multiple successors, put fences at 
+\begin_inset Formula $i-1$
+\end_inset
+
+ (which means between 
+\begin_inset Formula $t_{i-1}$
+\end_inset
+
+ and 
+\begin_inset Formula $t_{i}$
+\end_inset
+
+) and 
+\begin_inset Formula $t_{i}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Itemize
+If 
+\begin_inset Formula $t_{i}$
+\end_inset
+
+ has multiple predecessors, put a fence at 
+\begin_inset Formula $i-1$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+Here, the notion of successors and predecessors among the 
+\begin_inset Formula $t_{i}$
+\end_inset
+
+ is derived from the lines nested within.
+ Then for each fence 
+\begin_inset Formula $f_{i}$
+\end_inset
+
+, add control dependencies between all pairs 
+\begin_inset Formula $t_{j}$
+\end_inset
+
+ and 
+\begin_inset Formula $t_{k}$
+\end_inset
+
+ such that 
+\begin_inset Formula $f_{i-1}<j\leq f_{i}$
+\end_inset
+
+ and 
+\begin_inset Formula $f_{i}<k\leq f_{i+1}$
+\end_inset
+
+.
+\end_layout
+
+\end_deeper
+\begin_layout Standard
+The algorithm for computing all intervals is based on the following way
+ of computing a single interval:
+\end_layout
+
+\begin_layout Itemize
+Two control flow edges 
+\begin_inset Formula $a\rightarrow b$
+\end_inset
+
+ and 
+\begin_inset Formula $c\rightarrow d$
+\end_inset
+
+ overlap if their 
+\emph on
+coverage
+\emph default
+ overlaps but none is a subset of the other.
+ The coverage 
+\begin_inset Formula $C(e)$
+\end_inset
+
+ of an edge 
+\begin_inset Formula $e$
+\end_inset
+
+ is defined by:
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+\begin_inset Formula $C(a\rightarrow b)=[a,b-1]$
+\end_inset
+
+ if 
+\begin_inset Formula $a<b$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $C(a\rightarrow b)=[b,a]$
+\end_inset
+
+ if 
+\begin_inset Formula $b<a$
+\end_inset
+
+.
+\end_layout
+
+\end_deeper
+\begin_layout Itemize
+The control flow intervals are the equivalence classes of the overlap relation.
+\end_layout
+
+\begin_layout Standard
+We now prove the correctness of the algorithm implied by this definition.
+ First, an interval as defined above will be an equivalence class of the
+ overlap relation.
+ Consider an interval 
+\begin_inset Formula $[a,b]$
+\end_inset
+
+ such that 
+\end_layout
+
+\end_body
+\end_document
