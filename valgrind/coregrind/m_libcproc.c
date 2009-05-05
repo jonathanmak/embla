@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2007 Julian Seward 
+   Copyright (C) 2000-2008 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -36,6 +36,7 @@
 #include "pub_core_libcprint.h"
 #include "pub_core_libcproc.h"
 #include "pub_core_libcsignal.h"
+#include "pub_core_seqmatch.h"
 #include "pub_core_mallocfree.h"
 #include "pub_core_syscall.h"
 #include "pub_core_xarray.h"
@@ -89,7 +90,8 @@ Char **VG_(env_setenv) ( Char ***envp, const Char* varname, const Char *val )
    Char **env = (*envp);
    Char **cpp;
    Int len = VG_(strlen)(varname);
-   Char *valstr = VG_(arena_malloc)(VG_AR_CORE, len + VG_(strlen)(val) + 2);
+   Char *valstr = VG_(arena_malloc)(VG_AR_CORE, "libcproc.es.1",
+                                    len + VG_(strlen)(val) + 2);
    Char **oldenv = NULL;
 
    VG_(sprintf)(valstr, "%s=%s", varname, val);
@@ -102,7 +104,7 @@ Char **VG_(env_setenv) ( Char ***envp, const Char* varname, const Char *val )
    }
 
    if (env == NULL) {
-      env = VG_(arena_malloc)(VG_AR_CORE, sizeof(Char **) * 2);
+      env = VG_(arena_malloc)(VG_AR_CORE, "libcproc.es.2", sizeof(Char **) * 2);
       env[0] = valstr;
       env[1] = NULL;
 
@@ -110,7 +112,8 @@ Char **VG_(env_setenv) ( Char ***envp, const Char* varname, const Char *val )
 
    }  else {
       Int envlen = (cpp-env) + 2;
-      Char **newenv = VG_(arena_malloc)(VG_AR_CORE, envlen * sizeof(Char **));
+      Char **newenv = VG_(arena_malloc)(VG_AR_CORE, "libcproc.es.3",
+                                        envlen * sizeof(Char **));
 
       for (cpp = newenv; *env; )
 	 *cpp++ = *env++;
@@ -203,7 +206,8 @@ void VG_(env_remove_valgrind_env_stuff)(Char** envp)
          ld_library_path_str = &envp[i][16];
    }
 
-   buf = VG_(arena_malloc)(VG_AR_CORE, VG_(strlen)(VG_(libdir)) + 20);
+   buf = VG_(arena_malloc)(VG_AR_CORE, "libcproc.erves.1",
+                           VG_(strlen)(VG_(libdir)) + 20);
 
    // Remove Valgrind-specific entries from LD_*.
    VG_(sprintf)(buf, "%s*/vgpreload_*.so", VG_(libdir));
@@ -234,7 +238,7 @@ Int VG_(waitpid)(Int pid, Int *status, Int options)
       POSIX. */
    SysRes res = VG_(do_syscall5)(__NR_AIX5_kwaitpid, 
                                  (UWord)status, pid, 4 | options,0,0);
-   if (0) VG_(printf)("waitpid: got 0x%x 0x%x\n", res.res, res.err);
+   if (0) VG_(printf)("waitpid: got 0x%lx 0x%lx\n", res.res, res.err);
    return res.isError ? -1 : res.res;
 #  else
 #    error Unknown OS
@@ -253,7 +257,8 @@ Char **VG_(env_clone) ( Char **oldenv )
 
    envlen = oldenvp - oldenv + 1;
    
-   newenv = VG_(arena_malloc)(VG_AR_CORE, envlen * sizeof(Char **));
+   newenv = VG_(arena_malloc)(VG_AR_CORE, "libcproc.ec.1",
+                              envlen * sizeof(Char **));
 
    oldenvp = oldenv;
    newenvp = newenv;
@@ -267,36 +272,37 @@ Char **VG_(env_clone) ( Char **oldenv )
    return newenv;
 }
 
+void VG_(execv) ( Char* filename, Char** argv )
+{
+   Char** envp;
+   SysRes res;
+
+   /* restore the DATA rlimit for the child */
+   VG_(setrlimit)(VKI_RLIMIT_DATA, &VG_(client_rlimit_data));
+
+   envp = VG_(env_clone)(VG_(client_envp));
+   VG_(env_remove_valgrind_env_stuff)( envp );
+
+   res = VG_(do_syscall3)(__NR_execve,
+                          (UWord)filename, (UWord)argv, (UWord)envp);
+
+   VG_(printf)("EXEC failed, errno = %ld\n", res.res);
+}
+
 /* Return -1 if error, else 0.  NOTE does not indicate return code of
    child! */
 Int VG_(system) ( Char* cmd )
 {
-   Int    pid;
-   SysRes res;
+   Int pid;
    if (cmd == NULL)
       return 1;
-   res = VG_(do_syscall0)(__NR_fork);
-   if (res.isError)
+   pid = VG_(fork)();
+   if (pid < 0)
       return -1;
-   pid = res.res;
    if (pid == 0) {
       /* child */
-      static Char** envp = NULL;
-      Char* argv[4];
-
-      /* restore the DATA rlimit for the child */
-      VG_(setrlimit)(VKI_RLIMIT_DATA, &VG_(client_rlimit_data));
-
-      envp = VG_(env_clone)(VG_(client_envp));
-      VG_(env_remove_valgrind_env_stuff)( envp ); 
-
-      argv[0] = "/bin/sh";
-      argv[1] = "-c";
-      argv[2] = cmd;
-      argv[3] = 0;
-
-      (void)VG_(do_syscall3)(__NR_execve, 
-                             (UWord)"/bin/sh", (UWord)argv, (UWord)envp);
+      Char* argv[4] = { "/bin/sh", "-c", cmd, 0 };
+      VG_(execv)(argv[0], argv);
 
       /* If we're still alive here, execve failed. */
       VG_(exit)(1);
@@ -541,10 +547,21 @@ UInt VG_(read_millisecond_timer) ( void )
    now += (ULong)(nsec / 1000);
 #  else
 
-   struct vki_timeval tv_now;
+   struct vki_timespec ts_now;
    SysRes res;
-   res = VG_(do_syscall2)(__NR_gettimeofday, (UWord)&tv_now, (UWord)NULL);
-   now = tv_now.tv_sec * 1000000ULL + tv_now.tv_usec;
+   res = VG_(do_syscall2)(__NR_clock_gettime, VKI_CLOCK_MONOTONIC,
+                          (UWord)&ts_now);
+   if (res.isError == 0)
+   {
+     now = ts_now.tv_sec * 1000000ULL + ts_now.tv_nsec / 1000;
+   }
+   else
+   {
+     struct vki_timeval tv_now;
+     res = VG_(do_syscall2)(__NR_gettimeofday, (UWord)&tv_now, (UWord)NULL);
+     vg_assert(! res.isError);
+     now = tv_now.tv_sec * 1000000ULL + tv_now.tv_usec;
+   }
 #  endif
    
    if (base == 0)
@@ -554,26 +571,67 @@ UInt VG_(read_millisecond_timer) ( void )
 }
 
 /* ---------------------------------------------------------------------
-   A trivial atfork() facility for Valgrind's internal use
+   atfork()
    ------------------------------------------------------------------ */
 
-// Trivial because it only supports a single post-fork child action, which
-// is all we need.
+struct atfork {
+   vg_atfork_t  pre;
+   vg_atfork_t  parent;
+   vg_atfork_t  child;
+};
 
-static vg_atfork_t atfork_child = NULL;
+#define VG_MAX_ATFORK 10
 
-void VG_(atfork_child)(vg_atfork_t child)
+static struct atfork atforks[VG_MAX_ATFORK];
+static Int n_atfork = 0;
+
+void VG_(atfork)(vg_atfork_t pre, vg_atfork_t parent, vg_atfork_t child)
 {
-   if (NULL != atfork_child)
-      VG_(core_panic)("More than one atfork_child handler requested");
+   Int i;
 
-   atfork_child = child;
+   for (i = 0; i < n_atfork; i++) {
+      if (atforks[i].pre == pre &&
+          atforks[i].parent == parent &&
+          atforks[i].child == child)
+         return;
+   }
+
+   if (n_atfork >= VG_MAX_ATFORK)
+      VG_(core_panic)(
+         "Too many VG_(atfork) handlers requested: raise VG_MAX_ATFORK");
+
+   atforks[n_atfork].pre    = pre;
+   atforks[n_atfork].parent = parent;
+   atforks[n_atfork].child  = child;
+
+   n_atfork++;
+}
+
+void VG_(do_atfork_pre)(ThreadId tid)
+{
+   Int i;
+
+   for (i = 0; i < n_atfork; i++)
+      if (atforks[i].pre != NULL)
+         (*atforks[i].pre)(tid);
+}
+
+void VG_(do_atfork_parent)(ThreadId tid)
+{
+   Int i;
+
+   for (i = 0; i < n_atfork; i++)
+      if (atforks[i].parent != NULL)
+         (*atforks[i].parent)(tid);
 }
 
 void VG_(do_atfork_child)(ThreadId tid)
 {
-   if (NULL != atfork_child)
-      (*atfork_child)(tid);
+   Int i;
+
+   for (i = 0; i < n_atfork; i++)
+      if (atforks[i].child != NULL)
+         (*atforks[i].child)(tid);
 }
 
 /*--------------------------------------------------------------------*/

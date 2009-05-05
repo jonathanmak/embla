@@ -8,7 +8,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2007 Julian Seward
+   Copyright (C) 2000-2008 Julian Seward
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -44,6 +44,7 @@
 #include "pub_core_machine.h"
 #include "pub_core_ume.h"
 #include "pub_core_options.h"
+#include "pub_core_syscall.h"
 #include "pub_core_tooliface.h"       /* VG_TRACK */
 #include "pub_core_threadstate.h"     /* ThreadArchState */
 #include "pub_core_initimg.h"         /* self */
@@ -177,9 +178,6 @@ static void load_client ( /*OUT*/ExeInfo* info,
    }
 
    VG_(memset)(info, 0, sizeof(*info));
-   info->exe_base = VG_(client_base);
-   info->exe_end  = VG_(client_end);
-
    ret = VG_(do_exec)(exe_name, info);
 
    // The client was successfully loaded!  Continue.
@@ -240,12 +238,13 @@ static HChar** setup_client_env ( HChar** origenv, const HChar* toolname)
    Int preload_tool_path_len = vglib_len + VG_(strlen)(toolname) 
                                          + sizeof(VG_PLATFORM) + 16;
    Int preload_string_len    = preload_core_path_len + preload_tool_path_len;
-   HChar* preload_string     = VG_(malloc)(preload_string_len);
+   HChar* preload_string     = VG_(malloc)("initimg-linux.sce.1",
+                                           preload_string_len);
    vg_assert(preload_string);
 
    /* Determine if there's a vgpreload_<tool>.so file, and setup
       preload_string. */
-   preload_tool_path = VG_(malloc)(preload_tool_path_len);
+   preload_tool_path = VG_(malloc)("initimg-linux.sce.2", preload_tool_path_len);
    vg_assert(preload_tool_path);
    VG_(snprintf)(preload_tool_path, preload_tool_path_len,
                  "%s/%s/vgpreload_%s.so", VG_(libdir), VG_PLATFORM, toolname);
@@ -267,7 +266,8 @@ static HChar** setup_client_env ( HChar** origenv, const HChar* toolname)
       envc++;
 
    /* Allocate a new space */
-   ret = VG_(malloc) (sizeof(HChar *) * (envc+1+1)); /* 1 new entry + NULL */
+   ret = VG_(malloc) ("initimg-linux.sce.3",
+                      sizeof(HChar *) * (envc+1+1)); /* 1 new entry + NULL */
    vg_assert(ret);
 
    /* copy it over */
@@ -281,7 +281,7 @@ static HChar** setup_client_env ( HChar** origenv, const HChar* toolname)
    for (cpp = ret; cpp && *cpp; cpp++) {
       if (VG_(memcmp)(*cpp, ld_preload, ld_preload_len) == 0) {
          Int len = VG_(strlen)(*cpp) + preload_string_len;
-         HChar *cp = VG_(malloc)(len);
+         HChar *cp = VG_(malloc)("initimg-linux.sce.4", len);
          vg_assert(cp);
 
          VG_(snprintf)(cp, len, "%s%s:%s",
@@ -296,7 +296,7 @@ static HChar** setup_client_env ( HChar** origenv, const HChar* toolname)
    /* Add the missing bits */
    if (!ld_preload_done) {
       Int len = ld_preload_len + preload_string_len;
-      HChar *cp = VG_(malloc) (len);
+      HChar *cp = VG_(malloc) ("initimg-linux.sce.5", len);
       vg_assert(cp);
 
       VG_(snprintf)(cp, len, "%s%s", ld_preload, preload_string);
@@ -567,24 +567,37 @@ Addr setup_client_stack( void*  init_sp,
 #    endif
 
      if (0)
-        VG_(printf)("%p 0x%x  %p 0x%x\n", 
+        VG_(printf)("%#lx 0x%lx  %#lx 0x%lx\n",
                     resvn_start, resvn_size, anon_start, anon_size);
 
      /* Create a shrinkable reservation followed by an anonymous
         segment.  Together these constitute a growdown stack. */
+     res = VG_(mk_SysRes_Error)(0);
      ok = VG_(am_create_reservation)(
              resvn_start,
              resvn_size -inner_HACK,
              SmUpper, 
              anon_size +inner_HACK
           );
+     if (ok) {
+        /* allocate a stack - mmap enough space for the stack */
+        res = VG_(am_mmap_anon_fixed_client)(
+                 anon_start -inner_HACK,
+                 anon_size +inner_HACK,
+	         VKI_PROT_READ|VKI_PROT_WRITE|VKI_PROT_EXEC
+	      );
+     }
+     if ((!ok) || res.isError) {
+        /* Allocation of the stack failed.  We have to stop. */
+        VG_(printf)("valgrind: "
+                    "I failed to allocate space for the application's stack.\n");
+        VG_(printf)("valgrind: "
+                    "This may be the result of a very large --main-stacksize=\n");
+        VG_(printf)("valgrind: setting.  Cannot continue.  Sorry.\n\n");
+        VG_(exit)(0);
+     }
+
      vg_assert(ok);
-     /* allocate a stack - mmap enough space for the stack */
-     res = VG_(am_mmap_anon_fixed_client)(
-              anon_start -inner_HACK,
-              anon_size +inner_HACK,
-	      VKI_PROT_READ|VKI_PROT_WRITE|VKI_PROT_EXEC
-	   );
      vg_assert(!res.isError); 
    }
 
@@ -748,7 +761,7 @@ Addr setup_client_stack( void*  init_sp,
 
    /* client_SP is pointing at client's argc/argv */
 
-   if (0) VG_(printf)("startup SP = %p\n", client_SP);
+   if (0) VG_(printf)("startup SP = %#lx\n", client_SP);
    return client_SP;
 }
 
@@ -859,14 +872,29 @@ IIFinaliseImageInfo VG_(ii_create_image)( IICreateImageInfo iicii )
    //   p: fix_environment() [for 'env']
    //--------------------------------------------------------------
    {
+      /* When allocating space for the client stack on Linux, take
+         notice of the --main-stacksize value.  This makes it possible
+         to run programs with very large (primary) stack requirements
+         simply by specifying --main-stacksize. */
+      /* Logic is as follows:
+         - by default, use the client's current stack rlimit
+         - if that exceeds 16M, clamp to 16M
+         - if a larger --main-stacksize value is specified, use that instead
+         - in all situations, the minimum allowed stack size is 1M
+      */
       void* init_sp = iicii.argv - 1;
       SizeT m1  = 1024 * 1024;
       SizeT m16 = 16 * m1;
-      VG_(debugLog)(1, "initimg", "Setup client stack\n");
-      iifii.clstack_max_size = (SizeT)VG_(client_rlimit_stack).rlim_cur;
-      if (iifii.clstack_max_size < m1)  iifii.clstack_max_size = m1;
-      if (iifii.clstack_max_size > m16) iifii.clstack_max_size = m16;
-      iifii.clstack_max_size = VG_PGROUNDUP(iifii.clstack_max_size);
+      SizeT szB = (SizeT)VG_(client_rlimit_stack).rlim_cur;
+      if (szB < m1) szB = m1;
+      if (szB > m16) szB = m16;
+      if (VG_(clo_main_stacksize) > 0) szB = VG_(clo_main_stacksize);
+      if (szB < m1) szB = m1;
+      szB = VG_PGROUNDUP(szB);
+      VG_(debugLog)(1, "initimg",
+                       "Setup client stack: size will be %ld\n", szB);
+
+      iifii.clstack_max_size = szB;
 
       iifii.initial_client_SP
          = setup_client_stack( init_sp, env, 
@@ -877,11 +905,15 @@ IIFinaliseImageInfo VG_(ii_create_image)( IICreateImageInfo iicii )
 
       VG_(debugLog)(2, "initimg",
                        "Client info: "
-                       "initial_IP=%p initial_SP=%p initial_TOC=%p brk_base=%p\n",
+                       "initial_IP=%p initial_TOC=%p brk_base=%p\n",
                        (void*)(iifii.initial_client_IP), 
-                       (void*)(iifii.initial_client_SP),
                        (void*)(iifii.initial_client_TOC),
                        (void*)VG_(brk_base) );
+      VG_(debugLog)(2, "initimg",
+                       "Client info: "
+                       "initial_SP=%p max_stack_size=%ld\n",
+                       (void*)(iifii.initial_client_SP),
+                       (SizeT)iifii.clstack_max_size );
    }
 
    //--------------------------------------------------------------
@@ -923,14 +955,15 @@ void VG_(ii_finalise_image)( IIFinaliseImageInfo iifii )
       all other registers zeroed. */
 
 #  if defined(VGP_x86_linux)
-   vg_assert(0 == sizeof(VexGuestX86State) % 8);
+   vg_assert(0 == sizeof(VexGuestX86State) % 16);
 
    /* Zero out the initial state, and set up the simulated FPU in a
       sane way. */
    LibVEX_GuestX86_initialise(&arch->vex);
 
-   /* Zero out the shadow area. */
-   VG_(memset)(&arch->vex_shadow, 0, sizeof(VexGuestX86State));
+   /* Zero out the shadow areas. */
+   VG_(memset)(&arch->vex_shadow1, 0, sizeof(VexGuestX86State));
+   VG_(memset)(&arch->vex_shadow2, 0, sizeof(VexGuestX86State));
 
    /* Put essential stuff into the new state. */
    arch->vex.guest_ESP = iifii.initial_client_SP;
@@ -943,28 +976,30 @@ void VG_(ii_finalise_image)( IIFinaliseImageInfo iifii )
    asm volatile("movw %%ss, %0" : : "m" (arch->vex.guest_SS));
 
 #  elif defined(VGP_amd64_linux)
-   vg_assert(0 == sizeof(VexGuestAMD64State) % 8);
+   vg_assert(0 == sizeof(VexGuestAMD64State) % 16);
 
    /* Zero out the initial state, and set up the simulated FPU in a
       sane way. */
    LibVEX_GuestAMD64_initialise(&arch->vex);
 
-   /* Zero out the shadow area. */
-   VG_(memset)(&arch->vex_shadow, 0, sizeof(VexGuestAMD64State));
+   /* Zero out the shadow areas. */
+   VG_(memset)(&arch->vex_shadow1, 0, sizeof(VexGuestAMD64State));
+   VG_(memset)(&arch->vex_shadow2, 0, sizeof(VexGuestAMD64State));
 
    /* Put essential stuff into the new state. */
    arch->vex.guest_RSP = iifii.initial_client_SP;
    arch->vex.guest_RIP = iifii.initial_client_IP;
 
 #  elif defined(VGP_ppc32_linux)
-   vg_assert(0 == sizeof(VexGuestPPC32State) % 8);
+   vg_assert(0 == sizeof(VexGuestPPC32State) % 16);
 
    /* Zero out the initial state, and set up the simulated FPU in a
       sane way. */
    LibVEX_GuestPPC32_initialise(&arch->vex);
 
-   /* Zero out the shadow area. */
-   VG_(memset)(&arch->vex_shadow, 0, sizeof(VexGuestPPC32State));
+   /* Zero out the shadow areas. */
+   VG_(memset)(&arch->vex_shadow1, 0, sizeof(VexGuestPPC32State));
+   VG_(memset)(&arch->vex_shadow2, 0, sizeof(VexGuestPPC32State));
 
    /* Put essential stuff into the new state. */
    arch->vex.guest_GPR1 = iifii.initial_client_SP;
@@ -977,8 +1012,9 @@ void VG_(ii_finalise_image)( IIFinaliseImageInfo iifii )
       sane way. */
    LibVEX_GuestPPC64_initialise(&arch->vex);
 
-   /* Zero out the shadow area. */
-   VG_(memset)(&arch->vex_shadow, 0, sizeof(VexGuestPPC64State));
+   /* Zero out the shadow areas. */
+   VG_(memset)(&arch->vex_shadow1, 0, sizeof(VexGuestPPC64State));
+   VG_(memset)(&arch->vex_shadow2, 0, sizeof(VexGuestPPC64State));
 
    /* Put essential stuff into the new state. */
    arch->vex.guest_GPR1 = iifii.initial_client_SP;

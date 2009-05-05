@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2008 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -925,6 +925,13 @@ IRExpr* guest_x86_spechelper ( HChar* function_name,
                            unop(Iop_32to16,cc_dep1), 
                            unop(Iop_32to16,cc_dep2)));
       }
+      if (isU32(cc_op, X86G_CC_OP_SUBW) && isU32(cond, X86CondNZ)) {
+         /* word sub/cmp, then NZ --> test dst!=src */
+         return unop(Iop_1Uto32,
+                     binop(Iop_CmpNE16, 
+                           unop(Iop_32to16,cc_dep1), 
+                           unop(Iop_32to16,cc_dep2)));
+      }
 
       /*---------------- SUBB ----------------*/
 
@@ -966,6 +973,18 @@ IRExpr* guest_x86_spechelper ( HChar* function_name,
          return binop(Iop_And32,
                       binop(Iop_Shr32,cc_dep1,mkU8(7)),
                       mkU32(1));
+      }
+      if (isU32(cc_op, X86G_CC_OP_SUBB) && isU32(cond, X86CondNS)
+                                        && isU32(cc_dep2, 0)) {
+         /* byte sub/cmp of zero, then NS --> test !(dst-0 <s 0) 
+                                          --> test !(dst <s 0)
+                                          --> (UInt) !dst[7] 
+         */
+         return binop(Iop_Xor32,
+                      binop(Iop_And32,
+                            binop(Iop_Shr32,cc_dep1,mkU8(7)),
+                            mkU32(1)),
+                mkU32(1));
       }
 
       /*---------------- LOGICL ----------------*/
@@ -1727,6 +1746,86 @@ void x86g_dirtyhelper_FXSAVE ( VexGuestX86State* gst, HWord addr )
 
 
 /* CALLED FROM GENERATED CODE */
+/* DIRTY HELPER (writes guest state, reads guest mem) */
+VexEmWarn x86g_dirtyhelper_FXRSTOR ( VexGuestX86State* gst, HWord addr )
+{
+   Fpu_State tmp;
+   VexEmWarn warnX87 = EmWarn_NONE;
+   VexEmWarn warnXMM = EmWarn_NONE;
+   UShort*   addrS   = (UShort*)addr;
+   UChar*    addrC   = (UChar*)addr;
+   U128*     xmm     = (U128*)(addr + 160);
+   UShort    fp_tags;
+   Int       r, stno, i;
+
+   /* Restore %xmm0 .. %xmm7.  If the host is big-endian, these need
+      to be byte-swapped. */
+   vassert(host_is_little_endian());
+
+#  define COPY_U128(_dst,_src)                       \
+      do { _dst[0] = _src[0]; _dst[1] = _src[1];     \
+           _dst[2] = _src[2]; _dst[3] = _src[3]; }   \
+      while (0)
+
+   COPY_U128( gst->guest_XMM0, xmm[0] );
+   COPY_U128( gst->guest_XMM1, xmm[1] );
+   COPY_U128( gst->guest_XMM2, xmm[2] );
+   COPY_U128( gst->guest_XMM3, xmm[3] );
+   COPY_U128( gst->guest_XMM4, xmm[4] );
+   COPY_U128( gst->guest_XMM5, xmm[5] );
+   COPY_U128( gst->guest_XMM6, xmm[6] );
+   COPY_U128( gst->guest_XMM7, xmm[7] );
+
+#  undef COPY_U128
+
+   /* Copy the x87 registers out of the image, into a temporary
+      Fpu_State struct. */
+   for (i = 0; i < 14; i++) tmp.env[i] = 0;
+   for (i = 0; i < 80; i++) tmp.reg[i] = 0;
+   /* fill in tmp.reg[0..7] */
+   for (stno = 0; stno < 8; stno++) {
+      UShort* dstS = (UShort*)(&tmp.reg[10*stno]);
+      UShort* srcS = (UShort*)(&addrS[16 + 8*stno]);
+      dstS[0] = srcS[0];
+      dstS[1] = srcS[1];
+      dstS[2] = srcS[2];
+      dstS[3] = srcS[3];
+      dstS[4] = srcS[4];
+   }
+   /* fill in tmp.env[0..13] */
+   tmp.env[FP_ENV_CTRL] = addrS[0]; /* FCW: fpu control word */
+   tmp.env[FP_ENV_STAT] = addrS[1]; /* FCW: fpu status word */
+
+   fp_tags = 0;
+   for (r = 0; r < 8; r++) {
+      if (addrC[4] & (1<<r))
+         fp_tags |= (0 << (2*r)); /* EMPTY */
+      else 
+         fp_tags |= (3 << (2*r)); /* VALID -- not really precise enough. */
+   }
+   tmp.env[FP_ENV_TAG] = fp_tags;
+
+   /* Now write 'tmp' into the guest state. */
+   warnX87 = do_put_x87( True/*moveRegs*/, (UChar*)&tmp, gst );
+
+   { UInt w32 = (((UInt)addrS[12]) & 0xFFFF)
+                | ((((UInt)addrS[13]) & 0xFFFF) << 16);
+     ULong w64 = x86g_check_ldmxcsr( w32 );
+
+     warnXMM = (VexEmWarn)(w64 >> 32);
+
+     gst->guest_SSEROUND = (UInt)w64;
+   }
+
+   /* Prefer an X87 emwarn over an XMM one, if both exist. */
+   if (warnX87 != EmWarn_NONE)
+      return warnX87;
+   else
+      return warnXMM;
+}
+
+
+/* CALLED FROM GENERATED CODE */
 /* DIRTY HELPER (reads guest state, writes guest mem) */
 void x86g_dirtyhelper_FSAVE ( VexGuestX86State* gst, HWord addr )
 {
@@ -2075,37 +2174,118 @@ void x86g_dirtyhelper_CPUID_sse1 ( VexGuestX86State* st )
    }
 }
 
-/* Claim to be the following SSE2-capable CPU:
+/* Claim to be the following SSSE3-capable CPU (2 x ...):
    vendor_id       : GenuineIntel
-   cpu family      : 15
-   model           : 2
-   model name      : Intel(R) Pentium(R) 4 CPU 2.40GHz
-   stepping        : 7
-   cpu MHz         : 2394.234
-   cache size      : 512 KB
+   cpu family      : 6
+   model           : 15
+   model name      : Intel(R) Core(TM)2 CPU 6600 @ 2.40GHz
+   stepping        : 6
+   cpu MHz         : 2394.000
+   cache size      : 4096 KB
+   physical id     : 0
+   siblings        : 2
+   core id         : 0
+   cpu cores       : 2
+   fpu             : yes
+   fpu_exception   : yes
+   cpuid level     : 10
+   wp              : yes
+   flags           : fpu vme de pse tsc msr pae mce cx8 apic sep
+                     mtrr pge mca cmov pat pse36 clflush dts acpi
+                     mmx fxsr sse sse2 ss ht tm syscall nx lm
+                     constant_tsc pni monitor ds_cpl vmx est tm2
+                     cx16 xtpr lahf_lm
+   bogomips        : 4798.78
+   clflush size    : 64
+   cache_alignment : 64
+   address sizes   : 36 bits physical, 48 bits virtual
+   power management:
 */
 void x86g_dirtyhelper_CPUID_sse2 ( VexGuestX86State* st )
 {
+#  define SET_ABCD(_a,_b,_c,_d)               \
+      do { st->guest_EAX = (UInt)(_a);        \
+           st->guest_EBX = (UInt)(_b);        \
+           st->guest_ECX = (UInt)(_c);        \
+           st->guest_EDX = (UInt)(_d);        \
+      } while (0)
+
    switch (st->guest_EAX) {
-      case 0: 
-         st->guest_EAX = 0x00000002;
-         st->guest_EBX = 0x756e6547;
-         st->guest_ECX = 0x6c65746e;
-         st->guest_EDX = 0x49656e69;
+      case 0x00000000:
+         SET_ABCD(0x0000000a, 0x756e6547, 0x6c65746e, 0x49656e69);
          break;
-      case 1: 
-         st->guest_EAX = 0x00000f27;
-         st->guest_EBX = 0x00010809;
-         st->guest_ECX = 0x00004400;
-         st->guest_EDX = 0xbfebfbff;
+      case 0x00000001:
+         SET_ABCD(0x000006f6, 0x00020800, 0x0000e3bd, 0xbfebfbff);
+         break;
+      case 0x00000002:
+         SET_ABCD(0x05b0b101, 0x005657f0, 0x00000000, 0x2cb43049);
+         break;
+      case 0x00000003:
+         SET_ABCD(0x00000000, 0x00000000, 0x00000000, 0x00000000);
+         break;
+      case 0x00000004: {
+         switch (st->guest_ECX) {
+            case 0x00000000: SET_ABCD(0x04000121, 0x01c0003f,
+                                      0x0000003f, 0x00000001); break;
+            case 0x00000001: SET_ABCD(0x04000122, 0x01c0003f,
+                                      0x0000003f, 0x00000001); break;
+            case 0x00000002: SET_ABCD(0x04004143, 0x03c0003f,
+                                      0x00000fff, 0x00000001); break;
+            default:         SET_ABCD(0x00000000, 0x00000000,
+                                      0x00000000, 0x00000000); break;
+         }
+         break;
+      }
+      case 0x00000005:
+         SET_ABCD(0x00000040, 0x00000040, 0x00000003, 0x00000020);
+         break;
+      case 0x00000006:
+         SET_ABCD(0x00000001, 0x00000002, 0x00000001, 0x00000000);
+         break;
+      case 0x00000007:
+         SET_ABCD(0x00000000, 0x00000000, 0x00000000, 0x00000000);
+         break;
+      case 0x00000008:
+         SET_ABCD(0x00000400, 0x00000000, 0x00000000, 0x00000000);
+         break;
+      case 0x00000009:
+         SET_ABCD(0x00000000, 0x00000000, 0x00000000, 0x00000000);
+         break;
+      case 0x0000000a:
+      unhandled_eax_value:
+         SET_ABCD(0x07280202, 0x00000000, 0x00000000, 0x00000000);
+         break;
+      case 0x80000000:
+         SET_ABCD(0x80000008, 0x00000000, 0x00000000, 0x00000000);
+         break;
+      case 0x80000001:
+         SET_ABCD(0x00000000, 0x00000000, 0x00000001, 0x20100000);
+         break;
+      case 0x80000002:
+         SET_ABCD(0x65746e49, 0x2952286c, 0x726f4320, 0x4d542865);
+         break;
+      case 0x80000003:
+         SET_ABCD(0x43203229, 0x20205550, 0x20202020, 0x20202020);
+         break;
+      case 0x80000004:
+         SET_ABCD(0x30303636, 0x20402020, 0x30342e32, 0x007a4847);
+         break;
+      case 0x80000005:
+         SET_ABCD(0x00000000, 0x00000000, 0x00000000, 0x00000000);
+         break;
+      case 0x80000006:
+         SET_ABCD(0x00000000, 0x00000000, 0x10008040, 0x00000000);
+         break;
+      case 0x80000007:
+         SET_ABCD(0x00000000, 0x00000000, 0x00000000, 0x00000000);
+         break;
+      case 0x80000008:
+         SET_ABCD(0x00003024, 0x00000000, 0x00000000, 0x00000000);
          break;
       default:
-         st->guest_EAX = 0x665b5101;
-         st->guest_EBX = 0x00000000;
-         st->guest_ECX = 0x00000000;
-         st->guest_EDX = 0x007b7040;
-         break;
+         goto unhandled_eax_value;
    }
+#  undef SET_ABCD
 }
 
 
@@ -2453,7 +2633,8 @@ void LibVEX_GuestX86_initialise ( /*OUT*/VexGuestX86State* vex_state )
    vex_state->guest_TISTART = 0;
    vex_state->guest_TILEN   = 0;
 
-   vex_state->guest_NRADDR = 0;
+   vex_state->guest_NRADDR   = 0;
+   vex_state->guest_SC_CLASS = 0;
 }
 
 
@@ -2510,6 +2691,10 @@ VexGuestLayout
           /* Describe the stack pointer. */
           .offset_SP = offsetof(VexGuestX86State,guest_ESP),
           .sizeof_SP = 4,
+
+          /* Describe the frame pointer. */
+          .offset_FP = offsetof(VexGuestX86State,guest_EBP),
+          .sizeof_FP = 4,
 
           /* Describe the instruction pointer. */
           .offset_IP = offsetof(VexGuestX86State,guest_EIP),

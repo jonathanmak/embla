@@ -43,9 +43,10 @@ DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 check_PROGRAMS = alloc-fns$(EXEEXT) basic$(EXEEXT) big-alloc$(EXEEXT) \
 	culling1$(EXEEXT) culling2$(EXEEXT) custom_alloc$(EXEEXT) \
 	deep$(EXEEXT) ignoring$(EXEEXT) insig$(EXEEXT) \
-	long-time$(EXEEXT) new-cpp$(EXEEXT) null$(EXEEXT) one$(EXEEXT) \
-	overloaded-new$(EXEEXT) peak$(EXEEXT) realloc$(EXEEXT) \
-	thresholds$(EXEEXT) zero$(EXEEXT)
+	long-names$(EXEEXT) long-time$(EXEEXT) new-cpp$(EXEEXT) \
+	null$(EXEEXT) one$(EXEEXT) overloaded-new$(EXEEXT) \
+	peak$(EXEEXT) realloc$(EXEEXT) thresholds$(EXEEXT) \
+	zero$(EXEEXT)
 subdir = massif/tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.in
@@ -81,6 +82,9 @@ ignoring_LDADD = $(LDADD)
 insig_SOURCES = insig.c
 insig_OBJECTS = insig.$(OBJEXT)
 insig_LDADD = $(LDADD)
+long_names_SOURCES = long-names.c
+long_names_OBJECTS = long-names.$(OBJEXT)
+long_names_LDADD = $(LDADD)
 long_time_SOURCES = long-time.c
 long_time_OBJECTS = long-time.$(OBJEXT)
 long_time_LDADD = $(LDADD)
@@ -122,13 +126,13 @@ CXXLD = $(CXX)
 CXXLINK = $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
 	-o $@
 SOURCES = alloc-fns.c basic.c big-alloc.c culling1.c culling2.c \
-	custom_alloc.c deep.c ignoring.c insig.c long-time.c \
-	$(new_cpp_SOURCES) null.c one.c $(overloaded_new_SOURCES) \
-	peak.c realloc.c thresholds.c zero.c
+	custom_alloc.c deep.c ignoring.c insig.c long-names.c \
+	long-time.c $(new_cpp_SOURCES) null.c one.c \
+	$(overloaded_new_SOURCES) peak.c realloc.c thresholds.c zero.c
 DIST_SOURCES = alloc-fns.c basic.c big-alloc.c culling1.c culling2.c \
-	custom_alloc.c deep.c ignoring.c insig.c long-time.c \
-	$(new_cpp_SOURCES) null.c one.c $(overloaded_new_SOURCES) \
-	peak.c realloc.c thresholds.c zero.c
+	custom_alloc.c deep.c ignoring.c insig.c long-names.c \
+	long-time.c $(new_cpp_SOURCES) null.c one.c \
+	$(overloaded_new_SOURCES) peak.c realloc.c thresholds.c zero.c
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -136,16 +140,21 @@ ACLOCAL = @ACLOCAL@
 AMDEP_FALSE = @AMDEP_FALSE@
 AMDEP_TRUE = @AMDEP_TRUE@
 AMTAR = @AMTAR@
+AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+BOOST_CFLAGS = @BOOST_CFLAGS@
+BOOST_LIBS = @BOOST_LIBS@
 BUILD_MPIWRAP_PRI_FALSE = @BUILD_MPIWRAP_PRI_FALSE@
 BUILD_MPIWRAP_PRI_TRUE = @BUILD_MPIWRAP_PRI_TRUE@
 BUILD_MPIWRAP_SEC_FALSE = @BUILD_MPIWRAP_SEC_FALSE@
 BUILD_MPIWRAP_SEC_TRUE = @BUILD_MPIWRAP_SEC_TRUE@
 BUILD_SSE3_TESTS_FALSE = @BUILD_SSE3_TESTS_FALSE@
 BUILD_SSE3_TESTS_TRUE = @BUILD_SSE3_TESTS_TRUE@
+BUILD_SSSE3_TESTS_FALSE = @BUILD_SSSE3_TESTS_FALSE@
+BUILD_SSSE3_TESTS_TRUE = @BUILD_SSSE3_TESTS_TRUE@
 CC = @CC@
 CCAS = @CCAS@
 CCASFLAGS = @CCASFLAGS@
@@ -173,8 +182,22 @@ FLAG_MAIX32 = @FLAG_MAIX32@
 FLAG_MAIX64 = @FLAG_MAIX64@
 FLAG_MMMX = @FLAG_MMMX@
 FLAG_MSSE = @FLAG_MSSE@
+FLAG_UNLIMITED_INLINE_UNIT_GROWTH = @FLAG_UNLIMITED_INLINE_UNIT_GROWTH@
 FLAG_WDECL_AFTER_STMT = @FLAG_WDECL_AFTER_STMT@
+FLAG_W_EXTRA = @FLAG_W_EXTRA@
+FLAG_W_NO_FORMAT_ZERO_LENGTH = @FLAG_W_NO_FORMAT_ZERO_LENGTH@
 GDB = @GDB@
+GLIBC_VERSION = @GLIBC_VERSION@
+HAS_ALTIVEC_FALSE = @HAS_ALTIVEC_FALSE@
+HAS_ALTIVEC_TRUE = @HAS_ALTIVEC_TRUE@
+HAVE_ALTIVEC_H_FALSE = @HAVE_ALTIVEC_H_FALSE@
+HAVE_ALTIVEC_H_TRUE = @HAVE_ALTIVEC_H_TRUE@
+HAVE_BOOST_1_35_FALSE = @HAVE_BOOST_1_35_FALSE@
+HAVE_BOOST_1_35_TRUE = @HAVE_BOOST_1_35_TRUE@
+HAVE_OPENMP_FALSE = @HAVE_OPENMP_FALSE@
+HAVE_OPENMP_TRUE = @HAVE_OPENMP_TRUE@
+HAVE_QTCORE_FALSE = @HAVE_QTCORE_FALSE@
+HAVE_QTCORE_TRUE = @HAVE_QTCORE_TRUE@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
@@ -224,8 +247,9 @@ VGP_PPC64_LINUX_FALSE = @VGP_PPC64_LINUX_FALSE@
 VGP_PPC64_LINUX_TRUE = @VGP_PPC64_LINUX_TRUE@
 VGP_X86_LINUX_FALSE = @VGP_X86_LINUX_FALSE@
 VGP_X86_LINUX_TRUE = @VGP_X86_LINUX_TRUE@
-VG_ARCH = @VG_ARCH@
 VG_ARCH_ALL = @VG_ARCH_ALL@
+VG_ARCH_MAX = @VG_ARCH_MAX@
+VG_ARCH_PRI = @VG_ARCH_PRI@
 VG_OS = @VG_OS@
 VG_PLATFORM_PRI = @VG_PLATFORM_PRI@
 VG_PLATFORM_SEC = @VG_PLATFORM_SEC@
@@ -275,6 +299,7 @@ target_alias = @target_alias@
 # performance and get whatever useful warnings we can out of gcc.
 AM_CFLAGS_BASE = -O2 -g -Wmissing-prototypes -Wall -Wshadow \
                  -Wpointer-arith -Wstrict-prototypes -Wmissing-declarations \
+		 @FLAG_W_NO_FORMAT_ZERO_LENGTH@ \
                  -fno-strict-aliasing
 
 
@@ -331,8 +356,8 @@ AM_CCASFLAGS_PRI = $(AM_CCASFLAGS_@VG_PLATFORM_PRI@)
 
 # Baseline link flags for making dynamic shared objects.
 #
-PRELOAD_LDFLAGS_COMMON_LINUX = -nostdlib -shared -Wl,-z,interpose,-z,initfirst
-PRELOAD_LDFLAGS_COMMON_AIX5 = -nostdlib -shared -Wl,-G -Wl,-bnogc
+PRELOAD_LDFLAGS_COMMON_LINUX = -nodefaultlibs -shared -Wl,-z,interpose,-z,initfirst
+PRELOAD_LDFLAGS_COMMON_AIX5 = -nodefaultlibs -shared -Wl,-G -Wl,-bnogc
 PRELOAD_LDFLAGS_X86_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
 PRELOAD_LDFLAGS_AMD64_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M64@
 PRELOAD_LDFLAGS_PPC32_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
@@ -379,9 +404,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu  massif/tests/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign  massif/tests/Makefile'; \
 	cd $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu  massif/tests/Makefile
+	  $(AUTOMAKE) --foreign  massif/tests/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -429,6 +454,9 @@ ignoring$(EXEEXT): $(ignoring_OBJECTS) $(ignoring_DEPENDENCIES)
 insig$(EXEEXT): $(insig_OBJECTS) $(insig_DEPENDENCIES) 
 	@rm -f insig$(EXEEXT)
 	$(LINK) $(insig_LDFLAGS) $(insig_OBJECTS) $(insig_LDADD) $(LIBS)
+long-names$(EXEEXT): $(long_names_OBJECTS) $(long_names_DEPENDENCIES) 
+	@rm -f long-names$(EXEEXT)
+	$(LINK) $(long_names_LDFLAGS) $(long_names_OBJECTS) $(long_names_LDADD) $(LIBS)
 long-time$(EXEEXT): $(long_time_OBJECTS) $(long_time_DEPENDENCIES) 
 	@rm -f long-time$(EXEEXT)
 	$(LINK) $(long_time_LDFLAGS) $(long_time_OBJECTS) $(long_time_LDADD) $(LIBS)
@@ -472,6 +500,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/deep.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ignoring.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/insig.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/long-names.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/long-time.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/new-cpp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/null.Po@am__quote@
@@ -677,6 +706,7 @@ uninstall-am: uninstall-info-am
 	uninstall-am uninstall-info-am
 
 	ignoring.post.exp ignoring.stderr.exp ignoring.vgtest \
+	long-names.post.exp long-names.stderr.exp long-names.vgtest \
 	long-time.post.exp long-time.stderr.exp long-time.vgtest \
 	new-cpp.post.exp new-cpp.stderr.exp new-cpp.vgtest \
 	no-stack-no-heap.post.exp no-stack-no-heap.stderr.exp no-stack-no-heap.vgtest \

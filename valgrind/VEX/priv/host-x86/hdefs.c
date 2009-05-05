@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2008 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -2276,6 +2276,12 @@ Int emit_X86Instr ( UChar* buf, Int nbuf, X86Instr* i,
          case Ijk_Sys_int128:
             *p++ = 0xBD;
             p = emit32(p, VEX_TRC_JMP_SYS_INT128); break;
+         case Ijk_Sys_int129:
+            *p++ = 0xBD;
+            p = emit32(p, VEX_TRC_JMP_SYS_INT129); break;
+         case Ijk_Sys_int130:
+            *p++ = 0xBD;
+            p = emit32(p, VEX_TRC_JMP_SYS_INT130); break;
          case Ijk_Yield: 
             *p++ = 0xBD;
             p = emit32(p, VEX_TRC_JMP_YIELD); break;

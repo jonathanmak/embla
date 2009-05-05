@@ -9,7 +9,7 @@
    This file is part of MemCheck, a heavyweight Valgrind tool for
    detecting memory errors.
 
-   Copyright (C) 2000-2007 Julian Seward 
+   Copyright (C) 2000-2008 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -401,6 +401,7 @@ MEMCHR(m_libc_soname, memchr)
 
 MEMCPY(m_libc_soname, memcpy)
 MEMCPY(m_ld_so_1,     memcpy) /* ld.so.1 */
+MEMCPY(m_ld64_so_1,   memcpy) /* ld64.so.1 */
 /* icc9 blats these around all over the place.  Not only in the main
    executable but various .so's.  They are highly tuned and read
    memory beyond the source boundary (although work correctly and

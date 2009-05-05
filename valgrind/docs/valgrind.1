@@ -2,7 +2,7 @@
 .\" It was generated using the DocBook XSL Stylesheets (version 1.69.1).
 .\" Instead of manually editing it, you probably should edit the DocBook XML
 .\" source for it and then use the DocBook XSL Stylesheets to regenerate it.
-.TH "VALGRIND" "1" "12/11/2007" "Release 3.3.0" "Release 3.3.0"
+.TH "VALGRIND" "1" "03/02/2009" "Release 3.4.0" "Release 3.4.0"
 .\" disable hyphenation
 .nh
 .\" disable justification (adjust text to left margin only)
@@ -136,7 +136,7 @@ Specifies that Valgrind should send all of its messages to the specified file. I
 \fB%p\fR
 is replaced with the current process ID. This is very useful for program that invoke multiple processes. WARNING: If you use
 \fB\-\-trace\-children=yes\fR
-and your program invokes multiple processes and you don't use this specifier (or the
+and your program invokes multiple processes OR your program forks without calling exec afterwards, and you don't use this specifier (or the
 \fB%q\fR
 specifier below), the Valgrind output from all those processes will go into one file, possibly jumbled up, and possibly incomplete.
 .sp
@@ -205,7 +205,7 @@ is not present in the stack trace); most of the time it's uninteresting C librar
 will be shown.
 .TP
 \fB\-\-suppressions=<filename> [default: $PREFIX/lib/valgrind/default.supp] \fR
-Specifies an extra file from which to read descriptions of errors to suppress. You may use as many extra suppressions files as you like.
+Specifies an extra file from which to read descriptions of errors to suppress. You may use up to 100 extra suppression files.
 .TP
 \fB\-\-gen\-suppressions=<yes|no|all> [default: no] \fR
 When set to
@@ -226,7 +226,10 @@ When set to
 .sp
 This option is particularly useful with C++ programs, as it prints out the suppressions with mangled names, as required.
 .sp
-Note that the suppressions printed are as specific as possible. You may want to common up similar ones, eg. by adding wildcards to function names. Sometimes two different errors are suppressed by the same suppression, in which case Valgrind will output the suppression more than once, but you only need to have one copy in your suppression file (but having more than one won't cause problems). Also, the suppression name is given as
+Note that the suppressions printed are as specific as possible. You may want to common up similar ones, by adding wildcards to function names, and by using frame\-level wildcards. The wildcarding facilities are powerful yet flexible, and with a bit of careful editing, you may be able to suppress a whole family of related errors with only a few suppressions. For details on how to do this, see
+???.
+.sp
+Sometimes two different errors are suppressed by the same suppression, in which case Valgrind will output the suppression more than once, but you only need to have one copy in your suppression file (but having more than one won't cause problems). Also, the suppression name is given as
 <insert a suppression name here>; the name doesn't really matter, it's only used with the
 \fB\-v\fR
 option which prints out all used suppression records.
@@ -254,14 +257,6 @@ causes Valgrind to start a debugger for the program at this point. When you have
 or
 \fIc Ret\fR
 causes Valgrind not to start a debugger, and not to ask again.
-.sp
-\fBNote:\fR\fB\-\-db\-attach=yes\fR
-conflicts with
-\fB\-\-trace\-children=yes\fR. You can't use them together. Valgrind refuses to start up in this situation.
-.sp
-May 2002: this is a historical relic which could be easily fixed if it gets in your way. Mail us and complain if this is a problem for you.
-.sp
-Nov 2002: if you're sending output to a logfile or to a network socket, I guess this option doesn't make any sense. Caveat emptor.
 .TP
 \fB\-\-db\-command=<command> [default: gdb \-nw %f %p] \fR
 Specify the debugger to use with the
@@ -303,6 +298,39 @@ You may need to use this option if your program has large stack\-allocated array
 You should only consider use of this flag if Valgrind's debug output directs you to do so. In that case it will tell you the new threshold you should specify.
 .sp
 In general, allocating large structures on the stack is a bad idea, because you can easily run out of stack space, especially on systems with limited memory or which expect to support large numbers of threads each with a small stack, and also because the error checking performed by Memcheck is more effective for heap\-allocated data than for stack\-allocated data. If you have to use this flag, you may wish to consider rewriting your code to allocate on the heap rather than on the stack.
+.TP
+\fB\-\-main\-stacksize=<number> [default: use current 'ulimit' value] \fR
+Specifies the size of the main thread's stack.
+.sp
+To simplify its memory management, Valgrind reserves all required space for the main thread's stack at startup. That means it needs to know the required stack size at startup.
+.sp
+By default, Valgrind uses the current "ulimit" value for the stack size, or 16 MB, whichever is lower. In many cases this gives a stack size in the range 8 to 16 MB, which almost never overflows for most applications.
+.sp
+If you need a larger total stack size, use
+\fB\-\-main\-stacksize\fR
+to specify it. Only set it as high as you need, since reserving far more space than you need (that is, hundreds of megabytes more than you need) constrains Valgrind's memory allocators and may reduce the total amount of memory that Valgrind can use. This is only really of significance on 32\-bit machines.
+.sp
+On Linux, you may request a stack of size up to 2GB. Valgrind will stop with a diagnostic message if the stack cannot be allocated. On AIX5 the allowed stack size is restricted to 128MB.
+.sp
+\fB\-\-main\-stacksize\fR
+only affects the stack size for the program's initial thread. It has no bearing on the size of thread stacks, as Valgrind does not allocate those.
+.sp
+You may need to use both
+\fB\-\-main\-stacksize\fR
+and
+\fB\-\-max\-stackframe\fR
+together. It is important to understand that
+\fB\-\-main\-stacksize\fR
+sets the maximum total stack size, whilst
+\fB\-\-max\-stackframe\fR
+specifies the largest size of any one stack frame. You will have to work out the
+\fB\-\-main\-stacksize\fR
+value for yourself (usually, if your applications segfaults). But Valgrind will tell you the needed
+\fB\-\-max\-stackframe\fR
+size, if necessary.
+.sp
+As discussed further in the description of
+\fB\-\-max\-stackframe\fR, a requirement for a large stack is a sign of potential portability problems. You are best advised to place all large data in heap\-allocated memory.
 .SH "MALLOC()\-RELATED OPTIONS"
 .PP
 For tools that use their own version of
@@ -376,6 +404,53 @@ There are also some options for debugging Valgrind itself. You shouldn't need to
 option.
 .SH "MEMCHECK OPTIONS"
 .TP
+\fB\-\-undef\-value\-errors=<yes|no> [default: yes] \fR
+Controls whether
+\fBmemcheck\fR
+reports uses of undefined value errors. Set this to
+\fIno\fR
+if you don't want to see undefined value errors. It also has the side effect of speeding up
+\fBmemcheck\fR
+somewhat.
+.TP
+\fB\-\-track\-origins=<yes|no> [default: no] \fR
+Controls whether
+\fBmemcheck\fR
+tracks the origin of uninitialised values. By default, it does not, which means that although it can tell you that an uninitialised value is being used in a dangerous way, it cannot tell you where the uninitialised value came from. This often makes it difficult to track down the root problem.
+.sp
+When set to
+\fIyes\fR,
+\fBmemcheck\fR
+keeps track of the origins of all uninitialised values. Then, when an uninitialised value error is reported,
+\fBmemcheck\fR
+will try to show the origin of the value. An origin can be one of the following four places: a heap block, a stack allocation, a client request, or miscellaneous other sources (eg, a call to
+\fIbrk\fR).
+.sp
+For uninitialised values originating from a heap block,
+\fBmemcheck\fR
+shows where the block was allocated. For uninitialised values originating from a stack allocation,
+\fBmemcheck\fR
+can tell you which function allocated the value, but no more than that \-\- typically it shows you the source location of the opening brace of the function. So you should carefully check that all of the function's local variables are initialised properly.
+.sp
+Performance overhead: origin tracking is expensive. It halves
+\fBmemcheck\fR's speed and increases memory use by a minimum of 100MB, and possibly more. Nevertheless it can drastically reduce the effort required to identify the root cause of uninitialised value errors, and so is often a programmer productivity win, despite running more slowly.
+.sp
+Accuracy:
+\fBmemcheck\fR
+tracks origins quite accurately. To avoid very large space and time overheads, some approximations are made. It is possible, although unlikely, that
+\fBmemcheck\fR
+will report an incorrect origin, or not be able to identify any origin.
+.sp
+Note that the combination
+\fB\-\-track\-origins=yes\fR
+and
+\fB\-\-undef\-value\-errors=no\fR
+is nonsensical.
+\fBmemcheck\fR
+checks for and rejects this combination at startup.
+.sp
+Origin tracking is a new feature, introduced in Valgrind version 3.4.0.
+.TP
 \fB\-\-leak\-check=<no|summary|yes|full> [default: summary] \fR
 When enabled, search for memory leaks when the client program finishes. A memory leak means a malloc'd block, which has not yet been free'd, but to which no pointer can be found. Such a block can never be free'd by the program, since no pointer to it exists. If set to
 \fIsummary\fR, it says how many leaks occurred. If set to
@@ -434,15 +509,6 @@ When
 \fIno\fR, loads from partially invalid addresses are treated the same as loads from completely invalid addresses: an illegal\-address error is issued, and the resulting bytes are marked as initialised.
 .sp
 Note that code that behaves in this way is in violation of the the ISO C/C++ standards, and should be considered broken. If at all possible, such code should be fixed. This flag should be used only as a last resort.
-.TP
-\fB\-\-undef\-value\-errors=<yes|no> [default: yes] \fR
-Controls whether
-\fBmemcheck\fR
-detects dangerous uses of undefined value errors. Set this to
-\fIno\fR
-if you don't like seeing undefined value errors; it also has the side effect of speeding
-\fBmemcheck\fR
-up somewhat.
 .TP
 \fB\-\-malloc\-fill=<hexnumber> \fR
 Fills blocks allocated by
@@ -576,11 +642,9 @@ Collection state can be toggled at entry and exit of a given function with the o
 implicitly sets
 \-\-collect\-state=no.
 .sp
-Collection state can be toggled also by using a Valgrind Client Request in your application. For this, include
-valgrind/callgrind.h
-and specify the macro
-CALLGRIND_TOGGLE_COLLECT
-at the needed positions. This only will have any effect if run under supervision of the Callgrind tool.
+Collection state can be toggled also by inserting the client request
+???;
+at the needed code positions.
 .TP
 \fB\-\-toggle\-collect=<function> \fR
 Toggle collection on entry/exit of <function>.
@@ -675,30 +739,35 @@ for details.
 The minimum alignment (and thus size) of heap blocks.
 .SH "HELGRIND OPTIONS"
 .TP
-\fB\-\-happens\-before=none|threads|all [default: all] \fR
-Helgrind always regards locks as the basis for inter\-thread synchronisation. However, by default, before reporting a race error, Helgrind will also check whether certain other kinds of inter\-thread synchronisation events happened. It may be that if such events took place, then no race really occurred, and so no error needs to be reported. See
-above
-for a discussion of transfers of exclusive ownership states between threads.
-.sp
-With
-\fI\-\-happens\-before=all\fR, the following events are regarded as sources of synchronisation: thread creation/joinage, condition variable signal/broadcast/waits, and semaphore posts/waits.
-.sp
-With
-\fI\-\-happens\-before=threads\fR, only thread creation/joinage events are regarded as sources of synchronisation.
-.sp
-With
-\fI\-\-happens\-before=none\fR, no events (apart, of course, from locking) are regarded as sources of synchronisation.
-.sp
-Changing this setting from the default will increase your false\-error rate but give little or no gain. The only advantage is that
-\fB\-\-happens\-before=threads\fR
-and
-\fB\-\-happens\-before=none\fR
-should make Helgrind less and less sensitive to the scheduling of threads, and hence the output more and more repeatable across runs.
+\fB\-\-track\-lockorders=no|yes [default: yes] \fR
+When enabled (the default), Helgrind performs lock order consistency checking. For some buggy programs, the large number of lock order errors reported can become annoying, particularly if you're only interested in race errors. You may therefore find it helpful to disable lock order checking.
 .TP
-\fB\-\-trace\-addr=0xXXYYZZ \fR and \fB\-\-trace\-level=0|1|2 [default: 1] \fR
-Requests that Helgrind produces a log of all state changes to location 0xXXYYZZ. This can be helpful in tracking down tricky races.
-\fI\-\-trace\-level\fR
-controls the verbosity of the log. At the default setting (1), a one\-line summary of is printed for each state change. At level 2 a complete stack trace is printed for each state change.
+\fB\-\-show\-conflicts=no|yes [default: yes] \fR
+When enabled (the default), Helgrind collects enough information about "old" accesses that it can produce two stack traces in a race report \-\- both the stack trace for the current access, and the trace for the older, conflicting access.
+.sp
+Collecting such information is expensive in both speed and memory. This flag disables collection of such information. Helgrind will run significantly faster and use less memory, but without the conflicting access stacks, it will be very much more difficult to track down the root causes of races. However, this option may be useful in situations where you just want to check for the presence or absence of races, for example, when doing regression testing of a previously race\-free program.
+.TP
+\fB\-\-conflict\-cache\-size=N [default: 1000000] \fR
+Information about "old" conflicting accesses is stored in a cache of limited size, with LRU\-style management. This is necessary because it isn't practical to store a stack trace for every single memory access made by the program. Historical information on not recently accessed locations is periodically discarded, to free up space in the cache.
+.sp
+This flag controls the size of the cache, in terms of the number of different memory addresses for which conflicting access information is stored. If you find that Helgrind is showing race errors with only one stack instead of the expected two stacks, try increasing this value.
+.sp
+The minimum value is 10,000 and the maximum is 10,000,000 (ten times the default value). Increasing the value by 1 increases Helgrind's memory requirement by very roughly 100 bytes, so the maximum value will easily eat up an extra gigabyte or so of memory.
+.SH "PTRCHECK OPTIONS"
+.TP
+\fB\-\-enable\-sg\-checks=no|yes [default: yes] \fR
+By default, Ptrcheck checks for overruns of stack, global and heap arrays. With
+\fI\-\-enable\-sg\-checks=no\fR, the stack and global array checks are omitted, and only heap checking is performed. This can be useful because the stack and global checks are quite expensive, so omitting them speeds Ptrcheck up a lot.
+.TP
+\fB\-\-partial\-loads\-ok=<yes|no> [default: no] \fR
+This option has the same meaning as it does for Memcheck.
+.sp
+Controls how Ptrcheck handles word\-sized, word\-aligned loads which partially overlap the end of heap blocks \-\- that is, some of the bytes in the word are validly addressable, but others are not. When
+\fIyes\fR, such loads do not produce an address error. When
+\fIno\fR
+(the default), loads from partially invalid addresses are treated the same as loads from completely invalid addresses: an illegal heap access error is issued.
+.sp
+Note that code that behaves in this way is in violation of the the ISO C/C++ standards, and should be considered broken. If at all possible, such code should be fixed. This flag should be used only as a last resort.
 .SH "LACKEY OPTIONS"
 .TP
 \fB\-\-basic\-counts=<no|yes> [default: yes] \fR

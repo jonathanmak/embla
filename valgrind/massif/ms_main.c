@@ -6,7 +6,7 @@
    This file is part of Massif, a Valgrind tool for profiling memory
    usage of programs.
 
-   Copyright (C) 2003-2007 Nicholas Nethercote
+   Copyright (C) 2003-2008 Nicholas Nethercote
       njn@valgrind.org
 
    This program is free software; you can redistribute it and/or
@@ -292,7 +292,8 @@ static XArray* alloc_fns;
 static void init_alloc_fns(void)
 {
    // Create the list, and add the default elements.
-   alloc_fns = VG_(newXA)(VG_(malloc), VG_(free), sizeof(Char*));
+   alloc_fns = VG_(newXA)(VG_(malloc), "ms.main.iaf.1",
+                                       VG_(free), sizeof(Char*));
    #define DO(x)  { Char* s = x; VG_(addToXA)(alloc_fns, &s); }
 
    // Ordered according to (presumed) frequency.
@@ -396,7 +397,7 @@ static Bool ms_process_cmd_line_option(Char* arg)
       VG_(addToXA)(alloc_fns, &alloc_fn);
    }
 
-   else if (VG_CLO_STREQN(14, arg, "--massif-out-file=")) {
+   else if (VG_CLO_STREQN(18, arg, "--massif-out-file=")) {
       clo_massif_out_file = &arg[18];
    }
 
@@ -583,11 +584,13 @@ static void add_child_xpt(XPt* parent, XPt* child)
    if (parent->n_children == parent->max_children) {
       if (parent->max_children == 0) {
          parent->max_children = 4;
-         parent->children = VG_(malloc)( parent->max_children * sizeof(XPt*) );
+         parent->children = VG_(malloc)( "ms.main.acx.1",
+                                         parent->max_children * sizeof(XPt*) );
          n_xpt_init_expansions++;
       } else {
          parent->max_children *= 2;    // Double size
-         parent->children = VG_(realloc)( parent->children,
+         parent->children = VG_(realloc)( "ms.main.acx.2",
+                                          parent->children,
                                           parent->max_children * sizeof(XPt*) );
          n_xpt_later_expansions++;
       }
@@ -650,7 +653,7 @@ static SXPt* dup_XTree(XPt* xpt, SizeT total_szB)
    n_child_sxpts = n_sig_children + ( n_insig_children > 0 ? 1 : 0 );
 
    // Duplicate the XPt.
-   sxpt                 = VG_(malloc)(sizeof(SXPt));
+   sxpt                 = VG_(malloc)("ms.main.dX.1", sizeof(SXPt));
    n_sxpt_allocs++;
    sxpt->tag            = SigSXPt;
    sxpt->szB            = xpt->szB;
@@ -661,7 +664,8 @@ static SXPt* dup_XTree(XPt* xpt, SizeT total_szB)
    if (n_child_sxpts > 0) {
       Int j;
       SizeT sig_children_szB = 0, insig_children_szB = 0;
-      sxpt->Sig.children = VG_(malloc)(n_child_sxpts * sizeof(SXPt*));
+      sxpt->Sig.children = VG_(malloc)("ms.main.dX.2", 
+                                       n_child_sxpts * sizeof(SXPt*));
 
       // Duplicate the significant children.  (Nb: sig_children_szB +
       // insig_children_szB doesn't necessarily equal xpt->szB.)
@@ -680,7 +684,7 @@ static SXPt* dup_XTree(XPt* xpt, SizeT total_szB)
       if (n_insig_children > 0) {
          // Nb: We 'n_sxpt_allocs' here because creating an Insig SXPt
          // doesn't involve a call to dup_XTree().
-         SXPt* insig_sxpt = VG_(malloc)(sizeof(SXPt));
+         SXPt* insig_sxpt = VG_(malloc)("ms.main.dX.3", sizeof(SXPt));
          n_sxpt_allocs++;
          insig_sxpt->tag = InsigSXPt;
          insig_sxpt->szB = insig_children_szB;
@@ -774,6 +778,11 @@ static void sanity_check_SXTree(SXPt* sxpt)
 #define MAX_OVERESTIMATE   50
 #define MAX_IPS            (MAX_DEPTH + MAX_OVERESTIMATE)
 
+// This is used for various buffers which can hold function names/IP
+// description.  Some C++ names can get really long so 1024 isn't big
+// enough.
+#define BUF_LEN   2048
+
 // Get the stack trace for an XCon, filtering out uninteresting entries:
 // alloc-fns and entries above alloc-fns, and entries below main-or-below-main.
 //   Eg:       alloc-fn1 / alloc-fn2 / a / b / main / (below main) / c
@@ -783,7 +792,6 @@ static void sanity_check_SXTree(SXPt* sxpt)
 static
 Int get_IPs( ThreadId tid, Bool is_custom_alloc, Addr ips[])
 {
-   #define BUF_LEN   1024
    Char buf[BUF_LEN];
    Int n_ips, i, n_alloc_fns_removed;
    Int overestimate;
@@ -809,7 +817,9 @@ Int get_IPs( ThreadId tid, Bool is_custom_alloc, Addr ips[])
 
       // Ask for more IPs than clo_depth suggests we need.
       n_ips = VG_(get_StackTrace)( tid, ips, clo_depth + overestimate,
-                                        0/*first_ip_delta*/ );
+                                   NULL/*array to dump SP values in*/,
+                                   NULL/*array to dump FP values in*/,
+                                   0/*first_ip_delta*/ );
       tl_assert(n_ips > 0);
 
       // If the original stack trace is smaller than asked-for, redo=False.
@@ -1472,7 +1482,7 @@ void* new_block ( ThreadId tid, void* p, SizeT req_szB, SizeT req_alignB,
    }
 
    // Make new HP_Chunk node, add to malloc_list
-   hc           = VG_(malloc)(sizeof(HP_Chunk));
+   hc           = VG_(malloc)("ms.main.nb.1", sizeof(HP_Chunk));
    hc->req_szB  = req_szB;
    hc->slop_szB = slop_szB;
    hc->data     = (Addr)p;
@@ -1726,7 +1736,7 @@ static void die_mem_stack(Addr a, SizeT len)
    die_mem_stack_2(a, len, "stk-die");
 }
 
-static void new_mem_stack_signal(Addr a, SizeT len)
+static void new_mem_stack_signal(Addr a, SizeT len, ThreadId tid)
 {
    new_mem_stack_2(a, len, "sig-new");
 }
@@ -1860,16 +1870,25 @@ IRSB* ms_instrument ( VgCallbackClosure* closure,
 //--- Writing snapshots                                    ---//
 //------------------------------------------------------------//
 
-// The output file name.  Controlled by --massif-out-file.
-static Char* massif_out_file = NULL;
-
-#define FP_BUF_SIZE     1024
-Char FP_buf[FP_BUF_SIZE];
+Char FP_buf[BUF_LEN];
 
 // XXX: implement f{,n}printf in m_libcprint.c eventually, and use it here.
 // Then change Cachegrind to use it too.
 #define FP(format, args...) ({ \
-   VG_(snprintf)(FP_buf, FP_BUF_SIZE, format, ##args); \
+   VG_(snprintf)(FP_buf, BUF_LEN, format, ##args); \
+   FP_buf[BUF_LEN-1] = '\0';  /* Make sure the string is terminated. */ \
+   VG_(write)(fd, (void*)FP_buf, VG_(strlen)(FP_buf)); \
+})
+
+// Same as FP, but guarantees a '\n' at the end.  (At one point we were
+// truncating without adding the '\n', which caused bug #155929.)
+#define FPn(format, args...) ({ \
+   VG_(snprintf)(FP_buf, BUF_LEN, format, ##args); \
+   FP_buf[BUF_LEN-5] = '.';   /* "..." at the end make the truncation */ \
+   FP_buf[BUF_LEN-4] = '.';   /*  more obvious */ \
+   FP_buf[BUF_LEN-3] = '.'; \
+   FP_buf[BUF_LEN-2] = '\n';  /* Make sure the last char is a newline. */ \
+   FP_buf[BUF_LEN-1] = '\0';  /* Make sure the string is terminated. */ \
    VG_(write)(fd, (void*)FP_buf, VG_(strlen)(FP_buf)); \
 })
 
@@ -1892,18 +1911,21 @@ static void pp_snapshot_SXPt(Int fd, SXPt* sxpt, Int depth, Char* depth_str,
                             Int depth_str_len,
                             SizeT snapshot_heap_szB, SizeT snapshot_total_szB)
 {
-   #define BUF_LEN   1024
    Int   i, n_insig_children_sxpts;
    Char* perc;
-   Char  ip_desc_array[BUF_LEN];
-   Char* ip_desc = ip_desc_array;
    SXPt* pred  = NULL;
    SXPt* child = NULL;
+
+   // Used for printing function names.  Is made static to keep it out
+   // of the stack frame -- this function is recursive.  Obviously this
+   // now means its contents are trashed across the recursive call.
+   static Char ip_desc_array[BUF_LEN];
+   Char* ip_desc = ip_desc_array;
 
    switch (sxpt->tag) {
     case SigSXPt:
       // Print the SXPt itself.
-      if (sxpt->Sig.ip == 0) {
+      if (0 == depth) {
          ip_desc =
             "(heap allocation functions) malloc/new/new[], --alloc-fns, etc.";
       } else {
@@ -1925,7 +1947,10 @@ static void pp_snapshot_SXPt(Int fd, SXPt* sxpt, Int depth, Char* depth_str,
          ip_desc = VG_(describe_IP)(sxpt->Sig.ip-1, ip_desc, BUF_LEN);
       }
       perc = make_perc(sxpt->szB, snapshot_total_szB);
-      FP("%sn%d: %lu %s\n",
+      // Nb: we deliberately use 'FPn', not 'FP'.  So if the ip_desc is
+      // too long (eg. due to a long C++ function name), it'll get
+      // truncated, but the '\n' is still there so its a valid file.
+      FPn("%sn%d: %lu %s\n",     
          depth_str, sxpt->Sig.n_children, sxpt->szB, ip_desc);
 
       // Indent.
@@ -1951,7 +1976,9 @@ static void pp_snapshot_SXPt(Int fd, SXPt* sxpt, Int depth, Char* depth_str,
          if (InsigSXPt == child->tag)
             n_insig_children_sxpts++;
 
-         // Ok, print the child.
+         // Ok, print the child.  NB: contents of ip_desc_array will be
+         // trashed by this recursive call.  Doesn't matter currently,
+         // but worth noting.
          pp_snapshot_SXPt(fd, child, depth+1, depth_str, depth_str_len,
             snapshot_heap_szB, snapshot_total_szB);
       }
@@ -1993,7 +2020,8 @@ static void pp_snapshot(Int fd, Snapshot* snapshot, Int snapshot_n)
    if (is_detailed_snapshot(snapshot)) {
       // Detailed snapshot -- print heap tree.
       Int   depth_str_len = clo_depth + 3;
-      Char* depth_str = VG_(malloc)(sizeof(Char) * depth_str_len);
+      Char* depth_str = VG_(malloc)("ms.main.pps.1", 
+                                    sizeof(Char) * depth_str_len);
       SizeT snapshot_total_szB =
          snapshot->heap_szB + snapshot->heap_extra_szB + snapshot->stacks_szB;
       depth_str[0] = '\0';   // Initialise depth_str to "".
@@ -2015,6 +2043,14 @@ static void write_snapshots_to_file(void)
    Int i, fd;
    SysRes sres;
 
+   // Setup output filename.  Nb: it's important to do this now, ie. as late
+   // as possible.  If we do it at start-up and the program forks and the
+   // output file format string contains a %p (pid) specifier, both the
+   // parent and child will incorrectly write to the same file;  this
+   // happened in 3.3.0.
+   Char* massif_out_file =
+      VG_(expand_file_name)("--massif-out-file", clo_massif_out_file);
+
    sres = VG_(open)(massif_out_file, VKI_O_CREAT|VKI_O_TRUNC|VKI_O_WRONLY,
                                      VKI_S_IRUSR|VKI_S_IWUSR);
    if (sres.isError) {
@@ -2024,9 +2060,11 @@ static void write_snapshots_to_file(void)
          "error: can't open output file '%s'", massif_out_file );
       VG_(message)(Vg_UserMsg,
          "       ... so profiling results will be missing.");
+      VG_(free)(massif_out_file);
       return;
    } else {
       fd = sres.res;
+      VG_(free)(massif_out_file);
    }
 
    // Print massif-specific options that were used.
@@ -2151,17 +2189,14 @@ static void ms_post_clo_init(void)
    }
 
    // Initialise snapshot array, and sanity-check it.
-   snapshots = VG_(malloc)(sizeof(Snapshot) * clo_max_snapshots);
+   snapshots = VG_(malloc)("ms.main.mpoci.1", 
+                           sizeof(Snapshot) * clo_max_snapshots);
    // We don't want to do snapshot sanity checks here, because they're
    // currently uninitialised.
    for (i = 0; i < clo_max_snapshots; i++) {
       clear_snapshot( & snapshots[i], /*do_sanity_check*/False );
    }
    sanity_check_snapshots_array();
-
-   // Setup output filename.
-   massif_out_file =
-      VG_(expand_file_name)("--massif-out-file", clo_massif_out_file);
 }
 
 static void ms_pre_clo_init(void)
@@ -2170,7 +2205,7 @@ static void ms_pre_clo_init(void)
    VG_(details_version)         (NULL);
    VG_(details_description)     ("a heap profiler");
    VG_(details_copyright_author)(
-      "Copyright (C) 2003-2007, and GNU GPL'd, by Nicholas Nethercote");
+      "Copyright (C) 2003-2008, and GNU GPL'd, by Nicholas Nethercote");
    VG_(details_bug_reports_to)  (VG_BUGS_TO);
 
    // Basic functions
@@ -2207,7 +2242,8 @@ static void ms_pre_clo_init(void)
    init_alloc_fns();
 
    // Initialise args_for_massif.
-   args_for_massif = VG_(newXA)(VG_(malloc), VG_(free), sizeof(HChar*));
+   args_for_massif = VG_(newXA)(VG_(malloc), "ms.main.mprci.1", 
+                                VG_(free), sizeof(HChar*));
 }
 
 VG_DETERMINE_INTERFACE_VERSION(ms_pre_clo_init)

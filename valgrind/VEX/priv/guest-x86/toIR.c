@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2008 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -958,7 +958,7 @@ static void setFlags_INC_DEC ( Bool inc, IRTemp res, IRType ty )
       may require reading all four thunk fields. */
    stmt( IRStmt_Put( OFFB_CC_NDEP, mk_x86g_calculate_eflags_c()) );
    stmt( IRStmt_Put( OFFB_CC_OP,   mkU32(ccOp)) );
-   stmt( IRStmt_Put( OFFB_CC_DEP1, mkexpr(res)) );
+   stmt( IRStmt_Put( OFFB_CC_DEP1, widenUto32(mkexpr(res))) );
    stmt( IRStmt_Put( OFFB_CC_DEP2, mkU32(0)) );
 }
 
@@ -5027,7 +5027,25 @@ UInt dis_FPU ( Bool* decode_ok, UChar sorb, Int delta )
             case 0xE0: /* FNSTSW %ax */
                DIP("fnstsw %%ax\n");
                /* Get the FPU status word value and dump it in %AX. */
-               putIReg(2, R_EAX, get_FPU_sw());
+               if (0) {
+                  /* The obvious thing to do is simply dump the 16-bit
+                     status word value in %AX.  However, due to a
+                     limitation in Memcheck's origin tracking
+                     machinery, this causes Memcheck not to track the
+                     origin of any undefinedness into %AH (only into
+                     %AL/%AX/%EAX), which means origins are lost in
+                     the sequence "fnstsw %ax; test $M,%ah; jcond .." */
+                  putIReg(2, R_EAX, get_FPU_sw());
+               } else {
+                  /* So a somewhat lame kludge is to make it very
+                     clear to Memcheck that the value is written to
+                     both %AH and %AL.  This generates marginally
+                     worse code, but I don't think it matters much. */
+                  IRTemp t16 = newTemp(Ity_I16);
+                  assign(t16, get_FPU_sw());
+                  putIReg( 1, R_AL, unop(Iop_16to8, mkexpr(t16)) );
+                  putIReg( 1, R_AH, unop(Iop_16HIto8, mkexpr(t16)) );
+               }
                break;
 
             case 0xE8 ... 0xEF: /* FUCOMIP %st(0),%st(?) */
@@ -7135,6 +7153,271 @@ static IRExpr* mk64from16s ( IRTemp t3, IRTemp t2,
    );
 }
 
+/* Generate IR to set the guest %EFLAGS from the pushfl-format image
+   in the given 32-bit temporary.  The flags that are set are: O S Z A
+   C P D ID AC.
+
+   In all cases, code to set AC is generated.  However, VEX actually
+   ignores the AC value and so can optionally emit an emulation
+   warning when it is enabled.  In this routine, an emulation warning
+   is only emitted if emit_AC_emwarn is True, in which case
+   next_insn_EIP must be correct (this allows for correct code
+   generation for popfl/popfw).  If emit_AC_emwarn is False,
+   next_insn_EIP is unimportant (this allows for easy if kludgey code
+   generation for IRET.) */
+
+static 
+void set_EFLAGS_from_value ( IRTemp t1, 
+                             Bool   emit_AC_emwarn,
+                             Addr32 next_insn_EIP )
+{
+   vassert(typeOfIRTemp(irsb->tyenv,t1) == Ity_I32);
+
+   /* t1 is the flag word.  Mask out everything except OSZACP and set
+      the flags thunk to X86G_CC_OP_COPY. */
+   stmt( IRStmt_Put( OFFB_CC_OP,   mkU32(X86G_CC_OP_COPY) ));
+   stmt( IRStmt_Put( OFFB_CC_DEP2, mkU32(0) ));
+   stmt( IRStmt_Put( OFFB_CC_DEP1, 
+                     binop(Iop_And32,
+                           mkexpr(t1), 
+                           mkU32( X86G_CC_MASK_C | X86G_CC_MASK_P 
+                                  | X86G_CC_MASK_A | X86G_CC_MASK_Z 
+                                  | X86G_CC_MASK_S| X86G_CC_MASK_O )
+                          )
+                    )
+       );
+   /* Set NDEP even though it isn't used.  This makes redundant-PUT
+      elimination of previous stores to this field work better. */
+   stmt( IRStmt_Put( OFFB_CC_NDEP, mkU32(0) ));
+
+   /* Also need to set the D flag, which is held in bit 10 of t1.
+      If zero, put 1 in OFFB_DFLAG, else -1 in OFFB_DFLAG. */
+   stmt( IRStmt_Put( 
+            OFFB_DFLAG,
+            IRExpr_Mux0X( 
+               unop(Iop_32to8,
+                    binop(Iop_And32, 
+                          binop(Iop_Shr32, mkexpr(t1), mkU8(10)), 
+                          mkU32(1))),
+               mkU32(1), 
+               mkU32(0xFFFFFFFF))) 
+       );
+
+   /* Set the ID flag */
+   stmt( IRStmt_Put( 
+            OFFB_IDFLAG,
+            IRExpr_Mux0X( 
+               unop(Iop_32to8,
+                    binop(Iop_And32, 
+                          binop(Iop_Shr32, mkexpr(t1), mkU8(21)), 
+                          mkU32(1))),
+               mkU32(0), 
+               mkU32(1))) 
+       );
+
+   /* And set the AC flag.  If setting it 1 to, possibly emit an
+      emulation warning. */
+   stmt( IRStmt_Put( 
+            OFFB_ACFLAG,
+            IRExpr_Mux0X( 
+               unop(Iop_32to8,
+                    binop(Iop_And32, 
+                          binop(Iop_Shr32, mkexpr(t1), mkU8(18)), 
+                          mkU32(1))),
+               mkU32(0), 
+               mkU32(1))) 
+       );
+
+   if (emit_AC_emwarn) {
+      put_emwarn( mkU32(EmWarn_X86_acFlag) );
+      stmt( 
+         IRStmt_Exit(
+            binop( Iop_CmpNE32, 
+                   binop(Iop_And32, mkexpr(t1), mkU32(1<<18)), 
+                   mkU32(0) ),
+            Ijk_EmWarn,
+            IRConst_U32( next_insn_EIP )
+         )
+      );
+   }
+}
+
+
+/* Helper for the SSSE3 (not SSE3) PMULHRSW insns.  Given two 64-bit
+   values (aa,bb), computes, for each of the 4 16-bit lanes:
+
+   (((aa_lane *s32 bb_lane) >>u 14) + 1) >>u 1
+*/
+static IRExpr* dis_PMULHRSW_helper ( IRExpr* aax, IRExpr* bbx )
+{
+   IRTemp aa      = newTemp(Ity_I64);
+   IRTemp bb      = newTemp(Ity_I64);
+   IRTemp aahi32s = newTemp(Ity_I64);
+   IRTemp aalo32s = newTemp(Ity_I64);
+   IRTemp bbhi32s = newTemp(Ity_I64);
+   IRTemp bblo32s = newTemp(Ity_I64);
+   IRTemp rHi     = newTemp(Ity_I64);
+   IRTemp rLo     = newTemp(Ity_I64);
+   IRTemp one32x2 = newTemp(Ity_I64);
+   assign(aa, aax);
+   assign(bb, bbx);
+   assign( aahi32s,
+           binop(Iop_SarN32x2,
+                 binop(Iop_InterleaveHI16x4, mkexpr(aa), mkexpr(aa)),
+                 mkU8(16) ));
+   assign( aalo32s,
+           binop(Iop_SarN32x2,
+                 binop(Iop_InterleaveLO16x4, mkexpr(aa), mkexpr(aa)),
+                 mkU8(16) ));
+   assign( bbhi32s,
+           binop(Iop_SarN32x2,
+                 binop(Iop_InterleaveHI16x4, mkexpr(bb), mkexpr(bb)),
+                 mkU8(16) ));
+   assign( bblo32s,
+           binop(Iop_SarN32x2,
+                 binop(Iop_InterleaveLO16x4, mkexpr(bb), mkexpr(bb)),
+                 mkU8(16) ));
+   assign(one32x2, mkU64( (1ULL << 32) + 1 ));
+   assign(
+      rHi,
+      binop(
+         Iop_ShrN32x2,
+         binop(
+            Iop_Add32x2, 
+            binop(
+               Iop_ShrN32x2,
+               binop(Iop_Mul32x2, mkexpr(aahi32s), mkexpr(bbhi32s)),
+               mkU8(14)
+            ),
+            mkexpr(one32x2)
+         ),
+         mkU8(1)
+      )
+   );
+   assign(
+      rLo,
+      binop(
+         Iop_ShrN32x2,
+         binop(
+            Iop_Add32x2, 
+            binop(
+               Iop_ShrN32x2,
+               binop(Iop_Mul32x2, mkexpr(aalo32s), mkexpr(bblo32s)),
+               mkU8(14)
+            ),
+            mkexpr(one32x2)
+         ),
+         mkU8(1)
+      )
+   );
+   return
+      binop(Iop_CatEvenLanes16x4, mkexpr(rHi), mkexpr(rLo));
+}
+
+/* Helper for the SSSE3 (not SSE3) PSIGN{B,W,D} insns.  Given two 64-bit
+   values (aa,bb), computes, for each lane:
+
+          if aa_lane < 0 then - bb_lane
+     else if aa_lane > 0 then bb_lane
+     else 0
+*/
+static IRExpr* dis_PSIGN_helper ( IRExpr* aax, IRExpr* bbx, Int laneszB )
+{
+   IRTemp aa       = newTemp(Ity_I64);
+   IRTemp bb       = newTemp(Ity_I64);
+   IRTemp zero     = newTemp(Ity_I64);
+   IRTemp bbNeg    = newTemp(Ity_I64);
+   IRTemp negMask  = newTemp(Ity_I64);
+   IRTemp posMask  = newTemp(Ity_I64);
+   IROp   opSub    = Iop_INVALID;
+   IROp   opCmpGTS = Iop_INVALID;
+
+   switch (laneszB) {
+      case 1: opSub = Iop_Sub8x8;  opCmpGTS = Iop_CmpGT8Sx8;  break;
+      case 2: opSub = Iop_Sub16x4; opCmpGTS = Iop_CmpGT16Sx4; break;
+      case 4: opSub = Iop_Sub32x2; opCmpGTS = Iop_CmpGT32Sx2; break;
+      default: vassert(0);
+   }
+
+   assign( aa,      aax );
+   assign( bb,      bbx );
+   assign( zero,    mkU64(0) );
+   assign( bbNeg,   binop(opSub,    mkexpr(zero), mkexpr(bb)) );
+   assign( negMask, binop(opCmpGTS, mkexpr(zero), mkexpr(aa)) );
+   assign( posMask, binop(opCmpGTS, mkexpr(aa),   mkexpr(zero)) );
+
+   return
+      binop(Iop_Or64,
+            binop(Iop_And64, mkexpr(bb),    mkexpr(posMask)),
+            binop(Iop_And64, mkexpr(bbNeg), mkexpr(negMask)) );
+
+}
+
+/* Helper for the SSSE3 (not SSE3) PABS{B,W,D} insns.  Given a 64-bit
+   value aa, computes, for each lane
+
+   if aa < 0 then -aa else aa
+
+   Note that the result is interpreted as unsigned, so that the
+   absolute value of the most negative signed input can be
+   represented.
+*/
+static IRExpr* dis_PABS_helper ( IRExpr* aax, Int laneszB )
+{
+   IRTemp aa      = newTemp(Ity_I64);
+   IRTemp zero    = newTemp(Ity_I64);
+   IRTemp aaNeg   = newTemp(Ity_I64);
+   IRTemp negMask = newTemp(Ity_I64);
+   IRTemp posMask = newTemp(Ity_I64);
+   IROp   opSub   = Iop_INVALID;
+   IROp   opSarN  = Iop_INVALID;
+
+   switch (laneszB) {
+      case 1: opSub = Iop_Sub8x8;  opSarN = Iop_SarN8x8;  break;
+      case 2: opSub = Iop_Sub16x4; opSarN = Iop_SarN16x4; break;
+      case 4: opSub = Iop_Sub32x2; opSarN = Iop_SarN32x2; break;
+      default: vassert(0);
+   }
+
+   assign( aa,      aax );
+   assign( negMask, binop(opSarN, mkexpr(aa), mkU8(8*laneszB-1)) );
+   assign( posMask, unop(Iop_Not64, mkexpr(negMask)) );
+   assign( zero,    mkU64(0) );
+   assign( aaNeg,   binop(opSub, mkexpr(zero), mkexpr(aa)) );
+   return
+      binop(Iop_Or64,
+            binop(Iop_And64, mkexpr(aa),    mkexpr(posMask)),
+            binop(Iop_And64, mkexpr(aaNeg), mkexpr(negMask)) );
+}
+
+static IRExpr* dis_PALIGNR_XMM_helper ( IRTemp hi64,
+                                        IRTemp lo64, Int byteShift )
+{
+   vassert(byteShift >= 1 && byteShift <= 7);
+   return
+      binop(Iop_Or64,
+            binop(Iop_Shl64, mkexpr(hi64), mkU8(8*(8-byteShift))),
+            binop(Iop_Shr64, mkexpr(lo64), mkU8(8*byteShift))
+      );
+}
+
+/* Generate a SIGSEGV followed by a restart of the current instruction
+   if effective_addr is not 16-aligned.  This is required behaviour
+   for some SSE3 instructions and all 128-bit SSSE3 instructions.
+   This assumes that guest_RIP_curr_instr is set correctly! */
+static void gen_SEGV_if_not_16_aligned ( IRTemp effective_addr )
+{
+   stmt(
+      IRStmt_Exit(
+         binop(Iop_CmpNE32,
+               binop(Iop_And32,mkexpr(effective_addr),mkU32(0xF)),
+               mkU32(0)),
+         Ijk_SigSEGV,
+         IRConst_U32(guest_EIP_curr_instr)
+      )
+   );
+}
+
 
 /* Helper for deciding whether a given insn (starting at the opcode
    byte) may validly be used with a LOCK prefix.  The following insns
@@ -7534,6 +7817,76 @@ DisResult disInstr_X86_WRK (
       d->fxState[5].size   = 8 * sizeof(U128);
 
       d->fxState[6].fx     = Ifx_Read;
+      d->fxState[6].offset = OFFB_SSEROUND;
+      d->fxState[6].size   = sizeof(UInt);
+
+      /* Be paranoid ... this assertion tries to ensure the 8 %xmm
+	 images are packed back-to-back.  If not, the value of
+	 d->fxState[5].size is wrong. */
+      vassert(16 == sizeof(U128));
+      vassert(OFFB_XMM7 == (OFFB_XMM0 + 7 * 16));
+
+      stmt( IRStmt_Dirty(d) );
+
+      goto decode_success;
+   }
+
+   /* 0F AE /1 = FXRSTOR m512 -- read x87 and SSE state from memory */
+   if (sz == 4 && insn[0] == 0x0F && insn[1] == 0xAE
+       && !epartIsReg(insn[2]) && gregOfRM(insn[2]) == 1) {
+      IRDirty* d;
+      modrm = getIByte(delta+2);
+      vassert(sz == 4);
+      vassert(!epartIsReg(modrm));
+
+      addr = disAMode ( &alen, sorb, delta+2, dis_buf );
+      delta += 2+alen;
+
+      DIP("fxrstor %s\n", dis_buf);
+
+      /* Uses dirty helper: 
+            void x86g_do_FXRSTOR ( VexGuestX86State*, UInt ) */
+      d = unsafeIRDirty_0_N ( 
+             0/*regparms*/, 
+             "x86g_dirtyhelper_FXRSTOR", 
+             &x86g_dirtyhelper_FXRSTOR,
+             mkIRExprVec_1( mkexpr(addr) )
+          );
+      d->needsBBP = True;
+
+      /* declare we're reading memory */
+      d->mFx   = Ifx_Read;
+      d->mAddr = mkexpr(addr);
+      d->mSize = 512;
+
+      /* declare we're writing guest state */
+      d->nFxState = 7;
+
+      d->fxState[0].fx     = Ifx_Write;
+      d->fxState[0].offset = OFFB_FTOP;
+      d->fxState[0].size   = sizeof(UInt);
+
+      d->fxState[1].fx     = Ifx_Write;
+      d->fxState[1].offset = OFFB_FPREGS;
+      d->fxState[1].size   = 8 * sizeof(ULong);
+
+      d->fxState[2].fx     = Ifx_Write;
+      d->fxState[2].offset = OFFB_FPTAGS;
+      d->fxState[2].size   = 8 * sizeof(UChar);
+
+      d->fxState[3].fx     = Ifx_Write;
+      d->fxState[3].offset = OFFB_FPROUND;
+      d->fxState[3].size   = sizeof(UInt);
+
+      d->fxState[4].fx     = Ifx_Write;
+      d->fxState[4].offset = OFFB_FC3210;
+      d->fxState[4].size   = sizeof(UInt);
+
+      d->fxState[5].fx     = Ifx_Write;
+      d->fxState[5].offset = OFFB_XMM0;
+      d->fxState[5].size   = 8 * sizeof(U128);
+
+      d->fxState[6].fx     = Ifx_Write;
       d->fxState[6].offset = OFFB_SSEROUND;
       d->fxState[6].size   = sizeof(UInt);
 
@@ -9663,7 +10016,11 @@ DisResult disInstr_X86_WRK (
       vassert(sz == 4);
       modrm = getIByte(delta+3);
       if (epartIsReg(modrm)) {
-         /* fall through, we don't yet have a test case */
+         putXMMRegLane64( eregOfRM(modrm), 0,
+                          getXMMRegLane64( gregOfRM(modrm), 0 ));
+         DIP("movsd %s,%s\n", nameXMMReg(gregOfRM(modrm)),
+                              nameXMMReg(eregOfRM(modrm)));
+         delta += 3+1;
       } else {
          addr = disAMode ( &alen, sorb, delta+3, dis_buf );
          storeLE( mkexpr(addr),
@@ -9671,8 +10028,8 @@ DisResult disInstr_X86_WRK (
          DIP("movsd %s,%s\n", nameXMMReg(gregOfRM(modrm)),
                               dis_buf);
          delta += 3+alen;
-         goto decode_success;
       }
+      goto decode_success;
    }
 
    /* 66 0F 59 = MULPD -- mul 64Fx2 from R/M to R */
@@ -11078,6 +11435,817 @@ DisResult disInstr_X86_WRK (
    /* --- end of the SSE3 decoder.                     --- */
    /* ---------------------------------------------------- */
 
+   /* ---------------------------------------------------- */
+   /* --- start of the SSSE3 decoder.                  --- */
+   /* ---------------------------------------------------- */
+
+   /* 0F 38 04 = PMADDUBSW -- Multiply and Add Packed Signed and
+      Unsigned Bytes (MMX) */
+   if (sz == 4
+       && insn[0] == 0x0F && insn[1] == 0x38 && insn[2] == 0x04) {
+      IRTemp sV        = newTemp(Ity_I64);
+      IRTemp dV        = newTemp(Ity_I64);
+      IRTemp sVoddsSX  = newTemp(Ity_I64);
+      IRTemp sVevensSX = newTemp(Ity_I64);
+      IRTemp dVoddsZX  = newTemp(Ity_I64);
+      IRTemp dVevensZX = newTemp(Ity_I64);
+
+      modrm = insn[3];
+      do_MMX_preamble();
+      assign( dV, getMMXReg(gregOfRM(modrm)) );
+
+      if (epartIsReg(modrm)) {
+         assign( sV, getMMXReg(eregOfRM(modrm)) );
+         delta += 3+1;
+         DIP("pmaddubsw %s,%s\n", nameMMXReg(eregOfRM(modrm)),
+                                  nameMMXReg(gregOfRM(modrm)));
+      } else {
+         addr = disAMode ( &alen, sorb, delta+3, dis_buf );
+         assign( sV, loadLE(Ity_I64, mkexpr(addr)) );
+         delta += 3+alen;
+         DIP("pmaddubsw %s,%s\n", dis_buf,
+                                  nameMMXReg(gregOfRM(modrm)));
+      }
+
+      /* compute dV unsigned x sV signed */
+      assign( sVoddsSX,
+              binop(Iop_SarN16x4, mkexpr(sV), mkU8(8)) );
+      assign( sVevensSX,
+              binop(Iop_SarN16x4, 
+                    binop(Iop_ShlN16x4, mkexpr(sV), mkU8(8)), 
+                    mkU8(8)) );
+      assign( dVoddsZX,
+              binop(Iop_ShrN16x4, mkexpr(dV), mkU8(8)) );
+      assign( dVevensZX,
+              binop(Iop_ShrN16x4,
+                    binop(Iop_ShlN16x4, mkexpr(dV), mkU8(8)),
+                    mkU8(8)) );
+
+      putMMXReg(
+         gregOfRM(modrm),
+         binop(Iop_QAdd16Sx4,
+               binop(Iop_Mul16x4, mkexpr(sVoddsSX), mkexpr(dVoddsZX)),
+               binop(Iop_Mul16x4, mkexpr(sVevensSX), mkexpr(dVevensZX))
+         )
+      );
+      goto decode_success;
+   }
+
+   /* 66 0F 38 04 = PMADDUBSW -- Multiply and Add Packed Signed and
+      Unsigned Bytes (XMM) */
+   if (sz == 2
+       && insn[0] == 0x0F && insn[1] == 0x38 && insn[2] == 0x04) {
+      IRTemp sV        = newTemp(Ity_V128);
+      IRTemp dV        = newTemp(Ity_V128);
+      IRTemp sVoddsSX  = newTemp(Ity_V128);
+      IRTemp sVevensSX = newTemp(Ity_V128);
+      IRTemp dVoddsZX  = newTemp(Ity_V128);
+      IRTemp dVevensZX = newTemp(Ity_V128);
+
+      modrm = insn[3];
+      assign( dV, getXMMReg(gregOfRM(modrm)) );
+
+      if (epartIsReg(modrm)) {
+         assign( sV, getXMMReg(eregOfRM(modrm)) );
+         delta += 3+1;
+         DIP("pmaddubsw %s,%s\n", nameXMMReg(eregOfRM(modrm)),
+                                  nameXMMReg(gregOfRM(modrm)));
+      } else {
+         addr = disAMode ( &alen, sorb, delta+3, dis_buf );
+         gen_SEGV_if_not_16_aligned( addr );
+         assign( sV, loadLE(Ity_V128, mkexpr(addr)) );
+         delta += 3+alen;
+         DIP("pmaddubsw %s,%s\n", dis_buf,
+                                  nameXMMReg(gregOfRM(modrm)));
+      }
+
+      /* compute dV unsigned x sV signed */
+      assign( sVoddsSX,
+              binop(Iop_SarN16x8, mkexpr(sV), mkU8(8)) );
+      assign( sVevensSX,
+              binop(Iop_SarN16x8, 
+                    binop(Iop_ShlN16x8, mkexpr(sV), mkU8(8)), 
+                    mkU8(8)) );
+      assign( dVoddsZX,
+              binop(Iop_ShrN16x8, mkexpr(dV), mkU8(8)) );
+      assign( dVevensZX,
+              binop(Iop_ShrN16x8,
+                    binop(Iop_ShlN16x8, mkexpr(dV), mkU8(8)),
+                    mkU8(8)) );
+
+      putXMMReg(
+         gregOfRM(modrm),
+         binop(Iop_QAdd16Sx8,
+               binop(Iop_Mul16x8, mkexpr(sVoddsSX), mkexpr(dVoddsZX)),
+               binop(Iop_Mul16x8, mkexpr(sVevensSX), mkexpr(dVevensZX))
+         )
+      );
+      goto decode_success;
+   }
+
+   /* ***--- these are MMX class insns introduced in SSSE3 ---*** */
+   /* 0F 38 03 = PHADDSW -- 16x4 signed qadd across from E (mem or
+      mmx) and G to G (mmx). */
+   /* 0F 38 07 = PHSUBSW -- 16x4 signed qsub across from E (mem or
+      mmx) and G to G (mmx). */
+   /* 0F 38 01 = PHADDW -- 16x4 add across from E (mem or mmx) and G
+      to G (mmx). */
+   /* 0F 38 05 = PHSUBW -- 16x4 sub across from E (mem or mmx) and G
+      to G (mmx). */
+   /* 0F 38 02 = PHADDD -- 32x2 add across from E (mem or mmx) and G
+      to G (mmx). */
+   /* 0F 38 06 = PHSUBD -- 32x2 sub across from E (mem or mmx) and G
+      to G (mmx). */
+
+   if (sz == 4 
+       && insn[0] == 0x0F && insn[1] == 0x38 
+       && (insn[2] == 0x03 || insn[2] == 0x07 || insn[2] == 0x01
+           || insn[2] == 0x05 || insn[2] == 0x02 || insn[2] == 0x06)) {
+      HChar* str    = "???";
+      IROp   opV64  = Iop_INVALID;
+      IROp   opCatO = Iop_CatOddLanes16x4;
+      IROp   opCatE = Iop_CatEvenLanes16x4;
+      IRTemp sV     = newTemp(Ity_I64);
+      IRTemp dV     = newTemp(Ity_I64);
+
+      modrm = insn[3];
+
+      switch (insn[2]) {
+         case 0x03: opV64 = Iop_QAdd16Sx4; str = "addsw"; break;
+         case 0x07: opV64 = Iop_QSub16Sx4; str = "subsw"; break;
+         case 0x01: opV64 = Iop_Add16x4;   str = "addw";  break;
+         case 0x05: opV64 = Iop_Sub16x4;   str = "subw";  break;
+         case 0x02: opV64 = Iop_Add32x2;   str = "addd";  break;
+         case 0x06: opV64 = Iop_Sub32x2;   str = "subd";  break;
+         default: vassert(0);
+      }
+      if (insn[2] == 0x02 || insn[2] == 0x06) {
+         opCatO = Iop_InterleaveHI32x2;
+         opCatE = Iop_InterleaveLO32x2;
+      }
+
+      do_MMX_preamble();
+      assign( dV, getMMXReg(gregOfRM(modrm)) );
+
+      if (epartIsReg(modrm)) {
+         assign( sV, getMMXReg(eregOfRM(modrm)) );
+         delta += 3+1;
+         DIP("ph%s %s,%s\n", str, nameMMXReg(eregOfRM(modrm)),
+                                  nameMMXReg(gregOfRM(modrm)));
+      } else {
+         addr = disAMode ( &alen, sorb, delta+3, dis_buf );
+         assign( sV, loadLE(Ity_I64, mkexpr(addr)) );
+         delta += 3+alen;
+         DIP("ph%s %s,%s\n", str, dis_buf,
+                                  nameMMXReg(gregOfRM(modrm)));
+      }
+
+      putMMXReg(
+         gregOfRM(modrm),
+         binop(opV64,
+               binop(opCatE,mkexpr(sV),mkexpr(dV)),
+               binop(opCatO,mkexpr(sV),mkexpr(dV))
+         )
+      );
+      goto decode_success;
+   }
+
+   /* 66 0F 38 03 = PHADDSW -- 16x8 signed qadd across from E (mem or
+      xmm) and G to G (xmm). */
+   /* 66 0F 38 07 = PHSUBSW -- 16x8 signed qsub across from E (mem or
+      xmm) and G to G (xmm). */
+   /* 66 0F 38 01 = PHADDW -- 16x8 add across from E (mem or xmm) and
+      G to G (xmm). */
+   /* 66 0F 38 05 = PHSUBW -- 16x8 sub across from E (mem or xmm) and
+      G to G (xmm). */
+   /* 66 0F 38 02 = PHADDD -- 32x4 add across from E (mem or xmm) and
+      G to G (xmm). */
+   /* 66 0F 38 06 = PHSUBD -- 32x4 sub across from E (mem or xmm) and
+      G to G (xmm). */
+
+   if (sz == 2
+       && insn[0] == 0x0F && insn[1] == 0x38 
+       && (insn[2] == 0x03 || insn[2] == 0x07 || insn[2] == 0x01
+           || insn[2] == 0x05 || insn[2] == 0x02 || insn[2] == 0x06)) {
+      HChar* str    = "???";
+      IROp   opV64  = Iop_INVALID;
+      IROp   opCatO = Iop_CatOddLanes16x4;
+      IROp   opCatE = Iop_CatEvenLanes16x4;
+      IRTemp sV     = newTemp(Ity_V128);
+      IRTemp dV     = newTemp(Ity_V128);
+      IRTemp sHi    = newTemp(Ity_I64);
+      IRTemp sLo    = newTemp(Ity_I64);
+      IRTemp dHi    = newTemp(Ity_I64);
+      IRTemp dLo    = newTemp(Ity_I64);
+
+      modrm = insn[3];
+
+      switch (insn[2]) {
+         case 0x03: opV64 = Iop_QAdd16Sx4; str = "addsw"; break;
+         case 0x07: opV64 = Iop_QSub16Sx4; str = "subsw"; break;
+         case 0x01: opV64 = Iop_Add16x4;   str = "addw";  break;
+         case 0x05: opV64 = Iop_Sub16x4;   str = "subw";  break;
+         case 0x02: opV64 = Iop_Add32x2;   str = "addd";  break;
+         case 0x06: opV64 = Iop_Sub32x2;   str = "subd";  break;
+         default: vassert(0);
+      }
+      if (insn[2] == 0x02 || insn[2] == 0x06) {
+         opCatO = Iop_InterleaveHI32x2;
+         opCatE = Iop_InterleaveLO32x2;
+      }
+
+      assign( dV, getXMMReg(gregOfRM(modrm)) );
+
+      if (epartIsReg(modrm)) {
+         assign( sV, getXMMReg( eregOfRM(modrm)) );
+         DIP("ph%s %s,%s\n", str, nameXMMReg(eregOfRM(modrm)),
+                                  nameXMMReg(gregOfRM(modrm)));
+         delta += 3+1;
+      } else {
+         addr = disAMode ( &alen, sorb, delta+3, dis_buf );
+         gen_SEGV_if_not_16_aligned( addr );
+         assign( sV, loadLE(Ity_V128, mkexpr(addr)) );
+         DIP("ph%s %s,%s\n", str, dis_buf,
+                             nameXMMReg(gregOfRM(modrm)));
+         delta += 3+alen;
+      }
+
+      assign( dHi, unop(Iop_V128HIto64, mkexpr(dV)) );
+      assign( dLo, unop(Iop_V128to64,   mkexpr(dV)) );
+      assign( sHi, unop(Iop_V128HIto64, mkexpr(sV)) );
+      assign( sLo, unop(Iop_V128to64,   mkexpr(sV)) );
+
+      /* This isn't a particularly efficient way to compute the
+         result, but at least it avoids a proliferation of IROps,
+         hence avoids complication all the backends. */
+      putXMMReg(
+         gregOfRM(modrm), 
+         binop(Iop_64HLtoV128,
+               binop(opV64,
+                     binop(opCatE,mkexpr(sHi),mkexpr(sLo)),
+                     binop(opCatO,mkexpr(sHi),mkexpr(sLo))
+               ),
+               binop(opV64,
+                     binop(opCatE,mkexpr(dHi),mkexpr(dLo)),
+                     binop(opCatO,mkexpr(dHi),mkexpr(dLo))
+               )
+         )
+      );
+      goto decode_success;
+   }
+
+   /* 0F 38 0B = PMULHRSW -- Packed Multiply High with Round and Scale
+      (MMX) */
+   if (sz == 4 
+       && insn[0] == 0x0F && insn[1] == 0x38 && insn[2] == 0x0B) {
+      IRTemp sV = newTemp(Ity_I64);
+      IRTemp dV = newTemp(Ity_I64);
+
+      modrm = insn[3];
+      do_MMX_preamble();
+      assign( dV, getMMXReg(gregOfRM(modrm)) );
+
+      if (epartIsReg(modrm)) {
+         assign( sV, getMMXReg(eregOfRM(modrm)) );
+         delta += 3+1;
+         DIP("pmulhrsw %s,%s\n", nameMMXReg(eregOfRM(modrm)),
+                                 nameMMXReg(gregOfRM(modrm)));
+      } else {
+         addr = disAMode ( &alen, sorb, delta+3, dis_buf );
+         assign( sV, loadLE(Ity_I64, mkexpr(addr)) );
+         delta += 3+alen;
+         DIP("pmulhrsw %s,%s\n", dis_buf,
+                                 nameMMXReg(gregOfRM(modrm)));
+      }
+
+      putMMXReg(
+         gregOfRM(modrm),
+         dis_PMULHRSW_helper( mkexpr(sV), mkexpr(dV) )
+      );
+      goto decode_success;
+   }
+
+   /* 66 0F 38 0B = PMULHRSW -- Packed Multiply High with Round and
+      Scale (XMM) */
+   if (sz == 2
+       && insn[0] == 0x0F && insn[1] == 0x38 && insn[2] == 0x0B) {
+      IRTemp sV  = newTemp(Ity_V128);
+      IRTemp dV  = newTemp(Ity_V128);
+      IRTemp sHi = newTemp(Ity_I64);
+      IRTemp sLo = newTemp(Ity_I64);
+      IRTemp dHi = newTemp(Ity_I64);
+      IRTemp dLo = newTemp(Ity_I64);
+
+      modrm = insn[3];
+      assign( dV, getXMMReg(gregOfRM(modrm)) );
+
+      if (epartIsReg(modrm)) {
+         assign( sV, getXMMReg(eregOfRM(modrm)) );
+         delta += 3+1;
+         DIP("pmulhrsw %s,%s\n", nameXMMReg(eregOfRM(modrm)),
+                                 nameXMMReg(gregOfRM(modrm)));
+      } else {
+         addr = disAMode ( &alen, sorb, delta+3, dis_buf );
+         gen_SEGV_if_not_16_aligned( addr );
+         assign( sV, loadLE(Ity_V128, mkexpr(addr)) );
+         delta += 3+alen;
+         DIP("pmulhrsw %s,%s\n", dis_buf,
+                                 nameXMMReg(gregOfRM(modrm)));
+      }
+
+      assign( dHi, unop(Iop_V128HIto64, mkexpr(dV)) );
+      assign( dLo, unop(Iop_V128to64,   mkexpr(dV)) );
+      assign( sHi, unop(Iop_V128HIto64, mkexpr(sV)) );
+      assign( sLo, unop(Iop_V128to64,   mkexpr(sV)) );
+
+      putXMMReg(
+         gregOfRM(modrm),
+         binop(Iop_64HLtoV128,
+               dis_PMULHRSW_helper( mkexpr(sHi), mkexpr(dHi) ),
+               dis_PMULHRSW_helper( mkexpr(sLo), mkexpr(dLo) )
+         )
+      );
+      goto decode_success;
+   }
+
+   /* 0F 38 08 = PSIGNB -- Packed Sign 8x8  (MMX) */
+   /* 0F 38 09 = PSIGNW -- Packed Sign 16x4 (MMX) */
+   /* 0F 38 09 = PSIGND -- Packed Sign 32x2 (MMX) */
+   if (sz == 4 
+       && insn[0] == 0x0F && insn[1] == 0x38 
+       && (insn[2] == 0x08 || insn[2] == 0x09 || insn[2] == 0x0A)) {
+      IRTemp sV      = newTemp(Ity_I64);
+      IRTemp dV      = newTemp(Ity_I64);
+      HChar* str     = "???";
+      Int    laneszB = 0;
+
+      switch (insn[2]) {
+         case 0x08: laneszB = 1; str = "b"; break;
+         case 0x09: laneszB = 2; str = "w"; break;
+         case 0x0A: laneszB = 4; str = "d"; break;
+         default: vassert(0);
+      }
+
+      modrm = insn[3];
+      do_MMX_preamble();
+      assign( dV, getMMXReg(gregOfRM(modrm)) );
+
+      if (epartIsReg(modrm)) {
+         assign( sV, getMMXReg(eregOfRM(modrm)) );
+         delta += 3+1;
+         DIP("psign%s %s,%s\n", str, nameMMXReg(eregOfRM(modrm)),
+                                     nameMMXReg(gregOfRM(modrm)));
+      } else {
+         addr = disAMode ( &alen, sorb, delta+3, dis_buf );
+         assign( sV, loadLE(Ity_I64, mkexpr(addr)) );
+         delta += 3+alen;
+         DIP("psign%s %s,%s\n", str, dis_buf,
+                                     nameMMXReg(gregOfRM(modrm)));
+      }
+
+      putMMXReg(
+         gregOfRM(modrm),
+         dis_PSIGN_helper( mkexpr(sV), mkexpr(dV), laneszB )
+      );
+      goto decode_success;
+   }
+
+   /* 66 0F 38 08 = PSIGNB -- Packed Sign 8x16 (XMM) */
+   /* 66 0F 38 09 = PSIGNW -- Packed Sign 16x8 (XMM) */
+   /* 66 0F 38 09 = PSIGND -- Packed Sign 32x4 (XMM) */
+   if (sz == 2
+       && insn[0] == 0x0F && insn[1] == 0x38 
+       && (insn[2] == 0x08 || insn[2] == 0x09 || insn[2] == 0x0A)) {
+      IRTemp sV      = newTemp(Ity_V128);
+      IRTemp dV      = newTemp(Ity_V128);
+      IRTemp sHi     = newTemp(Ity_I64);
+      IRTemp sLo     = newTemp(Ity_I64);
+      IRTemp dHi     = newTemp(Ity_I64);
+      IRTemp dLo     = newTemp(Ity_I64);
+      HChar* str     = "???";
+      Int    laneszB = 0;
+
+      switch (insn[2]) {
+         case 0x08: laneszB = 1; str = "b"; break;
+         case 0x09: laneszB = 2; str = "w"; break;
+         case 0x0A: laneszB = 4; str = "d"; break;
+         default: vassert(0);
+      }
+
+      modrm = insn[3];
+      assign( dV, getXMMReg(gregOfRM(modrm)) );
+
+      if (epartIsReg(modrm)) {
+         assign( sV, getXMMReg(eregOfRM(modrm)) );
+         delta += 3+1;
+         DIP("psign%s %s,%s\n", str, nameXMMReg(eregOfRM(modrm)),
+                                     nameXMMReg(gregOfRM(modrm)));
+      } else {
+         addr = disAMode ( &alen, sorb, delta+3, dis_buf );
+         gen_SEGV_if_not_16_aligned( addr );
+         assign( sV, loadLE(Ity_V128, mkexpr(addr)) );
+         delta += 3+alen;
+         DIP("psign%s %s,%s\n", str, dis_buf,
+                                     nameXMMReg(gregOfRM(modrm)));
+      }
+
+      assign( dHi, unop(Iop_V128HIto64, mkexpr(dV)) );
+      assign( dLo, unop(Iop_V128to64,   mkexpr(dV)) );
+      assign( sHi, unop(Iop_V128HIto64, mkexpr(sV)) );
+      assign( sLo, unop(Iop_V128to64,   mkexpr(sV)) );
+
+      putXMMReg(
+         gregOfRM(modrm),
+         binop(Iop_64HLtoV128,
+               dis_PSIGN_helper( mkexpr(sHi), mkexpr(dHi), laneszB ),
+               dis_PSIGN_helper( mkexpr(sLo), mkexpr(dLo), laneszB )
+         )
+      );
+      goto decode_success;
+   }
+
+   /* 0F 38 1C = PABSB -- Packed Absolute Value 8x8  (MMX) */
+   /* 0F 38 1D = PABSW -- Packed Absolute Value 16x4 (MMX) */
+   /* 0F 38 1E = PABSD -- Packed Absolute Value 32x2 (MMX) */
+   if (sz == 4 
+       && insn[0] == 0x0F && insn[1] == 0x38 
+       && (insn[2] == 0x1C || insn[2] == 0x1D || insn[2] == 0x1E)) {
+      IRTemp sV      = newTemp(Ity_I64);
+      HChar* str     = "???";
+      Int    laneszB = 0;
+
+      switch (insn[2]) {
+         case 0x1C: laneszB = 1; str = "b"; break;
+         case 0x1D: laneszB = 2; str = "w"; break;
+         case 0x1E: laneszB = 4; str = "d"; break;
+         default: vassert(0);
+      }
+
+      modrm = insn[3];
+      do_MMX_preamble();
+
+      if (epartIsReg(modrm)) {
+         assign( sV, getMMXReg(eregOfRM(modrm)) );
+         delta += 3+1;
+         DIP("pabs%s %s,%s\n", str, nameMMXReg(eregOfRM(modrm)),
+                                    nameMMXReg(gregOfRM(modrm)));
+      } else {
+         addr = disAMode ( &alen, sorb, delta+3, dis_buf );
+         assign( sV, loadLE(Ity_I64, mkexpr(addr)) );
+         delta += 3+alen;
+         DIP("pabs%s %s,%s\n", str, dis_buf,
+                                    nameMMXReg(gregOfRM(modrm)));
+      }
+
+      putMMXReg(
+         gregOfRM(modrm),
+         dis_PABS_helper( mkexpr(sV), laneszB )
+      );
+      goto decode_success;
+   }
+
+   /* 66 0F 38 1C = PABSB -- Packed Absolute Value 8x16 (XMM) */
+   /* 66 0F 38 1D = PABSW -- Packed Absolute Value 16x8 (XMM) */
+   /* 66 0F 38 1E = PABSD -- Packed Absolute Value 32x4 (XMM) */
+   if (sz == 2
+       && insn[0] == 0x0F && insn[1] == 0x38 
+       && (insn[2] == 0x1C || insn[2] == 0x1D || insn[2] == 0x1E)) {
+      IRTemp sV      = newTemp(Ity_V128);
+      IRTemp sHi     = newTemp(Ity_I64);
+      IRTemp sLo     = newTemp(Ity_I64);
+      HChar* str     = "???";
+      Int    laneszB = 0;
+
+      switch (insn[2]) {
+         case 0x1C: laneszB = 1; str = "b"; break;
+         case 0x1D: laneszB = 2; str = "w"; break;
+         case 0x1E: laneszB = 4; str = "d"; break;
+         default: vassert(0);
+      }
+
+      modrm = insn[3];
+
+      if (epartIsReg(modrm)) {
+         assign( sV, getXMMReg(eregOfRM(modrm)) );
+         delta += 3+1;
+         DIP("pabs%s %s,%s\n", str, nameXMMReg(eregOfRM(modrm)),
+                                    nameXMMReg(gregOfRM(modrm)));
+      } else {
+         addr = disAMode ( &alen, sorb, delta+3, dis_buf );
+         gen_SEGV_if_not_16_aligned( addr );
+         assign( sV, loadLE(Ity_V128, mkexpr(addr)) );
+         delta += 3+alen;
+         DIP("pabs%s %s,%s\n", str, dis_buf,
+                                    nameXMMReg(gregOfRM(modrm)));
+      }
+
+      assign( sHi, unop(Iop_V128HIto64, mkexpr(sV)) );
+      assign( sLo, unop(Iop_V128to64,   mkexpr(sV)) );
+
+      putXMMReg(
+         gregOfRM(modrm),
+         binop(Iop_64HLtoV128,
+               dis_PABS_helper( mkexpr(sHi), laneszB ),
+               dis_PABS_helper( mkexpr(sLo), laneszB )
+         )
+      );
+      goto decode_success;
+   }
+
+   /* 0F 3A 0F = PALIGNR -- Packed Align Right (MMX) */
+   if (sz == 4 
+       && insn[0] == 0x0F && insn[1] == 0x3A && insn[2] == 0x0F) {
+      IRTemp sV  = newTemp(Ity_I64);
+      IRTemp dV  = newTemp(Ity_I64);
+      IRTemp res = newTemp(Ity_I64);
+
+      modrm = insn[3];
+      do_MMX_preamble();
+      assign( dV, getMMXReg(gregOfRM(modrm)) );
+
+      if (epartIsReg(modrm)) {
+         assign( sV, getMMXReg(eregOfRM(modrm)) );
+         d32 = (UInt)insn[3+1];
+         delta += 3+1+1;
+         DIP("palignr $%d,%s,%s\n",  (Int)d32, 
+                                     nameMMXReg(eregOfRM(modrm)),
+                                     nameMMXReg(gregOfRM(modrm)));
+      } else {
+         addr = disAMode ( &alen, sorb, delta+3, dis_buf );
+         assign( sV, loadLE(Ity_I64, mkexpr(addr)) );
+         d32 = (UInt)insn[3+alen];
+         delta += 3+alen+1;
+         DIP("palignr $%d%s,%s\n", (Int)d32,
+                                   dis_buf,
+                                   nameMMXReg(gregOfRM(modrm)));
+      }
+
+      if (d32 == 0) {
+         assign( res, mkexpr(sV) );
+      }
+      else if (d32 >= 1 && d32 <= 7) {
+         assign(res, 
+                binop(Iop_Or64,
+                      binop(Iop_Shr64, mkexpr(sV), mkU8(8*d32)),
+                      binop(Iop_Shl64, mkexpr(dV), mkU8(8*(8-d32))
+                     )));
+      }
+      else if (d32 == 8) {
+        assign( res, mkexpr(dV) );
+      }
+      else if (d32 >= 9 && d32 <= 15) {
+         assign( res, binop(Iop_Shr64, mkexpr(dV), mkU8(8*(d32-8))) );
+      }
+      else if (d32 >= 16 && d32 <= 255) {
+         assign( res, mkU64(0) );
+      }
+      else
+         vassert(0);
+
+      putMMXReg( gregOfRM(modrm), mkexpr(res) );
+      goto decode_success;
+   }
+
+   /* 66 0F 3A 0F = PALIGNR -- Packed Align Right (XMM) */
+   if (sz == 2
+       && insn[0] == 0x0F && insn[1] == 0x3A && insn[2] == 0x0F) {
+      IRTemp sV  = newTemp(Ity_V128);
+      IRTemp dV  = newTemp(Ity_V128);
+      IRTemp sHi = newTemp(Ity_I64);
+      IRTemp sLo = newTemp(Ity_I64);
+      IRTemp dHi = newTemp(Ity_I64);
+      IRTemp dLo = newTemp(Ity_I64);
+      IRTemp rHi = newTemp(Ity_I64);
+      IRTemp rLo = newTemp(Ity_I64);
+
+      modrm = insn[3];
+      assign( dV, getXMMReg(gregOfRM(modrm)) );
+
+      if (epartIsReg(modrm)) {
+         assign( sV, getXMMReg(eregOfRM(modrm)) );
+         d32 = (UInt)insn[3+1];
+         delta += 3+1+1;
+         DIP("palignr $%d,%s,%s\n", (Int)d32,
+                                    nameXMMReg(eregOfRM(modrm)),
+                                    nameXMMReg(gregOfRM(modrm)));
+      } else {
+         addr = disAMode ( &alen, sorb, delta+3, dis_buf );
+         gen_SEGV_if_not_16_aligned( addr );
+         assign( sV, loadLE(Ity_V128, mkexpr(addr)) );
+         d32 = (UInt)insn[3+alen];
+         delta += 3+alen+1;
+         DIP("palignr $%d,%s,%s\n", (Int)d32,
+                                    dis_buf,
+                                    nameXMMReg(gregOfRM(modrm)));
+      }
+
+      assign( dHi, unop(Iop_V128HIto64, mkexpr(dV)) );
+      assign( dLo, unop(Iop_V128to64,   mkexpr(dV)) );
+      assign( sHi, unop(Iop_V128HIto64, mkexpr(sV)) );
+      assign( sLo, unop(Iop_V128to64,   mkexpr(sV)) );
+
+      if (d32 == 0) {
+         assign( rHi, mkexpr(sHi) );
+         assign( rLo, mkexpr(sLo) );
+      }
+      else if (d32 >= 1 && d32 <= 7) {
+         assign( rHi, dis_PALIGNR_XMM_helper(dLo, sHi, d32) );
+         assign( rLo, dis_PALIGNR_XMM_helper(sHi, sLo, d32) );
+      }
+      else if (d32 == 8) {
+         assign( rHi, mkexpr(dLo) );
+         assign( rLo, mkexpr(sHi) );
+      }
+      else if (d32 >= 9 && d32 <= 15) {
+         assign( rHi, dis_PALIGNR_XMM_helper(dHi, dLo, d32-8) );
+         assign( rLo, dis_PALIGNR_XMM_helper(dLo, sHi, d32-8) );
+      }
+      else if (d32 == 16) {
+         assign( rHi, mkexpr(dHi) );
+         assign( rLo, mkexpr(dLo) );
+      }
+      else if (d32 >= 17 && d32 <= 23) {
+         assign( rHi, binop(Iop_Shr64, mkexpr(dHi), mkU8(8*(d32-16))) );
+         assign( rLo, dis_PALIGNR_XMM_helper(dHi, dLo, d32-16) );
+      }
+      else if (d32 == 24) {
+         assign( rHi, mkU64(0) );
+         assign( rLo, mkexpr(dHi) );
+      }
+      else if (d32 >= 25 && d32 <= 31) {
+         assign( rHi, mkU64(0) );
+         assign( rLo, binop(Iop_Shr64, mkexpr(dHi), mkU8(8*(d32-24))) );
+      }
+      else if (d32 >= 32 && d32 <= 255) {
+         assign( rHi, mkU64(0) );
+         assign( rLo, mkU64(0) );
+      }
+      else
+         vassert(0);
+
+      putXMMReg(
+         gregOfRM(modrm),
+         binop(Iop_64HLtoV128, mkexpr(rHi), mkexpr(rLo))
+      );
+      goto decode_success;
+   }
+
+   /* 0F 38 00 = PSHUFB -- Packed Shuffle Bytes 8x8 (MMX) */
+   if (sz == 4 
+       && insn[0] == 0x0F && insn[1] == 0x38 && insn[2] == 0x00) {
+      IRTemp sV      = newTemp(Ity_I64);
+      IRTemp dV      = newTemp(Ity_I64);
+
+      modrm = insn[3];
+      do_MMX_preamble();
+      assign( dV, getMMXReg(gregOfRM(modrm)) );
+
+      if (epartIsReg(modrm)) {
+         assign( sV, getMMXReg(eregOfRM(modrm)) );
+         delta += 3+1;
+         DIP("pshufb %s,%s\n", nameMMXReg(eregOfRM(modrm)),
+                               nameMMXReg(gregOfRM(modrm)));
+      } else {
+         addr = disAMode ( &alen, sorb, delta+3, dis_buf );
+         assign( sV, loadLE(Ity_I64, mkexpr(addr)) );
+         delta += 3+alen;
+         DIP("pshufb %s,%s\n", dis_buf,
+                               nameMMXReg(gregOfRM(modrm)));
+      }
+
+      putMMXReg(
+         gregOfRM(modrm),
+         binop(
+            Iop_And64,
+            /* permute the lanes */
+            binop(
+               Iop_Perm8x8,
+               mkexpr(dV),
+               binop(Iop_And64, mkexpr(sV), mkU64(0x0707070707070707ULL))
+            ),
+            /* mask off lanes which have (index & 0x80) == 0x80 */
+            unop(Iop_Not64, binop(Iop_SarN8x8, mkexpr(sV), mkU8(7)))
+         )
+      );
+      goto decode_success;
+   }
+
+   /* 66 0F 38 00 = PSHUFB -- Packed Shuffle Bytes 8x16 (XMM) */
+   if (sz == 2
+       && insn[0] == 0x0F && insn[1] == 0x38 && insn[2] == 0x00) {
+      IRTemp sV         = newTemp(Ity_V128);
+      IRTemp dV         = newTemp(Ity_V128);
+      IRTemp sHi        = newTemp(Ity_I64);
+      IRTemp sLo        = newTemp(Ity_I64);
+      IRTemp dHi        = newTemp(Ity_I64);
+      IRTemp dLo        = newTemp(Ity_I64);
+      IRTemp rHi        = newTemp(Ity_I64);
+      IRTemp rLo        = newTemp(Ity_I64);
+      IRTemp sevens     = newTemp(Ity_I64);
+      IRTemp mask0x80hi = newTemp(Ity_I64);
+      IRTemp mask0x80lo = newTemp(Ity_I64);
+      IRTemp maskBit3hi = newTemp(Ity_I64);
+      IRTemp maskBit3lo = newTemp(Ity_I64);
+      IRTemp sAnd7hi    = newTemp(Ity_I64);
+      IRTemp sAnd7lo    = newTemp(Ity_I64);
+      IRTemp permdHi    = newTemp(Ity_I64);
+      IRTemp permdLo    = newTemp(Ity_I64);
+
+      modrm = insn[3];
+      assign( dV, getXMMReg(gregOfRM(modrm)) );
+
+      if (epartIsReg(modrm)) {
+         assign( sV, getXMMReg(eregOfRM(modrm)) );
+         delta += 3+1;
+         DIP("pshufb %s,%s\n", nameXMMReg(eregOfRM(modrm)),
+                               nameXMMReg(gregOfRM(modrm)));
+      } else {
+         addr = disAMode ( &alen, sorb, delta+3, dis_buf );
+         gen_SEGV_if_not_16_aligned( addr );
+         assign( sV, loadLE(Ity_V128, mkexpr(addr)) );
+         delta += 3+alen;
+         DIP("pshufb %s,%s\n", dis_buf,
+                               nameXMMReg(gregOfRM(modrm)));
+      }
+
+      assign( dHi, unop(Iop_V128HIto64, mkexpr(dV)) );
+      assign( dLo, unop(Iop_V128to64,   mkexpr(dV)) );
+      assign( sHi, unop(Iop_V128HIto64, mkexpr(sV)) );
+      assign( sLo, unop(Iop_V128to64,   mkexpr(sV)) );
+
+      assign( sevens, mkU64(0x0707070707070707ULL) );
+
+      /*
+      mask0x80hi = Not(SarN8x8(sHi,7))
+      maskBit3hi = SarN8x8(ShlN8x8(sHi,4),7)
+      sAnd7hi    = And(sHi,sevens)
+      permdHi    = Or( And(Perm8x8(dHi,sAnd7hi),maskBit3hi),
+                       And(Perm8x8(dLo,sAnd7hi),Not(maskBit3hi)) )
+      rHi        = And(permdHi,mask0x80hi)
+      */
+      assign(
+         mask0x80hi,
+         unop(Iop_Not64, binop(Iop_SarN8x8,mkexpr(sHi),mkU8(7))));
+
+      assign(
+         maskBit3hi,
+         binop(Iop_SarN8x8,
+               binop(Iop_ShlN8x8,mkexpr(sHi),mkU8(4)),
+               mkU8(7)));
+
+      assign(sAnd7hi, binop(Iop_And64,mkexpr(sHi),mkexpr(sevens)));
+
+      assign(
+         permdHi,
+         binop(
+            Iop_Or64,
+            binop(Iop_And64,
+                  binop(Iop_Perm8x8,mkexpr(dHi),mkexpr(sAnd7hi)),
+                  mkexpr(maskBit3hi)),
+            binop(Iop_And64,
+                  binop(Iop_Perm8x8,mkexpr(dLo),mkexpr(sAnd7hi)),
+                  unop(Iop_Not64,mkexpr(maskBit3hi))) ));
+
+      assign(rHi, binop(Iop_And64,mkexpr(permdHi),mkexpr(mask0x80hi)) );
+
+      /* And the same for the lower half of the result.  What fun. */
+
+      assign(
+         mask0x80lo,
+         unop(Iop_Not64, binop(Iop_SarN8x8,mkexpr(sLo),mkU8(7))));
+
+      assign(
+         maskBit3lo,
+         binop(Iop_SarN8x8,
+               binop(Iop_ShlN8x8,mkexpr(sLo),mkU8(4)),
+               mkU8(7)));
+
+      assign(sAnd7lo, binop(Iop_And64,mkexpr(sLo),mkexpr(sevens)));
+
+      assign(
+         permdLo,
+         binop(
+            Iop_Or64,
+            binop(Iop_And64,
+                  binop(Iop_Perm8x8,mkexpr(dHi),mkexpr(sAnd7lo)),
+                  mkexpr(maskBit3lo)),
+            binop(Iop_And64,
+                  binop(Iop_Perm8x8,mkexpr(dLo),mkexpr(sAnd7lo)),
+                  unop(Iop_Not64,mkexpr(maskBit3lo))) ));
+
+      assign(rLo, binop(Iop_And64,mkexpr(permdLo),mkexpr(mask0x80lo)) );
+
+      putXMMReg(
+         gregOfRM(modrm),
+         binop(Iop_64HLtoV128, mkexpr(rHi), mkexpr(rLo))
+      );
+      goto decode_success;
+   }
+
+   /* ---------------------------------------------------- */
+   /* --- end of the SSSE3 decoder.                    --- */
+   /* ---------------------------------------------------- */
+
    after_sse_decoders:
 
    /* ---------------------------------------------------- */
@@ -11124,7 +12292,32 @@ DisResult disInstr_X86_WRK (
       dres.whatNext = Dis_StopHere;
       DIP("ret\n");
       break;
-      
+
+   case 0xCF: /* IRET */
+      /* Note, this is an extremely kludgey and limited implementation
+         of iret.  All it really does is: 
+            popl %EIP; popl %CS; popl %EFLAGS.
+         %CS is set but ignored (as it is in (eg) popw %cs)". */
+      t1 = newTemp(Ity_I32); /* ESP */
+      t2 = newTemp(Ity_I32); /* new EIP */
+      t3 = newTemp(Ity_I32); /* new CS */
+      t4 = newTemp(Ity_I32); /* new EFLAGS */
+      assign(t1, getIReg(4,R_ESP));
+      assign(t2, loadLE(Ity_I32, binop(Iop_Add32,mkexpr(t1),mkU32(0) )));
+      assign(t3, loadLE(Ity_I32, binop(Iop_Add32,mkexpr(t1),mkU32(4) )));
+      assign(t4, loadLE(Ity_I32, binop(Iop_Add32,mkexpr(t1),mkU32(8) )));
+      /* Get stuff off stack */
+      putIReg(4, R_ESP,binop(Iop_Add32, mkexpr(t1), mkU32(12)));
+      /* set %CS (which is ignored anyway) */
+      putSReg( R_CS, unop(Iop_32to16, mkexpr(t3)) );
+      /* set %EFLAGS */
+      set_EFLAGS_from_value( t4, False/*!emit_AC_emwarn*/, 0/*unused*/ );
+      /* goto new EIP value */
+      jmp_treg(Ijk_Ret,t2);
+      dres.whatNext = Dis_StopHere;
+      DIP("iret (very kludgey)\n");
+      break;
+
    case 0xE8: /* CALL J4 */
       d32 = getUDisp32(delta); delta += 4;
       d32 += (guest_EIP_bbstart+delta); 
@@ -11380,6 +12573,12 @@ DisResult disInstr_X86_WRK (
    case 0xCD: /* INT imm8 */
       d32 = getIByte(delta); delta++;
 
+      /* For any of the cases where we emit a jump (that is, for all
+         currently handled cases), it's important that all ArchRegs
+         carry their up-to-date value at this point.  So we declare an
+         end-of-block here, which forces any TempRegs caching ArchRegs
+         to be flushed. */
+
       /* Handle int $0x40 .. $0x43 by synthesising a segfault and a
          restart of this instruction (hence the "-2" two lines below,
          to get the restart EIP to be this instruction.  This is
@@ -11392,14 +12591,29 @@ DisResult disInstr_X86_WRK (
          break;
       }
 
-      if (d32 != 0x80) goto decode_failure;
-      /* It's important that all ArchRegs carry their up-to-date value
-         at this point.  So we declare an end-of-block here, which
-         forces any TempRegs caching ArchRegs to be flushed. */
-      jmp_lit(Ijk_Sys_int128,((Addr32)guest_EIP_bbstart)+delta);
-      dres.whatNext = Dis_StopHere;
-      DIP("int $0x80\n");
-      break;
+      /* Handle int $0x80 (linux syscalls), int $0x81 and $0x82
+         (darwin syscalls). */
+      if (d32 == 0x80) {
+         jmp_lit(Ijk_Sys_int128,((Addr32)guest_EIP_bbstart)+delta);
+         dres.whatNext = Dis_StopHere;
+         DIP("int $0x80\n");
+         break;
+      }
+      if (d32 == 0x81) {
+         jmp_lit(Ijk_Sys_int129,((Addr32)guest_EIP_bbstart)+delta);
+         dres.whatNext = Dis_StopHere;
+         DIP("int $0x81\n");
+         break;
+      }
+      if (d32 == 0x82) {
+         jmp_lit(Ijk_Sys_int130,((Addr32)guest_EIP_bbstart)+delta);
+         dres.whatNext = Dis_StopHere;
+         DIP("int $0x82\n");
+         break;
+      }
+
+      /* none of the above */
+      goto decode_failure;
 
    /* ------------------------ Jcond, byte offset --------- */
 
@@ -11858,77 +13072,15 @@ DisResult disInstr_X86_WRK (
 
    case 0x9D: /* POPF */
       vassert(sz == 2 || sz == 4);
-      if (sz != 4) goto decode_failure;
-      vassert(sz == 4); // until we know a sz==2 test case exists
       t1 = newTemp(Ity_I32); t2 = newTemp(Ity_I32);
       assign(t2, getIReg(4, R_ESP));
       assign(t1, widenUto32(loadLE(szToITy(sz),mkexpr(t2))));
       putIReg(4, R_ESP, binop(Iop_Add32, mkexpr(t2), mkU32(sz)));
-      /* t1 is the flag word.  Mask out everything except OSZACP and 
-         set the flags thunk to X86G_CC_OP_COPY. */
-      stmt( IRStmt_Put( OFFB_CC_OP,   mkU32(X86G_CC_OP_COPY) ));
-      stmt( IRStmt_Put( OFFB_CC_DEP2, mkU32(0) ));
-      stmt( IRStmt_Put( OFFB_CC_DEP1, 
-                        binop(Iop_And32,
-                              mkexpr(t1), 
-                              mkU32( X86G_CC_MASK_C | X86G_CC_MASK_P 
-                                     | X86G_CC_MASK_A | X86G_CC_MASK_Z 
-                                     | X86G_CC_MASK_S| X86G_CC_MASK_O )
-                             )
-                       )
-          );
-      /* Set NDEP even though it isn't used.  This makes redundant-PUT
-         elimination of previous stores to this field work better. */
-      stmt( IRStmt_Put( OFFB_CC_NDEP, mkU32(0) ));
 
-      /* Also need to set the D flag, which is held in bit 10 of t1.
-         If zero, put 1 in OFFB_DFLAG, else -1 in OFFB_DFLAG. */
-      stmt( IRStmt_Put( 
-               OFFB_DFLAG,
-               IRExpr_Mux0X( 
-                  unop(Iop_32to8,
-                       binop(Iop_And32, 
-                             binop(Iop_Shr32, mkexpr(t1), mkU8(10)), 
-                             mkU32(1))),
-                  mkU32(1), 
-                  mkU32(0xFFFFFFFF))) 
-          );
-
-      /* Set the ID flag */
-      stmt( IRStmt_Put( 
-               OFFB_IDFLAG,
-               IRExpr_Mux0X( 
-                  unop(Iop_32to8,
-                       binop(Iop_And32, 
-                             binop(Iop_Shr32, mkexpr(t1), mkU8(21)), 
-                             mkU32(1))),
-                  mkU32(0), 
-                  mkU32(1))) 
-          );
-
-      /* And set the AC flag.  If setting it 1 to, emit an emulation
-         warning. */
-      stmt( IRStmt_Put( 
-               OFFB_ACFLAG,
-               IRExpr_Mux0X( 
-                  unop(Iop_32to8,
-                       binop(Iop_And32, 
-                             binop(Iop_Shr32, mkexpr(t1), mkU8(18)), 
-                             mkU32(1))),
-                  mkU32(0), 
-                  mkU32(1))) 
-          );
-
-      put_emwarn( mkU32(EmWarn_X86_acFlag) );
-      stmt( 
-         IRStmt_Exit(
-            binop( Iop_CmpNE32, 
-                   binop(Iop_And32, mkexpr(t1), mkU32(1<<18)), 
-                   mkU32(0) ),
-            Ijk_EmWarn,
-            IRConst_U32( ((Addr32)guest_EIP_bbstart)+delta)
-         )
-      );
+      /* Generate IR to set %EFLAGS{O,S,Z,A,C,P,D,ID,AC} from the
+	 value in t1. */
+      set_EFLAGS_from_value( t1, True/*emit_AC_emwarn*/,
+                                 ((Addr32)guest_EIP_bbstart)+delta );
 
       DIP("popf%c\n", nameISize(sz));
       break;
@@ -12046,8 +13198,6 @@ DisResult disInstr_X86_WRK (
 
    case 0x9C: /* PUSHF */ {
       vassert(sz == 2 || sz == 4);
-      if (sz != 4) goto decode_failure;
-      vassert(sz == 4);  // wait for sz==2 test case
 
       t1 = newTemp(Ity_I32);
       assign( t1, binop(Iop_Sub32,getIReg(4,R_ESP),mkU32(sz)) );
@@ -12240,7 +13390,7 @@ DisResult disInstr_X86_WRK (
 
    /* REPNE prefix insn */
    case 0xF2: { 
-      Addr32 eip_orig = guest_EIP_bbstart + delta - 1;
+      Addr32 eip_orig = guest_EIP_bbstart + delta_start;
       if (sorb != 0) goto decode_failure;
       abyte = getIByte(delta); delta++;
 
@@ -12255,12 +13405,13 @@ DisResult disInstr_X86_WRK (
          dis_REP_op ( X86CondNZ, dis_MOVS, sz, eip_orig,
                                  guest_EIP_bbstart+delta, "repne movs" );
          break;
-//-- 
-//--       case 0xA6: sz = 1;   /* REPNE CMPS<sz> */
-//--       case 0xA7:
-//--          dis_REP_op ( cb, CondNZ, dis_CMPS, sz, eip_orig, eip, "repne cmps" );
-//--          break;
-//-- 
+
+      case 0xA6: sz = 1;   /* REPNE CMP<sz> */
+      case 0xA7:
+         dis_REP_op ( X86CondNZ, dis_CMPS, sz, eip_orig, 
+                                 guest_EIP_bbstart+delta, "repne cmps" );
+         break;
+
       case 0xAA: sz = 1;   /* REPNE STOS<sz> */
       case 0xAB:
          dis_REP_op ( X86CondNZ, dis_STOS, sz, eip_orig, 
@@ -12282,7 +13433,7 @@ DisResult disInstr_X86_WRK (
    /* REP/REPE prefix insn (for SCAS and CMPS, 0xF3 means REPE,
       for the rest, it means REP) */
    case 0xF3: { 
-      Addr32 eip_orig = guest_EIP_bbstart + delta - 1;
+      Addr32 eip_orig = guest_EIP_bbstart + delta_start;
       if (sorb != 0) goto decode_failure;
       abyte = getIByte(delta); delta++;
 
@@ -12517,6 +13668,9 @@ DisResult disInstr_X86_WRK (
 
    /* ------------------------ (Grp1 extensions) ---------- */
 
+   case 0x82: /* Grp1 Ib,Eb too.  Apparently this is the same as 
+                 case 0x80, but only in 32-bit mode. */
+      /* fallthru */
    case 0x80: /* Grp1 Ib,Eb */
       modrm = getIByte(delta);
       am_sz = lengthAMode(delta);
@@ -12866,7 +14020,7 @@ DisResult disInstr_X86_WRK (
          d->fxState[1].fx     = Ifx_Write;
          d->fxState[1].offset = OFFB_EBX;
          d->fxState[1].size   = 4;
-         d->fxState[2].fx     = Ifx_Write;
+         d->fxState[2].fx     = Ifx_Modify;
          d->fxState[2].offset = OFFB_ECX;
          d->fxState[2].size   = 4;
          d->fxState[3].fx     = Ifx_Write;

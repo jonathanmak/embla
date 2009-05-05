@@ -8,7 +8,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2007 Julian Seward 
+   Copyright (C) 2000-2008 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -384,7 +384,8 @@ UInt addEClassNo ( /*MOD*/Sector* sec, Int ec, UShort tteno )
       old_sz = sec->ec2tte_size[ec];
       old_ar = sec->ec2tte[ec];
       new_sz = old_sz==0 ? 8 : old_sz<64 ? 2*old_sz : (3*old_sz)/2;
-      new_ar = VG_(arena_malloc)(VG_AR_TTAUX, new_sz * sizeof(UShort));
+      new_ar = VG_(arena_malloc)(VG_AR_TTAUX, "transtab.aECN.1",
+                                 new_sz * sizeof(UShort));
       for (i = 0; i < old_sz; i++)
          new_ar[i] = old_ar[i];
       if (old_ar)
@@ -804,7 +805,7 @@ static void invalidate_icache ( void *ptr, Int nbytes )
    cls = vai.ppc_cache_line_szB;
 
    /* Stay sane .. */
-   vg_assert(cls == 32 || cls == 128);
+   vg_assert(cls == 32 || cls == 64 || cls == 128);
 
    startaddr &= ~(cls - 1);
    for (addr = startaddr; addr < endaddr; addr += cls)
@@ -1532,23 +1533,23 @@ UInt VG_(get_bbs_translated) ( void )
 void VG_(print_tt_tc_stats) ( void )
 {
    VG_(message)(Vg_DebugMsg,
-      "    tt/tc: %,llu tt lookups requiring %,llu probes", 
+      "    tt/tc: %'llu tt lookups requiring %'llu probes",
       n_full_lookups, n_lookup_probes );
    VG_(message)(Vg_DebugMsg,
-      "    tt/tc: %,llu fast-cache updates, %,llu flushes", 
+      "    tt/tc: %'llu fast-cache updates, %'llu flushes",
       n_fast_updates, n_fast_flushes );
 
    VG_(message)(Vg_DebugMsg,
-                " transtab: new        %,lld "
-                "(%,llu -> %,llu; ratio %,llu:10) [%,llu scs]",
+                " transtab: new        %'lld "
+                "(%'llu -> %'llu; ratio %'llu:10) [%'llu scs]",
                 n_in_count, n_in_osize, n_in_tsize,
                 safe_idiv(10*n_in_tsize, n_in_osize),
                 n_in_sc_count);
    VG_(message)(Vg_DebugMsg,
-                " transtab: dumped     %,llu (%,llu -> ?" "?)",
+                " transtab: dumped     %'llu (%'llu -> ?" "?)",
                 n_dump_count, n_dump_osize );
    VG_(message)(Vg_DebugMsg,
-                " transtab: discarded  %,llu (%,llu -> ?" "?)",
+                " transtab: discarded  %'llu (%'llu -> ?" "?)",
                 n_disc_count, n_disc_osize );
 
    if (0) {
