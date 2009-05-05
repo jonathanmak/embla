@@ -99,8 +99,11 @@ CONFIG_CLEAN_FILES =
 @VGP_PPC64_AIX5_TRUE@am__EXEEXT_6 = helgrind-ppc64-aix5$(EXEEXT) \
 @VGP_PPC64_AIX5_TRUE@	vgpreload_helgrind-ppc64-aix5.so$(EXEEXT)
 PROGRAMS = $(noinst_PROGRAMS)
-am__objects_1 = helgrind_amd64_linux-hg_wordfm.$(OBJEXT) \
+am__objects_1 = helgrind_amd64_linux-hg_basics.$(OBJEXT) \
+	helgrind_amd64_linux-hg_lock_n_thread.$(OBJEXT) \
 	helgrind_amd64_linux-hg_wordset.$(OBJEXT) \
+	helgrind_amd64_linux-libhb_core.$(OBJEXT) \
+	helgrind_amd64_linux-hg_errors.$(OBJEXT) \
 	helgrind_amd64_linux-hg_main.$(OBJEXT)
 am_helgrind_amd64_linux_OBJECTS = $(am__objects_1)
 helgrind_amd64_linux_OBJECTS = $(am_helgrind_amd64_linux_OBJECTS)
@@ -109,8 +112,11 @@ am__DEPENDENCIES_1 =  \
 	@VEX_DIR@/libvex_amd64_linux.a
 am__DEPENDENCIES_2 =
 am__DEPENDENCIES_3 = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_2)
-am__objects_2 = helgrind_ppc32_aix5-hg_wordfm.$(OBJEXT) \
+am__objects_2 = helgrind_ppc32_aix5-hg_basics.$(OBJEXT) \
+	helgrind_ppc32_aix5-hg_lock_n_thread.$(OBJEXT) \
 	helgrind_ppc32_aix5-hg_wordset.$(OBJEXT) \
+	helgrind_ppc32_aix5-libhb_core.$(OBJEXT) \
+	helgrind_ppc32_aix5-hg_errors.$(OBJEXT) \
 	helgrind_ppc32_aix5-hg_main.$(OBJEXT)
 am_helgrind_ppc32_aix5_OBJECTS = $(am__objects_2)
 helgrind_ppc32_aix5_OBJECTS = $(am_helgrind_ppc32_aix5_OBJECTS)
@@ -118,8 +124,11 @@ am__DEPENDENCIES_4 =  \
 	$(top_builddir)/coregrind/libcoregrind_ppc32_aix5.a \
 	@VEX_DIR@/libvex_ppc32_aix5.a
 am__DEPENDENCIES_5 = $(am__DEPENDENCIES_4) $(am__DEPENDENCIES_2)
-am__objects_3 = helgrind_ppc32_linux-hg_wordfm.$(OBJEXT) \
+am__objects_3 = helgrind_ppc32_linux-hg_basics.$(OBJEXT) \
+	helgrind_ppc32_linux-hg_lock_n_thread.$(OBJEXT) \
 	helgrind_ppc32_linux-hg_wordset.$(OBJEXT) \
+	helgrind_ppc32_linux-libhb_core.$(OBJEXT) \
+	helgrind_ppc32_linux-hg_errors.$(OBJEXT) \
 	helgrind_ppc32_linux-hg_main.$(OBJEXT)
 am_helgrind_ppc32_linux_OBJECTS = $(am__objects_3)
 helgrind_ppc32_linux_OBJECTS = $(am_helgrind_ppc32_linux_OBJECTS)
@@ -127,8 +136,11 @@ am__DEPENDENCIES_6 =  \
 	$(top_builddir)/coregrind/libcoregrind_ppc32_linux.a \
 	@VEX_DIR@/libvex_ppc32_linux.a
 am__DEPENDENCIES_7 = $(am__DEPENDENCIES_6) $(am__DEPENDENCIES_2)
-am__objects_4 = helgrind_ppc64_aix5-hg_wordfm.$(OBJEXT) \
+am__objects_4 = helgrind_ppc64_aix5-hg_basics.$(OBJEXT) \
+	helgrind_ppc64_aix5-hg_lock_n_thread.$(OBJEXT) \
 	helgrind_ppc64_aix5-hg_wordset.$(OBJEXT) \
+	helgrind_ppc64_aix5-libhb_core.$(OBJEXT) \
+	helgrind_ppc64_aix5-hg_errors.$(OBJEXT) \
 	helgrind_ppc64_aix5-hg_main.$(OBJEXT)
 am_helgrind_ppc64_aix5_OBJECTS = $(am__objects_4)
 helgrind_ppc64_aix5_OBJECTS = $(am_helgrind_ppc64_aix5_OBJECTS)
@@ -136,8 +148,11 @@ am__DEPENDENCIES_8 =  \
 	$(top_builddir)/coregrind/libcoregrind_ppc64_aix5.a \
 	@VEX_DIR@/libvex_ppc64_aix5.a
 am__DEPENDENCIES_9 = $(am__DEPENDENCIES_8) $(am__DEPENDENCIES_2)
-am__objects_5 = helgrind_ppc64_linux-hg_wordfm.$(OBJEXT) \
+am__objects_5 = helgrind_ppc64_linux-hg_basics.$(OBJEXT) \
+	helgrind_ppc64_linux-hg_lock_n_thread.$(OBJEXT) \
 	helgrind_ppc64_linux-hg_wordset.$(OBJEXT) \
+	helgrind_ppc64_linux-libhb_core.$(OBJEXT) \
+	helgrind_ppc64_linux-hg_errors.$(OBJEXT) \
 	helgrind_ppc64_linux-hg_main.$(OBJEXT)
 am_helgrind_ppc64_linux_OBJECTS = $(am__objects_5)
 helgrind_ppc64_linux_OBJECTS = $(am_helgrind_ppc64_linux_OBJECTS)
@@ -145,8 +160,11 @@ am__DEPENDENCIES_10 =  \
 	$(top_builddir)/coregrind/libcoregrind_ppc64_linux.a \
 	@VEX_DIR@/libvex_ppc64_linux.a
 am__DEPENDENCIES_11 = $(am__DEPENDENCIES_10) $(am__DEPENDENCIES_2)
-am__objects_6 = helgrind_x86_linux-hg_wordfm.$(OBJEXT) \
+am__objects_6 = helgrind_x86_linux-hg_basics.$(OBJEXT) \
+	helgrind_x86_linux-hg_lock_n_thread.$(OBJEXT) \
 	helgrind_x86_linux-hg_wordset.$(OBJEXT) \
+	helgrind_x86_linux-libhb_core.$(OBJEXT) \
+	helgrind_x86_linux-hg_errors.$(OBJEXT) \
 	helgrind_x86_linux-hg_main.$(OBJEXT)
 am_helgrind_x86_linux_OBJECTS = $(am__objects_6)
 helgrind_x86_linux_OBJECTS = $(am_helgrind_x86_linux_OBJECTS)
@@ -240,16 +258,21 @@ ACLOCAL = @ACLOCAL@
 AMDEP_FALSE = @AMDEP_FALSE@
 AMDEP_TRUE = @AMDEP_TRUE@
 AMTAR = @AMTAR@
+AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+BOOST_CFLAGS = @BOOST_CFLAGS@
+BOOST_LIBS = @BOOST_LIBS@
 BUILD_MPIWRAP_PRI_FALSE = @BUILD_MPIWRAP_PRI_FALSE@
 BUILD_MPIWRAP_PRI_TRUE = @BUILD_MPIWRAP_PRI_TRUE@
 BUILD_MPIWRAP_SEC_FALSE = @BUILD_MPIWRAP_SEC_FALSE@
 BUILD_MPIWRAP_SEC_TRUE = @BUILD_MPIWRAP_SEC_TRUE@
 BUILD_SSE3_TESTS_FALSE = @BUILD_SSE3_TESTS_FALSE@
 BUILD_SSE3_TESTS_TRUE = @BUILD_SSE3_TESTS_TRUE@
+BUILD_SSSE3_TESTS_FALSE = @BUILD_SSSE3_TESTS_FALSE@
+BUILD_SSSE3_TESTS_TRUE = @BUILD_SSSE3_TESTS_TRUE@
 CC = @CC@
 CCAS = @CCAS@
 CCASFLAGS = @CCASFLAGS@
@@ -277,8 +300,22 @@ FLAG_MAIX32 = @FLAG_MAIX32@
 FLAG_MAIX64 = @FLAG_MAIX64@
 FLAG_MMMX = @FLAG_MMMX@
 FLAG_MSSE = @FLAG_MSSE@
+FLAG_UNLIMITED_INLINE_UNIT_GROWTH = @FLAG_UNLIMITED_INLINE_UNIT_GROWTH@
 FLAG_WDECL_AFTER_STMT = @FLAG_WDECL_AFTER_STMT@
+FLAG_W_EXTRA = @FLAG_W_EXTRA@
+FLAG_W_NO_FORMAT_ZERO_LENGTH = @FLAG_W_NO_FORMAT_ZERO_LENGTH@
 GDB = @GDB@
+GLIBC_VERSION = @GLIBC_VERSION@
+HAS_ALTIVEC_FALSE = @HAS_ALTIVEC_FALSE@
+HAS_ALTIVEC_TRUE = @HAS_ALTIVEC_TRUE@
+HAVE_ALTIVEC_H_FALSE = @HAVE_ALTIVEC_H_FALSE@
+HAVE_ALTIVEC_H_TRUE = @HAVE_ALTIVEC_H_TRUE@
+HAVE_BOOST_1_35_FALSE = @HAVE_BOOST_1_35_FALSE@
+HAVE_BOOST_1_35_TRUE = @HAVE_BOOST_1_35_TRUE@
+HAVE_OPENMP_FALSE = @HAVE_OPENMP_FALSE@
+HAVE_OPENMP_TRUE = @HAVE_OPENMP_TRUE@
+HAVE_QTCORE_FALSE = @HAVE_QTCORE_FALSE@
+HAVE_QTCORE_TRUE = @HAVE_QTCORE_TRUE@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
@@ -328,8 +365,9 @@ VGP_PPC64_LINUX_FALSE = @VGP_PPC64_LINUX_FALSE@
 VGP_PPC64_LINUX_TRUE = @VGP_PPC64_LINUX_TRUE@
 VGP_X86_LINUX_FALSE = @VGP_X86_LINUX_FALSE@
 VGP_X86_LINUX_TRUE = @VGP_X86_LINUX_TRUE@
-VG_ARCH = @VG_ARCH@
 VG_ARCH_ALL = @VG_ARCH_ALL@
+VG_ARCH_MAX = @VG_ARCH_MAX@
+VG_ARCH_PRI = @VG_ARCH_PRI@
 VG_OS = @VG_OS@
 VG_PLATFORM_PRI = @VG_PLATFORM_PRI@
 VG_PLATFORM_SEC = @VG_PLATFORM_SEC@
@@ -418,6 +456,7 @@ add_includes_ppc64_aix5 = -I$(top_srcdir)/include \
 # performance and get whatever useful warnings we can out of gcc.
 AM_CFLAGS_BASE = -O2 -g -Wmissing-prototypes -Wall -Wshadow \
                  -Wpointer-arith -Wstrict-prototypes -Wmissing-declarations \
+		 @FLAG_W_NO_FORMAT_ZERO_LENGTH@ \
                  -fno-strict-aliasing
 
 
@@ -474,8 +513,8 @@ AM_CCASFLAGS_PRI = $(AM_CCASFLAGS_@VG_PLATFORM_PRI@)
 
 # Baseline link flags for making dynamic shared objects.
 #
-PRELOAD_LDFLAGS_COMMON_LINUX = -nostdlib -shared -Wl,-z,interpose,-z,initfirst
-PRELOAD_LDFLAGS_COMMON_AIX5 = -nostdlib -shared -Wl,-G -Wl,-bnogc
+PRELOAD_LDFLAGS_COMMON_LINUX = -nodefaultlibs -shared -Wl,-z,interpose,-z,initfirst
+PRELOAD_LDFLAGS_COMMON_AIX5 = -nodefaultlibs -shared -Wl,-G -Wl,-bnogc
 PRELOAD_LDFLAGS_X86_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
 PRELOAD_LDFLAGS_AMD64_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M64@
 PRELOAD_LDFLAGS_PPC32_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
@@ -633,7 +672,10 @@ vgpreload_helgrind_ppc64_aix5_so_LDFLAGS = \
 	$(PRELOAD_LDFLAGS_PPC64_AIX5) \
 	$(LIBREPLACEMALLOC_LDFLAGS_PPC64_AIX5)
 
-HELGRIND_SOURCES_COMMON = hg_wordfm.c hg_wordset.c hg_main.c
+HELGRIND_SOURCES_COMMON = \
+	hg_basics.c hg_lock_n_thread.c hg_wordset.c libhb_core.c \
+	hg_errors.c hg_main.c
+
 helgrind_x86_linux_SOURCES = $(HELGRIND_SOURCES_COMMON)
 helgrind_x86_linux_CPPFLAGS = $(AM_CPPFLAGS_X86_LINUX)
 helgrind_x86_linux_CFLAGS = $(AM_CFLAGS_X86_LINUX) -O2
@@ -672,7 +714,11 @@ helgrind_ppc64_aix5_LDADD = $(TOOL_LDADD_PPC64_AIX5)
 helgrind_ppc64_aix5_LDFLAGS = $(TOOL_LDFLAGS_PPC64_AIX5)
 hgincludedir = $(includedir)/valgrind
 hginclude_HEADERS = helgrind.h
-noinst_HEADERS = hg_wordfm.h hg_wordset.h
+noinst_HEADERS = \
+	hg_basics.h hg_lock_n_thread.h hg_errors.h hg_wordset.h \
+	libhb.h
+
+EXTRA_DIST = README_MSMProp2.txt README_YARD.txt
 all: all-recursive
 
 .SUFFIXES:
@@ -686,9 +732,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu  helgrind/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign  helgrind/Makefile'; \
 	cd $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu  helgrind/Makefile
+	  $(AUTOMAKE) --foreign  helgrind/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -752,24 +798,42 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_amd64_linux-hg_basics.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_amd64_linux-hg_errors.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_amd64_linux-hg_lock_n_thread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_amd64_linux-hg_main.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_amd64_linux-hg_wordfm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_amd64_linux-hg_wordset.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_amd64_linux-libhb_core.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc32_aix5-hg_basics.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc32_aix5-hg_errors.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc32_aix5-hg_lock_n_thread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc32_aix5-hg_main.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc32_aix5-hg_wordfm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc32_aix5-hg_wordset.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc32_aix5-libhb_core.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc32_linux-hg_basics.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc32_linux-hg_errors.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc32_linux-hg_lock_n_thread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc32_linux-hg_main.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc32_linux-hg_wordfm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc32_linux-hg_wordset.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc32_linux-libhb_core.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc64_aix5-hg_basics.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc64_aix5-hg_errors.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc64_aix5-hg_lock_n_thread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc64_aix5-hg_main.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc64_aix5-hg_wordfm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc64_aix5-hg_wordset.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc64_aix5-libhb_core.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc64_linux-hg_basics.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc64_linux-hg_errors.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc64_linux-hg_lock_n_thread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc64_linux-hg_main.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc64_linux-hg_wordfm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc64_linux-hg_wordset.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_ppc64_linux-libhb_core.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_x86_linux-hg_basics.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_x86_linux-hg_errors.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_x86_linux-hg_lock_n_thread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_x86_linux-hg_main.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_x86_linux-hg_wordfm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_x86_linux-hg_wordset.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helgrind_x86_linux-libhb_core.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_helgrind_amd64_linux_so-hg_intercepts.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_helgrind_ppc32_aix5_so-hg_intercepts.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_helgrind_ppc32_linux_so-hg_intercepts.Po@am__quote@
@@ -791,19 +855,33 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
 
-helgrind_amd64_linux-hg_wordfm.o: hg_wordfm.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -MT helgrind_amd64_linux-hg_wordfm.o -MD -MP -MF "$(DEPDIR)/helgrind_amd64_linux-hg_wordfm.Tpo" -c -o helgrind_amd64_linux-hg_wordfm.o `test -f 'hg_wordfm.c' || echo '$(srcdir)/'`hg_wordfm.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_amd64_linux-hg_wordfm.Tpo" "$(DEPDIR)/helgrind_amd64_linux-hg_wordfm.Po"; else rm -f "$(DEPDIR)/helgrind_amd64_linux-hg_wordfm.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_wordfm.c' object='helgrind_amd64_linux-hg_wordfm.o' libtool=no @AMDEPBACKSLASH@
+helgrind_amd64_linux-hg_basics.o: hg_basics.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -MT helgrind_amd64_linux-hg_basics.o -MD -MP -MF "$(DEPDIR)/helgrind_amd64_linux-hg_basics.Tpo" -c -o helgrind_amd64_linux-hg_basics.o `test -f 'hg_basics.c' || echo '$(srcdir)/'`hg_basics.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_amd64_linux-hg_basics.Tpo" "$(DEPDIR)/helgrind_amd64_linux-hg_basics.Po"; else rm -f "$(DEPDIR)/helgrind_amd64_linux-hg_basics.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_basics.c' object='helgrind_amd64_linux-hg_basics.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_amd64_linux-hg_wordfm.o `test -f 'hg_wordfm.c' || echo '$(srcdir)/'`hg_wordfm.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_amd64_linux-hg_basics.o `test -f 'hg_basics.c' || echo '$(srcdir)/'`hg_basics.c
 
-helgrind_amd64_linux-hg_wordfm.obj: hg_wordfm.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -MT helgrind_amd64_linux-hg_wordfm.obj -MD -MP -MF "$(DEPDIR)/helgrind_amd64_linux-hg_wordfm.Tpo" -c -o helgrind_amd64_linux-hg_wordfm.obj `if test -f 'hg_wordfm.c'; then $(CYGPATH_W) 'hg_wordfm.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordfm.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_amd64_linux-hg_wordfm.Tpo" "$(DEPDIR)/helgrind_amd64_linux-hg_wordfm.Po"; else rm -f "$(DEPDIR)/helgrind_amd64_linux-hg_wordfm.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_wordfm.c' object='helgrind_amd64_linux-hg_wordfm.obj' libtool=no @AMDEPBACKSLASH@
+helgrind_amd64_linux-hg_basics.obj: hg_basics.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -MT helgrind_amd64_linux-hg_basics.obj -MD -MP -MF "$(DEPDIR)/helgrind_amd64_linux-hg_basics.Tpo" -c -o helgrind_amd64_linux-hg_basics.obj `if test -f 'hg_basics.c'; then $(CYGPATH_W) 'hg_basics.c'; else $(CYGPATH_W) '$(srcdir)/hg_basics.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_amd64_linux-hg_basics.Tpo" "$(DEPDIR)/helgrind_amd64_linux-hg_basics.Po"; else rm -f "$(DEPDIR)/helgrind_amd64_linux-hg_basics.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_basics.c' object='helgrind_amd64_linux-hg_basics.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_amd64_linux-hg_wordfm.obj `if test -f 'hg_wordfm.c'; then $(CYGPATH_W) 'hg_wordfm.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordfm.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_amd64_linux-hg_basics.obj `if test -f 'hg_basics.c'; then $(CYGPATH_W) 'hg_basics.c'; else $(CYGPATH_W) '$(srcdir)/hg_basics.c'; fi`
+
+helgrind_amd64_linux-hg_lock_n_thread.o: hg_lock_n_thread.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -MT helgrind_amd64_linux-hg_lock_n_thread.o -MD -MP -MF "$(DEPDIR)/helgrind_amd64_linux-hg_lock_n_thread.Tpo" -c -o helgrind_amd64_linux-hg_lock_n_thread.o `test -f 'hg_lock_n_thread.c' || echo '$(srcdir)/'`hg_lock_n_thread.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_amd64_linux-hg_lock_n_thread.Tpo" "$(DEPDIR)/helgrind_amd64_linux-hg_lock_n_thread.Po"; else rm -f "$(DEPDIR)/helgrind_amd64_linux-hg_lock_n_thread.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_lock_n_thread.c' object='helgrind_amd64_linux-hg_lock_n_thread.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_amd64_linux-hg_lock_n_thread.o `test -f 'hg_lock_n_thread.c' || echo '$(srcdir)/'`hg_lock_n_thread.c
+
+helgrind_amd64_linux-hg_lock_n_thread.obj: hg_lock_n_thread.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -MT helgrind_amd64_linux-hg_lock_n_thread.obj -MD -MP -MF "$(DEPDIR)/helgrind_amd64_linux-hg_lock_n_thread.Tpo" -c -o helgrind_amd64_linux-hg_lock_n_thread.obj `if test -f 'hg_lock_n_thread.c'; then $(CYGPATH_W) 'hg_lock_n_thread.c'; else $(CYGPATH_W) '$(srcdir)/hg_lock_n_thread.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_amd64_linux-hg_lock_n_thread.Tpo" "$(DEPDIR)/helgrind_amd64_linux-hg_lock_n_thread.Po"; else rm -f "$(DEPDIR)/helgrind_amd64_linux-hg_lock_n_thread.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_lock_n_thread.c' object='helgrind_amd64_linux-hg_lock_n_thread.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_amd64_linux-hg_lock_n_thread.obj `if test -f 'hg_lock_n_thread.c'; then $(CYGPATH_W) 'hg_lock_n_thread.c'; else $(CYGPATH_W) '$(srcdir)/hg_lock_n_thread.c'; fi`
 
 helgrind_amd64_linux-hg_wordset.o: hg_wordset.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -MT helgrind_amd64_linux-hg_wordset.o -MD -MP -MF "$(DEPDIR)/helgrind_amd64_linux-hg_wordset.Tpo" -c -o helgrind_amd64_linux-hg_wordset.o `test -f 'hg_wordset.c' || echo '$(srcdir)/'`hg_wordset.c; \
@@ -819,6 +897,34 @@ helgrind_amd64_linux-hg_wordset.obj: hg_wordset.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_amd64_linux-hg_wordset.obj `if test -f 'hg_wordset.c'; then $(CYGPATH_W) 'hg_wordset.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordset.c'; fi`
 
+helgrind_amd64_linux-libhb_core.o: libhb_core.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -MT helgrind_amd64_linux-libhb_core.o -MD -MP -MF "$(DEPDIR)/helgrind_amd64_linux-libhb_core.Tpo" -c -o helgrind_amd64_linux-libhb_core.o `test -f 'libhb_core.c' || echo '$(srcdir)/'`libhb_core.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_amd64_linux-libhb_core.Tpo" "$(DEPDIR)/helgrind_amd64_linux-libhb_core.Po"; else rm -f "$(DEPDIR)/helgrind_amd64_linux-libhb_core.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='libhb_core.c' object='helgrind_amd64_linux-libhb_core.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_amd64_linux-libhb_core.o `test -f 'libhb_core.c' || echo '$(srcdir)/'`libhb_core.c
+
+helgrind_amd64_linux-libhb_core.obj: libhb_core.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -MT helgrind_amd64_linux-libhb_core.obj -MD -MP -MF "$(DEPDIR)/helgrind_amd64_linux-libhb_core.Tpo" -c -o helgrind_amd64_linux-libhb_core.obj `if test -f 'libhb_core.c'; then $(CYGPATH_W) 'libhb_core.c'; else $(CYGPATH_W) '$(srcdir)/libhb_core.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_amd64_linux-libhb_core.Tpo" "$(DEPDIR)/helgrind_amd64_linux-libhb_core.Po"; else rm -f "$(DEPDIR)/helgrind_amd64_linux-libhb_core.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='libhb_core.c' object='helgrind_amd64_linux-libhb_core.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_amd64_linux-libhb_core.obj `if test -f 'libhb_core.c'; then $(CYGPATH_W) 'libhb_core.c'; else $(CYGPATH_W) '$(srcdir)/libhb_core.c'; fi`
+
+helgrind_amd64_linux-hg_errors.o: hg_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -MT helgrind_amd64_linux-hg_errors.o -MD -MP -MF "$(DEPDIR)/helgrind_amd64_linux-hg_errors.Tpo" -c -o helgrind_amd64_linux-hg_errors.o `test -f 'hg_errors.c' || echo '$(srcdir)/'`hg_errors.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_amd64_linux-hg_errors.Tpo" "$(DEPDIR)/helgrind_amd64_linux-hg_errors.Po"; else rm -f "$(DEPDIR)/helgrind_amd64_linux-hg_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_errors.c' object='helgrind_amd64_linux-hg_errors.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_amd64_linux-hg_errors.o `test -f 'hg_errors.c' || echo '$(srcdir)/'`hg_errors.c
+
+helgrind_amd64_linux-hg_errors.obj: hg_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -MT helgrind_amd64_linux-hg_errors.obj -MD -MP -MF "$(DEPDIR)/helgrind_amd64_linux-hg_errors.Tpo" -c -o helgrind_amd64_linux-hg_errors.obj `if test -f 'hg_errors.c'; then $(CYGPATH_W) 'hg_errors.c'; else $(CYGPATH_W) '$(srcdir)/hg_errors.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_amd64_linux-hg_errors.Tpo" "$(DEPDIR)/helgrind_amd64_linux-hg_errors.Po"; else rm -f "$(DEPDIR)/helgrind_amd64_linux-hg_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_errors.c' object='helgrind_amd64_linux-hg_errors.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_amd64_linux-hg_errors.obj `if test -f 'hg_errors.c'; then $(CYGPATH_W) 'hg_errors.c'; else $(CYGPATH_W) '$(srcdir)/hg_errors.c'; fi`
+
 helgrind_amd64_linux-hg_main.o: hg_main.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -MT helgrind_amd64_linux-hg_main.o -MD -MP -MF "$(DEPDIR)/helgrind_amd64_linux-hg_main.Tpo" -c -o helgrind_amd64_linux-hg_main.o `test -f 'hg_main.c' || echo '$(srcdir)/'`hg_main.c; \
 @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_amd64_linux-hg_main.Tpo" "$(DEPDIR)/helgrind_amd64_linux-hg_main.Po"; else rm -f "$(DEPDIR)/helgrind_amd64_linux-hg_main.Tpo"; exit 1; fi
@@ -833,19 +939,33 @@ helgrind_amd64_linux-hg_main.obj: hg_main.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_amd64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_amd64_linux-hg_main.obj `if test -f 'hg_main.c'; then $(CYGPATH_W) 'hg_main.c'; else $(CYGPATH_W) '$(srcdir)/hg_main.c'; fi`
 
-helgrind_ppc32_aix5-hg_wordfm.o: hg_wordfm.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_aix5-hg_wordfm.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_aix5-hg_wordfm.Tpo" -c -o helgrind_ppc32_aix5-hg_wordfm.o `test -f 'hg_wordfm.c' || echo '$(srcdir)/'`hg_wordfm.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_wordfm.Tpo" "$(DEPDIR)/helgrind_ppc32_aix5-hg_wordfm.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_wordfm.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_wordfm.c' object='helgrind_ppc32_aix5-hg_wordfm.o' libtool=no @AMDEPBACKSLASH@
+helgrind_ppc32_aix5-hg_basics.o: hg_basics.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_aix5-hg_basics.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_aix5-hg_basics.Tpo" -c -o helgrind_ppc32_aix5-hg_basics.o `test -f 'hg_basics.c' || echo '$(srcdir)/'`hg_basics.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_basics.Tpo" "$(DEPDIR)/helgrind_ppc32_aix5-hg_basics.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_basics.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_basics.c' object='helgrind_ppc32_aix5-hg_basics.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_aix5-hg_wordfm.o `test -f 'hg_wordfm.c' || echo '$(srcdir)/'`hg_wordfm.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_aix5-hg_basics.o `test -f 'hg_basics.c' || echo '$(srcdir)/'`hg_basics.c
 
-helgrind_ppc32_aix5-hg_wordfm.obj: hg_wordfm.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_aix5-hg_wordfm.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_aix5-hg_wordfm.Tpo" -c -o helgrind_ppc32_aix5-hg_wordfm.obj `if test -f 'hg_wordfm.c'; then $(CYGPATH_W) 'hg_wordfm.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordfm.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_wordfm.Tpo" "$(DEPDIR)/helgrind_ppc32_aix5-hg_wordfm.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_wordfm.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_wordfm.c' object='helgrind_ppc32_aix5-hg_wordfm.obj' libtool=no @AMDEPBACKSLASH@
+helgrind_ppc32_aix5-hg_basics.obj: hg_basics.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_aix5-hg_basics.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_aix5-hg_basics.Tpo" -c -o helgrind_ppc32_aix5-hg_basics.obj `if test -f 'hg_basics.c'; then $(CYGPATH_W) 'hg_basics.c'; else $(CYGPATH_W) '$(srcdir)/hg_basics.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_basics.Tpo" "$(DEPDIR)/helgrind_ppc32_aix5-hg_basics.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_basics.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_basics.c' object='helgrind_ppc32_aix5-hg_basics.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_aix5-hg_wordfm.obj `if test -f 'hg_wordfm.c'; then $(CYGPATH_W) 'hg_wordfm.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordfm.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_aix5-hg_basics.obj `if test -f 'hg_basics.c'; then $(CYGPATH_W) 'hg_basics.c'; else $(CYGPATH_W) '$(srcdir)/hg_basics.c'; fi`
+
+helgrind_ppc32_aix5-hg_lock_n_thread.o: hg_lock_n_thread.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_aix5-hg_lock_n_thread.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_aix5-hg_lock_n_thread.Tpo" -c -o helgrind_ppc32_aix5-hg_lock_n_thread.o `test -f 'hg_lock_n_thread.c' || echo '$(srcdir)/'`hg_lock_n_thread.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_lock_n_thread.Tpo" "$(DEPDIR)/helgrind_ppc32_aix5-hg_lock_n_thread.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_lock_n_thread.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_lock_n_thread.c' object='helgrind_ppc32_aix5-hg_lock_n_thread.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_aix5-hg_lock_n_thread.o `test -f 'hg_lock_n_thread.c' || echo '$(srcdir)/'`hg_lock_n_thread.c
+
+helgrind_ppc32_aix5-hg_lock_n_thread.obj: hg_lock_n_thread.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_aix5-hg_lock_n_thread.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_aix5-hg_lock_n_thread.Tpo" -c -o helgrind_ppc32_aix5-hg_lock_n_thread.obj `if test -f 'hg_lock_n_thread.c'; then $(CYGPATH_W) 'hg_lock_n_thread.c'; else $(CYGPATH_W) '$(srcdir)/hg_lock_n_thread.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_lock_n_thread.Tpo" "$(DEPDIR)/helgrind_ppc32_aix5-hg_lock_n_thread.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_lock_n_thread.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_lock_n_thread.c' object='helgrind_ppc32_aix5-hg_lock_n_thread.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_aix5-hg_lock_n_thread.obj `if test -f 'hg_lock_n_thread.c'; then $(CYGPATH_W) 'hg_lock_n_thread.c'; else $(CYGPATH_W) '$(srcdir)/hg_lock_n_thread.c'; fi`
 
 helgrind_ppc32_aix5-hg_wordset.o: hg_wordset.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_aix5-hg_wordset.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_aix5-hg_wordset.Tpo" -c -o helgrind_ppc32_aix5-hg_wordset.o `test -f 'hg_wordset.c' || echo '$(srcdir)/'`hg_wordset.c; \
@@ -861,6 +981,34 @@ helgrind_ppc32_aix5-hg_wordset.obj: hg_wordset.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_aix5-hg_wordset.obj `if test -f 'hg_wordset.c'; then $(CYGPATH_W) 'hg_wordset.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordset.c'; fi`
 
+helgrind_ppc32_aix5-libhb_core.o: libhb_core.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_aix5-libhb_core.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_aix5-libhb_core.Tpo" -c -o helgrind_ppc32_aix5-libhb_core.o `test -f 'libhb_core.c' || echo '$(srcdir)/'`libhb_core.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_aix5-libhb_core.Tpo" "$(DEPDIR)/helgrind_ppc32_aix5-libhb_core.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_aix5-libhb_core.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='libhb_core.c' object='helgrind_ppc32_aix5-libhb_core.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_aix5-libhb_core.o `test -f 'libhb_core.c' || echo '$(srcdir)/'`libhb_core.c
+
+helgrind_ppc32_aix5-libhb_core.obj: libhb_core.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_aix5-libhb_core.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_aix5-libhb_core.Tpo" -c -o helgrind_ppc32_aix5-libhb_core.obj `if test -f 'libhb_core.c'; then $(CYGPATH_W) 'libhb_core.c'; else $(CYGPATH_W) '$(srcdir)/libhb_core.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_aix5-libhb_core.Tpo" "$(DEPDIR)/helgrind_ppc32_aix5-libhb_core.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_aix5-libhb_core.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='libhb_core.c' object='helgrind_ppc32_aix5-libhb_core.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_aix5-libhb_core.obj `if test -f 'libhb_core.c'; then $(CYGPATH_W) 'libhb_core.c'; else $(CYGPATH_W) '$(srcdir)/libhb_core.c'; fi`
+
+helgrind_ppc32_aix5-hg_errors.o: hg_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_aix5-hg_errors.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_aix5-hg_errors.Tpo" -c -o helgrind_ppc32_aix5-hg_errors.o `test -f 'hg_errors.c' || echo '$(srcdir)/'`hg_errors.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_errors.Tpo" "$(DEPDIR)/helgrind_ppc32_aix5-hg_errors.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_errors.c' object='helgrind_ppc32_aix5-hg_errors.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_aix5-hg_errors.o `test -f 'hg_errors.c' || echo '$(srcdir)/'`hg_errors.c
+
+helgrind_ppc32_aix5-hg_errors.obj: hg_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_aix5-hg_errors.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_aix5-hg_errors.Tpo" -c -o helgrind_ppc32_aix5-hg_errors.obj `if test -f 'hg_errors.c'; then $(CYGPATH_W) 'hg_errors.c'; else $(CYGPATH_W) '$(srcdir)/hg_errors.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_errors.Tpo" "$(DEPDIR)/helgrind_ppc32_aix5-hg_errors.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_errors.c' object='helgrind_ppc32_aix5-hg_errors.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_aix5-hg_errors.obj `if test -f 'hg_errors.c'; then $(CYGPATH_W) 'hg_errors.c'; else $(CYGPATH_W) '$(srcdir)/hg_errors.c'; fi`
+
 helgrind_ppc32_aix5-hg_main.o: hg_main.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_aix5-hg_main.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_aix5-hg_main.Tpo" -c -o helgrind_ppc32_aix5-hg_main.o `test -f 'hg_main.c' || echo '$(srcdir)/'`hg_main.c; \
 @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_main.Tpo" "$(DEPDIR)/helgrind_ppc32_aix5-hg_main.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_aix5-hg_main.Tpo"; exit 1; fi
@@ -875,19 +1023,33 @@ helgrind_ppc32_aix5-hg_main.obj: hg_main.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_aix5-hg_main.obj `if test -f 'hg_main.c'; then $(CYGPATH_W) 'hg_main.c'; else $(CYGPATH_W) '$(srcdir)/hg_main.c'; fi`
 
-helgrind_ppc32_linux-hg_wordfm.o: hg_wordfm.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_linux-hg_wordfm.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_linux-hg_wordfm.Tpo" -c -o helgrind_ppc32_linux-hg_wordfm.o `test -f 'hg_wordfm.c' || echo '$(srcdir)/'`hg_wordfm.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_linux-hg_wordfm.Tpo" "$(DEPDIR)/helgrind_ppc32_linux-hg_wordfm.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_linux-hg_wordfm.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_wordfm.c' object='helgrind_ppc32_linux-hg_wordfm.o' libtool=no @AMDEPBACKSLASH@
+helgrind_ppc32_linux-hg_basics.o: hg_basics.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_linux-hg_basics.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_linux-hg_basics.Tpo" -c -o helgrind_ppc32_linux-hg_basics.o `test -f 'hg_basics.c' || echo '$(srcdir)/'`hg_basics.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_linux-hg_basics.Tpo" "$(DEPDIR)/helgrind_ppc32_linux-hg_basics.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_linux-hg_basics.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_basics.c' object='helgrind_ppc32_linux-hg_basics.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_linux-hg_wordfm.o `test -f 'hg_wordfm.c' || echo '$(srcdir)/'`hg_wordfm.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_linux-hg_basics.o `test -f 'hg_basics.c' || echo '$(srcdir)/'`hg_basics.c
 
-helgrind_ppc32_linux-hg_wordfm.obj: hg_wordfm.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_linux-hg_wordfm.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_linux-hg_wordfm.Tpo" -c -o helgrind_ppc32_linux-hg_wordfm.obj `if test -f 'hg_wordfm.c'; then $(CYGPATH_W) 'hg_wordfm.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordfm.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_linux-hg_wordfm.Tpo" "$(DEPDIR)/helgrind_ppc32_linux-hg_wordfm.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_linux-hg_wordfm.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_wordfm.c' object='helgrind_ppc32_linux-hg_wordfm.obj' libtool=no @AMDEPBACKSLASH@
+helgrind_ppc32_linux-hg_basics.obj: hg_basics.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_linux-hg_basics.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_linux-hg_basics.Tpo" -c -o helgrind_ppc32_linux-hg_basics.obj `if test -f 'hg_basics.c'; then $(CYGPATH_W) 'hg_basics.c'; else $(CYGPATH_W) '$(srcdir)/hg_basics.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_linux-hg_basics.Tpo" "$(DEPDIR)/helgrind_ppc32_linux-hg_basics.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_linux-hg_basics.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_basics.c' object='helgrind_ppc32_linux-hg_basics.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_linux-hg_wordfm.obj `if test -f 'hg_wordfm.c'; then $(CYGPATH_W) 'hg_wordfm.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordfm.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_linux-hg_basics.obj `if test -f 'hg_basics.c'; then $(CYGPATH_W) 'hg_basics.c'; else $(CYGPATH_W) '$(srcdir)/hg_basics.c'; fi`
+
+helgrind_ppc32_linux-hg_lock_n_thread.o: hg_lock_n_thread.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_linux-hg_lock_n_thread.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_linux-hg_lock_n_thread.Tpo" -c -o helgrind_ppc32_linux-hg_lock_n_thread.o `test -f 'hg_lock_n_thread.c' || echo '$(srcdir)/'`hg_lock_n_thread.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_linux-hg_lock_n_thread.Tpo" "$(DEPDIR)/helgrind_ppc32_linux-hg_lock_n_thread.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_linux-hg_lock_n_thread.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_lock_n_thread.c' object='helgrind_ppc32_linux-hg_lock_n_thread.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_linux-hg_lock_n_thread.o `test -f 'hg_lock_n_thread.c' || echo '$(srcdir)/'`hg_lock_n_thread.c
+
+helgrind_ppc32_linux-hg_lock_n_thread.obj: hg_lock_n_thread.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_linux-hg_lock_n_thread.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_linux-hg_lock_n_thread.Tpo" -c -o helgrind_ppc32_linux-hg_lock_n_thread.obj `if test -f 'hg_lock_n_thread.c'; then $(CYGPATH_W) 'hg_lock_n_thread.c'; else $(CYGPATH_W) '$(srcdir)/hg_lock_n_thread.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_linux-hg_lock_n_thread.Tpo" "$(DEPDIR)/helgrind_ppc32_linux-hg_lock_n_thread.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_linux-hg_lock_n_thread.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_lock_n_thread.c' object='helgrind_ppc32_linux-hg_lock_n_thread.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_linux-hg_lock_n_thread.obj `if test -f 'hg_lock_n_thread.c'; then $(CYGPATH_W) 'hg_lock_n_thread.c'; else $(CYGPATH_W) '$(srcdir)/hg_lock_n_thread.c'; fi`
 
 helgrind_ppc32_linux-hg_wordset.o: hg_wordset.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_linux-hg_wordset.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_linux-hg_wordset.Tpo" -c -o helgrind_ppc32_linux-hg_wordset.o `test -f 'hg_wordset.c' || echo '$(srcdir)/'`hg_wordset.c; \
@@ -903,6 +1065,34 @@ helgrind_ppc32_linux-hg_wordset.obj: hg_wordset.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_linux-hg_wordset.obj `if test -f 'hg_wordset.c'; then $(CYGPATH_W) 'hg_wordset.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordset.c'; fi`
 
+helgrind_ppc32_linux-libhb_core.o: libhb_core.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_linux-libhb_core.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_linux-libhb_core.Tpo" -c -o helgrind_ppc32_linux-libhb_core.o `test -f 'libhb_core.c' || echo '$(srcdir)/'`libhb_core.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_linux-libhb_core.Tpo" "$(DEPDIR)/helgrind_ppc32_linux-libhb_core.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_linux-libhb_core.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='libhb_core.c' object='helgrind_ppc32_linux-libhb_core.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_linux-libhb_core.o `test -f 'libhb_core.c' || echo '$(srcdir)/'`libhb_core.c
+
+helgrind_ppc32_linux-libhb_core.obj: libhb_core.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_linux-libhb_core.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_linux-libhb_core.Tpo" -c -o helgrind_ppc32_linux-libhb_core.obj `if test -f 'libhb_core.c'; then $(CYGPATH_W) 'libhb_core.c'; else $(CYGPATH_W) '$(srcdir)/libhb_core.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_linux-libhb_core.Tpo" "$(DEPDIR)/helgrind_ppc32_linux-libhb_core.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_linux-libhb_core.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='libhb_core.c' object='helgrind_ppc32_linux-libhb_core.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_linux-libhb_core.obj `if test -f 'libhb_core.c'; then $(CYGPATH_W) 'libhb_core.c'; else $(CYGPATH_W) '$(srcdir)/libhb_core.c'; fi`
+
+helgrind_ppc32_linux-hg_errors.o: hg_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_linux-hg_errors.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_linux-hg_errors.Tpo" -c -o helgrind_ppc32_linux-hg_errors.o `test -f 'hg_errors.c' || echo '$(srcdir)/'`hg_errors.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_linux-hg_errors.Tpo" "$(DEPDIR)/helgrind_ppc32_linux-hg_errors.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_linux-hg_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_errors.c' object='helgrind_ppc32_linux-hg_errors.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_linux-hg_errors.o `test -f 'hg_errors.c' || echo '$(srcdir)/'`hg_errors.c
+
+helgrind_ppc32_linux-hg_errors.obj: hg_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_linux-hg_errors.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_linux-hg_errors.Tpo" -c -o helgrind_ppc32_linux-hg_errors.obj `if test -f 'hg_errors.c'; then $(CYGPATH_W) 'hg_errors.c'; else $(CYGPATH_W) '$(srcdir)/hg_errors.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_linux-hg_errors.Tpo" "$(DEPDIR)/helgrind_ppc32_linux-hg_errors.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_linux-hg_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_errors.c' object='helgrind_ppc32_linux-hg_errors.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_linux-hg_errors.obj `if test -f 'hg_errors.c'; then $(CYGPATH_W) 'hg_errors.c'; else $(CYGPATH_W) '$(srcdir)/hg_errors.c'; fi`
+
 helgrind_ppc32_linux-hg_main.o: hg_main.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc32_linux-hg_main.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc32_linux-hg_main.Tpo" -c -o helgrind_ppc32_linux-hg_main.o `test -f 'hg_main.c' || echo '$(srcdir)/'`hg_main.c; \
 @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc32_linux-hg_main.Tpo" "$(DEPDIR)/helgrind_ppc32_linux-hg_main.Po"; else rm -f "$(DEPDIR)/helgrind_ppc32_linux-hg_main.Tpo"; exit 1; fi
@@ -917,19 +1107,33 @@ helgrind_ppc32_linux-hg_main.obj: hg_main.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc32_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc32_linux-hg_main.obj `if test -f 'hg_main.c'; then $(CYGPATH_W) 'hg_main.c'; else $(CYGPATH_W) '$(srcdir)/hg_main.c'; fi`
 
-helgrind_ppc64_aix5-hg_wordfm.o: hg_wordfm.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_aix5-hg_wordfm.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_aix5-hg_wordfm.Tpo" -c -o helgrind_ppc64_aix5-hg_wordfm.o `test -f 'hg_wordfm.c' || echo '$(srcdir)/'`hg_wordfm.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_wordfm.Tpo" "$(DEPDIR)/helgrind_ppc64_aix5-hg_wordfm.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_wordfm.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_wordfm.c' object='helgrind_ppc64_aix5-hg_wordfm.o' libtool=no @AMDEPBACKSLASH@
+helgrind_ppc64_aix5-hg_basics.o: hg_basics.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_aix5-hg_basics.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_aix5-hg_basics.Tpo" -c -o helgrind_ppc64_aix5-hg_basics.o `test -f 'hg_basics.c' || echo '$(srcdir)/'`hg_basics.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_basics.Tpo" "$(DEPDIR)/helgrind_ppc64_aix5-hg_basics.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_basics.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_basics.c' object='helgrind_ppc64_aix5-hg_basics.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_aix5-hg_wordfm.o `test -f 'hg_wordfm.c' || echo '$(srcdir)/'`hg_wordfm.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_aix5-hg_basics.o `test -f 'hg_basics.c' || echo '$(srcdir)/'`hg_basics.c
 
-helgrind_ppc64_aix5-hg_wordfm.obj: hg_wordfm.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_aix5-hg_wordfm.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_aix5-hg_wordfm.Tpo" -c -o helgrind_ppc64_aix5-hg_wordfm.obj `if test -f 'hg_wordfm.c'; then $(CYGPATH_W) 'hg_wordfm.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordfm.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_wordfm.Tpo" "$(DEPDIR)/helgrind_ppc64_aix5-hg_wordfm.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_wordfm.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_wordfm.c' object='helgrind_ppc64_aix5-hg_wordfm.obj' libtool=no @AMDEPBACKSLASH@
+helgrind_ppc64_aix5-hg_basics.obj: hg_basics.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_aix5-hg_basics.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_aix5-hg_basics.Tpo" -c -o helgrind_ppc64_aix5-hg_basics.obj `if test -f 'hg_basics.c'; then $(CYGPATH_W) 'hg_basics.c'; else $(CYGPATH_W) '$(srcdir)/hg_basics.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_basics.Tpo" "$(DEPDIR)/helgrind_ppc64_aix5-hg_basics.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_basics.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_basics.c' object='helgrind_ppc64_aix5-hg_basics.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_aix5-hg_wordfm.obj `if test -f 'hg_wordfm.c'; then $(CYGPATH_W) 'hg_wordfm.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordfm.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_aix5-hg_basics.obj `if test -f 'hg_basics.c'; then $(CYGPATH_W) 'hg_basics.c'; else $(CYGPATH_W) '$(srcdir)/hg_basics.c'; fi`
+
+helgrind_ppc64_aix5-hg_lock_n_thread.o: hg_lock_n_thread.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_aix5-hg_lock_n_thread.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_aix5-hg_lock_n_thread.Tpo" -c -o helgrind_ppc64_aix5-hg_lock_n_thread.o `test -f 'hg_lock_n_thread.c' || echo '$(srcdir)/'`hg_lock_n_thread.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_lock_n_thread.Tpo" "$(DEPDIR)/helgrind_ppc64_aix5-hg_lock_n_thread.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_lock_n_thread.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_lock_n_thread.c' object='helgrind_ppc64_aix5-hg_lock_n_thread.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_aix5-hg_lock_n_thread.o `test -f 'hg_lock_n_thread.c' || echo '$(srcdir)/'`hg_lock_n_thread.c
+
+helgrind_ppc64_aix5-hg_lock_n_thread.obj: hg_lock_n_thread.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_aix5-hg_lock_n_thread.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_aix5-hg_lock_n_thread.Tpo" -c -o helgrind_ppc64_aix5-hg_lock_n_thread.obj `if test -f 'hg_lock_n_thread.c'; then $(CYGPATH_W) 'hg_lock_n_thread.c'; else $(CYGPATH_W) '$(srcdir)/hg_lock_n_thread.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_lock_n_thread.Tpo" "$(DEPDIR)/helgrind_ppc64_aix5-hg_lock_n_thread.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_lock_n_thread.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_lock_n_thread.c' object='helgrind_ppc64_aix5-hg_lock_n_thread.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_aix5-hg_lock_n_thread.obj `if test -f 'hg_lock_n_thread.c'; then $(CYGPATH_W) 'hg_lock_n_thread.c'; else $(CYGPATH_W) '$(srcdir)/hg_lock_n_thread.c'; fi`
 
 helgrind_ppc64_aix5-hg_wordset.o: hg_wordset.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_aix5-hg_wordset.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_aix5-hg_wordset.Tpo" -c -o helgrind_ppc64_aix5-hg_wordset.o `test -f 'hg_wordset.c' || echo '$(srcdir)/'`hg_wordset.c; \
@@ -945,6 +1149,34 @@ helgrind_ppc64_aix5-hg_wordset.obj: hg_wordset.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_aix5-hg_wordset.obj `if test -f 'hg_wordset.c'; then $(CYGPATH_W) 'hg_wordset.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordset.c'; fi`
 
+helgrind_ppc64_aix5-libhb_core.o: libhb_core.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_aix5-libhb_core.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_aix5-libhb_core.Tpo" -c -o helgrind_ppc64_aix5-libhb_core.o `test -f 'libhb_core.c' || echo '$(srcdir)/'`libhb_core.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_aix5-libhb_core.Tpo" "$(DEPDIR)/helgrind_ppc64_aix5-libhb_core.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_aix5-libhb_core.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='libhb_core.c' object='helgrind_ppc64_aix5-libhb_core.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_aix5-libhb_core.o `test -f 'libhb_core.c' || echo '$(srcdir)/'`libhb_core.c
+
+helgrind_ppc64_aix5-libhb_core.obj: libhb_core.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_aix5-libhb_core.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_aix5-libhb_core.Tpo" -c -o helgrind_ppc64_aix5-libhb_core.obj `if test -f 'libhb_core.c'; then $(CYGPATH_W) 'libhb_core.c'; else $(CYGPATH_W) '$(srcdir)/libhb_core.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_aix5-libhb_core.Tpo" "$(DEPDIR)/helgrind_ppc64_aix5-libhb_core.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_aix5-libhb_core.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='libhb_core.c' object='helgrind_ppc64_aix5-libhb_core.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_aix5-libhb_core.obj `if test -f 'libhb_core.c'; then $(CYGPATH_W) 'libhb_core.c'; else $(CYGPATH_W) '$(srcdir)/libhb_core.c'; fi`
+
+helgrind_ppc64_aix5-hg_errors.o: hg_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_aix5-hg_errors.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_aix5-hg_errors.Tpo" -c -o helgrind_ppc64_aix5-hg_errors.o `test -f 'hg_errors.c' || echo '$(srcdir)/'`hg_errors.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_errors.Tpo" "$(DEPDIR)/helgrind_ppc64_aix5-hg_errors.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_errors.c' object='helgrind_ppc64_aix5-hg_errors.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_aix5-hg_errors.o `test -f 'hg_errors.c' || echo '$(srcdir)/'`hg_errors.c
+
+helgrind_ppc64_aix5-hg_errors.obj: hg_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_aix5-hg_errors.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_aix5-hg_errors.Tpo" -c -o helgrind_ppc64_aix5-hg_errors.obj `if test -f 'hg_errors.c'; then $(CYGPATH_W) 'hg_errors.c'; else $(CYGPATH_W) '$(srcdir)/hg_errors.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_errors.Tpo" "$(DEPDIR)/helgrind_ppc64_aix5-hg_errors.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_errors.c' object='helgrind_ppc64_aix5-hg_errors.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_aix5-hg_errors.obj `if test -f 'hg_errors.c'; then $(CYGPATH_W) 'hg_errors.c'; else $(CYGPATH_W) '$(srcdir)/hg_errors.c'; fi`
+
 helgrind_ppc64_aix5-hg_main.o: hg_main.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_aix5-hg_main.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_aix5-hg_main.Tpo" -c -o helgrind_ppc64_aix5-hg_main.o `test -f 'hg_main.c' || echo '$(srcdir)/'`hg_main.c; \
 @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_main.Tpo" "$(DEPDIR)/helgrind_ppc64_aix5-hg_main.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_aix5-hg_main.Tpo"; exit 1; fi
@@ -959,19 +1191,33 @@ helgrind_ppc64_aix5-hg_main.obj: hg_main.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_aix5-hg_main.obj `if test -f 'hg_main.c'; then $(CYGPATH_W) 'hg_main.c'; else $(CYGPATH_W) '$(srcdir)/hg_main.c'; fi`
 
-helgrind_ppc64_linux-hg_wordfm.o: hg_wordfm.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_linux-hg_wordfm.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_linux-hg_wordfm.Tpo" -c -o helgrind_ppc64_linux-hg_wordfm.o `test -f 'hg_wordfm.c' || echo '$(srcdir)/'`hg_wordfm.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_linux-hg_wordfm.Tpo" "$(DEPDIR)/helgrind_ppc64_linux-hg_wordfm.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_linux-hg_wordfm.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_wordfm.c' object='helgrind_ppc64_linux-hg_wordfm.o' libtool=no @AMDEPBACKSLASH@
+helgrind_ppc64_linux-hg_basics.o: hg_basics.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_linux-hg_basics.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_linux-hg_basics.Tpo" -c -o helgrind_ppc64_linux-hg_basics.o `test -f 'hg_basics.c' || echo '$(srcdir)/'`hg_basics.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_linux-hg_basics.Tpo" "$(DEPDIR)/helgrind_ppc64_linux-hg_basics.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_linux-hg_basics.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_basics.c' object='helgrind_ppc64_linux-hg_basics.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_linux-hg_wordfm.o `test -f 'hg_wordfm.c' || echo '$(srcdir)/'`hg_wordfm.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_linux-hg_basics.o `test -f 'hg_basics.c' || echo '$(srcdir)/'`hg_basics.c
 
-helgrind_ppc64_linux-hg_wordfm.obj: hg_wordfm.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_linux-hg_wordfm.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_linux-hg_wordfm.Tpo" -c -o helgrind_ppc64_linux-hg_wordfm.obj `if test -f 'hg_wordfm.c'; then $(CYGPATH_W) 'hg_wordfm.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordfm.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_linux-hg_wordfm.Tpo" "$(DEPDIR)/helgrind_ppc64_linux-hg_wordfm.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_linux-hg_wordfm.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_wordfm.c' object='helgrind_ppc64_linux-hg_wordfm.obj' libtool=no @AMDEPBACKSLASH@
+helgrind_ppc64_linux-hg_basics.obj: hg_basics.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_linux-hg_basics.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_linux-hg_basics.Tpo" -c -o helgrind_ppc64_linux-hg_basics.obj `if test -f 'hg_basics.c'; then $(CYGPATH_W) 'hg_basics.c'; else $(CYGPATH_W) '$(srcdir)/hg_basics.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_linux-hg_basics.Tpo" "$(DEPDIR)/helgrind_ppc64_linux-hg_basics.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_linux-hg_basics.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_basics.c' object='helgrind_ppc64_linux-hg_basics.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_linux-hg_wordfm.obj `if test -f 'hg_wordfm.c'; then $(CYGPATH_W) 'hg_wordfm.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordfm.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_linux-hg_basics.obj `if test -f 'hg_basics.c'; then $(CYGPATH_W) 'hg_basics.c'; else $(CYGPATH_W) '$(srcdir)/hg_basics.c'; fi`
+
+helgrind_ppc64_linux-hg_lock_n_thread.o: hg_lock_n_thread.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_linux-hg_lock_n_thread.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_linux-hg_lock_n_thread.Tpo" -c -o helgrind_ppc64_linux-hg_lock_n_thread.o `test -f 'hg_lock_n_thread.c' || echo '$(srcdir)/'`hg_lock_n_thread.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_linux-hg_lock_n_thread.Tpo" "$(DEPDIR)/helgrind_ppc64_linux-hg_lock_n_thread.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_linux-hg_lock_n_thread.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_lock_n_thread.c' object='helgrind_ppc64_linux-hg_lock_n_thread.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_linux-hg_lock_n_thread.o `test -f 'hg_lock_n_thread.c' || echo '$(srcdir)/'`hg_lock_n_thread.c
+
+helgrind_ppc64_linux-hg_lock_n_thread.obj: hg_lock_n_thread.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_linux-hg_lock_n_thread.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_linux-hg_lock_n_thread.Tpo" -c -o helgrind_ppc64_linux-hg_lock_n_thread.obj `if test -f 'hg_lock_n_thread.c'; then $(CYGPATH_W) 'hg_lock_n_thread.c'; else $(CYGPATH_W) '$(srcdir)/hg_lock_n_thread.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_linux-hg_lock_n_thread.Tpo" "$(DEPDIR)/helgrind_ppc64_linux-hg_lock_n_thread.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_linux-hg_lock_n_thread.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_lock_n_thread.c' object='helgrind_ppc64_linux-hg_lock_n_thread.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_linux-hg_lock_n_thread.obj `if test -f 'hg_lock_n_thread.c'; then $(CYGPATH_W) 'hg_lock_n_thread.c'; else $(CYGPATH_W) '$(srcdir)/hg_lock_n_thread.c'; fi`
 
 helgrind_ppc64_linux-hg_wordset.o: hg_wordset.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_linux-hg_wordset.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_linux-hg_wordset.Tpo" -c -o helgrind_ppc64_linux-hg_wordset.o `test -f 'hg_wordset.c' || echo '$(srcdir)/'`hg_wordset.c; \
@@ -987,6 +1233,34 @@ helgrind_ppc64_linux-hg_wordset.obj: hg_wordset.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_linux-hg_wordset.obj `if test -f 'hg_wordset.c'; then $(CYGPATH_W) 'hg_wordset.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordset.c'; fi`
 
+helgrind_ppc64_linux-libhb_core.o: libhb_core.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_linux-libhb_core.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_linux-libhb_core.Tpo" -c -o helgrind_ppc64_linux-libhb_core.o `test -f 'libhb_core.c' || echo '$(srcdir)/'`libhb_core.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_linux-libhb_core.Tpo" "$(DEPDIR)/helgrind_ppc64_linux-libhb_core.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_linux-libhb_core.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='libhb_core.c' object='helgrind_ppc64_linux-libhb_core.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_linux-libhb_core.o `test -f 'libhb_core.c' || echo '$(srcdir)/'`libhb_core.c
+
+helgrind_ppc64_linux-libhb_core.obj: libhb_core.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_linux-libhb_core.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_linux-libhb_core.Tpo" -c -o helgrind_ppc64_linux-libhb_core.obj `if test -f 'libhb_core.c'; then $(CYGPATH_W) 'libhb_core.c'; else $(CYGPATH_W) '$(srcdir)/libhb_core.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_linux-libhb_core.Tpo" "$(DEPDIR)/helgrind_ppc64_linux-libhb_core.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_linux-libhb_core.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='libhb_core.c' object='helgrind_ppc64_linux-libhb_core.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_linux-libhb_core.obj `if test -f 'libhb_core.c'; then $(CYGPATH_W) 'libhb_core.c'; else $(CYGPATH_W) '$(srcdir)/libhb_core.c'; fi`
+
+helgrind_ppc64_linux-hg_errors.o: hg_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_linux-hg_errors.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_linux-hg_errors.Tpo" -c -o helgrind_ppc64_linux-hg_errors.o `test -f 'hg_errors.c' || echo '$(srcdir)/'`hg_errors.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_linux-hg_errors.Tpo" "$(DEPDIR)/helgrind_ppc64_linux-hg_errors.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_linux-hg_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_errors.c' object='helgrind_ppc64_linux-hg_errors.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_linux-hg_errors.o `test -f 'hg_errors.c' || echo '$(srcdir)/'`hg_errors.c
+
+helgrind_ppc64_linux-hg_errors.obj: hg_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_linux-hg_errors.obj -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_linux-hg_errors.Tpo" -c -o helgrind_ppc64_linux-hg_errors.obj `if test -f 'hg_errors.c'; then $(CYGPATH_W) 'hg_errors.c'; else $(CYGPATH_W) '$(srcdir)/hg_errors.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_linux-hg_errors.Tpo" "$(DEPDIR)/helgrind_ppc64_linux-hg_errors.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_linux-hg_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_errors.c' object='helgrind_ppc64_linux-hg_errors.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_linux-hg_errors.obj `if test -f 'hg_errors.c'; then $(CYGPATH_W) 'hg_errors.c'; else $(CYGPATH_W) '$(srcdir)/hg_errors.c'; fi`
+
 helgrind_ppc64_linux-hg_main.o: hg_main.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -MT helgrind_ppc64_linux-hg_main.o -MD -MP -MF "$(DEPDIR)/helgrind_ppc64_linux-hg_main.Tpo" -c -o helgrind_ppc64_linux-hg_main.o `test -f 'hg_main.c' || echo '$(srcdir)/'`hg_main.c; \
 @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_ppc64_linux-hg_main.Tpo" "$(DEPDIR)/helgrind_ppc64_linux-hg_main.Po"; else rm -f "$(DEPDIR)/helgrind_ppc64_linux-hg_main.Tpo"; exit 1; fi
@@ -1001,19 +1275,33 @@ helgrind_ppc64_linux-hg_main.obj: hg_main.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_ppc64_linux_CFLAGS) $(CFLAGS) -c -o helgrind_ppc64_linux-hg_main.obj `if test -f 'hg_main.c'; then $(CYGPATH_W) 'hg_main.c'; else $(CYGPATH_W) '$(srcdir)/hg_main.c'; fi`
 
-helgrind_x86_linux-hg_wordfm.o: hg_wordfm.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -MT helgrind_x86_linux-hg_wordfm.o -MD -MP -MF "$(DEPDIR)/helgrind_x86_linux-hg_wordfm.Tpo" -c -o helgrind_x86_linux-hg_wordfm.o `test -f 'hg_wordfm.c' || echo '$(srcdir)/'`hg_wordfm.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_x86_linux-hg_wordfm.Tpo" "$(DEPDIR)/helgrind_x86_linux-hg_wordfm.Po"; else rm -f "$(DEPDIR)/helgrind_x86_linux-hg_wordfm.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_wordfm.c' object='helgrind_x86_linux-hg_wordfm.o' libtool=no @AMDEPBACKSLASH@
+helgrind_x86_linux-hg_basics.o: hg_basics.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -MT helgrind_x86_linux-hg_basics.o -MD -MP -MF "$(DEPDIR)/helgrind_x86_linux-hg_basics.Tpo" -c -o helgrind_x86_linux-hg_basics.o `test -f 'hg_basics.c' || echo '$(srcdir)/'`hg_basics.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_x86_linux-hg_basics.Tpo" "$(DEPDIR)/helgrind_x86_linux-hg_basics.Po"; else rm -f "$(DEPDIR)/helgrind_x86_linux-hg_basics.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_basics.c' object='helgrind_x86_linux-hg_basics.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -c -o helgrind_x86_linux-hg_wordfm.o `test -f 'hg_wordfm.c' || echo '$(srcdir)/'`hg_wordfm.c
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -c -o helgrind_x86_linux-hg_basics.o `test -f 'hg_basics.c' || echo '$(srcdir)/'`hg_basics.c
 
-helgrind_x86_linux-hg_wordfm.obj: hg_wordfm.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -MT helgrind_x86_linux-hg_wordfm.obj -MD -MP -MF "$(DEPDIR)/helgrind_x86_linux-hg_wordfm.Tpo" -c -o helgrind_x86_linux-hg_wordfm.obj `if test -f 'hg_wordfm.c'; then $(CYGPATH_W) 'hg_wordfm.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordfm.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_x86_linux-hg_wordfm.Tpo" "$(DEPDIR)/helgrind_x86_linux-hg_wordfm.Po"; else rm -f "$(DEPDIR)/helgrind_x86_linux-hg_wordfm.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_wordfm.c' object='helgrind_x86_linux-hg_wordfm.obj' libtool=no @AMDEPBACKSLASH@
+helgrind_x86_linux-hg_basics.obj: hg_basics.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -MT helgrind_x86_linux-hg_basics.obj -MD -MP -MF "$(DEPDIR)/helgrind_x86_linux-hg_basics.Tpo" -c -o helgrind_x86_linux-hg_basics.obj `if test -f 'hg_basics.c'; then $(CYGPATH_W) 'hg_basics.c'; else $(CYGPATH_W) '$(srcdir)/hg_basics.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_x86_linux-hg_basics.Tpo" "$(DEPDIR)/helgrind_x86_linux-hg_basics.Po"; else rm -f "$(DEPDIR)/helgrind_x86_linux-hg_basics.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_basics.c' object='helgrind_x86_linux-hg_basics.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -c -o helgrind_x86_linux-hg_wordfm.obj `if test -f 'hg_wordfm.c'; then $(CYGPATH_W) 'hg_wordfm.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordfm.c'; fi`
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -c -o helgrind_x86_linux-hg_basics.obj `if test -f 'hg_basics.c'; then $(CYGPATH_W) 'hg_basics.c'; else $(CYGPATH_W) '$(srcdir)/hg_basics.c'; fi`
+
+helgrind_x86_linux-hg_lock_n_thread.o: hg_lock_n_thread.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -MT helgrind_x86_linux-hg_lock_n_thread.o -MD -MP -MF "$(DEPDIR)/helgrind_x86_linux-hg_lock_n_thread.Tpo" -c -o helgrind_x86_linux-hg_lock_n_thread.o `test -f 'hg_lock_n_thread.c' || echo '$(srcdir)/'`hg_lock_n_thread.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_x86_linux-hg_lock_n_thread.Tpo" "$(DEPDIR)/helgrind_x86_linux-hg_lock_n_thread.Po"; else rm -f "$(DEPDIR)/helgrind_x86_linux-hg_lock_n_thread.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_lock_n_thread.c' object='helgrind_x86_linux-hg_lock_n_thread.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -c -o helgrind_x86_linux-hg_lock_n_thread.o `test -f 'hg_lock_n_thread.c' || echo '$(srcdir)/'`hg_lock_n_thread.c
+
+helgrind_x86_linux-hg_lock_n_thread.obj: hg_lock_n_thread.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -MT helgrind_x86_linux-hg_lock_n_thread.obj -MD -MP -MF "$(DEPDIR)/helgrind_x86_linux-hg_lock_n_thread.Tpo" -c -o helgrind_x86_linux-hg_lock_n_thread.obj `if test -f 'hg_lock_n_thread.c'; then $(CYGPATH_W) 'hg_lock_n_thread.c'; else $(CYGPATH_W) '$(srcdir)/hg_lock_n_thread.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_x86_linux-hg_lock_n_thread.Tpo" "$(DEPDIR)/helgrind_x86_linux-hg_lock_n_thread.Po"; else rm -f "$(DEPDIR)/helgrind_x86_linux-hg_lock_n_thread.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_lock_n_thread.c' object='helgrind_x86_linux-hg_lock_n_thread.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -c -o helgrind_x86_linux-hg_lock_n_thread.obj `if test -f 'hg_lock_n_thread.c'; then $(CYGPATH_W) 'hg_lock_n_thread.c'; else $(CYGPATH_W) '$(srcdir)/hg_lock_n_thread.c'; fi`
 
 helgrind_x86_linux-hg_wordset.o: hg_wordset.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -MT helgrind_x86_linux-hg_wordset.o -MD -MP -MF "$(DEPDIR)/helgrind_x86_linux-hg_wordset.Tpo" -c -o helgrind_x86_linux-hg_wordset.o `test -f 'hg_wordset.c' || echo '$(srcdir)/'`hg_wordset.c; \
@@ -1028,6 +1316,34 @@ helgrind_x86_linux-hg_wordset.obj: hg_wordset.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_wordset.c' object='helgrind_x86_linux-hg_wordset.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -c -o helgrind_x86_linux-hg_wordset.obj `if test -f 'hg_wordset.c'; then $(CYGPATH_W) 'hg_wordset.c'; else $(CYGPATH_W) '$(srcdir)/hg_wordset.c'; fi`
+
+helgrind_x86_linux-libhb_core.o: libhb_core.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -MT helgrind_x86_linux-libhb_core.o -MD -MP -MF "$(DEPDIR)/helgrind_x86_linux-libhb_core.Tpo" -c -o helgrind_x86_linux-libhb_core.o `test -f 'libhb_core.c' || echo '$(srcdir)/'`libhb_core.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_x86_linux-libhb_core.Tpo" "$(DEPDIR)/helgrind_x86_linux-libhb_core.Po"; else rm -f "$(DEPDIR)/helgrind_x86_linux-libhb_core.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='libhb_core.c' object='helgrind_x86_linux-libhb_core.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -c -o helgrind_x86_linux-libhb_core.o `test -f 'libhb_core.c' || echo '$(srcdir)/'`libhb_core.c
+
+helgrind_x86_linux-libhb_core.obj: libhb_core.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -MT helgrind_x86_linux-libhb_core.obj -MD -MP -MF "$(DEPDIR)/helgrind_x86_linux-libhb_core.Tpo" -c -o helgrind_x86_linux-libhb_core.obj `if test -f 'libhb_core.c'; then $(CYGPATH_W) 'libhb_core.c'; else $(CYGPATH_W) '$(srcdir)/libhb_core.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_x86_linux-libhb_core.Tpo" "$(DEPDIR)/helgrind_x86_linux-libhb_core.Po"; else rm -f "$(DEPDIR)/helgrind_x86_linux-libhb_core.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='libhb_core.c' object='helgrind_x86_linux-libhb_core.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -c -o helgrind_x86_linux-libhb_core.obj `if test -f 'libhb_core.c'; then $(CYGPATH_W) 'libhb_core.c'; else $(CYGPATH_W) '$(srcdir)/libhb_core.c'; fi`
+
+helgrind_x86_linux-hg_errors.o: hg_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -MT helgrind_x86_linux-hg_errors.o -MD -MP -MF "$(DEPDIR)/helgrind_x86_linux-hg_errors.Tpo" -c -o helgrind_x86_linux-hg_errors.o `test -f 'hg_errors.c' || echo '$(srcdir)/'`hg_errors.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_x86_linux-hg_errors.Tpo" "$(DEPDIR)/helgrind_x86_linux-hg_errors.Po"; else rm -f "$(DEPDIR)/helgrind_x86_linux-hg_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_errors.c' object='helgrind_x86_linux-hg_errors.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -c -o helgrind_x86_linux-hg_errors.o `test -f 'hg_errors.c' || echo '$(srcdir)/'`hg_errors.c
+
+helgrind_x86_linux-hg_errors.obj: hg_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -MT helgrind_x86_linux-hg_errors.obj -MD -MP -MF "$(DEPDIR)/helgrind_x86_linux-hg_errors.Tpo" -c -o helgrind_x86_linux-hg_errors.obj `if test -f 'hg_errors.c'; then $(CYGPATH_W) 'hg_errors.c'; else $(CYGPATH_W) '$(srcdir)/hg_errors.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/helgrind_x86_linux-hg_errors.Tpo" "$(DEPDIR)/helgrind_x86_linux-hg_errors.Po"; else rm -f "$(DEPDIR)/helgrind_x86_linux-hg_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hg_errors.c' object='helgrind_x86_linux-hg_errors.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -c -o helgrind_x86_linux-hg_errors.obj `if test -f 'hg_errors.c'; then $(CYGPATH_W) 'hg_errors.c'; else $(CYGPATH_W) '$(srcdir)/hg_errors.c'; fi`
 
 helgrind_x86_linux-hg_main.o: hg_main.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(helgrind_x86_linux_CPPFLAGS) $(CPPFLAGS) $(helgrind_x86_linux_CFLAGS) $(CFLAGS) -MT helgrind_x86_linux-hg_main.o -MD -MP -MF "$(DEPDIR)/helgrind_x86_linux-hg_main.Tpo" -c -o helgrind_x86_linux-hg_main.o `test -f 'hg_main.c' || echo '$(srcdir)/'`hg_main.c; \

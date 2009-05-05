@@ -102,7 +102,9 @@ PROGRAMS = $(noinst_PROGRAMS)
 am__objects_1 = memcheck_amd64_linux-mc_leakcheck.$(OBJEXT) \
 	memcheck_amd64_linux-mc_malloc_wrappers.$(OBJEXT) \
 	memcheck_amd64_linux-mc_main.$(OBJEXT) \
-	memcheck_amd64_linux-mc_translate.$(OBJEXT)
+	memcheck_amd64_linux-mc_translate.$(OBJEXT) \
+	memcheck_amd64_linux-mc_machine.$(OBJEXT) \
+	memcheck_amd64_linux-mc_errors.$(OBJEXT)
 am_memcheck_amd64_linux_OBJECTS = $(am__objects_1)
 memcheck_amd64_linux_OBJECTS = $(am_memcheck_amd64_linux_OBJECTS)
 am__DEPENDENCIES_1 =  \
@@ -113,7 +115,9 @@ am__DEPENDENCIES_3 = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_2)
 am__objects_2 = memcheck_ppc32_aix5-mc_leakcheck.$(OBJEXT) \
 	memcheck_ppc32_aix5-mc_malloc_wrappers.$(OBJEXT) \
 	memcheck_ppc32_aix5-mc_main.$(OBJEXT) \
-	memcheck_ppc32_aix5-mc_translate.$(OBJEXT)
+	memcheck_ppc32_aix5-mc_translate.$(OBJEXT) \
+	memcheck_ppc32_aix5-mc_machine.$(OBJEXT) \
+	memcheck_ppc32_aix5-mc_errors.$(OBJEXT)
 am_memcheck_ppc32_aix5_OBJECTS = $(am__objects_2)
 memcheck_ppc32_aix5_OBJECTS = $(am_memcheck_ppc32_aix5_OBJECTS)
 am__DEPENDENCIES_4 =  \
@@ -123,7 +127,9 @@ am__DEPENDENCIES_5 = $(am__DEPENDENCIES_4) $(am__DEPENDENCIES_2)
 am__objects_3 = memcheck_ppc32_linux-mc_leakcheck.$(OBJEXT) \
 	memcheck_ppc32_linux-mc_malloc_wrappers.$(OBJEXT) \
 	memcheck_ppc32_linux-mc_main.$(OBJEXT) \
-	memcheck_ppc32_linux-mc_translate.$(OBJEXT)
+	memcheck_ppc32_linux-mc_translate.$(OBJEXT) \
+	memcheck_ppc32_linux-mc_machine.$(OBJEXT) \
+	memcheck_ppc32_linux-mc_errors.$(OBJEXT)
 am_memcheck_ppc32_linux_OBJECTS = $(am__objects_3)
 memcheck_ppc32_linux_OBJECTS = $(am_memcheck_ppc32_linux_OBJECTS)
 am__DEPENDENCIES_6 =  \
@@ -133,7 +139,9 @@ am__DEPENDENCIES_7 = $(am__DEPENDENCIES_6) $(am__DEPENDENCIES_2)
 am__objects_4 = memcheck_ppc64_aix5-mc_leakcheck.$(OBJEXT) \
 	memcheck_ppc64_aix5-mc_malloc_wrappers.$(OBJEXT) \
 	memcheck_ppc64_aix5-mc_main.$(OBJEXT) \
-	memcheck_ppc64_aix5-mc_translate.$(OBJEXT)
+	memcheck_ppc64_aix5-mc_translate.$(OBJEXT) \
+	memcheck_ppc64_aix5-mc_machine.$(OBJEXT) \
+	memcheck_ppc64_aix5-mc_errors.$(OBJEXT)
 am_memcheck_ppc64_aix5_OBJECTS = $(am__objects_4)
 memcheck_ppc64_aix5_OBJECTS = $(am_memcheck_ppc64_aix5_OBJECTS)
 am__DEPENDENCIES_8 =  \
@@ -143,7 +151,9 @@ am__DEPENDENCIES_9 = $(am__DEPENDENCIES_8) $(am__DEPENDENCIES_2)
 am__objects_5 = memcheck_ppc64_linux-mc_leakcheck.$(OBJEXT) \
 	memcheck_ppc64_linux-mc_malloc_wrappers.$(OBJEXT) \
 	memcheck_ppc64_linux-mc_main.$(OBJEXT) \
-	memcheck_ppc64_linux-mc_translate.$(OBJEXT)
+	memcheck_ppc64_linux-mc_translate.$(OBJEXT) \
+	memcheck_ppc64_linux-mc_machine.$(OBJEXT) \
+	memcheck_ppc64_linux-mc_errors.$(OBJEXT)
 am_memcheck_ppc64_linux_OBJECTS = $(am__objects_5)
 memcheck_ppc64_linux_OBJECTS = $(am_memcheck_ppc64_linux_OBJECTS)
 am__DEPENDENCIES_10 =  \
@@ -153,7 +163,9 @@ am__DEPENDENCIES_11 = $(am__DEPENDENCIES_10) $(am__DEPENDENCIES_2)
 am__objects_6 = memcheck_x86_linux-mc_leakcheck.$(OBJEXT) \
 	memcheck_x86_linux-mc_malloc_wrappers.$(OBJEXT) \
 	memcheck_x86_linux-mc_main.$(OBJEXT) \
-	memcheck_x86_linux-mc_translate.$(OBJEXT)
+	memcheck_x86_linux-mc_translate.$(OBJEXT) \
+	memcheck_x86_linux-mc_machine.$(OBJEXT) \
+	memcheck_x86_linux-mc_errors.$(OBJEXT)
 am_memcheck_x86_linux_OBJECTS = $(am__objects_6)
 memcheck_x86_linux_OBJECTS = $(am_memcheck_x86_linux_OBJECTS)
 am__DEPENDENCIES_12 =  \
@@ -246,16 +258,21 @@ ACLOCAL = @ACLOCAL@
 AMDEP_FALSE = @AMDEP_FALSE@
 AMDEP_TRUE = @AMDEP_TRUE@
 AMTAR = @AMTAR@
+AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+BOOST_CFLAGS = @BOOST_CFLAGS@
+BOOST_LIBS = @BOOST_LIBS@
 BUILD_MPIWRAP_PRI_FALSE = @BUILD_MPIWRAP_PRI_FALSE@
 BUILD_MPIWRAP_PRI_TRUE = @BUILD_MPIWRAP_PRI_TRUE@
 BUILD_MPIWRAP_SEC_FALSE = @BUILD_MPIWRAP_SEC_FALSE@
 BUILD_MPIWRAP_SEC_TRUE = @BUILD_MPIWRAP_SEC_TRUE@
 BUILD_SSE3_TESTS_FALSE = @BUILD_SSE3_TESTS_FALSE@
 BUILD_SSE3_TESTS_TRUE = @BUILD_SSE3_TESTS_TRUE@
+BUILD_SSSE3_TESTS_FALSE = @BUILD_SSSE3_TESTS_FALSE@
+BUILD_SSSE3_TESTS_TRUE = @BUILD_SSSE3_TESTS_TRUE@
 CC = @CC@
 CCAS = @CCAS@
 CCASFLAGS = @CCASFLAGS@
@@ -283,8 +300,22 @@ FLAG_MAIX32 = @FLAG_MAIX32@
 FLAG_MAIX64 = @FLAG_MAIX64@
 FLAG_MMMX = @FLAG_MMMX@
 FLAG_MSSE = @FLAG_MSSE@
+FLAG_UNLIMITED_INLINE_UNIT_GROWTH = @FLAG_UNLIMITED_INLINE_UNIT_GROWTH@
 FLAG_WDECL_AFTER_STMT = @FLAG_WDECL_AFTER_STMT@
+FLAG_W_EXTRA = @FLAG_W_EXTRA@
+FLAG_W_NO_FORMAT_ZERO_LENGTH = @FLAG_W_NO_FORMAT_ZERO_LENGTH@
 GDB = @GDB@
+GLIBC_VERSION = @GLIBC_VERSION@
+HAS_ALTIVEC_FALSE = @HAS_ALTIVEC_FALSE@
+HAS_ALTIVEC_TRUE = @HAS_ALTIVEC_TRUE@
+HAVE_ALTIVEC_H_FALSE = @HAVE_ALTIVEC_H_FALSE@
+HAVE_ALTIVEC_H_TRUE = @HAVE_ALTIVEC_H_TRUE@
+HAVE_BOOST_1_35_FALSE = @HAVE_BOOST_1_35_FALSE@
+HAVE_BOOST_1_35_TRUE = @HAVE_BOOST_1_35_TRUE@
+HAVE_OPENMP_FALSE = @HAVE_OPENMP_FALSE@
+HAVE_OPENMP_TRUE = @HAVE_OPENMP_TRUE@
+HAVE_QTCORE_FALSE = @HAVE_QTCORE_FALSE@
+HAVE_QTCORE_TRUE = @HAVE_QTCORE_TRUE@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
@@ -334,8 +365,9 @@ VGP_PPC64_LINUX_FALSE = @VGP_PPC64_LINUX_FALSE@
 VGP_PPC64_LINUX_TRUE = @VGP_PPC64_LINUX_TRUE@
 VGP_X86_LINUX_FALSE = @VGP_X86_LINUX_FALSE@
 VGP_X86_LINUX_TRUE = @VGP_X86_LINUX_TRUE@
-VG_ARCH = @VG_ARCH@
 VG_ARCH_ALL = @VG_ARCH_ALL@
+VG_ARCH_MAX = @VG_ARCH_MAX@
+VG_ARCH_PRI = @VG_ARCH_PRI@
 VG_OS = @VG_OS@
 VG_PLATFORM_PRI = @VG_PLATFORM_PRI@
 VG_PLATFORM_SEC = @VG_PLATFORM_SEC@
@@ -424,6 +456,7 @@ add_includes_ppc64_aix5 = -I$(top_srcdir)/include \
 # performance and get whatever useful warnings we can out of gcc.
 AM_CFLAGS_BASE = -O2 -g -Wmissing-prototypes -Wall -Wshadow \
                  -Wpointer-arith -Wstrict-prototypes -Wmissing-declarations \
+		 @FLAG_W_NO_FORMAT_ZERO_LENGTH@ \
                  -fno-strict-aliasing
 
 
@@ -480,8 +513,8 @@ AM_CCASFLAGS_PRI = $(AM_CCASFLAGS_@VG_PLATFORM_PRI@)
 
 # Baseline link flags for making dynamic shared objects.
 #
-PRELOAD_LDFLAGS_COMMON_LINUX = -nostdlib -shared -Wl,-z,interpose,-z,initfirst
-PRELOAD_LDFLAGS_COMMON_AIX5 = -nostdlib -shared -Wl,-G -Wl,-bnogc
+PRELOAD_LDFLAGS_COMMON_LINUX = -nodefaultlibs -shared -Wl,-z,interpose,-z,initfirst
+PRELOAD_LDFLAGS_COMMON_AIX5 = -nodefaultlibs -shared -Wl,-G -Wl,-bnogc
 PRELOAD_LDFLAGS_X86_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
 PRELOAD_LDFLAGS_AMD64_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M64@
 PRELOAD_LDFLAGS_PPC32_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
@@ -649,7 +682,9 @@ MEMCHECK_SOURCES_COMMON = \
 	mc_leakcheck.c \
 	mc_malloc_wrappers.c \
 	mc_main.c \
-	mc_translate.c
+	mc_translate.c \
+	mc_machine.c \
+	mc_errors.c
 
 memcheck_x86_linux_SOURCES = $(MEMCHECK_SOURCES_COMMON)
 memcheck_x86_linux_CPPFLAGS = $(AM_CPPFLAGS_X86_LINUX)
@@ -713,9 +748,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu  memcheck/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign  memcheck/Makefile'; \
 	cd $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu  memcheck/Makefile
+	  $(AUTOMAKE) --foreign  memcheck/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -779,27 +814,39 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_amd64_linux-mc_errors.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_amd64_linux-mc_leakcheck.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_amd64_linux-mc_machine.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_amd64_linux-mc_main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_amd64_linux-mc_malloc_wrappers.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_amd64_linux-mc_translate.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_aix5-mc_errors.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_aix5-mc_leakcheck.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_aix5-mc_machine.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_aix5-mc_main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_aix5-mc_malloc_wrappers.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_aix5-mc_translate.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_linux-mc_errors.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_linux-mc_leakcheck.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_linux-mc_machine.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_linux-mc_main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_linux-mc_malloc_wrappers.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc32_linux-mc_translate.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_aix5-mc_errors.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_aix5-mc_leakcheck.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_aix5-mc_machine.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_aix5-mc_main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_aix5-mc_malloc_wrappers.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_aix5-mc_translate.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_linux-mc_errors.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_linux-mc_leakcheck.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_linux-mc_machine.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_linux-mc_main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_linux-mc_malloc_wrappers.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_ppc64_linux-mc_translate.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_x86_linux-mc_errors.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_x86_linux-mc_leakcheck.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_x86_linux-mc_machine.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_x86_linux-mc_main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_x86_linux-mc_malloc_wrappers.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcheck_x86_linux-mc_translate.Po@am__quote@
@@ -880,6 +927,34 @@ memcheck_amd64_linux-mc_translate.obj: mc_translate.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_amd64_linux-mc_translate.obj `if test -f 'mc_translate.c'; then $(CYGPATH_W) 'mc_translate.c'; else $(CYGPATH_W) '$(srcdir)/mc_translate.c'; fi`
 
+memcheck_amd64_linux-mc_machine.o: mc_machine.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -MT memcheck_amd64_linux-mc_machine.o -MD -MP -MF "$(DEPDIR)/memcheck_amd64_linux-mc_machine.Tpo" -c -o memcheck_amd64_linux-mc_machine.o `test -f 'mc_machine.c' || echo '$(srcdir)/'`mc_machine.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_amd64_linux-mc_machine.Tpo" "$(DEPDIR)/memcheck_amd64_linux-mc_machine.Po"; else rm -f "$(DEPDIR)/memcheck_amd64_linux-mc_machine.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_machine.c' object='memcheck_amd64_linux-mc_machine.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_amd64_linux-mc_machine.o `test -f 'mc_machine.c' || echo '$(srcdir)/'`mc_machine.c
+
+memcheck_amd64_linux-mc_machine.obj: mc_machine.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -MT memcheck_amd64_linux-mc_machine.obj -MD -MP -MF "$(DEPDIR)/memcheck_amd64_linux-mc_machine.Tpo" -c -o memcheck_amd64_linux-mc_machine.obj `if test -f 'mc_machine.c'; then $(CYGPATH_W) 'mc_machine.c'; else $(CYGPATH_W) '$(srcdir)/mc_machine.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_amd64_linux-mc_machine.Tpo" "$(DEPDIR)/memcheck_amd64_linux-mc_machine.Po"; else rm -f "$(DEPDIR)/memcheck_amd64_linux-mc_machine.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_machine.c' object='memcheck_amd64_linux-mc_machine.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_amd64_linux-mc_machine.obj `if test -f 'mc_machine.c'; then $(CYGPATH_W) 'mc_machine.c'; else $(CYGPATH_W) '$(srcdir)/mc_machine.c'; fi`
+
+memcheck_amd64_linux-mc_errors.o: mc_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -MT memcheck_amd64_linux-mc_errors.o -MD -MP -MF "$(DEPDIR)/memcheck_amd64_linux-mc_errors.Tpo" -c -o memcheck_amd64_linux-mc_errors.o `test -f 'mc_errors.c' || echo '$(srcdir)/'`mc_errors.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_amd64_linux-mc_errors.Tpo" "$(DEPDIR)/memcheck_amd64_linux-mc_errors.Po"; else rm -f "$(DEPDIR)/memcheck_amd64_linux-mc_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_errors.c' object='memcheck_amd64_linux-mc_errors.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_amd64_linux-mc_errors.o `test -f 'mc_errors.c' || echo '$(srcdir)/'`mc_errors.c
+
+memcheck_amd64_linux-mc_errors.obj: mc_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -MT memcheck_amd64_linux-mc_errors.obj -MD -MP -MF "$(DEPDIR)/memcheck_amd64_linux-mc_errors.Tpo" -c -o memcheck_amd64_linux-mc_errors.obj `if test -f 'mc_errors.c'; then $(CYGPATH_W) 'mc_errors.c'; else $(CYGPATH_W) '$(srcdir)/mc_errors.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_amd64_linux-mc_errors.Tpo" "$(DEPDIR)/memcheck_amd64_linux-mc_errors.Po"; else rm -f "$(DEPDIR)/memcheck_amd64_linux-mc_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_errors.c' object='memcheck_amd64_linux-mc_errors.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_amd64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_amd64_linux-mc_errors.obj `if test -f 'mc_errors.c'; then $(CYGPATH_W) 'mc_errors.c'; else $(CYGPATH_W) '$(srcdir)/mc_errors.c'; fi`
+
 memcheck_ppc32_aix5-mc_leakcheck.o: mc_leakcheck.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_aix5-mc_leakcheck.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_aix5-mc_leakcheck.Tpo" -c -o memcheck_ppc32_aix5-mc_leakcheck.o `test -f 'mc_leakcheck.c' || echo '$(srcdir)/'`mc_leakcheck.c; \
 @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_leakcheck.Tpo" "$(DEPDIR)/memcheck_ppc32_aix5-mc_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_leakcheck.Tpo"; exit 1; fi
@@ -935,6 +1010,34 @@ memcheck_ppc32_aix5-mc_translate.obj: mc_translate.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_translate.c' object='memcheck_ppc32_aix5-mc_translate.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_aix5-mc_translate.obj `if test -f 'mc_translate.c'; then $(CYGPATH_W) 'mc_translate.c'; else $(CYGPATH_W) '$(srcdir)/mc_translate.c'; fi`
+
+memcheck_ppc32_aix5-mc_machine.o: mc_machine.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_aix5-mc_machine.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_aix5-mc_machine.Tpo" -c -o memcheck_ppc32_aix5-mc_machine.o `test -f 'mc_machine.c' || echo '$(srcdir)/'`mc_machine.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_machine.Tpo" "$(DEPDIR)/memcheck_ppc32_aix5-mc_machine.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_machine.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_machine.c' object='memcheck_ppc32_aix5-mc_machine.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_aix5-mc_machine.o `test -f 'mc_machine.c' || echo '$(srcdir)/'`mc_machine.c
+
+memcheck_ppc32_aix5-mc_machine.obj: mc_machine.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_aix5-mc_machine.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_aix5-mc_machine.Tpo" -c -o memcheck_ppc32_aix5-mc_machine.obj `if test -f 'mc_machine.c'; then $(CYGPATH_W) 'mc_machine.c'; else $(CYGPATH_W) '$(srcdir)/mc_machine.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_machine.Tpo" "$(DEPDIR)/memcheck_ppc32_aix5-mc_machine.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_machine.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_machine.c' object='memcheck_ppc32_aix5-mc_machine.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_aix5-mc_machine.obj `if test -f 'mc_machine.c'; then $(CYGPATH_W) 'mc_machine.c'; else $(CYGPATH_W) '$(srcdir)/mc_machine.c'; fi`
+
+memcheck_ppc32_aix5-mc_errors.o: mc_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_aix5-mc_errors.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_aix5-mc_errors.Tpo" -c -o memcheck_ppc32_aix5-mc_errors.o `test -f 'mc_errors.c' || echo '$(srcdir)/'`mc_errors.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_errors.Tpo" "$(DEPDIR)/memcheck_ppc32_aix5-mc_errors.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_errors.c' object='memcheck_ppc32_aix5-mc_errors.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_aix5-mc_errors.o `test -f 'mc_errors.c' || echo '$(srcdir)/'`mc_errors.c
+
+memcheck_ppc32_aix5-mc_errors.obj: mc_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_aix5-mc_errors.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_aix5-mc_errors.Tpo" -c -o memcheck_ppc32_aix5-mc_errors.obj `if test -f 'mc_errors.c'; then $(CYGPATH_W) 'mc_errors.c'; else $(CYGPATH_W) '$(srcdir)/mc_errors.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_errors.Tpo" "$(DEPDIR)/memcheck_ppc32_aix5-mc_errors.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_aix5-mc_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_errors.c' object='memcheck_ppc32_aix5-mc_errors.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_aix5-mc_errors.obj `if test -f 'mc_errors.c'; then $(CYGPATH_W) 'mc_errors.c'; else $(CYGPATH_W) '$(srcdir)/mc_errors.c'; fi`
 
 memcheck_ppc32_linux-mc_leakcheck.o: mc_leakcheck.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_linux-mc_leakcheck.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_linux-mc_leakcheck.Tpo" -c -o memcheck_ppc32_linux-mc_leakcheck.o `test -f 'mc_leakcheck.c' || echo '$(srcdir)/'`mc_leakcheck.c; \
@@ -992,6 +1095,34 @@ memcheck_ppc32_linux-mc_translate.obj: mc_translate.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_linux-mc_translate.obj `if test -f 'mc_translate.c'; then $(CYGPATH_W) 'mc_translate.c'; else $(CYGPATH_W) '$(srcdir)/mc_translate.c'; fi`
 
+memcheck_ppc32_linux-mc_machine.o: mc_machine.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_linux-mc_machine.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_linux-mc_machine.Tpo" -c -o memcheck_ppc32_linux-mc_machine.o `test -f 'mc_machine.c' || echo '$(srcdir)/'`mc_machine.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_linux-mc_machine.Tpo" "$(DEPDIR)/memcheck_ppc32_linux-mc_machine.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_linux-mc_machine.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_machine.c' object='memcheck_ppc32_linux-mc_machine.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_linux-mc_machine.o `test -f 'mc_machine.c' || echo '$(srcdir)/'`mc_machine.c
+
+memcheck_ppc32_linux-mc_machine.obj: mc_machine.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_linux-mc_machine.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_linux-mc_machine.Tpo" -c -o memcheck_ppc32_linux-mc_machine.obj `if test -f 'mc_machine.c'; then $(CYGPATH_W) 'mc_machine.c'; else $(CYGPATH_W) '$(srcdir)/mc_machine.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_linux-mc_machine.Tpo" "$(DEPDIR)/memcheck_ppc32_linux-mc_machine.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_linux-mc_machine.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_machine.c' object='memcheck_ppc32_linux-mc_machine.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_linux-mc_machine.obj `if test -f 'mc_machine.c'; then $(CYGPATH_W) 'mc_machine.c'; else $(CYGPATH_W) '$(srcdir)/mc_machine.c'; fi`
+
+memcheck_ppc32_linux-mc_errors.o: mc_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_linux-mc_errors.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_linux-mc_errors.Tpo" -c -o memcheck_ppc32_linux-mc_errors.o `test -f 'mc_errors.c' || echo '$(srcdir)/'`mc_errors.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_linux-mc_errors.Tpo" "$(DEPDIR)/memcheck_ppc32_linux-mc_errors.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_linux-mc_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_errors.c' object='memcheck_ppc32_linux-mc_errors.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_linux-mc_errors.o `test -f 'mc_errors.c' || echo '$(srcdir)/'`mc_errors.c
+
+memcheck_ppc32_linux-mc_errors.obj: mc_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc32_linux-mc_errors.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc32_linux-mc_errors.Tpo" -c -o memcheck_ppc32_linux-mc_errors.obj `if test -f 'mc_errors.c'; then $(CYGPATH_W) 'mc_errors.c'; else $(CYGPATH_W) '$(srcdir)/mc_errors.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc32_linux-mc_errors.Tpo" "$(DEPDIR)/memcheck_ppc32_linux-mc_errors.Po"; else rm -f "$(DEPDIR)/memcheck_ppc32_linux-mc_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_errors.c' object='memcheck_ppc32_linux-mc_errors.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc32_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc32_linux-mc_errors.obj `if test -f 'mc_errors.c'; then $(CYGPATH_W) 'mc_errors.c'; else $(CYGPATH_W) '$(srcdir)/mc_errors.c'; fi`
+
 memcheck_ppc64_aix5-mc_leakcheck.o: mc_leakcheck.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_aix5-mc_leakcheck.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_aix5-mc_leakcheck.Tpo" -c -o memcheck_ppc64_aix5-mc_leakcheck.o `test -f 'mc_leakcheck.c' || echo '$(srcdir)/'`mc_leakcheck.c; \
 @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_leakcheck.Tpo" "$(DEPDIR)/memcheck_ppc64_aix5-mc_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_leakcheck.Tpo"; exit 1; fi
@@ -1047,6 +1178,34 @@ memcheck_ppc64_aix5-mc_translate.obj: mc_translate.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_translate.c' object='memcheck_ppc64_aix5-mc_translate.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_aix5-mc_translate.obj `if test -f 'mc_translate.c'; then $(CYGPATH_W) 'mc_translate.c'; else $(CYGPATH_W) '$(srcdir)/mc_translate.c'; fi`
+
+memcheck_ppc64_aix5-mc_machine.o: mc_machine.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_aix5-mc_machine.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_aix5-mc_machine.Tpo" -c -o memcheck_ppc64_aix5-mc_machine.o `test -f 'mc_machine.c' || echo '$(srcdir)/'`mc_machine.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_machine.Tpo" "$(DEPDIR)/memcheck_ppc64_aix5-mc_machine.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_machine.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_machine.c' object='memcheck_ppc64_aix5-mc_machine.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_aix5-mc_machine.o `test -f 'mc_machine.c' || echo '$(srcdir)/'`mc_machine.c
+
+memcheck_ppc64_aix5-mc_machine.obj: mc_machine.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_aix5-mc_machine.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_aix5-mc_machine.Tpo" -c -o memcheck_ppc64_aix5-mc_machine.obj `if test -f 'mc_machine.c'; then $(CYGPATH_W) 'mc_machine.c'; else $(CYGPATH_W) '$(srcdir)/mc_machine.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_machine.Tpo" "$(DEPDIR)/memcheck_ppc64_aix5-mc_machine.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_machine.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_machine.c' object='memcheck_ppc64_aix5-mc_machine.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_aix5-mc_machine.obj `if test -f 'mc_machine.c'; then $(CYGPATH_W) 'mc_machine.c'; else $(CYGPATH_W) '$(srcdir)/mc_machine.c'; fi`
+
+memcheck_ppc64_aix5-mc_errors.o: mc_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_aix5-mc_errors.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_aix5-mc_errors.Tpo" -c -o memcheck_ppc64_aix5-mc_errors.o `test -f 'mc_errors.c' || echo '$(srcdir)/'`mc_errors.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_errors.Tpo" "$(DEPDIR)/memcheck_ppc64_aix5-mc_errors.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_errors.c' object='memcheck_ppc64_aix5-mc_errors.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_aix5-mc_errors.o `test -f 'mc_errors.c' || echo '$(srcdir)/'`mc_errors.c
+
+memcheck_ppc64_aix5-mc_errors.obj: mc_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_aix5-mc_errors.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_aix5-mc_errors.Tpo" -c -o memcheck_ppc64_aix5-mc_errors.obj `if test -f 'mc_errors.c'; then $(CYGPATH_W) 'mc_errors.c'; else $(CYGPATH_W) '$(srcdir)/mc_errors.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_errors.Tpo" "$(DEPDIR)/memcheck_ppc64_aix5-mc_errors.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_aix5-mc_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_errors.c' object='memcheck_ppc64_aix5-mc_errors.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_aix5-mc_errors.obj `if test -f 'mc_errors.c'; then $(CYGPATH_W) 'mc_errors.c'; else $(CYGPATH_W) '$(srcdir)/mc_errors.c'; fi`
 
 memcheck_ppc64_linux-mc_leakcheck.o: mc_leakcheck.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_linux-mc_leakcheck.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_linux-mc_leakcheck.Tpo" -c -o memcheck_ppc64_linux-mc_leakcheck.o `test -f 'mc_leakcheck.c' || echo '$(srcdir)/'`mc_leakcheck.c; \
@@ -1104,6 +1263,34 @@ memcheck_ppc64_linux-mc_translate.obj: mc_translate.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_linux-mc_translate.obj `if test -f 'mc_translate.c'; then $(CYGPATH_W) 'mc_translate.c'; else $(CYGPATH_W) '$(srcdir)/mc_translate.c'; fi`
 
+memcheck_ppc64_linux-mc_machine.o: mc_machine.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_linux-mc_machine.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_linux-mc_machine.Tpo" -c -o memcheck_ppc64_linux-mc_machine.o `test -f 'mc_machine.c' || echo '$(srcdir)/'`mc_machine.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_linux-mc_machine.Tpo" "$(DEPDIR)/memcheck_ppc64_linux-mc_machine.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_linux-mc_machine.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_machine.c' object='memcheck_ppc64_linux-mc_machine.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_linux-mc_machine.o `test -f 'mc_machine.c' || echo '$(srcdir)/'`mc_machine.c
+
+memcheck_ppc64_linux-mc_machine.obj: mc_machine.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_linux-mc_machine.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_linux-mc_machine.Tpo" -c -o memcheck_ppc64_linux-mc_machine.obj `if test -f 'mc_machine.c'; then $(CYGPATH_W) 'mc_machine.c'; else $(CYGPATH_W) '$(srcdir)/mc_machine.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_linux-mc_machine.Tpo" "$(DEPDIR)/memcheck_ppc64_linux-mc_machine.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_linux-mc_machine.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_machine.c' object='memcheck_ppc64_linux-mc_machine.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_linux-mc_machine.obj `if test -f 'mc_machine.c'; then $(CYGPATH_W) 'mc_machine.c'; else $(CYGPATH_W) '$(srcdir)/mc_machine.c'; fi`
+
+memcheck_ppc64_linux-mc_errors.o: mc_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_linux-mc_errors.o -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_linux-mc_errors.Tpo" -c -o memcheck_ppc64_linux-mc_errors.o `test -f 'mc_errors.c' || echo '$(srcdir)/'`mc_errors.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_linux-mc_errors.Tpo" "$(DEPDIR)/memcheck_ppc64_linux-mc_errors.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_linux-mc_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_errors.c' object='memcheck_ppc64_linux-mc_errors.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_linux-mc_errors.o `test -f 'mc_errors.c' || echo '$(srcdir)/'`mc_errors.c
+
+memcheck_ppc64_linux-mc_errors.obj: mc_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -MT memcheck_ppc64_linux-mc_errors.obj -MD -MP -MF "$(DEPDIR)/memcheck_ppc64_linux-mc_errors.Tpo" -c -o memcheck_ppc64_linux-mc_errors.obj `if test -f 'mc_errors.c'; then $(CYGPATH_W) 'mc_errors.c'; else $(CYGPATH_W) '$(srcdir)/mc_errors.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_ppc64_linux-mc_errors.Tpo" "$(DEPDIR)/memcheck_ppc64_linux-mc_errors.Po"; else rm -f "$(DEPDIR)/memcheck_ppc64_linux-mc_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_errors.c' object='memcheck_ppc64_linux-mc_errors.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_ppc64_linux_CFLAGS) $(CFLAGS) -c -o memcheck_ppc64_linux-mc_errors.obj `if test -f 'mc_errors.c'; then $(CYGPATH_W) 'mc_errors.c'; else $(CYGPATH_W) '$(srcdir)/mc_errors.c'; fi`
+
 memcheck_x86_linux-mc_leakcheck.o: mc_leakcheck.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -MT memcheck_x86_linux-mc_leakcheck.o -MD -MP -MF "$(DEPDIR)/memcheck_x86_linux-mc_leakcheck.Tpo" -c -o memcheck_x86_linux-mc_leakcheck.o `test -f 'mc_leakcheck.c' || echo '$(srcdir)/'`mc_leakcheck.c; \
 @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_x86_linux-mc_leakcheck.Tpo" "$(DEPDIR)/memcheck_x86_linux-mc_leakcheck.Po"; else rm -f "$(DEPDIR)/memcheck_x86_linux-mc_leakcheck.Tpo"; exit 1; fi
@@ -1159,6 +1346,34 @@ memcheck_x86_linux-mc_translate.obj: mc_translate.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_translate.c' object='memcheck_x86_linux-mc_translate.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -c -o memcheck_x86_linux-mc_translate.obj `if test -f 'mc_translate.c'; then $(CYGPATH_W) 'mc_translate.c'; else $(CYGPATH_W) '$(srcdir)/mc_translate.c'; fi`
+
+memcheck_x86_linux-mc_machine.o: mc_machine.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -MT memcheck_x86_linux-mc_machine.o -MD -MP -MF "$(DEPDIR)/memcheck_x86_linux-mc_machine.Tpo" -c -o memcheck_x86_linux-mc_machine.o `test -f 'mc_machine.c' || echo '$(srcdir)/'`mc_machine.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_x86_linux-mc_machine.Tpo" "$(DEPDIR)/memcheck_x86_linux-mc_machine.Po"; else rm -f "$(DEPDIR)/memcheck_x86_linux-mc_machine.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_machine.c' object='memcheck_x86_linux-mc_machine.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -c -o memcheck_x86_linux-mc_machine.o `test -f 'mc_machine.c' || echo '$(srcdir)/'`mc_machine.c
+
+memcheck_x86_linux-mc_machine.obj: mc_machine.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -MT memcheck_x86_linux-mc_machine.obj -MD -MP -MF "$(DEPDIR)/memcheck_x86_linux-mc_machine.Tpo" -c -o memcheck_x86_linux-mc_machine.obj `if test -f 'mc_machine.c'; then $(CYGPATH_W) 'mc_machine.c'; else $(CYGPATH_W) '$(srcdir)/mc_machine.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_x86_linux-mc_machine.Tpo" "$(DEPDIR)/memcheck_x86_linux-mc_machine.Po"; else rm -f "$(DEPDIR)/memcheck_x86_linux-mc_machine.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_machine.c' object='memcheck_x86_linux-mc_machine.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -c -o memcheck_x86_linux-mc_machine.obj `if test -f 'mc_machine.c'; then $(CYGPATH_W) 'mc_machine.c'; else $(CYGPATH_W) '$(srcdir)/mc_machine.c'; fi`
+
+memcheck_x86_linux-mc_errors.o: mc_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -MT memcheck_x86_linux-mc_errors.o -MD -MP -MF "$(DEPDIR)/memcheck_x86_linux-mc_errors.Tpo" -c -o memcheck_x86_linux-mc_errors.o `test -f 'mc_errors.c' || echo '$(srcdir)/'`mc_errors.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_x86_linux-mc_errors.Tpo" "$(DEPDIR)/memcheck_x86_linux-mc_errors.Po"; else rm -f "$(DEPDIR)/memcheck_x86_linux-mc_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_errors.c' object='memcheck_x86_linux-mc_errors.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -c -o memcheck_x86_linux-mc_errors.o `test -f 'mc_errors.c' || echo '$(srcdir)/'`mc_errors.c
+
+memcheck_x86_linux-mc_errors.obj: mc_errors.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -MT memcheck_x86_linux-mc_errors.obj -MD -MP -MF "$(DEPDIR)/memcheck_x86_linux-mc_errors.Tpo" -c -o memcheck_x86_linux-mc_errors.obj `if test -f 'mc_errors.c'; then $(CYGPATH_W) 'mc_errors.c'; else $(CYGPATH_W) '$(srcdir)/mc_errors.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/memcheck_x86_linux-mc_errors.Tpo" "$(DEPDIR)/memcheck_x86_linux-mc_errors.Po"; else rm -f "$(DEPDIR)/memcheck_x86_linux-mc_errors.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mc_errors.c' object='memcheck_x86_linux-mc_errors.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcheck_x86_linux_CPPFLAGS) $(CPPFLAGS) $(memcheck_x86_linux_CFLAGS) $(CFLAGS) -c -o memcheck_x86_linux-mc_errors.obj `if test -f 'mc_errors.c'; then $(CYGPATH_W) 'mc_errors.c'; else $(CYGPATH_W) '$(srcdir)/mc_errors.c'; fi`
 
 vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.o: mc_replace_strmem.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_memcheck_amd64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_memcheck_amd64_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.o -MD -MP -MF "$(DEPDIR)/vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.Tpo" -c -o vgpreload_memcheck_amd64_linux_so-mc_replace_strmem.o `test -f 'mc_replace_strmem.c' || echo '$(srcdir)/'`mc_replace_strmem.c; \

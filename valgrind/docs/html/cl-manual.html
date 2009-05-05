@@ -33,6 +33,7 @@
 <dt><span class="sect2"><a href="cl-manual.html#cl-manual.dumps">6.2.1. Multiple profiling dumps from one program run</a></span></dt>
 <dt><span class="sect2"><a href="cl-manual.html#cl-manual.limits">6.2.2. Limiting the range of collected events</a></span></dt>
 <dt><span class="sect2"><a href="cl-manual.html#cl-manual.cycles">6.2.3. Avoiding cycles</a></span></dt>
+<dt><span class="sect2"><a href="cl-manual.html#cl-manual.forkingprograms">6.2.4. Forking Programs</a></span></dt>
 </dl></dd>
 <dt><span class="sect1"><a href="cl-manual.html#cl-manual.options">6.3. Command line option reference</a></span></dt>
 <dd><dl>
@@ -43,6 +44,7 @@
 <dt><span class="sect2"><a href="cl-manual.html#cl-manual.options.separation">6.3.5. Cost entity separation options</a></span></dt>
 <dt><span class="sect2"><a href="cl-manual.html#cl-manual.options.simulation">6.3.6. Cache simulation options</a></span></dt>
 </dl></dd>
+<dt><span class="sect1"><a href="cl-manual.html#cl-manual.clientrequests">6.4. Callgrind specific client requests</a></span></dt>
 </dl>
 </div>
 <div class="sect1" lang="en">
@@ -204,7 +206,7 @@ on heuristics to detect calls and returns.</p>
   <code class="computeroutput">callgrind_control -i on</code> just before the 
   interesting code section is executed. To exactly specify
   the code position where profiling should start, use the client request
-  <code class="computeroutput">CALLGRIND_START_INSTRUMENTATION</code>.</p>
+  <code class="computeroutput"><a href="cl-manual.html#cr.start-instr">CALLGRIND_START_INSTRUMENTATION</a></code>.</p>
 <p>If you want to be able to see assembly code level annotation, specify
   <code class="option"><a href="cl-manual.html#opt.dump-instr">--dump-instr</a>=yes</code>. This will produce
   profile data at instruction granularity. Note that the resulting profile
@@ -285,23 +287,14 @@ callgrind.out.<span class="emphasis"><em>pid</em></span>.<span class="emphasis">
       generate dumps before entering any function starting with 
       <span class="emphasis"><em>foo</em></span>.</p>
 </li>
-<li>
-<p><span><strong class="command">Program controlled dumping.</strong></span>
-      Put </p>
-<pre class="screen">#include &lt;valgrind/callgrind.h&gt;</pre>
-<p>
-      into your source and add 
-      <code class="computeroutput">CALLGRIND_DUMP_STATS;</code> when you
-      want a dump to happen. Use 
-      <code class="computeroutput">CALLGRIND_ZERO_STATS;</code> to only 
-      zero cost centers.</p>
-<p>In Valgrind terminology, this method is called "Client
-      requests".  The given macros generate a special instruction
-      pattern with no effect at all (i.e. a NOP). When run under
-      Valgrind, the CPU simulation engine detects the special
-      instruction pattern and triggers special actions like the ones
-      described above.</p>
-</li>
+<li><p><span><strong class="command">Program controlled dumping.</strong></span>
+      Insert
+      <code class="computeroutput"><a href="cl-manual.html#cr.dump-stats">CALLGRIND_DUMP_STATS</a>;</code>
+      at the position in your code where you want a profile dump to happen. Use 
+      <code class="computeroutput"><a href="cl-manual.html#cr.zero-stats">CALLGRIND_ZERO_STATS</a>;</code> to only 
+      zero profile counters.
+      See <a href="cl-manual.html#cl-manual.clientrequests">Client request reference</a> for more information on
+      Callgrind specific client requests.</p></li>
 </ul></div>
 <p>If you are running a multi-threaded application and specify the
   command line option <code class="option"><a href="cl-manual.html#opt.separate-threads">--separate-threads</a>=yes</code>, 
@@ -330,8 +323,8 @@ callgrind.out.<span class="emphasis"><em>pid</em></span>.<span class="emphasis">
 <p>
   and off by specifying "off" instead of "on".
   Furthermore, instrumentation state can be programatically changed with
-  the macros <code class="computeroutput">CALLGRIND_START_INSTRUMENTATION;</code>
-  and <code class="computeroutput">CALLGRIND_STOP_INSTRUMENTATION;</code>.
+  the macros <code class="computeroutput"><a href="cl-manual.html#cr.start-instr">CALLGRIND_START_INSTRUMENTATION</a>;</code>
+  and <code class="computeroutput"><a href="cl-manual.html#cr.stop-instr">CALLGRIND_STOP_INSTRUMENTATION</a>;</code>.
   </p>
 <p>In addition to enabling instrumentation, you must also enable
   event collection for the parts of your program you are interested in.
@@ -443,6 +436,23 @@ callgrind.out.<span class="emphasis"><em>pid</em></span>.<span class="emphasis">
   <code class="option"><a href="cl-manual.html#opt.separate-callers">--separate-callers</a>=2</code> to get a 2-caller 
   dependency for all functions.  Note that doing this will increase
   the size of profile data files.</p>
+</div>
+<div class="sect2" lang="en">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="cl-manual.forkingprograms"></a>6.2.4. Forking Programs</h3></div></div></div>
+<p>If your program forks, the child will inherit all the profiling
+  data that has been gathered for the parent. To start with empty profile
+  counter values in the child, the client request
+  <code class="computeroutput"><a href="cl-manual.html#cr.zero-stats">CALLGRIND_ZERO_STATS</a>;</code>
+  can be inserted into code to be executed by the child, directly after
+  <code class="computeroutput">fork()</code>.</p>
+<p>However, you will have to make sure that the output file format string
+  (controlled by <code class="option">--callgrind-out-file</code>) does contain
+  <code class="option">%p</code> (which is true by default). Otherwise, the
+  outputs from the parent and child will overwrite each other or will be
+  intermingled, which almost certainly is not what you want.</p>
+<p>You will be able to control the new child independently from
+  the parent via <code class="computeroutput">callgrind_control</code>.</p>
 </div>
 </div>
 <div class="sect1" lang="en">
@@ -652,13 +662,9 @@ Also see <a href="cl-manual.html#cl-manual.limits">Limiting range of event colle
       specification of <code class="computeroutput">--toggle-collect</code>
       implicitly sets
       <code class="computeroutput">--collect-state=no</code>.</p>
-<p>Collection state can be toggled also by using a Valgrind
-      Client Request in your application.  For this, include
-      <code class="computeroutput">valgrind/callgrind.h</code> and specify
-      the macro
-      <code class="computeroutput">CALLGRIND_TOGGLE_COLLECT</code> at the
-      needed positions. This only will have any effect if run under
-      supervision of the Callgrind tool.</p>
+<p>Collection state can be toggled also by inserting the client request
+      <code class="computeroutput"><a href="cl-manual.html#cr.toggle-collect">CALLGRIND_TOGGLE_COLLECT</a>;</code>
+      at the needed code positions.</p>
 </dd>
 <dt>
 <a name="opt.toggle-collect"></a><span class="term">
@@ -788,6 +794,77 @@ Also see <a href="cl-manual.html#cl-manual.cycles">Avoiding cycles</a>.</p>
       all possible stream accesses.</p></dd>
 </dl>
 </div>
+</div>
+</div>
+<div class="sect1" lang="en">
+<div class="titlepage"><div><div><h2 class="title" style="clear: both">
+<a name="cl-manual.clientrequests"></a>6.4. Callgrind specific client requests</h2></div></div></div>
+<p>In Valgrind terminology, a client request is a C macro which
+can be inserted into your code to request specific functionality when
+run under Valgrind. For this, special instruction patterns resulting
+in NOPs are used, but which can be detected by Valgrind.</p>
+<p>Callgrind provides the following specific client requests.
+To use them, add the line
+</p>
+<pre class="screen">#include &lt;valgrind/callgrind.h&gt;</pre>
+<p>
+into your code for the macro definitions.
+.</p>
+<div class="variablelist">
+<a name="cl.clientrequests.list"></a><dl>
+<dt>
+<a name="cr.dump-stats"></a><span class="term">
+      <code class="computeroutput">CALLGRIND_DUMP_STATS</code>
+    </span>
+</dt>
+<dd><p>Force generation of a profile dump at specified position
+      in code, for the current thread only. Written counters will be reset
+      to zero.</p></dd>
+<dt>
+<a name="cr.dump-stats-at"></a><span class="term">
+      <code class="computeroutput">CALLGRIND_DUMP_STATS_AT(string)</code>
+    </span>
+</dt>
+<dd><p>Same as CALLGRIND_DUMP_STATS, but allows to specify a string
+      to be able to distinguish profile dumps.</p></dd>
+<dt>
+<a name="cr.zero-stats"></a><span class="term">
+      <code class="computeroutput">CALLGRIND_ZERO_STATS</code>
+    </span>
+</dt>
+<dd><p>Reset the profile counters for the current thread to zero.</p></dd>
+<dt>
+<a name="cr.toggle-collect"></a><span class="term">
+      <code class="computeroutput">CALLGRIND_TOGGLE_COLLECT</code>
+    </span>
+</dt>
+<dd><p>Toggle the collection state. This allows to ignore events
+      with regard to profile counters. See also options
+      <a href="cl-manual.html#opt.collect-atstart">--collect-atstart</a> and
+      <a href="cl-manual.html#opt.toggle-collect">--toggle-collect</a>.</p></dd>
+<dt>
+<a name="cr.start-instr"></a><span class="term">
+      <code class="computeroutput">CALLGRIND_START_INSTRUMENTATION</code>
+    </span>
+</dt>
+<dd><p>Start full Callgrind instrumentation if not already switched on.
+      When cache simulation is done, this will flush the simulated cache
+      and lead to an artifical cache warmup phase afterwards with
+      cache misses which would not have happened in reality.
+      See also option <a href="cl-manual.html#opt.instr-atstart">--instr-atstart</a>.</p></dd>
+<dt>
+<a name="cr.stop-instr"></a><span class="term">
+      <code class="computeroutput">CALLGRIND_STOP_INSTRUMENTATION</code>
+    </span>
+</dt>
+<dd><p>Stop full Callgrind instrumentation if not already switched off.
+      This flushes Valgrinds translation cache, and does no additional
+      instrumentation afterwards: it effectivly will run at the same
+      speed as the "none" tool, ie. at minimal slowdown. Use this to
+      speed up the Callgrind run for uninteresting code parts. Use
+      <a href="cl-manual.html#cr.start-instr">CALLGRIND_START_INSTRUMENTATION</a> to switch on instrumentation again.
+      See also option <a href="cl-manual.html#opt.instr-atstart">--instr-atstart</a>.</p></dd>
+</dl>
 </div>
 </div>
 </div>

@@ -38,20 +38,23 @@ build_triplet = @build@
 host_triplet = @host@
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(top_srcdir)/Makefile.flags.am
-check_PROGRAMS = hg01_all_ok$(EXEEXT) hg02_deadlock$(EXEEXT) \
+check_PROGRAMS = bar_bad$(EXEEXT) bar_trivial$(EXEEXT) \
+	hg01_all_ok$(EXEEXT) hg02_deadlock$(EXEEXT) \
 	hg03_inherit$(EXEEXT) hg04_race$(EXEEXT) hg05_race2$(EXEEXT) \
-	hg06_readshared$(EXEEXT) tc01_simple_race$(EXEEXT) \
-	tc02_simple_tls$(EXEEXT) tc03_re_excl$(EXEEXT) \
-	tc04_free_lock$(EXEEXT) tc05_simple_race$(EXEEXT) \
-	tc06_two_races$(EXEEXT) tc07_hbl1$(EXEEXT) tc08_hbl2$(EXEEXT) \
-	tc09_bad_unlock$(EXEEXT) tc10_rec_lock$(EXEEXT) \
-	tc11_XCHG$(EXEEXT) tc12_rwl_trivial$(EXEEXT) \
-	tc13_laog1$(EXEEXT) tc14_laog_dinphils$(EXEEXT) \
-	tc15_laog_lockdel$(EXEEXT) tc16_byterace$(EXEEXT) \
-	tc17_sembar$(EXEEXT) tc18_semabuse$(EXEEXT) \
-	tc19_shadowmem$(EXEEXT) tc20_verifywrap$(EXEEXT) \
-	tc21_pthonce$(EXEEXT) tc22_exit_w_lock$(EXEEXT) \
-	tc23_bogus_condwait$(EXEEXT) tc24_nonzero_sem$(EXEEXT)
+	hg06_readshared$(EXEEXT) pth_barrier$(EXEEXT) \
+	rwlock_race$(EXEEXT) rwlock_test$(EXEEXT) \
+	tc01_simple_race$(EXEEXT) tc02_simple_tls$(EXEEXT) \
+	tc03_re_excl$(EXEEXT) tc04_free_lock$(EXEEXT) \
+	tc05_simple_race$(EXEEXT) tc06_two_races$(EXEEXT) \
+	tc07_hbl1$(EXEEXT) tc08_hbl2$(EXEEXT) tc09_bad_unlock$(EXEEXT) \
+	tc10_rec_lock$(EXEEXT) tc11_XCHG$(EXEEXT) \
+	tc12_rwl_trivial$(EXEEXT) tc13_laog1$(EXEEXT) \
+	tc14_laog_dinphils$(EXEEXT) tc15_laog_lockdel$(EXEEXT) \
+	tc16_byterace$(EXEEXT) tc17_sembar$(EXEEXT) \
+	tc18_semabuse$(EXEEXT) tc19_shadowmem$(EXEEXT) \
+	tc20_verifywrap$(EXEEXT) tc21_pthonce$(EXEEXT) \
+	tc22_exit_w_lock$(EXEEXT) tc23_bogus_condwait$(EXEEXT) \
+	tc24_nonzero_sem$(EXEEXT)
 subdir = helgrind/tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.in
@@ -60,6 +63,14 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
+bar_bad_SOURCES = bar_bad.c
+bar_bad_OBJECTS = bar_bad.$(OBJEXT)
+bar_bad_LDADD = $(LDADD)
+bar_bad_DEPENDENCIES =
+bar_trivial_SOURCES = bar_trivial.c
+bar_trivial_OBJECTS = bar_trivial.$(OBJEXT)
+bar_trivial_LDADD = $(LDADD)
+bar_trivial_DEPENDENCIES =
 hg01_all_ok_SOURCES = hg01_all_ok.c
 hg01_all_ok_OBJECTS = hg01_all_ok.$(OBJEXT)
 hg01_all_ok_LDADD = $(LDADD)
@@ -84,6 +95,18 @@ hg06_readshared_SOURCES = hg06_readshared.c
 hg06_readshared_OBJECTS = hg06_readshared.$(OBJEXT)
 hg06_readshared_LDADD = $(LDADD)
 hg06_readshared_DEPENDENCIES =
+am_pth_barrier_OBJECTS = pth_barrier.$(OBJEXT)
+pth_barrier_OBJECTS = $(am_pth_barrier_OBJECTS)
+pth_barrier_LDADD = $(LDADD)
+pth_barrier_DEPENDENCIES =
+am_rwlock_race_OBJECTS = rwlock_race.$(OBJEXT)
+rwlock_race_OBJECTS = $(am_rwlock_race_OBJECTS)
+rwlock_race_LDADD = $(LDADD)
+rwlock_race_DEPENDENCIES =
+am_rwlock_test_OBJECTS = rwlock_test.$(OBJEXT)
+rwlock_test_OBJECTS = $(am_rwlock_test_OBJECTS)
+rwlock_test_LDADD = $(LDADD)
+rwlock_test_DEPENDENCIES =
 tc01_simple_race_SOURCES = tc01_simple_race.c
 tc01_simple_race_OBJECTS = tc01_simple_race.$(OBJEXT)
 tc01_simple_race_LDADD = $(LDADD)
@@ -188,26 +211,28 @@ COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 CCLD = $(CC)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = hg01_all_ok.c hg02_deadlock.c hg03_inherit.c hg04_race.c \
-	hg05_race2.c hg06_readshared.c tc01_simple_race.c \
-	tc02_simple_tls.c tc03_re_excl.c tc04_free_lock.c \
-	tc05_simple_race.c tc06_two_races.c tc07_hbl1.c tc08_hbl2.c \
-	tc09_bad_unlock.c tc10_rec_lock.c tc11_XCHG.c \
-	tc12_rwl_trivial.c tc13_laog1.c tc14_laog_dinphils.c \
-	tc15_laog_lockdel.c tc16_byterace.c tc17_sembar.c \
-	tc18_semabuse.c tc19_shadowmem.c tc20_verifywrap.c \
-	tc21_pthonce.c tc22_exit_w_lock.c tc23_bogus_condwait.c \
-	tc24_nonzero_sem.c
-DIST_SOURCES = hg01_all_ok.c hg02_deadlock.c hg03_inherit.c \
-	hg04_race.c hg05_race2.c hg06_readshared.c tc01_simple_race.c \
-	tc02_simple_tls.c tc03_re_excl.c tc04_free_lock.c \
-	tc05_simple_race.c tc06_two_races.c tc07_hbl1.c tc08_hbl2.c \
-	tc09_bad_unlock.c tc10_rec_lock.c tc11_XCHG.c \
-	tc12_rwl_trivial.c tc13_laog1.c tc14_laog_dinphils.c \
-	tc15_laog_lockdel.c tc16_byterace.c tc17_sembar.c \
-	tc18_semabuse.c tc19_shadowmem.c tc20_verifywrap.c \
-	tc21_pthonce.c tc22_exit_w_lock.c tc23_bogus_condwait.c \
-	tc24_nonzero_sem.c
+SOURCES = bar_bad.c bar_trivial.c hg01_all_ok.c hg02_deadlock.c \
+	hg03_inherit.c hg04_race.c hg05_race2.c hg06_readshared.c \
+	$(pth_barrier_SOURCES) $(rwlock_race_SOURCES) \
+	$(rwlock_test_SOURCES) tc01_simple_race.c tc02_simple_tls.c \
+	tc03_re_excl.c tc04_free_lock.c tc05_simple_race.c \
+	tc06_two_races.c tc07_hbl1.c tc08_hbl2.c tc09_bad_unlock.c \
+	tc10_rec_lock.c tc11_XCHG.c tc12_rwl_trivial.c tc13_laog1.c \
+	tc14_laog_dinphils.c tc15_laog_lockdel.c tc16_byterace.c \
+	tc17_sembar.c tc18_semabuse.c tc19_shadowmem.c \
+	tc20_verifywrap.c tc21_pthonce.c tc22_exit_w_lock.c \
+	tc23_bogus_condwait.c tc24_nonzero_sem.c
+DIST_SOURCES = bar_bad.c bar_trivial.c hg01_all_ok.c hg02_deadlock.c \
+	hg03_inherit.c hg04_race.c hg05_race2.c hg06_readshared.c \
+	$(pth_barrier_SOURCES) $(rwlock_race_SOURCES) \
+	$(rwlock_test_SOURCES) tc01_simple_race.c tc02_simple_tls.c \
+	tc03_re_excl.c tc04_free_lock.c tc05_simple_race.c \
+	tc06_two_races.c tc07_hbl1.c tc08_hbl2.c tc09_bad_unlock.c \
+	tc10_rec_lock.c tc11_XCHG.c tc12_rwl_trivial.c tc13_laog1.c \
+	tc14_laog_dinphils.c tc15_laog_lockdel.c tc16_byterace.c \
+	tc17_sembar.c tc18_semabuse.c tc19_shadowmem.c \
+	tc20_verifywrap.c tc21_pthonce.c tc22_exit_w_lock.c \
+	tc23_bogus_condwait.c tc24_nonzero_sem.c
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -215,16 +240,21 @@ ACLOCAL = @ACLOCAL@
 AMDEP_FALSE = @AMDEP_FALSE@
 AMDEP_TRUE = @AMDEP_TRUE@
 AMTAR = @AMTAR@
+AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+BOOST_CFLAGS = @BOOST_CFLAGS@
+BOOST_LIBS = @BOOST_LIBS@
 BUILD_MPIWRAP_PRI_FALSE = @BUILD_MPIWRAP_PRI_FALSE@
 BUILD_MPIWRAP_PRI_TRUE = @BUILD_MPIWRAP_PRI_TRUE@
 BUILD_MPIWRAP_SEC_FALSE = @BUILD_MPIWRAP_SEC_FALSE@
 BUILD_MPIWRAP_SEC_TRUE = @BUILD_MPIWRAP_SEC_TRUE@
 BUILD_SSE3_TESTS_FALSE = @BUILD_SSE3_TESTS_FALSE@
 BUILD_SSE3_TESTS_TRUE = @BUILD_SSE3_TESTS_TRUE@
+BUILD_SSSE3_TESTS_FALSE = @BUILD_SSSE3_TESTS_FALSE@
+BUILD_SSSE3_TESTS_TRUE = @BUILD_SSSE3_TESTS_TRUE@
 CC = @CC@
 CCAS = @CCAS@
 CCASFLAGS = @CCASFLAGS@
@@ -252,8 +282,22 @@ FLAG_MAIX32 = @FLAG_MAIX32@
 FLAG_MAIX64 = @FLAG_MAIX64@
 FLAG_MMMX = @FLAG_MMMX@
 FLAG_MSSE = @FLAG_MSSE@
+FLAG_UNLIMITED_INLINE_UNIT_GROWTH = @FLAG_UNLIMITED_INLINE_UNIT_GROWTH@
 FLAG_WDECL_AFTER_STMT = @FLAG_WDECL_AFTER_STMT@
+FLAG_W_EXTRA = @FLAG_W_EXTRA@
+FLAG_W_NO_FORMAT_ZERO_LENGTH = @FLAG_W_NO_FORMAT_ZERO_LENGTH@
 GDB = @GDB@
+GLIBC_VERSION = @GLIBC_VERSION@
+HAS_ALTIVEC_FALSE = @HAS_ALTIVEC_FALSE@
+HAS_ALTIVEC_TRUE = @HAS_ALTIVEC_TRUE@
+HAVE_ALTIVEC_H_FALSE = @HAVE_ALTIVEC_H_FALSE@
+HAVE_ALTIVEC_H_TRUE = @HAVE_ALTIVEC_H_TRUE@
+HAVE_BOOST_1_35_FALSE = @HAVE_BOOST_1_35_FALSE@
+HAVE_BOOST_1_35_TRUE = @HAVE_BOOST_1_35_TRUE@
+HAVE_OPENMP_FALSE = @HAVE_OPENMP_FALSE@
+HAVE_OPENMP_TRUE = @HAVE_OPENMP_TRUE@
+HAVE_QTCORE_FALSE = @HAVE_QTCORE_FALSE@
+HAVE_QTCORE_TRUE = @HAVE_QTCORE_TRUE@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
@@ -303,8 +347,9 @@ VGP_PPC64_LINUX_FALSE = @VGP_PPC64_LINUX_FALSE@
 VGP_PPC64_LINUX_TRUE = @VGP_PPC64_LINUX_TRUE@
 VGP_X86_LINUX_FALSE = @VGP_X86_LINUX_FALSE@
 VGP_X86_LINUX_TRUE = @VGP_X86_LINUX_TRUE@
-VG_ARCH = @VG_ARCH@
 VG_ARCH_ALL = @VG_ARCH_ALL@
+VG_ARCH_MAX = @VG_ARCH_MAX@
+VG_ARCH_PRI = @VG_ARCH_PRI@
 VG_OS = @VG_OS@
 VG_PLATFORM_PRI = @VG_PLATFORM_PRI@
 VG_PLATFORM_SEC = @VG_PLATFORM_SEC@
@@ -354,6 +399,7 @@ target_alias = @target_alias@
 # performance and get whatever useful warnings we can out of gcc.
 AM_CFLAGS_BASE = -O2 -g -Wmissing-prototypes -Wall -Wshadow \
                  -Wpointer-arith -Wstrict-prototypes -Wmissing-declarations \
+		 @FLAG_W_NO_FORMAT_ZERO_LENGTH@ \
                  -fno-strict-aliasing
 
 
@@ -410,8 +456,8 @@ AM_CCASFLAGS_PRI = $(AM_CCASFLAGS_@VG_PLATFORM_PRI@)
 
 # Baseline link flags for making dynamic shared objects.
 #
-PRELOAD_LDFLAGS_COMMON_LINUX = -nostdlib -shared -Wl,-z,interpose,-z,initfirst
-PRELOAD_LDFLAGS_COMMON_AIX5 = -nostdlib -shared -Wl,-G -Wl,-bnogc
+PRELOAD_LDFLAGS_COMMON_LINUX = -nodefaultlibs -shared -Wl,-z,interpose,-z,initfirst
+PRELOAD_LDFLAGS_COMMON_AIX5 = -nodefaultlibs -shared -Wl,-G -Wl,-bnogc
 PRELOAD_LDFLAGS_X86_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
 PRELOAD_LDFLAGS_AMD64_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M64@
 PRELOAD_LDFLAGS_PPC32_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
@@ -422,25 +468,48 @@ PRELOAD_LDFLAGS_PPC64_AIX5 = $(PRELOAD_LDFLAGS_COMMON_AIX5)  @FLAG_MAIX64@
 # For AM_FLAG_M3264_PRI
 noinst_SCRIPTS = filter_stderr
 EXTRA_DIST = $(noinst_SCRIPTS) \
+	bar_bad.vgtest bar_bad.stdout.exp \
+		bar_bad.stderr.exp-glibc28-amd64 \
+	bar_trivial.vgtest bar_trivial.stdout.exp \
+		bar_trivial.stderr.exp-glibc28-amd64 \
 	hg01_all_ok.vgtest hg01_all_ok.stdout.exp \
 		hg01_all_ok.stderr.exp-glibc25-amd64 \
 	hg02_deadlock.vgtest hg02_deadlock.stdout.exp \
 		hg02_deadlock.stderr.exp-glibc25-amd64 \
 		hg02_deadlock.stderr.exp-glibc25-x86 \
+		hg02_deadlock.stderr.exp-glibc27-amd64 \
 	hg03_inherit.vgtest hg03_inherit.stdout.exp \
 		hg03_inherit.stderr.exp-glibc25-amd64 \
 		hg03_inherit.stderr.exp-glibc25-x86 \
+		hg03_inherit.stderr.exp-glibc27-amd64 \
 	hg04_race.vgtest hg04_race.stdout.exp \
 		hg04_race.stderr.exp-glibc25-amd64 \
 		hg04_race.stderr.exp-glibc25-x86 \
+		hg04_race.stderr.exp-glibc27-amd64 \
 	hg05_race2.vgtest hg05_race2.stdout.exp \
 		hg05_race2.stderr.exp-glibc25-amd64 \
 		hg05_race2.stderr.exp-glibc25-x86 \
+		hg05_race2.stderr.exp-glibc27-amd64 \
 	hg06_readshared.vgtest hg06_readshared.stdout.exp \
 		hg06_readshared.stderr.exp-glibc25-amd64 \
+	pth_barrier1.vgtest pth_barrier1.stdout.exp \
+		pth_barrier1.stderr.exp-glibc27-amd64 \
+		pth_barrier1.stderr.exp-glibc28-amd64 \
+	pth_barrier2.vgtest pth_barrier2.stdout.exp \
+		pth_barrier2.stderr.exp-glibc27-amd64 \
+		pth_barrier2.stderr.exp-glibc28-amd64 \
+	pth_barrier3.vgtest pth_barrier3.stdout.exp \
+		pth_barrier3.stderr.exp-glibc27-amd64 \
+		pth_barrier3.stderr.exp-glibc28-amd64 \
+	rwlock_race.vgtest rwlock_race.stdout.exp \
+		rwlock_race.stderr.exp-glibc25-amd64 \
+		rwlock_race.stderr.exp-glibc27-amd64 \
+	rwlock_test.vgtest rwlock_test.stdout.exp \
+		rwlock_test.stderr.exp-glibc25-amd64 \
 	tc01_simple_race.vgtest tc01_simple_race.stdout.exp \
 		tc01_simple_race.stderr.exp-glibc25-amd64 \
 		tc01_simple_race.stderr.exp-glibc25-x86 \
+		tc01_simple_race.stderr.exp-glibc27-amd64 \
 	tc02_simple_tls.vgtest tc02_simple_tls.stdout.exp \
 		tc02_simple_tls.stderr.exp-glibc25-amd64 \
 	tc03_re_excl.vgtest tc03_re_excl.stdout.exp \
@@ -450,9 +519,11 @@ EXTRA_DIST = $(noinst_SCRIPTS) \
 	tc05_simple_race.vgtest tc05_simple_race.stdout.exp \
 		tc05_simple_race.stderr.exp-glibc25-amd64 \
 		tc05_simple_race.stderr.exp-glibc25-x86 \
+		tc05_simple_race.stderr.exp-glibc27-amd64 \
 	tc06_two_races.vgtest tc06_two_races.stdout.exp \
 		tc06_two_races.stderr.exp-glibc25-amd64 \
 		tc06_two_races.stderr.exp-glibc25-x86 \
+		tc06_two_races.stderr.exp-glibc27-amd64 \
 	tc07_hbl1.vgtest tc07_hbl1.stdout.exp \
 		tc07_hbl1.stderr.exp-glibc25-amd64 \
 	tc08_hbl2.vgtest tc08_hbl2.stdout.exp \
@@ -461,6 +532,7 @@ EXTRA_DIST = $(noinst_SCRIPTS) \
 		tc09_bad_unlock.stderr.exp-glibc23-amd64 \
 		tc09_bad_unlock.stderr.exp-glibc25-amd64 \
 		tc09_bad_unlock.stderr.exp-glibc25-x86 \
+		tc09_bad_unlock.stderr.exp-glibc27-amd64 \
 	tc10_rec_lock.vgtest tc10_rec_lock.stdout.exp \
 		tc10_rec_lock.stderr.exp-glibc25-amd64 \
 	tc11_XCHG.vgtest tc11_XCHG.stdout.exp \
@@ -472,30 +544,39 @@ EXTRA_DIST = $(noinst_SCRIPTS) \
 	tc14_laog_dinphils.vgtest tc14_laog_dinphils.stdout.exp \
 		tc14_laog_dinphils.stderr.exp-glibc25-amd64 \
 		tc14_laog_dinphils.stderr.exp-glibc25-x86 \
+		tc14_laog_dinphils.stderr.exp-glibc27-amd64 \
 	tc15_laog_lockdel.vgtest tc15_laog_lockdel.stdout.exp \
 		tc15_laog_lockdel.stderr.exp-glibc25-amd64 \
 	tc16_byterace.vgtest tc16_byterace.stdout.exp \
 		tc16_byterace.stderr.exp-glibc25-amd64 \
 		tc16_byterace.stderr.exp-glibc25-x86 \
+		tc16_byterace.stderr.exp-glibc27-amd64 \
 	tc17_sembar.vgtest tc17_sembar.stdout.exp \
 		tc17_sembar.stderr.exp-glibc25-amd64 \
 		tc17_sembar.stderr.exp-glibc25-x86 \
 	tc18_semabuse.vgtest tc18_semabuse.stdout.exp \
 		tc18_semabuse.stderr.exp-glibc25-amd64 \
 		tc18_semabuse.stderr.exp-glibc25-x86 \
+		tc18_semabuse.stderr.exp-glibc28-amd64 \
 	tc19_shadowmem.vgtest tc19_shadowmem.stdout.exp \
 		tc19_shadowmem.stderr.exp-glibc25-amd64 \
 		tc19_shadowmem.stderr.exp-glibc25-x86 \
+		tc19_shadowmem.stderr.exp-glibc27-amd64 \
 	tc20_verifywrap.vgtest tc20_verifywrap.stdout.exp \
 		tc20_verifywrap.stderr.exp-glibc23-amd64 \
 		tc20_verifywrap.stderr.exp-glibc25-amd64 \
 		tc20_verifywrap.stderr.exp-glibc25-x86 \
+		tc20_verifywrap.stderr.exp-glibc27-amd64 \
+		tc20_verifywrap.stderr.exp-glibc28-amd64 \
 	tc21_pthonce.vgtest tc21_pthonce.stdout.exp \
+		tc21_pthonce.stderr.exp-glibc23-amd64 \
 		tc21_pthonce.stderr.exp-glibc25-amd64 \
 		tc21_pthonce.stderr.exp-glibc25-x86 \
+		tc21_pthonce.stderr.exp-glibc27-amd64 \
 	tc22_exit_w_lock.vgtest tc22_exit_w_lock.stdout.exp \
 		tc22_exit_w_lock.stderr.exp-glibc25-amd64 \
 		tc22_exit_w_lock.stderr.exp-glibc25-x86 \
+		tc22_exit_w_lock.stderr.exp-glibc27-amd64 \
 	tc23_bogus_condwait.vgtest tc23_bogus_condwait.stdout.exp \
 		tc23_bogus_condwait.stderr.exp-glibc25-amd64 \
 		tc23_bogus_condwait.stderr.exp-glibc25-x86 \
@@ -510,6 +591,11 @@ AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/include \
 # are these necessary?
 AM_CFLAGS = $(WERROR) -Winline -Wall -Wshadow -g $(AM_FLAG_M3264_PRI)
 LDADD = -lpthread
+
+# only needed because of referencing sources in drd/tests
+pth_barrier_SOURCES = ../../drd/tests/pth_barrier.c
+rwlock_race_SOURCES = ../../drd/tests/rwlock_race.c
+rwlock_test_SOURCES = ../../drd/tests/rwlock_test.c
 all: all-am
 
 .SUFFIXES:
@@ -523,9 +609,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu  helgrind/tests/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign  helgrind/tests/Makefile'; \
 	cd $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu  helgrind/tests/Makefile
+	  $(AUTOMAKE) --foreign  helgrind/tests/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -546,6 +632,12 @@ $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 
 clean-checkPROGRAMS:
 	-test -z "$(check_PROGRAMS)" || rm -f $(check_PROGRAMS)
+bar_bad$(EXEEXT): $(bar_bad_OBJECTS) $(bar_bad_DEPENDENCIES) 
+	@rm -f bar_bad$(EXEEXT)
+	$(LINK) $(bar_bad_LDFLAGS) $(bar_bad_OBJECTS) $(bar_bad_LDADD) $(LIBS)
+bar_trivial$(EXEEXT): $(bar_trivial_OBJECTS) $(bar_trivial_DEPENDENCIES) 
+	@rm -f bar_trivial$(EXEEXT)
+	$(LINK) $(bar_trivial_LDFLAGS) $(bar_trivial_OBJECTS) $(bar_trivial_LDADD) $(LIBS)
 hg01_all_ok$(EXEEXT): $(hg01_all_ok_OBJECTS) $(hg01_all_ok_DEPENDENCIES) 
 	@rm -f hg01_all_ok$(EXEEXT)
 	$(LINK) $(hg01_all_ok_LDFLAGS) $(hg01_all_ok_OBJECTS) $(hg01_all_ok_LDADD) $(LIBS)
@@ -564,6 +656,15 @@ hg05_race2$(EXEEXT): $(hg05_race2_OBJECTS) $(hg05_race2_DEPENDENCIES)
 hg06_readshared$(EXEEXT): $(hg06_readshared_OBJECTS) $(hg06_readshared_DEPENDENCIES) 
 	@rm -f hg06_readshared$(EXEEXT)
 	$(LINK) $(hg06_readshared_LDFLAGS) $(hg06_readshared_OBJECTS) $(hg06_readshared_LDADD) $(LIBS)
+pth_barrier$(EXEEXT): $(pth_barrier_OBJECTS) $(pth_barrier_DEPENDENCIES) 
+	@rm -f pth_barrier$(EXEEXT)
+	$(LINK) $(pth_barrier_LDFLAGS) $(pth_barrier_OBJECTS) $(pth_barrier_LDADD) $(LIBS)
+rwlock_race$(EXEEXT): $(rwlock_race_OBJECTS) $(rwlock_race_DEPENDENCIES) 
+	@rm -f rwlock_race$(EXEEXT)
+	$(LINK) $(rwlock_race_LDFLAGS) $(rwlock_race_OBJECTS) $(rwlock_race_LDADD) $(LIBS)
+rwlock_test$(EXEEXT): $(rwlock_test_OBJECTS) $(rwlock_test_DEPENDENCIES) 
+	@rm -f rwlock_test$(EXEEXT)
+	$(LINK) $(rwlock_test_LDFLAGS) $(rwlock_test_OBJECTS) $(rwlock_test_LDADD) $(LIBS)
 tc01_simple_race$(EXEEXT): $(tc01_simple_race_OBJECTS) $(tc01_simple_race_DEPENDENCIES) 
 	@rm -f tc01_simple_race$(EXEEXT)
 	$(LINK) $(tc01_simple_race_LDFLAGS) $(tc01_simple_race_OBJECTS) $(tc01_simple_race_LDADD) $(LIBS)
@@ -643,12 +744,17 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bar_bad.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bar_trivial.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hg01_all_ok.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hg02_deadlock.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hg03_inherit.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hg04_race.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hg05_race2.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hg06_readshared.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pth_barrier.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rwlock_race.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rwlock_test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tc01_simple_race.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tc02_simple_tls.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tc03_re_excl.Po@am__quote@
@@ -687,6 +793,48 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
+
+pth_barrier.o: ../../drd/tests/pth_barrier.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT pth_barrier.o -MD -MP -MF "$(DEPDIR)/pth_barrier.Tpo" -c -o pth_barrier.o `test -f '../../drd/tests/pth_barrier.c' || echo '$(srcdir)/'`../../drd/tests/pth_barrier.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/pth_barrier.Tpo" "$(DEPDIR)/pth_barrier.Po"; else rm -f "$(DEPDIR)/pth_barrier.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../../drd/tests/pth_barrier.c' object='pth_barrier.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o pth_barrier.o `test -f '../../drd/tests/pth_barrier.c' || echo '$(srcdir)/'`../../drd/tests/pth_barrier.c
+
+pth_barrier.obj: ../../drd/tests/pth_barrier.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT pth_barrier.obj -MD -MP -MF "$(DEPDIR)/pth_barrier.Tpo" -c -o pth_barrier.obj `if test -f '../../drd/tests/pth_barrier.c'; then $(CYGPATH_W) '../../drd/tests/pth_barrier.c'; else $(CYGPATH_W) '$(srcdir)/../../drd/tests/pth_barrier.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/pth_barrier.Tpo" "$(DEPDIR)/pth_barrier.Po"; else rm -f "$(DEPDIR)/pth_barrier.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../../drd/tests/pth_barrier.c' object='pth_barrier.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o pth_barrier.obj `if test -f '../../drd/tests/pth_barrier.c'; then $(CYGPATH_W) '../../drd/tests/pth_barrier.c'; else $(CYGPATH_W) '$(srcdir)/../../drd/tests/pth_barrier.c'; fi`
+
+rwlock_race.o: ../../drd/tests/rwlock_race.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rwlock_race.o -MD -MP -MF "$(DEPDIR)/rwlock_race.Tpo" -c -o rwlock_race.o `test -f '../../drd/tests/rwlock_race.c' || echo '$(srcdir)/'`../../drd/tests/rwlock_race.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/rwlock_race.Tpo" "$(DEPDIR)/rwlock_race.Po"; else rm -f "$(DEPDIR)/rwlock_race.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../../drd/tests/rwlock_race.c' object='rwlock_race.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rwlock_race.o `test -f '../../drd/tests/rwlock_race.c' || echo '$(srcdir)/'`../../drd/tests/rwlock_race.c
+
+rwlock_race.obj: ../../drd/tests/rwlock_race.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rwlock_race.obj -MD -MP -MF "$(DEPDIR)/rwlock_race.Tpo" -c -o rwlock_race.obj `if test -f '../../drd/tests/rwlock_race.c'; then $(CYGPATH_W) '../../drd/tests/rwlock_race.c'; else $(CYGPATH_W) '$(srcdir)/../../drd/tests/rwlock_race.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/rwlock_race.Tpo" "$(DEPDIR)/rwlock_race.Po"; else rm -f "$(DEPDIR)/rwlock_race.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../../drd/tests/rwlock_race.c' object='rwlock_race.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rwlock_race.obj `if test -f '../../drd/tests/rwlock_race.c'; then $(CYGPATH_W) '../../drd/tests/rwlock_race.c'; else $(CYGPATH_W) '$(srcdir)/../../drd/tests/rwlock_race.c'; fi`
+
+rwlock_test.o: ../../drd/tests/rwlock_test.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rwlock_test.o -MD -MP -MF "$(DEPDIR)/rwlock_test.Tpo" -c -o rwlock_test.o `test -f '../../drd/tests/rwlock_test.c' || echo '$(srcdir)/'`../../drd/tests/rwlock_test.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/rwlock_test.Tpo" "$(DEPDIR)/rwlock_test.Po"; else rm -f "$(DEPDIR)/rwlock_test.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../../drd/tests/rwlock_test.c' object='rwlock_test.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rwlock_test.o `test -f '../../drd/tests/rwlock_test.c' || echo '$(srcdir)/'`../../drd/tests/rwlock_test.c
+
+rwlock_test.obj: ../../drd/tests/rwlock_test.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT rwlock_test.obj -MD -MP -MF "$(DEPDIR)/rwlock_test.Tpo" -c -o rwlock_test.obj `if test -f '../../drd/tests/rwlock_test.c'; then $(CYGPATH_W) '../../drd/tests/rwlock_test.c'; else $(CYGPATH_W) '$(srcdir)/../../drd/tests/rwlock_test.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/rwlock_test.Tpo" "$(DEPDIR)/rwlock_test.Po"; else rm -f "$(DEPDIR)/rwlock_test.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../../drd/tests/rwlock_test.c' object='rwlock_test.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o rwlock_test.obj `if test -f '../../drd/tests/rwlock_test.c'; then $(CYGPATH_W) '../../drd/tests/rwlock_test.c'; else $(CYGPATH_W) '$(srcdir)/../../drd/tests/rwlock_test.c'; fi`
 uninstall-info-am:
 
 ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)

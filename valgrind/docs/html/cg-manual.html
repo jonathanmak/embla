@@ -35,6 +35,7 @@
 <dt><span class="sect2"><a href="cg-manual.html#cg-manual.cgopts">5.2.2. Cachegrind options</a></span></dt>
 <dt><span class="sect2"><a href="cg-manual.html#cg-manual.annotate">5.2.3. Annotating C/C++ programs</a></span></dt>
 <dt><span class="sect2"><a href="cg-manual.html#cg-manual.assembler">5.2.4. Annotating assembly code programs</a></span></dt>
+<dt><span class="sect2"><a href="cg-manual.html#ms-manual.forkingprograms">5.2.5. Forking Programs</a></span></dt>
 </dl></dd>
 <dt><span class="sect1"><a href="cg-manual.html#cg-manual.annopts">5.3. cg_annotate options</a></span></dt>
 <dd><dl>
@@ -153,17 +154,19 @@ follows:</p>
     written to is brought into the D1 cache.  Most modern caches
     have this property.</p></li>
 <li>
-<p>Bit-selection hash function: the line(s) in the cache
+<p>Bit-selection hash function: the set of line(s) in the cache
     to which a memory block maps is chosen by the middle bits
     M--(M+N-1) of the byte address, where:</p>
 <div class="itemizedlist"><ul type="circle">
 <li><p>line size = 2^M bytes</p></li>
-<li><p>(cache size / line size) = 2^N bytes</p></li>
+<li><p>(cache size / line size / associativity) = 2^N bytes</p></li>
 </ul></div>
 </li>
-<li><p>Inclusive L2 cache: the L2 cache replicates all the
-    entries of the L1 cache.  This is standard on Pentium chips,
-    but AMD Opterons, Athlons and Durons 
+<li><p>Inclusive L2 cache: the L2 cache typically replicates all
+    the entries of the L1 caches, because fetching into L1 involves
+    fetching into L2 first (this does not guarantee strict inclusiveness,
+    as lines evicted from L2 still could reside in L1).  This is
+    standard on Pentium chips, but AMD Opterons, Athlons and Durons
     use an exclusive L2 cache that only holds
     blocks evicted from L1.  Ditto most modern VIA CPUs.</p></li>
 </ul></div>
@@ -178,7 +181,10 @@ happens.  You can manually specify one, two or all three levels
 (I1/D1/L2) of the cache from the command line using the
 <code class="computeroutput">--I1</code>,
 <code class="computeroutput">--D1</code> and
-<code class="computeroutput">--L2</code> options.</p>
+<code class="computeroutput">--L2</code> options.
+For cache parameters to be valid for simulation, the number
+of sets (with associativity being the number of cache lines in
+each set) has to be a power of two.</p>
 <p>On PowerPC platforms
 Cachegrind cannot automatically 
 determine the cache configuration, so you will 
@@ -215,10 +221,7 @@ need to specify it with the
 <p>If you are interested in simulating a cache with different
 properties, it is not particularly hard to write your own cache
 simulator, or to modify the existing ones in
-<code class="computeroutput">vg_cachesim_I1.c</code>,
-<code class="computeroutput">vg_cachesim_D1.c</code>,
-<code class="computeroutput">vg_cachesim_L2.c</code> and
-<code class="computeroutput">vg_cachesim_gen.c</code>.  We'd be
+<code class="computeroutput">cg_sim.c</code>. We'd be
 interested to hear from anyone who does.</p>
 </div>
 <div class="sect2" lang="en">
@@ -661,14 +664,23 @@ useful for understanding what is really happening when an
 interesting line of C code is translated into multiple
 instructions.</p>
 <p>To do this, you just need to assemble your
-<code class="computeroutput">.s</code> files with assembler-level
-debug information.  gcc doesn't do this, but you can use the GNU
-assembler with the <code class="computeroutput">--gstabs</code>
-option to generate object files with this information, eg:</p>
-<pre class="programlisting">
-as --gstabs foo.s</pre>
-<p>You can then profile and annotate source files in the same
-way as for C/C++ programs.</p>
+<code class="computeroutput">.s</code> files with assembly-level debug
+information.  You can use <code class="computeroutput">gcc
+-S</code> to compile C/C++ programs to assembly code, and then
+<code class="computeroutput">gcc -g</code> on the assembly code files to
+achieve this.  You can then profile and annotate the assembly code source
+files in the same way as C/C++ source files.</p>
+</div>
+<div class="sect2" lang="en">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="ms-manual.forkingprograms"></a>5.2.5. Forking Programs</h3></div></div></div>
+<p>If your program forks, the child will inherit all the profiling data that
+has been gathered for the parent.</p>
+<p>If the output file format string (controlled by
+<code class="option">--cachegrind-out-file</code>) does not contain <code class="option">%p</code>,
+then the outputs from the parent and child will be intermingled in a single
+output file, which will almost certainly make it unreadable by
+cg_annotate.</p>
 </div>
 </div>
 <div class="sect1" lang="en">

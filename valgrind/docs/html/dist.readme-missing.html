@@ -67,38 +67,47 @@ should be familiar to many Unix programmers.<br>
 <br>
 The syscall wrapper for time()<br>
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~<br>
-Removing the debug printing clutter, it looks like this:<br>
+The wrapper for the time system call looks like this:<br>
 <br>
-  PRE(time)<br>
+  PRE(sys_time)<br>
   {<br>
      /* time_t time(time_t *t); */<br>
-     PRINT("time ( %p )",arg1);<br>
-     if (arg1 != (UWord)NULL) {<br>
-        PRE_MEM_WRITE( "time", arg1, sizeof(time_t) );<br>
+     PRINT("sys_time ( %p )",ARG1);<br>
+     PRE_REG_READ1(long, "time", int *, t);<br>
+     if (ARG1 != 0) {<br>
+        PRE_MEM_WRITE( "time(t)", ARG1, sizeof(vki_time_t) );<br>
      }<br>
   }<br>
 <br>
-  POST(time)<br>
+  POST(sys_time)<br>
   {  <br>
-     if (arg1 != (UWord)NULL) {<br>
-        POST_MEM_WRITE( arg1, sizeof(vki_time_t) );<br>
+     if (ARG1 != 0) {<br>
+        POST_MEM_WRITE( ARG1, sizeof(vki_time_t) );<br>
      }<br>
   }<br>
 <br>
-The first thing we do happens before the syscall occurs, in the PRE() function:<br>
-if a non-NULL buffer is passed in as the argument, tell the tool that the<br>
+The first thing we do happens before the syscall occurs, in the PRE() function.<br>
+The PRE() function typically starts with invoking to the PRINT() macro. This<br>
+PRINT() macro implements support for the --trace-syscalls command line option.<br>
+Next, the tool is told the return type of the syscall, that the syscall has<br>
+one argument, the type of the syscall argument and that the argument is being<br>
+read from a register:<br>
+<br>
+     PRE_REG_READ1(long, "time", int *, t);<br>
+<br>
+Next, if a non-NULL buffer is passed in as the argument, tell the tool that the<br>
 buffer is about to be written to:<br>
 <br>
-     if (arg1 != (UWord)NULL) {<br>
-        PRE_MEM_WRITE( "time", arg1, sizeof(vki_time_t) );<br>
+     if (ARG1 != 0) {<br>
+        PRE_MEM_WRITE( "time", ARG1, sizeof(vki_time_t) );<br>
      }<br>
 <br>
 Finally, the really important bit, after the syscall occurs, in the POST()<br>
 function:  if, and only if, the system call was successful, tell the tool that<br>
 the memory was written:<br>
 <br>
-     if (arg1 != (UInt)NULL) {<br>
-        POST_MEM_WRITE( arg1, sizeof(vki_time_t) );<br>
+     if (ARG1 != 0) {<br>
+        POST_MEM_WRITE( ARG1, sizeof(vki_time_t) );<br>
      }<br>
 <br>
 The POST() function won't be called if the syscall failed, so you<br>
@@ -157,8 +166,7 @@ following:<br>
     dependant ones (in syswrap-$(PLATFORM)-linux.c).<br>
     The *XY variant if it requires a PRE() and POST() function, and<br>
     the *X_ variant if it only requires a PRE()<br>
-    function.  The 2nd arg of these macros indicate if the syscall<br>
-    could possibly block.<br>
+    function.  <br>
     <br>
     If you find this difficult, read the wrappers for other syscalls<br>
     for ideas.  A good tip is to look for the wrapper for a syscall<br>

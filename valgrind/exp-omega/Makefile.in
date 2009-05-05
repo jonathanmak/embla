@@ -14,33 +14,8 @@
 
 @SET_MAKE@
 
-# What the first for loop does: it copies a bunch of files which names
-# of the form wurble-arch-os to $prefix/lib/valgrind/arch-os/wurble.
-# There is some complexity in the sed mangling because wurble may itself
-# contain a dash, which must be ignored.  For example we want
-#    exp-omega-x86-linux
-# to be installed in 
-#    $prefix/lib/valgrind/x86-linux/exp-omega
-# and not in
-#    $prefix/lib/valgrind/omega-x86-linux/exp
-# or similarly mutant place.
-#
-# Note there is identical sed magic in Makefile.tool-inplace.am.
-
-# What the second for loop does: it copies libcoregrind.a and libvex.a
-# into the correct (target-specific) lib dirs at install time.
-# $(noinst_LIBRARIES) will look like this:
-#    libcoregrind_x86_linux.a libreplacemalloc_toolpreload_x86_linux.a
-#    libcoregrind_amd64_linux.a libreplacemalloc_toolpreload_amd64_linux.a
-# The 'if expr' filters out all but the libcoregrind_ ones.
-# pD and pU are the (arch,os) target pairs separated by a dash (pD) or
-# an underscore (pU) respectively, eg amd64-linux (pD) and amd64_linux (pU).
-# It then copies libcoregrind.a and libvex.a to the right places.
-
-# For a description of what these magic sed commands do, see comments
-# in Makefile.install.am (which has identical magic)
-
-
+# Don't build Omega.  Bundle all the relevant stuff up into
+# the tarfile, though.
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
 VPATH = @srcdir@
@@ -63,22 +38,8 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-DIST_COMMON = $(noinst_HEADERS) $(oinclude_HEADERS) \
-	$(srcdir)/Makefile.am $(srcdir)/Makefile.in \
-	$(top_srcdir)/Makefile.all.am $(top_srcdir)/Makefile.flags.am \
-	$(top_srcdir)/Makefile.install.am \
-	$(top_srcdir)/Makefile.tool-flags.am \
-	$(top_srcdir)/Makefile.tool-inplace.am \
-	$(top_srcdir)/Makefile.tool.am
-noinst_PROGRAMS = $(am__EXEEXT_1) $(am__EXEEXT_2) $(am__EXEEXT_3) \
-	$(am__EXEEXT_4) $(am__EXEEXT_5) $(am__EXEEXT_6)
-@VGP_X86_LINUX_TRUE@am__append_1 = exp-omega-x86-linux vgpreload_exp-omega-x86-linux.so
-@VGP_AMD64_LINUX_TRUE@am__append_2 = exp-omega-amd64-linux vgpreload_exp-omega-amd64-linux.so
-@VGP_PPC32_LINUX_TRUE@am__append_3 = exp-omega-ppc32-linux vgpreload_exp-omega-ppc32-linux.so
-@VGP_PPC64_LINUX_TRUE@am__append_4 = exp-omega-ppc64-linux vgpreload_exp-omega-ppc64-linux.so
-@VGP_PPC32_AIX5_TRUE@am__append_5 = exp-omega-ppc32-aix5 vgpreload_exp-omega-ppc32-aix5.so
-@VGP_PPC64_AIX5_TRUE@am__append_6 = exp-omega-ppc64-aix5 vgpreload_exp-omega-ppc64-aix5.so
 subdir = exp-omega
+DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.in
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
@@ -86,144 +47,14 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
-@VGP_X86_LINUX_TRUE@am__EXEEXT_1 = exp-omega-x86-linux$(EXEEXT) \
-@VGP_X86_LINUX_TRUE@	vgpreload_exp-omega-x86-linux.so$(EXEEXT)
-@VGP_AMD64_LINUX_TRUE@am__EXEEXT_2 = exp-omega-amd64-linux$(EXEEXT) \
-@VGP_AMD64_LINUX_TRUE@	vgpreload_exp-omega-amd64-linux.so$(EXEEXT)
-@VGP_PPC32_LINUX_TRUE@am__EXEEXT_3 = exp-omega-ppc32-linux$(EXEEXT) \
-@VGP_PPC32_LINUX_TRUE@	vgpreload_exp-omega-ppc32-linux.so$(EXEEXT)
-@VGP_PPC64_LINUX_TRUE@am__EXEEXT_4 = exp-omega-ppc64-linux$(EXEEXT) \
-@VGP_PPC64_LINUX_TRUE@	vgpreload_exp-omega-ppc64-linux.so$(EXEEXT)
-@VGP_PPC32_AIX5_TRUE@am__EXEEXT_5 = exp-omega-ppc32-aix5$(EXEEXT) \
-@VGP_PPC32_AIX5_TRUE@	vgpreload_exp-omega-ppc32-aix5.so$(EXEEXT)
-@VGP_PPC64_AIX5_TRUE@am__EXEEXT_6 = exp-omega-ppc64-aix5$(EXEEXT) \
-@VGP_PPC64_AIX5_TRUE@	vgpreload_exp-omega-ppc64-aix5.so$(EXEEXT)
-PROGRAMS = $(noinst_PROGRAMS)
-am__objects_1 = exp_omega_amd64_linux-o_main.$(OBJEXT)
-am_exp_omega_amd64_linux_OBJECTS = $(am__objects_1)
-exp_omega_amd64_linux_OBJECTS = $(am_exp_omega_amd64_linux_OBJECTS)
-am__DEPENDENCIES_1 =  \
-	$(top_builddir)/coregrind/libcoregrind_amd64_linux.a \
-	@VEX_DIR@/libvex_amd64_linux.a
-am__DEPENDENCIES_2 =
-am__DEPENDENCIES_3 = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_2)
-am__objects_2 = exp_omega_ppc32_aix5-o_main.$(OBJEXT)
-am_exp_omega_ppc32_aix5_OBJECTS = $(am__objects_2)
-exp_omega_ppc32_aix5_OBJECTS = $(am_exp_omega_ppc32_aix5_OBJECTS)
-am__DEPENDENCIES_4 =  \
-	$(top_builddir)/coregrind/libcoregrind_ppc32_aix5.a \
-	@VEX_DIR@/libvex_ppc32_aix5.a
-am__DEPENDENCIES_5 = $(am__DEPENDENCIES_4) $(am__DEPENDENCIES_2)
-am__objects_3 = exp_omega_ppc32_linux-o_main.$(OBJEXT)
-am_exp_omega_ppc32_linux_OBJECTS = $(am__objects_3)
-exp_omega_ppc32_linux_OBJECTS = $(am_exp_omega_ppc32_linux_OBJECTS)
-am__DEPENDENCIES_6 =  \
-	$(top_builddir)/coregrind/libcoregrind_ppc32_linux.a \
-	@VEX_DIR@/libvex_ppc32_linux.a
-am__DEPENDENCIES_7 = $(am__DEPENDENCIES_6) $(am__DEPENDENCIES_2)
-am__objects_4 = exp_omega_ppc64_aix5-o_main.$(OBJEXT)
-am_exp_omega_ppc64_aix5_OBJECTS = $(am__objects_4)
-exp_omega_ppc64_aix5_OBJECTS = $(am_exp_omega_ppc64_aix5_OBJECTS)
-am__DEPENDENCIES_8 =  \
-	$(top_builddir)/coregrind/libcoregrind_ppc64_aix5.a \
-	@VEX_DIR@/libvex_ppc64_aix5.a
-am__DEPENDENCIES_9 = $(am__DEPENDENCIES_8) $(am__DEPENDENCIES_2)
-am__objects_5 = exp_omega_ppc64_linux-o_main.$(OBJEXT)
-am_exp_omega_ppc64_linux_OBJECTS = $(am__objects_5)
-exp_omega_ppc64_linux_OBJECTS = $(am_exp_omega_ppc64_linux_OBJECTS)
-am__DEPENDENCIES_10 =  \
-	$(top_builddir)/coregrind/libcoregrind_ppc64_linux.a \
-	@VEX_DIR@/libvex_ppc64_linux.a
-am__DEPENDENCIES_11 = $(am__DEPENDENCIES_10) $(am__DEPENDENCIES_2)
-am__objects_6 = exp_omega_x86_linux-o_main.$(OBJEXT)
-am_exp_omega_x86_linux_OBJECTS = $(am__objects_6)
-exp_omega_x86_linux_OBJECTS = $(am_exp_omega_x86_linux_OBJECTS)
-am__DEPENDENCIES_12 =  \
-	$(top_builddir)/coregrind/libcoregrind_x86_linux.a \
-	@VEX_DIR@/libvex_x86_linux.a
-am__DEPENDENCIES_13 = $(am__DEPENDENCIES_12) $(am__DEPENDENCIES_2)
-am__objects_7 =  \
-	vgpreload_exp_omega_amd64_linux_so-o_replace_memops.$(OBJEXT)
-am_vgpreload_exp_omega_amd64_linux_so_OBJECTS = $(am__objects_7)
-vgpreload_exp_omega_amd64_linux_so_OBJECTS =  \
-	$(am_vgpreload_exp_omega_amd64_linux_so_OBJECTS)
-vgpreload_exp_omega_amd64_linux_so_LDADD = $(LDADD)
-am__objects_8 =  \
-	vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.$(OBJEXT)
-am_vgpreload_exp_omega_ppc32_aix5_so_OBJECTS = $(am__objects_8)
-vgpreload_exp_omega_ppc32_aix5_so_OBJECTS =  \
-	$(am_vgpreload_exp_omega_ppc32_aix5_so_OBJECTS)
-vgpreload_exp_omega_ppc32_aix5_so_LDADD = $(LDADD)
-am__objects_9 =  \
-	vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.$(OBJEXT)
-am_vgpreload_exp_omega_ppc32_linux_so_OBJECTS = $(am__objects_9)
-vgpreload_exp_omega_ppc32_linux_so_OBJECTS =  \
-	$(am_vgpreload_exp_omega_ppc32_linux_so_OBJECTS)
-vgpreload_exp_omega_ppc32_linux_so_LDADD = $(LDADD)
-am__objects_10 =  \
-	vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.$(OBJEXT)
-am_vgpreload_exp_omega_ppc64_aix5_so_OBJECTS = $(am__objects_10)
-vgpreload_exp_omega_ppc64_aix5_so_OBJECTS =  \
-	$(am_vgpreload_exp_omega_ppc64_aix5_so_OBJECTS)
-vgpreload_exp_omega_ppc64_aix5_so_LDADD = $(LDADD)
-am__objects_11 =  \
-	vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.$(OBJEXT)
-am_vgpreload_exp_omega_ppc64_linux_so_OBJECTS = $(am__objects_11)
-vgpreload_exp_omega_ppc64_linux_so_OBJECTS =  \
-	$(am_vgpreload_exp_omega_ppc64_linux_so_OBJECTS)
-vgpreload_exp_omega_ppc64_linux_so_LDADD = $(LDADD)
-am__objects_12 =  \
-	vgpreload_exp_omega_x86_linux_so-o_replace_memops.$(OBJEXT)
-am_vgpreload_exp_omega_x86_linux_so_OBJECTS = $(am__objects_12)
-vgpreload_exp_omega_x86_linux_so_OBJECTS =  \
-	$(am_vgpreload_exp_omega_x86_linux_so_OBJECTS)
-vgpreload_exp_omega_x86_linux_so_LDADD = $(LDADD)
-DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
-depcomp = $(SHELL) $(top_srcdir)/depcomp
-am__depfiles_maybe = depfiles
-COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
-	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
-CCLD = $(CC)
-LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(exp_omega_amd64_linux_SOURCES) \
-	$(exp_omega_ppc32_aix5_SOURCES) \
-	$(exp_omega_ppc32_linux_SOURCES) \
-	$(exp_omega_ppc64_aix5_SOURCES) \
-	$(exp_omega_ppc64_linux_SOURCES) \
-	$(exp_omega_x86_linux_SOURCES) \
-	$(vgpreload_exp_omega_amd64_linux_so_SOURCES) \
-	$(vgpreload_exp_omega_ppc32_aix5_so_SOURCES) \
-	$(vgpreload_exp_omega_ppc32_linux_so_SOURCES) \
-	$(vgpreload_exp_omega_ppc64_aix5_so_SOURCES) \
-	$(vgpreload_exp_omega_ppc64_linux_so_SOURCES) \
-	$(vgpreload_exp_omega_x86_linux_so_SOURCES)
-DIST_SOURCES = $(exp_omega_amd64_linux_SOURCES) \
-	$(exp_omega_ppc32_aix5_SOURCES) \
-	$(exp_omega_ppc32_linux_SOURCES) \
-	$(exp_omega_ppc64_aix5_SOURCES) \
-	$(exp_omega_ppc64_linux_SOURCES) \
-	$(exp_omega_x86_linux_SOURCES) \
-	$(vgpreload_exp_omega_amd64_linux_so_SOURCES) \
-	$(vgpreload_exp_omega_ppc32_aix5_so_SOURCES) \
-	$(vgpreload_exp_omega_ppc32_linux_so_SOURCES) \
-	$(vgpreload_exp_omega_ppc64_aix5_so_SOURCES) \
-	$(vgpreload_exp_omega_ppc64_linux_so_SOURCES) \
-	$(vgpreload_exp_omega_x86_linux_so_SOURCES)
+SOURCES =
+DIST_SOURCES =
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	html-recursive info-recursive install-data-recursive \
 	install-exec-recursive install-info-recursive \
 	install-recursive installcheck-recursive installdirs-recursive \
 	pdf-recursive ps-recursive uninstall-info-recursive \
 	uninstall-recursive
-am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
-am__vpath_adj = case $$p in \
-    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
-    *) f=$$p;; \
-  esac;
-am__strip_dir = `echo $$p | sed -e 's|^.*/||'`;
-am__installdirs = "$(DESTDIR)$(oincludedir)"
-oincludeHEADERS_INSTALL = $(INSTALL_HEADER)
-HEADERS = $(noinst_HEADERS) $(oinclude_HEADERS)
 ETAGS = etags
 CTAGS = ctags
 DIST_SUBDIRS = $(SUBDIRS)
@@ -232,16 +63,21 @@ ACLOCAL = @ACLOCAL@
 AMDEP_FALSE = @AMDEP_FALSE@
 AMDEP_TRUE = @AMDEP_TRUE@
 AMTAR = @AMTAR@
+AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+BOOST_CFLAGS = @BOOST_CFLAGS@
+BOOST_LIBS = @BOOST_LIBS@
 BUILD_MPIWRAP_PRI_FALSE = @BUILD_MPIWRAP_PRI_FALSE@
 BUILD_MPIWRAP_PRI_TRUE = @BUILD_MPIWRAP_PRI_TRUE@
 BUILD_MPIWRAP_SEC_FALSE = @BUILD_MPIWRAP_SEC_FALSE@
 BUILD_MPIWRAP_SEC_TRUE = @BUILD_MPIWRAP_SEC_TRUE@
 BUILD_SSE3_TESTS_FALSE = @BUILD_SSE3_TESTS_FALSE@
 BUILD_SSE3_TESTS_TRUE = @BUILD_SSE3_TESTS_TRUE@
+BUILD_SSSE3_TESTS_FALSE = @BUILD_SSSE3_TESTS_FALSE@
+BUILD_SSSE3_TESTS_TRUE = @BUILD_SSSE3_TESTS_TRUE@
 CC = @CC@
 CCAS = @CCAS@
 CCASFLAGS = @CCASFLAGS@
@@ -269,8 +105,22 @@ FLAG_MAIX32 = @FLAG_MAIX32@
 FLAG_MAIX64 = @FLAG_MAIX64@
 FLAG_MMMX = @FLAG_MMMX@
 FLAG_MSSE = @FLAG_MSSE@
+FLAG_UNLIMITED_INLINE_UNIT_GROWTH = @FLAG_UNLIMITED_INLINE_UNIT_GROWTH@
 FLAG_WDECL_AFTER_STMT = @FLAG_WDECL_AFTER_STMT@
+FLAG_W_EXTRA = @FLAG_W_EXTRA@
+FLAG_W_NO_FORMAT_ZERO_LENGTH = @FLAG_W_NO_FORMAT_ZERO_LENGTH@
 GDB = @GDB@
+GLIBC_VERSION = @GLIBC_VERSION@
+HAS_ALTIVEC_FALSE = @HAS_ALTIVEC_FALSE@
+HAS_ALTIVEC_TRUE = @HAS_ALTIVEC_TRUE@
+HAVE_ALTIVEC_H_FALSE = @HAVE_ALTIVEC_H_FALSE@
+HAVE_ALTIVEC_H_TRUE = @HAVE_ALTIVEC_H_TRUE@
+HAVE_BOOST_1_35_FALSE = @HAVE_BOOST_1_35_FALSE@
+HAVE_BOOST_1_35_TRUE = @HAVE_BOOST_1_35_TRUE@
+HAVE_OPENMP_FALSE = @HAVE_OPENMP_FALSE@
+HAVE_OPENMP_TRUE = @HAVE_OPENMP_TRUE@
+HAVE_QTCORE_FALSE = @HAVE_QTCORE_FALSE@
+HAVE_QTCORE_TRUE = @HAVE_QTCORE_TRUE@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
@@ -320,8 +170,9 @@ VGP_PPC64_LINUX_FALSE = @VGP_PPC64_LINUX_FALSE@
 VGP_PPC64_LINUX_TRUE = @VGP_PPC64_LINUX_TRUE@
 VGP_X86_LINUX_FALSE = @VGP_X86_LINUX_FALSE@
 VGP_X86_LINUX_TRUE = @VGP_X86_LINUX_TRUE@
-VG_ARCH = @VG_ARCH@
 VG_ARCH_ALL = @VG_ARCH_ALL@
+VG_ARCH_MAX = @VG_ARCH_MAX@
+VG_ARCH_PRI = @VG_ARCH_PRI@
 VG_OS = @VG_OS@
 VG_PLATFORM_PRI = @VG_PLATFORM_PRI@
 VG_PLATFORM_SEC = @VG_PLATFORM_SEC@
@@ -366,324 +217,12 @@ sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
-SUBDIRS = . tests docs
-valdir = $(libdir)/valgrind
-inplacedir = $(top_builddir)/.in_place
-add_includes_x86_linux = -I$(top_srcdir)/include \
-		-I@VEX_DIR@/pub \
-		-DVGA_x86=1 \
-		-DVGO_linux=1 \
-		-DVGP_x86_linux=1
-
-add_includes_amd64_linux = -I$(top_srcdir)/include \
-		-I@VEX_DIR@/pub \
-		-DVGA_amd64=1 \
-		-DVGO_linux=1 \
-		-DVGP_amd64_linux=1
-
-add_includes_ppc32_linux = -I$(top_srcdir)/include \
-		-I@VEX_DIR@/pub \
-		-DVGA_ppc32=1 \
-		-DVGO_linux=1 \
-		-DVGP_ppc32_linux=1
-
-add_includes_ppc64_linux = -I$(top_srcdir)/include \
-		-I@VEX_DIR@/pub \
-		-DVGA_ppc64=1 \
-		-DVGO_linux=1 \
-		-DVGP_ppc64_linux=1
-
-add_includes_ppc32_aix5 = -I$(top_srcdir)/include \
-		-I@VEX_DIR@/pub \
-		-DVGA_ppc32=1 \
-		-DVGO_aix5=1 \
-		-DVGP_ppc32_aix5=1
-
-add_includes_ppc64_aix5 = -I$(top_srcdir)/include \
-		-I@VEX_DIR@/pub \
-		-DVGA_ppc64=1 \
-		-DVGO_aix5=1 \
-		-DVGP_ppc64_aix5=1
-
-
-# Baseline flags for all compilations.  Aim here is to maximise
-# performance and get whatever useful warnings we can out of gcc.
-AM_CFLAGS_BASE = -O2 -g -Wmissing-prototypes -Wall -Wshadow \
-                 -Wpointer-arith -Wstrict-prototypes -Wmissing-declarations \
-                 -fno-strict-aliasing
-
-
-# These flags are used for building the preload shared objects.
-# The aim is to give reasonable performance but also to have good
-# stack traces, since users often see stack traces extending 
-# into (and through) the preloads.
-AM_CFLAGS_PIC = -O -g -fpic -fno-omit-frame-pointer -fno-strict-aliasing
-
-# Flags for specific targets
-AM_FLAG_M3264_X86_LINUX = @FLAG_M32@
-AM_CPPFLAGS_X86_LINUX = $(add_includes_x86_linux)
-AM_CFLAGS_X86_LINUX = $(WERROR) @FLAG_M32@ @PREFERRED_STACK_BOUNDARY@ \
-			 	$(AM_CFLAGS_BASE)
-
-AM_CCASFLAGS_X86_LINUX = $(add_includes_x86_linux) @FLAG_M32@ -g
-AM_FLAG_M3264_AMD64_LINUX = @FLAG_M64@
-AM_CPPFLAGS_AMD64_LINUX = $(add_includes_amd64_linux)
-AM_CFLAGS_AMD64_LINUX = $(WERROR) @FLAG_M64@ -fomit-frame-pointer \
-				@PREFERRED_STACK_BOUNDARY@ $(AM_CFLAGS_BASE)
-
-AM_CCASFLAGS_AMD64_LINUX = $(add_includes_amd64_linux) @FLAG_M64@ -g
-AM_FLAG_M3264_PPC32_LINUX = @FLAG_M32@
-AM_CPPFLAGS_PPC32_LINUX = $(add_includes_ppc32_linux)
-AM_CFLAGS_PPC32_LINUX = $(WERROR) @FLAG_M32@ $(AM_CFLAGS_BASE)
-AM_CCASFLAGS_PPC32_LINUX = $(add_includes_ppc32_linux) -Wa,-maltivec @FLAG_M32@ -g
-AM_FLAG_M3264_PPC64_LINUX = @FLAG_M64@
-AM_CPPFLAGS_PPC64_LINUX = $(add_includes_ppc64_linux)
-AM_CFLAGS_PPC64_LINUX = $(WERROR) @FLAG_M64@ $(AM_CFLAGS_BASE)
-AM_CCASFLAGS_PPC64_LINUX = $(add_includes_ppc64_linux) -Wa,-maltivec @FLAG_M64@ -g
-AM_FLAG_M3264_PPC32_AIX5 = @FLAG_MAIX32@
-AM_CPPFLAGS_PPC32_AIX5 = $(add_includes_ppc32_aix5)
-AM_CFLAGS_PPC32_AIX5 = $(WERROR) @FLAG_MAIX32@ -mcpu=powerpc $(AM_CFLAGS_BASE)
-AM_CCASFLAGS_PPC32_AIX5 = $(add_includes_ppc32_aix5) \
-				@FLAG_MAIX32@ -mcpu=powerpc -g
-
-AM_FLAG_M3264_PPC64_AIX5 = @FLAG_MAIX64@
-AM_CPPFLAGS_PPC64_AIX5 = $(add_includes_ppc64_aix5)
-AM_CFLAGS_PPC64_AIX5 = $(WERROR) @FLAG_MAIX64@ -mcpu=powerpc64 $(AM_CFLAGS_BASE)
-AM_CCASFLAGS_PPC64_AIX5 = $(add_includes_ppc64_aix5) \
-				@FLAG_MAIX64@ -mcpu=powerpc64 -g
-
-
-# Flags for the primary target.  These must be used to build the
-# regtests and performance tests.  In fact, these must be used to
-# build anything which is built only once on a dual-arch build.
-#
-AM_FLAG_M3264_PRI = $(AM_FLAG_M3264_@VG_PLATFORM_PRI@)
-AM_CPPFLAGS_PRI = $(AM_CPPFLAGS_@VG_PLATFORM_PRI@)
-AM_CFLAGS_PRI = $(AM_CFLAGS_@VG_PLATFORM_PRI@)
-AM_CCASFLAGS_PRI = $(AM_CCASFLAGS_@VG_PLATFORM_PRI@)
-@VGP_HAVE_SECONDARY_FALSE@AM_FLAG_M3264_SEC = 
-@VGP_HAVE_SECONDARY_TRUE@AM_FLAG_M3264_SEC = $(AM_FLAG_M3264_@VG_PLATFORM_SEC@)
-
-# Baseline link flags for making dynamic shared objects.
-#
-PRELOAD_LDFLAGS_COMMON_LINUX = -nostdlib -shared -Wl,-z,interpose,-z,initfirst
-PRELOAD_LDFLAGS_COMMON_AIX5 = -nostdlib -shared -Wl,-G -Wl,-bnogc
-PRELOAD_LDFLAGS_X86_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
-PRELOAD_LDFLAGS_AMD64_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M64@
-PRELOAD_LDFLAGS_PPC32_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
-PRELOAD_LDFLAGS_PPC64_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M64@
-PRELOAD_LDFLAGS_PPC32_AIX5 = $(PRELOAD_LDFLAGS_COMMON_AIX5)  @FLAG_MAIX32@
-PRELOAD_LDFLAGS_PPC64_AIX5 = $(PRELOAD_LDFLAGS_COMMON_AIX5)  @FLAG_MAIX64@
-LIBREPLACEMALLOC_X86_LINUX = \
-	$(top_builddir)/coregrind/libreplacemalloc_toolpreload_x86_linux.a
-
-LIBREPLACEMALLOC_AMD64_LINUX = \
-	$(top_builddir)/coregrind/libreplacemalloc_toolpreload_amd64_linux.a
-
-LIBREPLACEMALLOC_PPC32_LINUX = \
-	$(top_builddir)/coregrind/libreplacemalloc_toolpreload_ppc32_linux.a
-
-LIBREPLACEMALLOC_PPC64_LINUX = \
-	$(top_builddir)/coregrind/libreplacemalloc_toolpreload_ppc64_linux.a
-
-LIBREPLACEMALLOC_PPC32_AIX5 = \
-	$(top_builddir)/coregrind/libreplacemalloc_toolpreload_ppc32_aix5.a
-
-LIBREPLACEMALLOC_PPC64_AIX5 = \
-	$(top_builddir)/coregrind/libreplacemalloc_toolpreload_ppc64_aix5.a
-
-COREGRIND_LIBS_X86_LINUX = \
-	$(top_builddir)/coregrind/libcoregrind_x86_linux.a \
-	@VEX_DIR@/libvex_x86_linux.a
-
-COREGRIND_LIBS_AMD64_LINUX = \
-	$(top_builddir)/coregrind/libcoregrind_amd64_linux.a \
-	@VEX_DIR@/libvex_amd64_linux.a
-
-COREGRIND_LIBS_PPC32_LINUX = \
-	$(top_builddir)/coregrind/libcoregrind_ppc32_linux.a \
-	@VEX_DIR@/libvex_ppc32_linux.a
-
-COREGRIND_LIBS_PPC64_LINUX = \
-	$(top_builddir)/coregrind/libcoregrind_ppc64_linux.a \
-	@VEX_DIR@/libvex_ppc64_linux.a
-
-COREGRIND_LIBS_PPC32_AIX5 = \
-	$(top_builddir)/coregrind/libcoregrind_ppc32_aix5.a \
-	@VEX_DIR@/libvex_ppc32_aix5.a
-
-COREGRIND_LIBS_PPC64_AIX5 = \
-	$(top_builddir)/coregrind/libcoregrind_ppc64_aix5.a \
-	@VEX_DIR@/libvex_ppc64_aix5.a
-
-TOOL_LDADD_COMMON = -lgcc
-TOOL_LDFLAGS_COMMON_LINUX = -static \
-	-Wl,-defsym,valt_load_address=@VALT_LOAD_ADDRESS@ \
-	-nodefaultlibs -nostartfiles -u _start
-
-TOOL_LDFLAGS_COMMON_AIX5 = -static -Wl,-e_start_valgrind
-TOOL_LDADD_X86_LINUX = $(COREGRIND_LIBS_X86_LINUX) $(TOOL_LDADD_COMMON)
-TOOL_LDFLAGS_X86_LINUX = \
-	$(TOOL_LDFLAGS_COMMON_LINUX) @FLAG_M32@ \
-	-Wl,-T,$(top_builddir)/valt_load_address_x86_linux.lds
-
-TOOL_LDADD_AMD64_LINUX = $(COREGRIND_LIBS_AMD64_LINUX) $(TOOL_LDADD_COMMON)
-TOOL_LDFLAGS_AMD64_LINUX = \
-	$(TOOL_LDFLAGS_COMMON_LINUX) @FLAG_M64@ \
-	-Wl,-T,$(top_builddir)/valt_load_address_amd64_linux.lds
-
-TOOL_LDADD_PPC32_LINUX = $(COREGRIND_LIBS_PPC32_LINUX) $(TOOL_LDADD_COMMON)
-TOOL_LDFLAGS_PPC32_LINUX = \
-	$(TOOL_LDFLAGS_COMMON_LINUX) @FLAG_M32@ \
-	-Wl,-T,$(top_builddir)/valt_load_address_ppc32_linux.lds
-
-TOOL_LDADD_PPC64_LINUX = $(COREGRIND_LIBS_PPC64_LINUX) $(TOOL_LDADD_COMMON)
-TOOL_LDFLAGS_PPC64_LINUX = \
-	$(TOOL_LDFLAGS_COMMON_LINUX) @FLAG_M64@ \
-	-Wl,-T,$(top_builddir)/valt_load_address_ppc64_linux.lds
-
-TOOL_LDADD_PPC32_AIX5 = $(COREGRIND_LIBS_PPC32_AIX5) $(TOOL_LDADD_COMMON)
-TOOL_LDFLAGS_PPC32_AIX5 = \
-	$(TOOL_LDFLAGS_COMMON_AIX5) @FLAG_MAIX32@
-
-TOOL_LDADD_PPC64_AIX5 = $(COREGRIND_LIBS_PPC64_AIX5) $(TOOL_LDADD_COMMON)
-TOOL_LDFLAGS_PPC64_AIX5 = \
-	$(TOOL_LDFLAGS_COMMON_AIX5) @FLAG_MAIX64@ -Wl,-bbigtoc
-
-LIBREPLACEMALLOC_LDFLAGS_X86_LINUX = \
-	-Wl,--whole-archive \
-	$(LIBREPLACEMALLOC_X86_LINUX) \
-	-Wl,--no-whole-archive
-
-LIBREPLACEMALLOC_LDFLAGS_AMD64_LINUX = \
-	-Wl,--whole-archive \
-	$(LIBREPLACEMALLOC_AMD64_LINUX) \
-	-Wl,--no-whole-archive
-
-LIBREPLACEMALLOC_LDFLAGS_PPC32_LINUX = \
-	-Wl,--whole-archive \
-	$(LIBREPLACEMALLOC_PPC32_LINUX) \
-	-Wl,--no-whole-archive
-
-LIBREPLACEMALLOC_LDFLAGS_PPC64_LINUX = \
-	-Wl,--whole-archive \
-	$(LIBREPLACEMALLOC_PPC64_LINUX) \
-	-Wl,--no-whole-archive
-
-LIBREPLACEMALLOC_LDFLAGS_PPC32_AIX5 = \
-	$(LIBREPLACEMALLOC_PPC32_AIX5)
-
-LIBREPLACEMALLOC_LDFLAGS_PPC64_AIX5 = \
-	$(LIBREPLACEMALLOC_PPC64_AIX5)
-
-VGPRELOAD_OMEGA_SOURCES_COMMON = o_replace_memops.c
-vgpreload_exp_omega_x86_linux_so_SOURCES = $(VGPRELOAD_OMEGA_SOURCES_COMMON)
-vgpreload_exp_omega_x86_linux_so_CPPFLAGS = $(AM_CPPFLAGS_X86_LINUX)
-vgpreload_exp_omega_x86_linux_so_CFLAGS = $(AM_CFLAGS_X86_LINUX) $(AM_CFLAGS_PIC) -O2
-vgpreload_exp_omega_x86_linux_so_CCASFLAGS = $(AM_CCASFLAGS_X86_LINUX)
-vgpreload_exp_omega_x86_linux_so_DEPENDENCIES = $(LIBREPLACEMALLOC_X86_LINUX)
-vgpreload_exp_omega_x86_linux_so_LDFLAGS = \
-	$(PRELOAD_LDFLAGS_X86_LINUX) \
-	$(LIBREPLACEMALLOC_LDFLAGS_X86_LINUX)
-
-vgpreload_exp_omega_amd64_linux_so_SOURCES = $(VGPRELOAD_OMEGA_SOURCES_COMMON)
-vgpreload_exp_omega_amd64_linux_so_CPPFLAGS = $(AM_CPPFLAGS_AMD64_LINUX)
-vgpreload_exp_omega_amd64_linux_so_CFLAGS = $(AM_CFLAGS_AMD64_LINUX) $(AM_CFLAGS_PIC) -O2
-vgpreload_exp_omega_amd64_linux_so_CCASFLAGS = $(AM_CCASFLAGS_AMD64_LINUX)
-vgpreload_exp_omega_amd64_linux_so_DEPENDENCIES = $(LIBREPLACEMALLOC_AMD64_LINUX)
-vgpreload_exp_omega_amd64_linux_so_LDFLAGS = \
-	$(PRELOAD_LDFLAGS_AMD64_LINUX) \
-	$(LIBREPLACEMALLOC_LDFLAGS_AMD64_LINUX)
-
-vgpreload_exp_omega_ppc32_linux_so_SOURCES = $(VGPRELOAD_OMEGA_SOURCES_COMMON)
-vgpreload_exp_omega_ppc32_linux_so_CPPFLAGS = $(AM_CPPFLAGS_PPC32_LINUX)
-vgpreload_exp_omega_ppc32_linux_so_CFLAGS = $(AM_CFLAGS_PPC32_LINUX) $(AM_CFLAGS_PIC) -O2
-vgpreload_exp_omega_ppc32_linux_so_CCASFLAGS = $(AM_CCASFLAGS_PPC32_LINUX)
-vgpreload_exp_omega_ppc32_linux_so_DEPENDENCIES = $(LIBREPLACEMALLOC_PPC32_LINUX)
-vgpreload_exp_omega_ppc32_linux_so_LDFLAGS = \
-	$(PRELOAD_LDFLAGS_PPC32_LINUX) \
-	$(LIBREPLACEMALLOC_LDFLAGS_PPC32_LINUX)
-
-vgpreload_exp_omega_ppc64_linux_so_SOURCES = $(VGPRELOAD_OMEGA_SOURCES_COMMON)
-vgpreload_exp_omega_ppc64_linux_so_CPPFLAGS = $(AM_CPPFLAGS_PPC64_LINUX)
-vgpreload_exp_omega_ppc64_linux_so_CFLAGS = $(AM_CFLAGS_PPC64_LINUX) $(AM_CFLAGS_PIC) -O2
-vgpreload_exp_omega_ppc64_linux_so_CCASFLAGS = $(AM_CCASFLAGS_PPC64_LINUX)
-vgpreload_exp_omega_ppc64_linux_so_DEPENDENCIES = $(LIBREPLACEMALLOC_PPC64_LINUX)
-vgpreload_exp_omega_ppc64_linux_so_LDFLAGS = \
-	$(PRELOAD_LDFLAGS_PPC64_LINUX) \
-	$(LIBREPLACEMALLOC_LDFLAGS_PPC64_LINUX)
-
-vgpreload_exp_omega_ppc32_aix5_so_SOURCES = $(VGPRELOAD_OMEGA_SOURCES_COMMON)
-vgpreload_exp_omega_ppc32_aix5_so_CPPFLAGS = $(AM_CPPFLAGS_PPC32_AIX5)
-vgpreload_exp_omega_ppc32_aix5_so_CFLAGS = $(AM_CFLAGS_PPC32_AIX5) $(AM_CFLAGS_PIC) -O2
-vgpreload_exp_omega_ppc32_aix5_so_CCASFLAGS = $(AM_CCASFLAGS_PPC32_AIX5)
-vgpreload_exp_omega_ppc32_aix5_so_DEPENDENCIES = $(LIBREPLACEMALLOC_PPC32_AIX5)
-vgpreload_exp_omega_ppc32_aix5_so_LDFLAGS = \
-	$(PRELOAD_LDFLAGS_PPC32_AIX5) \
-	$(LIBREPLACEMALLOC_LDFLAGS_PPC32_AIX5)
-
-vgpreload_exp_omega_ppc64_aix5_so_SOURCES = $(VGPRELOAD_OMEGA_SOURCES_COMMON)
-vgpreload_exp_omega_ppc64_aix5_so_CPPFLAGS = $(AM_CPPFLAGS_PPC64_AIX5)
-vgpreload_exp_omega_ppc64_aix5_so_CFLAGS = $(AM_CFLAGS_PPC64_AIX5) $(AM_CFLAGS_PIC) -O2
-vgpreload_exp_omega_ppc64_aix5_so_CCASFLAGS = $(AM_CCASFLAGS_PPC64_AIX5)
-vgpreload_exp_omega_ppc64_aix5_so_DEPENDENCIES = $(LIBREPLACEMALLOC_PPC64_AIX5)
-vgpreload_exp_omega_ppc64_aix5_so_LDFLAGS = \
-	$(PRELOAD_LDFLAGS_PPC64_AIX5) \
-	$(LIBREPLACEMALLOC_LDFLAGS_PPC64_AIX5)
-
-OMEGA_SOURCES_COMMON = \
-	o_main.c
-
-exp_omega_x86_linux_SOURCES = $(OMEGA_SOURCES_COMMON)
-exp_omega_x86_linux_CPPFLAGS = $(AM_CPPFLAGS_X86_LINUX)
-exp_omega_x86_linux_CFLAGS = $(AM_CFLAGS_X86_LINUX) -O2
-exp_omega_x86_linux_CCASFLAGS = $(AM_CCASFLAGS_X86_LINUX)
-exp_omega_x86_linux_DEPENDENCIES = $(COREGRIND_LIBS_X86_LINUX)
-exp_omega_x86_linux_LDADD = $(TOOL_LDADD_X86_LINUX)
-exp_omega_x86_linux_LDFLAGS = $(TOOL_LDFLAGS_X86_LINUX)
-exp_omega_amd64_linux_SOURCES = $(OMEGA_SOURCES_COMMON)
-exp_omega_amd64_linux_CPPFLAGS = $(AM_CPPFLAGS_AMD64_LINUX)
-exp_omega_amd64_linux_CFLAGS = $(AM_CFLAGS_AMD64_LINUX) -g -O0 #-O2
-exp_omega_amd64_linux_CCASFLAGS = $(AM_CCASFLAGS_AMD64_LINUX)
-exp_omega_amd64_linux_DEPENDENCIES = $(COREGRIND_LIBS_AMD64_LINUX)
-exp_omega_amd64_linux_LDADD = $(TOOL_LDADD_AMD64_LINUX)
-exp_omega_amd64_linux_LDFLAGS = $(TOOL_LDFLAGS_AMD64_LINUX)
-exp_omega_ppc32_linux_SOURCES = $(OMEGA_SOURCES_COMMON)
-exp_omega_ppc32_linux_CPPFLAGS = $(AM_CPPFLAGS_PPC32_LINUX)
-exp_omega_ppc32_linux_CFLAGS = $(AM_CFLAGS_PPC32_LINUX) -O2
-exp_omega_ppc32_linux_CCASFLAGS = $(AM_CCASFLAGS_PPC32_LINUX)
-exp_omega_ppc32_linux_DEPENDENCIES = $(COREGRIND_LIBS_PPC32_LINUX)
-exp_omega_ppc32_linux_LDADD = $(TOOL_LDADD_PPC32_LINUX)
-exp_omega_ppc32_linux_LDFLAGS = $(TOOL_LDFLAGS_PPC32_LINUX)
-exp_omega_ppc64_linux_SOURCES = $(OMEGA_SOURCES_COMMON)
-exp_omega_ppc64_linux_CPPFLAGS = $(AM_CPPFLAGS_PPC64_LINUX)
-exp_omega_ppc64_linux_CFLAGS = $(AM_CFLAGS_PPC64_LINUX) -O2
-exp_omega_ppc64_linux_CCASFLAGS = $(AM_CCASFLAGS_PPC64_LINUX)
-exp_omega_ppc64_linux_DEPENDENCIES = $(COREGRIND_LIBS_PPC64_LINUX)
-exp_omega_ppc64_linux_LDADD = $(TOOL_LDADD_PPC64_LINUX)
-exp_omega_ppc64_linux_LDFLAGS = $(TOOL_LDFLAGS_PPC64_LINUX)
-exp_omega_ppc32_aix5_SOURCES = $(OMEGA_SOURCES_COMMON)
-exp_omega_ppc32_aix5_CPPFLAGS = $(AM_CPPFLAGS_PPC32_AIX5)
-exp_omega_ppc32_aix5_CFLAGS = $(AM_CFLAGS_PPC32_AIX5) -O2
-exp_omega_ppc32_aix5_CCASFLAGS = $(AM_CCASFLAGS_PPC32_AIX5)
-exp_omega_ppc32_aix5_DEPENDENCIES = $(COREGRIND_LIBS_PPC32_AIX5)
-exp_omega_ppc32_aix5_LDADD = $(TOOL_LDADD_PPC32_AIX5)
-exp_omega_ppc32_aix5_LDFLAGS = $(TOOL_LDFLAGS_PPC32_AIX5)
-exp_omega_ppc64_aix5_SOURCES = $(OMEGA_SOURCES_COMMON)
-exp_omega_ppc64_aix5_CPPFLAGS = $(AM_CPPFLAGS_PPC64_AIX5)
-exp_omega_ppc64_aix5_CFLAGS = $(AM_CFLAGS_PPC64_AIX5) -O2
-exp_omega_ppc64_aix5_CCASFLAGS = $(AM_CCASFLAGS_PPC64_AIX5)
-exp_omega_ppc64_aix5_DEPENDENCIES = $(COREGRIND_LIBS_PPC64_AIX5)
-exp_omega_ppc64_aix5_LDADD = $(TOOL_LDADD_PPC64_AIX5)
-exp_omega_ppc64_aix5_LDFLAGS = $(TOOL_LDFLAGS_PPC64_AIX5)
-oincludedir = $(includedir)/valgrind
-oinclude_HEADERS = exp-omega.h
-noinst_HEADERS = 
+SUBDIRS = docs tests
+EXTRA_DIST = exp-omega.h o_main.c o_replace_memops.c
 all: all-recursive
 
 .SUFFIXES:
-.SUFFIXES: .c .o .obj
-$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir)/Makefile.tool.am $(top_srcdir)/Makefile.all.am $(top_srcdir)/Makefile.install.am $(top_srcdir)/Makefile.tool-flags.am $(top_srcdir)/Makefile.flags.am $(top_srcdir)/Makefile.tool-inplace.am $(am__configure_deps)
+$(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -692,9 +231,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu  exp-omega/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign  exp-omega/Makefile'; \
 	cd $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu  exp-omega/Makefile
+	  $(AUTOMAKE) --foreign  exp-omega/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -712,264 +251,7 @@ $(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
-
-clean-noinstPROGRAMS:
-	-test -z "$(noinst_PROGRAMS)" || rm -f $(noinst_PROGRAMS)
-exp-omega-amd64-linux$(EXEEXT): $(exp_omega_amd64_linux_OBJECTS) $(exp_omega_amd64_linux_DEPENDENCIES) 
-	@rm -f exp-omega-amd64-linux$(EXEEXT)
-	$(LINK) $(exp_omega_amd64_linux_LDFLAGS) $(exp_omega_amd64_linux_OBJECTS) $(exp_omega_amd64_linux_LDADD) $(LIBS)
-exp-omega-ppc32-aix5$(EXEEXT): $(exp_omega_ppc32_aix5_OBJECTS) $(exp_omega_ppc32_aix5_DEPENDENCIES) 
-	@rm -f exp-omega-ppc32-aix5$(EXEEXT)
-	$(LINK) $(exp_omega_ppc32_aix5_LDFLAGS) $(exp_omega_ppc32_aix5_OBJECTS) $(exp_omega_ppc32_aix5_LDADD) $(LIBS)
-exp-omega-ppc32-linux$(EXEEXT): $(exp_omega_ppc32_linux_OBJECTS) $(exp_omega_ppc32_linux_DEPENDENCIES) 
-	@rm -f exp-omega-ppc32-linux$(EXEEXT)
-	$(LINK) $(exp_omega_ppc32_linux_LDFLAGS) $(exp_omega_ppc32_linux_OBJECTS) $(exp_omega_ppc32_linux_LDADD) $(LIBS)
-exp-omega-ppc64-aix5$(EXEEXT): $(exp_omega_ppc64_aix5_OBJECTS) $(exp_omega_ppc64_aix5_DEPENDENCIES) 
-	@rm -f exp-omega-ppc64-aix5$(EXEEXT)
-	$(LINK) $(exp_omega_ppc64_aix5_LDFLAGS) $(exp_omega_ppc64_aix5_OBJECTS) $(exp_omega_ppc64_aix5_LDADD) $(LIBS)
-exp-omega-ppc64-linux$(EXEEXT): $(exp_omega_ppc64_linux_OBJECTS) $(exp_omega_ppc64_linux_DEPENDENCIES) 
-	@rm -f exp-omega-ppc64-linux$(EXEEXT)
-	$(LINK) $(exp_omega_ppc64_linux_LDFLAGS) $(exp_omega_ppc64_linux_OBJECTS) $(exp_omega_ppc64_linux_LDADD) $(LIBS)
-exp-omega-x86-linux$(EXEEXT): $(exp_omega_x86_linux_OBJECTS) $(exp_omega_x86_linux_DEPENDENCIES) 
-	@rm -f exp-omega-x86-linux$(EXEEXT)
-	$(LINK) $(exp_omega_x86_linux_LDFLAGS) $(exp_omega_x86_linux_OBJECTS) $(exp_omega_x86_linux_LDADD) $(LIBS)
-vgpreload_exp-omega-amd64-linux.so$(EXEEXT): $(vgpreload_exp_omega_amd64_linux_so_OBJECTS) $(vgpreload_exp_omega_amd64_linux_so_DEPENDENCIES) 
-	@rm -f vgpreload_exp-omega-amd64-linux.so$(EXEEXT)
-	$(LINK) $(vgpreload_exp_omega_amd64_linux_so_LDFLAGS) $(vgpreload_exp_omega_amd64_linux_so_OBJECTS) $(vgpreload_exp_omega_amd64_linux_so_LDADD) $(LIBS)
-vgpreload_exp-omega-ppc32-aix5.so$(EXEEXT): $(vgpreload_exp_omega_ppc32_aix5_so_OBJECTS) $(vgpreload_exp_omega_ppc32_aix5_so_DEPENDENCIES) 
-	@rm -f vgpreload_exp-omega-ppc32-aix5.so$(EXEEXT)
-	$(LINK) $(vgpreload_exp_omega_ppc32_aix5_so_LDFLAGS) $(vgpreload_exp_omega_ppc32_aix5_so_OBJECTS) $(vgpreload_exp_omega_ppc32_aix5_so_LDADD) $(LIBS)
-vgpreload_exp-omega-ppc32-linux.so$(EXEEXT): $(vgpreload_exp_omega_ppc32_linux_so_OBJECTS) $(vgpreload_exp_omega_ppc32_linux_so_DEPENDENCIES) 
-	@rm -f vgpreload_exp-omega-ppc32-linux.so$(EXEEXT)
-	$(LINK) $(vgpreload_exp_omega_ppc32_linux_so_LDFLAGS) $(vgpreload_exp_omega_ppc32_linux_so_OBJECTS) $(vgpreload_exp_omega_ppc32_linux_so_LDADD) $(LIBS)
-vgpreload_exp-omega-ppc64-aix5.so$(EXEEXT): $(vgpreload_exp_omega_ppc64_aix5_so_OBJECTS) $(vgpreload_exp_omega_ppc64_aix5_so_DEPENDENCIES) 
-	@rm -f vgpreload_exp-omega-ppc64-aix5.so$(EXEEXT)
-	$(LINK) $(vgpreload_exp_omega_ppc64_aix5_so_LDFLAGS) $(vgpreload_exp_omega_ppc64_aix5_so_OBJECTS) $(vgpreload_exp_omega_ppc64_aix5_so_LDADD) $(LIBS)
-vgpreload_exp-omega-ppc64-linux.so$(EXEEXT): $(vgpreload_exp_omega_ppc64_linux_so_OBJECTS) $(vgpreload_exp_omega_ppc64_linux_so_DEPENDENCIES) 
-	@rm -f vgpreload_exp-omega-ppc64-linux.so$(EXEEXT)
-	$(LINK) $(vgpreload_exp_omega_ppc64_linux_so_LDFLAGS) $(vgpreload_exp_omega_ppc64_linux_so_OBJECTS) $(vgpreload_exp_omega_ppc64_linux_so_LDADD) $(LIBS)
-vgpreload_exp-omega-x86-linux.so$(EXEEXT): $(vgpreload_exp_omega_x86_linux_so_OBJECTS) $(vgpreload_exp_omega_x86_linux_so_DEPENDENCIES) 
-	@rm -f vgpreload_exp-omega-x86-linux.so$(EXEEXT)
-	$(LINK) $(vgpreload_exp_omega_x86_linux_so_LDFLAGS) $(vgpreload_exp_omega_x86_linux_so_OBJECTS) $(vgpreload_exp_omega_x86_linux_so_LDADD) $(LIBS)
-
-mostlyclean-compile:
-	-rm -f *.$(OBJEXT)
-
-distclean-compile:
-	-rm -f *.tab.c
-
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/exp_omega_amd64_linux-o_main.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/exp_omega_ppc32_aix5-o_main.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/exp_omega_ppc32_linux-o_main.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/exp_omega_ppc64_aix5-o_main.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/exp_omega_ppc64_linux-o_main.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/exp_omega_x86_linux-o_main.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_exp_omega_amd64_linux_so-o_replace_memops.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vgpreload_exp_omega_x86_linux_so-o_replace_memops.Po@am__quote@
-
-.c.o:
-@am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/$*.Tpo" "$(DEPDIR)/$*.Po"; else rm -f "$(DEPDIR)/$*.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(COMPILE) -c $<
-
-.c.obj:
-@am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ `$(CYGPATH_W) '$<'`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/$*.Tpo" "$(DEPDIR)/$*.Po"; else rm -f "$(DEPDIR)/$*.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
-
-exp_omega_amd64_linux-o_main.o: o_main.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(exp_omega_amd64_linux_CFLAGS) $(CFLAGS) -MT exp_omega_amd64_linux-o_main.o -MD -MP -MF "$(DEPDIR)/exp_omega_amd64_linux-o_main.Tpo" -c -o exp_omega_amd64_linux-o_main.o `test -f 'o_main.c' || echo '$(srcdir)/'`o_main.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/exp_omega_amd64_linux-o_main.Tpo" "$(DEPDIR)/exp_omega_amd64_linux-o_main.Po"; else rm -f "$(DEPDIR)/exp_omega_amd64_linux-o_main.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_main.c' object='exp_omega_amd64_linux-o_main.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(exp_omega_amd64_linux_CFLAGS) $(CFLAGS) -c -o exp_omega_amd64_linux-o_main.o `test -f 'o_main.c' || echo '$(srcdir)/'`o_main.c
-
-exp_omega_amd64_linux-o_main.obj: o_main.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(exp_omega_amd64_linux_CFLAGS) $(CFLAGS) -MT exp_omega_amd64_linux-o_main.obj -MD -MP -MF "$(DEPDIR)/exp_omega_amd64_linux-o_main.Tpo" -c -o exp_omega_amd64_linux-o_main.obj `if test -f 'o_main.c'; then $(CYGPATH_W) 'o_main.c'; else $(CYGPATH_W) '$(srcdir)/o_main.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/exp_omega_amd64_linux-o_main.Tpo" "$(DEPDIR)/exp_omega_amd64_linux-o_main.Po"; else rm -f "$(DEPDIR)/exp_omega_amd64_linux-o_main.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_main.c' object='exp_omega_amd64_linux-o_main.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_amd64_linux_CPPFLAGS) $(CPPFLAGS) $(exp_omega_amd64_linux_CFLAGS) $(CFLAGS) -c -o exp_omega_amd64_linux-o_main.obj `if test -f 'o_main.c'; then $(CYGPATH_W) 'o_main.c'; else $(CYGPATH_W) '$(srcdir)/o_main.c'; fi`
-
-exp_omega_ppc32_aix5-o_main.o: o_main.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(exp_omega_ppc32_aix5_CFLAGS) $(CFLAGS) -MT exp_omega_ppc32_aix5-o_main.o -MD -MP -MF "$(DEPDIR)/exp_omega_ppc32_aix5-o_main.Tpo" -c -o exp_omega_ppc32_aix5-o_main.o `test -f 'o_main.c' || echo '$(srcdir)/'`o_main.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/exp_omega_ppc32_aix5-o_main.Tpo" "$(DEPDIR)/exp_omega_ppc32_aix5-o_main.Po"; else rm -f "$(DEPDIR)/exp_omega_ppc32_aix5-o_main.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_main.c' object='exp_omega_ppc32_aix5-o_main.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(exp_omega_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o exp_omega_ppc32_aix5-o_main.o `test -f 'o_main.c' || echo '$(srcdir)/'`o_main.c
-
-exp_omega_ppc32_aix5-o_main.obj: o_main.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(exp_omega_ppc32_aix5_CFLAGS) $(CFLAGS) -MT exp_omega_ppc32_aix5-o_main.obj -MD -MP -MF "$(DEPDIR)/exp_omega_ppc32_aix5-o_main.Tpo" -c -o exp_omega_ppc32_aix5-o_main.obj `if test -f 'o_main.c'; then $(CYGPATH_W) 'o_main.c'; else $(CYGPATH_W) '$(srcdir)/o_main.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/exp_omega_ppc32_aix5-o_main.Tpo" "$(DEPDIR)/exp_omega_ppc32_aix5-o_main.Po"; else rm -f "$(DEPDIR)/exp_omega_ppc32_aix5-o_main.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_main.c' object='exp_omega_ppc32_aix5-o_main.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_ppc32_aix5_CPPFLAGS) $(CPPFLAGS) $(exp_omega_ppc32_aix5_CFLAGS) $(CFLAGS) -c -o exp_omega_ppc32_aix5-o_main.obj `if test -f 'o_main.c'; then $(CYGPATH_W) 'o_main.c'; else $(CYGPATH_W) '$(srcdir)/o_main.c'; fi`
-
-exp_omega_ppc32_linux-o_main.o: o_main.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(exp_omega_ppc32_linux_CFLAGS) $(CFLAGS) -MT exp_omega_ppc32_linux-o_main.o -MD -MP -MF "$(DEPDIR)/exp_omega_ppc32_linux-o_main.Tpo" -c -o exp_omega_ppc32_linux-o_main.o `test -f 'o_main.c' || echo '$(srcdir)/'`o_main.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/exp_omega_ppc32_linux-o_main.Tpo" "$(DEPDIR)/exp_omega_ppc32_linux-o_main.Po"; else rm -f "$(DEPDIR)/exp_omega_ppc32_linux-o_main.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_main.c' object='exp_omega_ppc32_linux-o_main.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(exp_omega_ppc32_linux_CFLAGS) $(CFLAGS) -c -o exp_omega_ppc32_linux-o_main.o `test -f 'o_main.c' || echo '$(srcdir)/'`o_main.c
-
-exp_omega_ppc32_linux-o_main.obj: o_main.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(exp_omega_ppc32_linux_CFLAGS) $(CFLAGS) -MT exp_omega_ppc32_linux-o_main.obj -MD -MP -MF "$(DEPDIR)/exp_omega_ppc32_linux-o_main.Tpo" -c -o exp_omega_ppc32_linux-o_main.obj `if test -f 'o_main.c'; then $(CYGPATH_W) 'o_main.c'; else $(CYGPATH_W) '$(srcdir)/o_main.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/exp_omega_ppc32_linux-o_main.Tpo" "$(DEPDIR)/exp_omega_ppc32_linux-o_main.Po"; else rm -f "$(DEPDIR)/exp_omega_ppc32_linux-o_main.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_main.c' object='exp_omega_ppc32_linux-o_main.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_ppc32_linux_CPPFLAGS) $(CPPFLAGS) $(exp_omega_ppc32_linux_CFLAGS) $(CFLAGS) -c -o exp_omega_ppc32_linux-o_main.obj `if test -f 'o_main.c'; then $(CYGPATH_W) 'o_main.c'; else $(CYGPATH_W) '$(srcdir)/o_main.c'; fi`
-
-exp_omega_ppc64_aix5-o_main.o: o_main.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(exp_omega_ppc64_aix5_CFLAGS) $(CFLAGS) -MT exp_omega_ppc64_aix5-o_main.o -MD -MP -MF "$(DEPDIR)/exp_omega_ppc64_aix5-o_main.Tpo" -c -o exp_omega_ppc64_aix5-o_main.o `test -f 'o_main.c' || echo '$(srcdir)/'`o_main.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/exp_omega_ppc64_aix5-o_main.Tpo" "$(DEPDIR)/exp_omega_ppc64_aix5-o_main.Po"; else rm -f "$(DEPDIR)/exp_omega_ppc64_aix5-o_main.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_main.c' object='exp_omega_ppc64_aix5-o_main.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(exp_omega_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o exp_omega_ppc64_aix5-o_main.o `test -f 'o_main.c' || echo '$(srcdir)/'`o_main.c
-
-exp_omega_ppc64_aix5-o_main.obj: o_main.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(exp_omega_ppc64_aix5_CFLAGS) $(CFLAGS) -MT exp_omega_ppc64_aix5-o_main.obj -MD -MP -MF "$(DEPDIR)/exp_omega_ppc64_aix5-o_main.Tpo" -c -o exp_omega_ppc64_aix5-o_main.obj `if test -f 'o_main.c'; then $(CYGPATH_W) 'o_main.c'; else $(CYGPATH_W) '$(srcdir)/o_main.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/exp_omega_ppc64_aix5-o_main.Tpo" "$(DEPDIR)/exp_omega_ppc64_aix5-o_main.Po"; else rm -f "$(DEPDIR)/exp_omega_ppc64_aix5-o_main.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_main.c' object='exp_omega_ppc64_aix5-o_main.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_ppc64_aix5_CPPFLAGS) $(CPPFLAGS) $(exp_omega_ppc64_aix5_CFLAGS) $(CFLAGS) -c -o exp_omega_ppc64_aix5-o_main.obj `if test -f 'o_main.c'; then $(CYGPATH_W) 'o_main.c'; else $(CYGPATH_W) '$(srcdir)/o_main.c'; fi`
-
-exp_omega_ppc64_linux-o_main.o: o_main.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(exp_omega_ppc64_linux_CFLAGS) $(CFLAGS) -MT exp_omega_ppc64_linux-o_main.o -MD -MP -MF "$(DEPDIR)/exp_omega_ppc64_linux-o_main.Tpo" -c -o exp_omega_ppc64_linux-o_main.o `test -f 'o_main.c' || echo '$(srcdir)/'`o_main.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/exp_omega_ppc64_linux-o_main.Tpo" "$(DEPDIR)/exp_omega_ppc64_linux-o_main.Po"; else rm -f "$(DEPDIR)/exp_omega_ppc64_linux-o_main.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_main.c' object='exp_omega_ppc64_linux-o_main.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(exp_omega_ppc64_linux_CFLAGS) $(CFLAGS) -c -o exp_omega_ppc64_linux-o_main.o `test -f 'o_main.c' || echo '$(srcdir)/'`o_main.c
-
-exp_omega_ppc64_linux-o_main.obj: o_main.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(exp_omega_ppc64_linux_CFLAGS) $(CFLAGS) -MT exp_omega_ppc64_linux-o_main.obj -MD -MP -MF "$(DEPDIR)/exp_omega_ppc64_linux-o_main.Tpo" -c -o exp_omega_ppc64_linux-o_main.obj `if test -f 'o_main.c'; then $(CYGPATH_W) 'o_main.c'; else $(CYGPATH_W) '$(srcdir)/o_main.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/exp_omega_ppc64_linux-o_main.Tpo" "$(DEPDIR)/exp_omega_ppc64_linux-o_main.Po"; else rm -f "$(DEPDIR)/exp_omega_ppc64_linux-o_main.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_main.c' object='exp_omega_ppc64_linux-o_main.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_ppc64_linux_CPPFLAGS) $(CPPFLAGS) $(exp_omega_ppc64_linux_CFLAGS) $(CFLAGS) -c -o exp_omega_ppc64_linux-o_main.obj `if test -f 'o_main.c'; then $(CYGPATH_W) 'o_main.c'; else $(CYGPATH_W) '$(srcdir)/o_main.c'; fi`
-
-exp_omega_x86_linux-o_main.o: o_main.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_x86_linux_CPPFLAGS) $(CPPFLAGS) $(exp_omega_x86_linux_CFLAGS) $(CFLAGS) -MT exp_omega_x86_linux-o_main.o -MD -MP -MF "$(DEPDIR)/exp_omega_x86_linux-o_main.Tpo" -c -o exp_omega_x86_linux-o_main.o `test -f 'o_main.c' || echo '$(srcdir)/'`o_main.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/exp_omega_x86_linux-o_main.Tpo" "$(DEPDIR)/exp_omega_x86_linux-o_main.Po"; else rm -f "$(DEPDIR)/exp_omega_x86_linux-o_main.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_main.c' object='exp_omega_x86_linux-o_main.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_x86_linux_CPPFLAGS) $(CPPFLAGS) $(exp_omega_x86_linux_CFLAGS) $(CFLAGS) -c -o exp_omega_x86_linux-o_main.o `test -f 'o_main.c' || echo '$(srcdir)/'`o_main.c
-
-exp_omega_x86_linux-o_main.obj: o_main.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_x86_linux_CPPFLAGS) $(CPPFLAGS) $(exp_omega_x86_linux_CFLAGS) $(CFLAGS) -MT exp_omega_x86_linux-o_main.obj -MD -MP -MF "$(DEPDIR)/exp_omega_x86_linux-o_main.Tpo" -c -o exp_omega_x86_linux-o_main.obj `if test -f 'o_main.c'; then $(CYGPATH_W) 'o_main.c'; else $(CYGPATH_W) '$(srcdir)/o_main.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/exp_omega_x86_linux-o_main.Tpo" "$(DEPDIR)/exp_omega_x86_linux-o_main.Po"; else rm -f "$(DEPDIR)/exp_omega_x86_linux-o_main.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_main.c' object='exp_omega_x86_linux-o_main.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(exp_omega_x86_linux_CPPFLAGS) $(CPPFLAGS) $(exp_omega_x86_linux_CFLAGS) $(CFLAGS) -c -o exp_omega_x86_linux-o_main.obj `if test -f 'o_main.c'; then $(CYGPATH_W) 'o_main.c'; else $(CYGPATH_W) '$(srcdir)/o_main.c'; fi`
-
-vgpreload_exp_omega_amd64_linux_so-o_replace_memops.o: o_replace_memops.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_amd64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_amd64_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_exp_omega_amd64_linux_so-o_replace_memops.o -MD -MP -MF "$(DEPDIR)/vgpreload_exp_omega_amd64_linux_so-o_replace_memops.Tpo" -c -o vgpreload_exp_omega_amd64_linux_so-o_replace_memops.o `test -f 'o_replace_memops.c' || echo '$(srcdir)/'`o_replace_memops.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_exp_omega_amd64_linux_so-o_replace_memops.Tpo" "$(DEPDIR)/vgpreload_exp_omega_amd64_linux_so-o_replace_memops.Po"; else rm -f "$(DEPDIR)/vgpreload_exp_omega_amd64_linux_so-o_replace_memops.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_replace_memops.c' object='vgpreload_exp_omega_amd64_linux_so-o_replace_memops.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_amd64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_amd64_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_exp_omega_amd64_linux_so-o_replace_memops.o `test -f 'o_replace_memops.c' || echo '$(srcdir)/'`o_replace_memops.c
-
-vgpreload_exp_omega_amd64_linux_so-o_replace_memops.obj: o_replace_memops.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_amd64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_amd64_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_exp_omega_amd64_linux_so-o_replace_memops.obj -MD -MP -MF "$(DEPDIR)/vgpreload_exp_omega_amd64_linux_so-o_replace_memops.Tpo" -c -o vgpreload_exp_omega_amd64_linux_so-o_replace_memops.obj `if test -f 'o_replace_memops.c'; then $(CYGPATH_W) 'o_replace_memops.c'; else $(CYGPATH_W) '$(srcdir)/o_replace_memops.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_exp_omega_amd64_linux_so-o_replace_memops.Tpo" "$(DEPDIR)/vgpreload_exp_omega_amd64_linux_so-o_replace_memops.Po"; else rm -f "$(DEPDIR)/vgpreload_exp_omega_amd64_linux_so-o_replace_memops.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_replace_memops.c' object='vgpreload_exp_omega_amd64_linux_so-o_replace_memops.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_amd64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_amd64_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_exp_omega_amd64_linux_so-o_replace_memops.obj `if test -f 'o_replace_memops.c'; then $(CYGPATH_W) 'o_replace_memops.c'; else $(CYGPATH_W) '$(srcdir)/o_replace_memops.c'; fi`
-
-vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.o: o_replace_memops.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_ppc32_aix5_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_ppc32_aix5_so_CFLAGS) $(CFLAGS) -MT vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.o -MD -MP -MF "$(DEPDIR)/vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.Tpo" -c -o vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.o `test -f 'o_replace_memops.c' || echo '$(srcdir)/'`o_replace_memops.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.Tpo" "$(DEPDIR)/vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.Po"; else rm -f "$(DEPDIR)/vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_replace_memops.c' object='vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_ppc32_aix5_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_ppc32_aix5_so_CFLAGS) $(CFLAGS) -c -o vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.o `test -f 'o_replace_memops.c' || echo '$(srcdir)/'`o_replace_memops.c
-
-vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.obj: o_replace_memops.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_ppc32_aix5_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_ppc32_aix5_so_CFLAGS) $(CFLAGS) -MT vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.obj -MD -MP -MF "$(DEPDIR)/vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.Tpo" -c -o vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.obj `if test -f 'o_replace_memops.c'; then $(CYGPATH_W) 'o_replace_memops.c'; else $(CYGPATH_W) '$(srcdir)/o_replace_memops.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.Tpo" "$(DEPDIR)/vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.Po"; else rm -f "$(DEPDIR)/vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_replace_memops.c' object='vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_ppc32_aix5_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_ppc32_aix5_so_CFLAGS) $(CFLAGS) -c -o vgpreload_exp_omega_ppc32_aix5_so-o_replace_memops.obj `if test -f 'o_replace_memops.c'; then $(CYGPATH_W) 'o_replace_memops.c'; else $(CYGPATH_W) '$(srcdir)/o_replace_memops.c'; fi`
-
-vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.o: o_replace_memops.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_ppc32_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_ppc32_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.o -MD -MP -MF "$(DEPDIR)/vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.Tpo" -c -o vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.o `test -f 'o_replace_memops.c' || echo '$(srcdir)/'`o_replace_memops.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.Tpo" "$(DEPDIR)/vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.Po"; else rm -f "$(DEPDIR)/vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_replace_memops.c' object='vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_ppc32_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_ppc32_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.o `test -f 'o_replace_memops.c' || echo '$(srcdir)/'`o_replace_memops.c
-
-vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.obj: o_replace_memops.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_ppc32_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_ppc32_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.obj -MD -MP -MF "$(DEPDIR)/vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.Tpo" -c -o vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.obj `if test -f 'o_replace_memops.c'; then $(CYGPATH_W) 'o_replace_memops.c'; else $(CYGPATH_W) '$(srcdir)/o_replace_memops.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.Tpo" "$(DEPDIR)/vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.Po"; else rm -f "$(DEPDIR)/vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_replace_memops.c' object='vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_ppc32_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_ppc32_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_exp_omega_ppc32_linux_so-o_replace_memops.obj `if test -f 'o_replace_memops.c'; then $(CYGPATH_W) 'o_replace_memops.c'; else $(CYGPATH_W) '$(srcdir)/o_replace_memops.c'; fi`
-
-vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.o: o_replace_memops.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_ppc64_aix5_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_ppc64_aix5_so_CFLAGS) $(CFLAGS) -MT vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.o -MD -MP -MF "$(DEPDIR)/vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.Tpo" -c -o vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.o `test -f 'o_replace_memops.c' || echo '$(srcdir)/'`o_replace_memops.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.Tpo" "$(DEPDIR)/vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.Po"; else rm -f "$(DEPDIR)/vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_replace_memops.c' object='vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_ppc64_aix5_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_ppc64_aix5_so_CFLAGS) $(CFLAGS) -c -o vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.o `test -f 'o_replace_memops.c' || echo '$(srcdir)/'`o_replace_memops.c
-
-vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.obj: o_replace_memops.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_ppc64_aix5_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_ppc64_aix5_so_CFLAGS) $(CFLAGS) -MT vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.obj -MD -MP -MF "$(DEPDIR)/vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.Tpo" -c -o vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.obj `if test -f 'o_replace_memops.c'; then $(CYGPATH_W) 'o_replace_memops.c'; else $(CYGPATH_W) '$(srcdir)/o_replace_memops.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.Tpo" "$(DEPDIR)/vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.Po"; else rm -f "$(DEPDIR)/vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_replace_memops.c' object='vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_ppc64_aix5_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_ppc64_aix5_so_CFLAGS) $(CFLAGS) -c -o vgpreload_exp_omega_ppc64_aix5_so-o_replace_memops.obj `if test -f 'o_replace_memops.c'; then $(CYGPATH_W) 'o_replace_memops.c'; else $(CYGPATH_W) '$(srcdir)/o_replace_memops.c'; fi`
-
-vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.o: o_replace_memops.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_ppc64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_ppc64_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.o -MD -MP -MF "$(DEPDIR)/vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.Tpo" -c -o vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.o `test -f 'o_replace_memops.c' || echo '$(srcdir)/'`o_replace_memops.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.Tpo" "$(DEPDIR)/vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.Po"; else rm -f "$(DEPDIR)/vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_replace_memops.c' object='vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_ppc64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_ppc64_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.o `test -f 'o_replace_memops.c' || echo '$(srcdir)/'`o_replace_memops.c
-
-vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.obj: o_replace_memops.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_ppc64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_ppc64_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.obj -MD -MP -MF "$(DEPDIR)/vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.Tpo" -c -o vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.obj `if test -f 'o_replace_memops.c'; then $(CYGPATH_W) 'o_replace_memops.c'; else $(CYGPATH_W) '$(srcdir)/o_replace_memops.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.Tpo" "$(DEPDIR)/vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.Po"; else rm -f "$(DEPDIR)/vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_replace_memops.c' object='vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_ppc64_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_ppc64_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_exp_omega_ppc64_linux_so-o_replace_memops.obj `if test -f 'o_replace_memops.c'; then $(CYGPATH_W) 'o_replace_memops.c'; else $(CYGPATH_W) '$(srcdir)/o_replace_memops.c'; fi`
-
-vgpreload_exp_omega_x86_linux_so-o_replace_memops.o: o_replace_memops.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_x86_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_x86_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_exp_omega_x86_linux_so-o_replace_memops.o -MD -MP -MF "$(DEPDIR)/vgpreload_exp_omega_x86_linux_so-o_replace_memops.Tpo" -c -o vgpreload_exp_omega_x86_linux_so-o_replace_memops.o `test -f 'o_replace_memops.c' || echo '$(srcdir)/'`o_replace_memops.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_exp_omega_x86_linux_so-o_replace_memops.Tpo" "$(DEPDIR)/vgpreload_exp_omega_x86_linux_so-o_replace_memops.Po"; else rm -f "$(DEPDIR)/vgpreload_exp_omega_x86_linux_so-o_replace_memops.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_replace_memops.c' object='vgpreload_exp_omega_x86_linux_so-o_replace_memops.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_x86_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_x86_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_exp_omega_x86_linux_so-o_replace_memops.o `test -f 'o_replace_memops.c' || echo '$(srcdir)/'`o_replace_memops.c
-
-vgpreload_exp_omega_x86_linux_so-o_replace_memops.obj: o_replace_memops.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_x86_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_x86_linux_so_CFLAGS) $(CFLAGS) -MT vgpreload_exp_omega_x86_linux_so-o_replace_memops.obj -MD -MP -MF "$(DEPDIR)/vgpreload_exp_omega_x86_linux_so-o_replace_memops.Tpo" -c -o vgpreload_exp_omega_x86_linux_so-o_replace_memops.obj `if test -f 'o_replace_memops.c'; then $(CYGPATH_W) 'o_replace_memops.c'; else $(CYGPATH_W) '$(srcdir)/o_replace_memops.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/vgpreload_exp_omega_x86_linux_so-o_replace_memops.Tpo" "$(DEPDIR)/vgpreload_exp_omega_x86_linux_so-o_replace_memops.Po"; else rm -f "$(DEPDIR)/vgpreload_exp_omega_x86_linux_so-o_replace_memops.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='o_replace_memops.c' object='vgpreload_exp_omega_x86_linux_so-o_replace_memops.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(vgpreload_exp_omega_x86_linux_so_CPPFLAGS) $(CPPFLAGS) $(vgpreload_exp_omega_x86_linux_so_CFLAGS) $(CFLAGS) -c -o vgpreload_exp_omega_x86_linux_so-o_replace_memops.obj `if test -f 'o_replace_memops.c'; then $(CYGPATH_W) 'o_replace_memops.c'; else $(CYGPATH_W) '$(srcdir)/o_replace_memops.c'; fi`
 uninstall-info-am:
-install-oincludeHEADERS: $(oinclude_HEADERS)
-	@$(NORMAL_INSTALL)
-	test -z "$(oincludedir)" || $(mkdir_p) "$(DESTDIR)$(oincludedir)"
-	@list='$(oinclude_HEADERS)'; for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  f=$(am__strip_dir) \
-	  echo " $(oincludeHEADERS_INSTALL) '$$d$$p' '$(DESTDIR)$(oincludedir)/$$f'"; \
-	  $(oincludeHEADERS_INSTALL) "$$d$$p" "$(DESTDIR)$(oincludedir)/$$f"; \
-	done
-
-uninstall-oincludeHEADERS:
-	@$(NORMAL_UNINSTALL)
-	@list='$(oinclude_HEADERS)'; for p in $$list; do \
-	  f=$(am__strip_dir) \
-	  echo " rm -f '$(DESTDIR)$(oincludedir)/$$f'"; \
-	  rm -f "$(DESTDIR)$(oincludedir)/$$f"; \
-	done
 
 # This directory's subdirectories are mostly independent; you can cd
 # into them and run `make' without going through this Makefile.
@@ -1104,7 +386,6 @@ distclean-tags:
 	-rm -f TAGS ID GTAGS GRTAGS GSYMS GPATH tags
 
 distdir: $(DISTFILES)
-	$(mkdir_p) $(distdir)/..
 	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
 	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's|.|.|g'`; \
 	list='$(DISTFILES)'; for file in $$list; do \
@@ -1148,12 +429,9 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-recursive
-all-am: Makefile $(PROGRAMS) $(HEADERS) all-local
+all-am: Makefile
 installdirs: installdirs-recursive
 installdirs-am:
-	for dir in "$(DESTDIR)$(oincludedir)"; do \
-	  test -z "$$dir" || $(mkdir_p) "$$dir"; \
-	done
 install: install-recursive
 install-exec: install-exec-recursive
 install-data: install-data-recursive
@@ -1180,13 +458,11 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-recursive
 
-clean-am: clean-generic clean-noinstPROGRAMS mostlyclean-am
+clean-am: clean-generic mostlyclean-am
 
 distclean: distclean-recursive
-	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
-distclean-am: clean-am distclean-compile distclean-generic \
-	distclean-tags
+distclean-am: clean-am distclean-generic distclean-tags
 
 dvi: dvi-recursive
 
@@ -1198,9 +474,9 @@ info: info-recursive
 
 info-am:
 
-install-data-am: install-oincludeHEADERS
+install-data-am:
 
-install-exec-am: install-exec-local
+install-exec-am:
 
 install-info: install-info-recursive
 
@@ -1209,13 +485,12 @@ install-man:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-recursive
-	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
 mostlyclean: mostlyclean-recursive
 
-mostlyclean-am: mostlyclean-compile mostlyclean-generic
+mostlyclean-am: mostlyclean-generic
 
 pdf: pdf-recursive
 
@@ -1225,105 +500,24 @@ ps: ps-recursive
 
 ps-am:
 
-uninstall-am: uninstall-info-am uninstall-oincludeHEADERS
+uninstall-am: uninstall-info-am
 
 uninstall-info: uninstall-info-recursive
 
-.PHONY: $(RECURSIVE_TARGETS) CTAGS GTAGS all all-am all-local check \
-	check-am clean clean-generic clean-noinstPROGRAMS \
-	clean-recursive ctags ctags-recursive distclean \
-	distclean-compile distclean-generic distclean-recursive \
-	distclean-tags distdir dvi dvi-am html html-am info info-am \
-	install install-am install-data install-data-am install-exec \
-	install-exec-am install-exec-local install-info \
-	install-info-am install-man install-oincludeHEADERS \
+.PHONY: $(RECURSIVE_TARGETS) CTAGS GTAGS all all-am check check-am \
+	clean clean-generic clean-recursive ctags ctags-recursive \
+	distclean distclean-generic distclean-recursive distclean-tags \
+	distdir dvi dvi-am html html-am info info-am install \
+	install-am install-data install-data-am install-exec \
+	install-exec-am install-info install-info-am install-man \
 	install-strip installcheck installcheck-am installdirs \
 	installdirs-am maintainer-clean maintainer-clean-generic \
-	maintainer-clean-recursive mostlyclean mostlyclean-compile \
-	mostlyclean-generic mostlyclean-recursive pdf pdf-am ps ps-am \
-	tags tags-recursive uninstall uninstall-am uninstall-info-am \
-	uninstall-oincludeHEADERS
+	maintainer-clean-recursive mostlyclean mostlyclean-generic \
+	mostlyclean-recursive pdf pdf-am ps ps-am tags tags-recursive \
+	uninstall uninstall-am uninstall-info-am
 
 
-# The kludge that passes for vex's build system can't handle parallel
-# builds.  So, for the time being, serialise all Valgrind building.
-# (this is equivalent to enforcing "make -j 1".
-.NOTPARALLEL:
-
-install-exec-local:
-	if [ -n "$(noinst_PROGRAMS)" ] ; then \
-	  for f in $(noinst_PROGRAMS); do \
-	    name=`echo $$f | sed -e 's/-\([^-]*-[^-.]*\)\(\..*\)\?$$/\2/'`; \
-	    plat=`echo $$f | sed -e 's/^.*-\([^-]*-[^-.]*\)\(\..*\)\?$$/\1/'`; \
-	    $(mkinstalldirs) $(DESTDIR)$(valdir)/$$plat; \
-	    $(INSTALL_PROGRAM) $$f $(DESTDIR)$(valdir)/$$plat/$$name; \
-	  done ; \
-	fi ; \
-	if [ -n "$(noinst_LIBRARIES)" ] ; then \
-	  for f in $(noinst_LIBRARIES) expr_wont_match_me; do \
-	    if expr match $$f libcoregrind_ > /dev/null ; then \
-	      pU=`echo $$f | sed -e 's/libcoregrind_//g' -e 's/\.a//g'` ; \
-	      pD=`echo $$pU | sed -e 's/_/-/g'` ; \
-	      $(INSTALL_DATA) $$f $(DESTDIR)$(valdir)/$$pD/libcoregrind.a ; \
-	      $(INSTALL_DATA) @VEX_DIR@/libvex_$$pU.a \
-				$(DESTDIR)$(valdir)/$$pD/libvex.a ; \
-	    fi ; \
-	  done ; \
-	fi
-
-all-local:
-	if [ -n "$(noinst_PROGRAMS)" ] ; then \
-	  for f in $(noinst_PROGRAMS); do \
-	    name=`echo $$f | sed -e 's/-\([^-]*-[^-.]*\)\(\..*\)\?$$/\2/'`; \
-	    plat=`echo $$f | sed -e 's/^.*-\([^-]*-[^-.]*\)\(\..*\)\?$$/\1/'`; \
-	    mkdir -p $(inplacedir)/$$plat; \
-	    rm -f $(inplacedir)/$$plat/$$name; \
-	    ln -f -s ../../$(subdir)/$$f $(inplacedir)/$$plat/$$name; \
-	  done ; \
-	fi
-
-@VEX_DIR@/libvex_x86_linux.a: @VEX_DIR@/priv/main/vex_svnversion.h
-	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR)" \
-	libvex_x86_linux.a \
-	EXTRA_CFLAGS="$(AM_CFLAGS_X86_LINUX) @FLAG_WDECL_AFTER_STMT@ \
-			@FLAG_FNO_STACK_PROTECTOR@"
-
-@VEX_DIR@/libvex_amd64_linux.a: @VEX_DIR@/priv/main/vex_svnversion.h
-	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR)" \
-	libvex_amd64_linux.a \
-	EXTRA_CFLAGS="$(AM_CFLAGS_AMD64_LINUX) @FLAG_WDECL_AFTER_STMT@ \
-			@FLAG_FNO_STACK_PROTECTOR@"
-
-@VEX_DIR@/libvex_ppc32_linux.a: @VEX_DIR@/priv/main/vex_svnversion.h
-	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR)" \
-	libvex_ppc32_linux.a \
-	EXTRA_CFLAGS="$(AM_CFLAGS_PPC32_LINUX) @FLAG_WDECL_AFTER_STMT@ \
-			@FLAG_FNO_STACK_PROTECTOR@"
-
-@VEX_DIR@/libvex_ppc64_linux.a: @VEX_DIR@/priv/main/vex_svnversion.h
-	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR)" \
-	libvex_ppc64_linux.a \
-	EXTRA_CFLAGS="$(AM_CFLAGS_PPC64_LINUX) @FLAG_WDECL_AFTER_STMT@ \
-			@FLAG_FNO_STACK_PROTECTOR@"
-
-@VEX_DIR@/libvex_ppc32_aix5.a: @VEX_DIR@/priv/main/vex_svnversion.h
-	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR) -X32" \
-	libvex_ppc32_aix5.a \
-	EXTRA_CFLAGS="$(AM_CFLAGS_PPC32_AIX5) @FLAG_WDECL_AFTER_STMT@ \
-			@FLAG_FNO_STACK_PROTECTOR@"
-
-@VEX_DIR@/libvex_ppc64_aix5.a: @VEX_DIR@/priv/main/vex_svnversion.h
-	$(MAKE) -C @VEX_DIR@ CC="$(CC)" AR="$(AR) -X64" \
-	libvex_ppc64_aix5.a \
-	EXTRA_CFLAGS="$(AM_CFLAGS_PPC64_AIX5) @FLAG_WDECL_AFTER_STMT@ \
-			@FLAG_FNO_STACK_PROTECTOR@"
-
-@VEX_DIR@/priv/main/vex_svnversion.h:
-	$(MAKE) -C @VEX_DIR@ CC="$(CC)" version
-
-o_replace_memops.o: CFLAGS += -fno-omit-frame-pointer
-
-o_main.o: CFLAGS += -fno-omit-frame-pointer #-fomit-frame-pointer
+###--- The original Makefile.am begins here ---###
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

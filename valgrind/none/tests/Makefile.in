@@ -14,6 +14,7 @@
 
 @SET_MAKE@
 
+
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
 VPATH = @srcdir@
@@ -36,8 +37,8 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
-	$(top_srcdir)/Makefile.flags.am
+DIST_COMMON = $(noinst_HEADERS) $(srcdir)/Makefile.am \
+	$(srcdir)/Makefile.in $(top_srcdir)/Makefile.flags.am
 @VGP_X86_LINUX_TRUE@am__append_1 = x86
 @VGP_AMD64_LINUX_TRUE@am__append_2 = amd64
 @VGP_PPC32_LINUX_TRUE@am__append_3 = ppc32
@@ -58,12 +59,11 @@ check_PROGRAMS = ansi$(EXEEXT) args$(EXEEXT) async-sigs$(EXEEXT) \
 	pth_cancel1$(EXEEXT) pth_cancel2$(EXEEXT) \
 	pth_cvsimple$(EXEEXT) pth_empty$(EXEEXT) pth_exit$(EXEEXT) \
 	pth_exit2$(EXEEXT) pth_mutexspeed$(EXEEXT) pth_once$(EXEEXT) \
-	pth_rwlock$(EXEEXT) pth_stackalign$(EXEEXT) \
-	pth_detached$(EXEEXT) rcrl$(EXEEXT) readline1$(EXEEXT) \
-	res_search$(EXEEXT) resolv$(EXEEXT) rlimit_nofile$(EXEEXT) \
-	selfrun$(EXEEXT) sem$(EXEEXT) semlimit$(EXEEXT) \
-	sha1_test$(EXEEXT) shortpush$(EXEEXT) shorts$(EXEEXT) \
-	stackgrowth$(EXEEXT) sigstackgrowth$(EXEEXT) \
+	pth_rwlock$(EXEEXT) pth_stackalign$(EXEEXT) rcrl$(EXEEXT) \
+	readline1$(EXEEXT) res_search$(EXEEXT) resolv$(EXEEXT) \
+	rlimit_nofile$(EXEEXT) selfrun$(EXEEXT) sem$(EXEEXT) \
+	semlimit$(EXEEXT) sha1_test$(EXEEXT) shortpush$(EXEEXT) \
+	shorts$(EXEEXT) stackgrowth$(EXEEXT) sigstackgrowth$(EXEEXT) \
 	susphello$(EXEEXT) syscall-restart1$(EXEEXT) \
 	syscall-restart2$(EXEEXT) system$(EXEEXT) \
 	thread-exits$(EXEEXT) threaded-fork$(EXEEXT) \
@@ -193,7 +193,7 @@ pth_blockedsig_SOURCES = pth_blockedsig.c
 pth_blockedsig_OBJECTS = pth_blockedsig.$(OBJEXT)
 pth_blockedsig_DEPENDENCIES =
 pth_cancel1_SOURCES = pth_cancel1.c
-pth_cancel1_OBJECTS = pth_cancel1.$(OBJEXT)
+pth_cancel1_OBJECTS = pth_cancel1-pth_cancel1.$(OBJEXT)
 pth_cancel1_DEPENDENCIES =
 pth_cancel2_SOURCES = pth_cancel2.c
 pth_cancel2_OBJECTS = pth_cancel2.$(OBJEXT)
@@ -201,9 +201,6 @@ pth_cancel2_DEPENDENCIES =
 pth_cvsimple_SOURCES = pth_cvsimple.c
 pth_cvsimple_OBJECTS = pth_cvsimple.$(OBJEXT)
 pth_cvsimple_DEPENDENCIES =
-pth_detached_SOURCES = pth_detached.c
-pth_detached_OBJECTS = pth_detached.$(OBJEXT)
-pth_detached_DEPENDENCIES =
 pth_empty_SOURCES = pth_empty.c
 pth_empty_OBJECTS = pth_empty.$(OBJEXT)
 pth_empty_DEPENDENCIES =
@@ -317,14 +314,14 @@ SOURCES = ansi.c args.c async-sigs.c bitfield1.c blockfault.c \
 	$(gxx304_SOURCES) manythreads.c map_unaligned.c map_unmap.c \
 	mq.c mremap.c mremap2.c munmap_exe.c nestedfns.c pending.c \
 	pth_atfork1.c pth_blockedsig.c pth_cancel1.c pth_cancel2.c \
-	pth_cvsimple.c pth_detached.c pth_empty.c pth_exit.c \
-	pth_exit2.c pth_mutexspeed.c pth_once.c pth_rwlock.c \
-	pth_stackalign.c rcrl.c readline1.c res_search.c resolv.c \
-	rlimit_nofile.c selfrun.c sem.c semlimit.c sha1_test.c \
-	shortpush.c shorts.c sigstackgrowth.c stackgrowth.c \
-	susphello.c syscall-restart1.c syscall-restart2.c system.c \
-	thread-exits.c threaded-fork.c threadederrno.c $(tls_SOURCES) \
-	$(tls_so_SOURCES) $(tls2_so_SOURCES) vgprintf.c
+	pth_cvsimple.c pth_empty.c pth_exit.c pth_exit2.c \
+	pth_mutexspeed.c pth_once.c pth_rwlock.c pth_stackalign.c \
+	rcrl.c readline1.c res_search.c resolv.c rlimit_nofile.c \
+	selfrun.c sem.c semlimit.c sha1_test.c shortpush.c shorts.c \
+	sigstackgrowth.c stackgrowth.c susphello.c syscall-restart1.c \
+	syscall-restart2.c system.c thread-exits.c threaded-fork.c \
+	threadederrno.c $(tls_SOURCES) $(tls_so_SOURCES) \
+	$(tls2_so_SOURCES) vgprintf.c
 DIST_SOURCES = ansi.c args.c async-sigs.c bitfield1.c blockfault.c \
 	bug129866.c closeall.c $(coolo_sigaction_SOURCES) \
 	coolo_strlen.c discard.c exec-sigmask.c execve.c faultstatus.c \
@@ -334,20 +331,21 @@ DIST_SOURCES = ansi.c args.c async-sigs.c bitfield1.c blockfault.c \
 	$(gxx304_SOURCES) manythreads.c map_unaligned.c map_unmap.c \
 	mq.c mremap.c mremap2.c munmap_exe.c nestedfns.c pending.c \
 	pth_atfork1.c pth_blockedsig.c pth_cancel1.c pth_cancel2.c \
-	pth_cvsimple.c pth_detached.c pth_empty.c pth_exit.c \
-	pth_exit2.c pth_mutexspeed.c pth_once.c pth_rwlock.c \
-	pth_stackalign.c rcrl.c readline1.c res_search.c resolv.c \
-	rlimit_nofile.c selfrun.c sem.c semlimit.c sha1_test.c \
-	shortpush.c shorts.c sigstackgrowth.c stackgrowth.c \
-	susphello.c syscall-restart1.c syscall-restart2.c system.c \
-	thread-exits.c threaded-fork.c threadederrno.c $(tls_SOURCES) \
-	$(tls_so_SOURCES) $(tls2_so_SOURCES) vgprintf.c
+	pth_cvsimple.c pth_empty.c pth_exit.c pth_exit2.c \
+	pth_mutexspeed.c pth_once.c pth_rwlock.c pth_stackalign.c \
+	rcrl.c readline1.c res_search.c resolv.c rlimit_nofile.c \
+	selfrun.c sem.c semlimit.c sha1_test.c shortpush.c shorts.c \
+	sigstackgrowth.c stackgrowth.c susphello.c syscall-restart1.c \
+	syscall-restart2.c system.c thread-exits.c threaded-fork.c \
+	threadederrno.c $(tls_SOURCES) $(tls_so_SOURCES) \
+	$(tls2_so_SOURCES) vgprintf.c
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	html-recursive info-recursive install-data-recursive \
 	install-exec-recursive install-info-recursive \
 	install-recursive installcheck-recursive installdirs-recursive \
 	pdf-recursive ps-recursive uninstall-info-recursive \
 	uninstall-recursive
+HEADERS = $(noinst_HEADERS)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -355,16 +353,21 @@ ACLOCAL = @ACLOCAL@
 AMDEP_FALSE = @AMDEP_FALSE@
 AMDEP_TRUE = @AMDEP_TRUE@
 AMTAR = @AMTAR@
+AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+BOOST_CFLAGS = @BOOST_CFLAGS@
+BOOST_LIBS = @BOOST_LIBS@
 BUILD_MPIWRAP_PRI_FALSE = @BUILD_MPIWRAP_PRI_FALSE@
 BUILD_MPIWRAP_PRI_TRUE = @BUILD_MPIWRAP_PRI_TRUE@
 BUILD_MPIWRAP_SEC_FALSE = @BUILD_MPIWRAP_SEC_FALSE@
 BUILD_MPIWRAP_SEC_TRUE = @BUILD_MPIWRAP_SEC_TRUE@
 BUILD_SSE3_TESTS_FALSE = @BUILD_SSE3_TESTS_FALSE@
 BUILD_SSE3_TESTS_TRUE = @BUILD_SSE3_TESTS_TRUE@
+BUILD_SSSE3_TESTS_FALSE = @BUILD_SSSE3_TESTS_FALSE@
+BUILD_SSSE3_TESTS_TRUE = @BUILD_SSSE3_TESTS_TRUE@
 CC = @CC@
 CCAS = @CCAS@
 CCASFLAGS = @CCASFLAGS@
@@ -392,8 +395,22 @@ FLAG_MAIX32 = @FLAG_MAIX32@
 FLAG_MAIX64 = @FLAG_MAIX64@
 FLAG_MMMX = @FLAG_MMMX@
 FLAG_MSSE = @FLAG_MSSE@
+FLAG_UNLIMITED_INLINE_UNIT_GROWTH = @FLAG_UNLIMITED_INLINE_UNIT_GROWTH@
 FLAG_WDECL_AFTER_STMT = @FLAG_WDECL_AFTER_STMT@
+FLAG_W_EXTRA = @FLAG_W_EXTRA@
+FLAG_W_NO_FORMAT_ZERO_LENGTH = @FLAG_W_NO_FORMAT_ZERO_LENGTH@
 GDB = @GDB@
+GLIBC_VERSION = @GLIBC_VERSION@
+HAS_ALTIVEC_FALSE = @HAS_ALTIVEC_FALSE@
+HAS_ALTIVEC_TRUE = @HAS_ALTIVEC_TRUE@
+HAVE_ALTIVEC_H_FALSE = @HAVE_ALTIVEC_H_FALSE@
+HAVE_ALTIVEC_H_TRUE = @HAVE_ALTIVEC_H_TRUE@
+HAVE_BOOST_1_35_FALSE = @HAVE_BOOST_1_35_FALSE@
+HAVE_BOOST_1_35_TRUE = @HAVE_BOOST_1_35_TRUE@
+HAVE_OPENMP_FALSE = @HAVE_OPENMP_FALSE@
+HAVE_OPENMP_TRUE = @HAVE_OPENMP_TRUE@
+HAVE_QTCORE_FALSE = @HAVE_QTCORE_FALSE@
+HAVE_QTCORE_TRUE = @HAVE_QTCORE_TRUE@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
@@ -443,8 +460,9 @@ VGP_PPC64_LINUX_FALSE = @VGP_PPC64_LINUX_FALSE@
 VGP_PPC64_LINUX_TRUE = @VGP_PPC64_LINUX_TRUE@
 VGP_X86_LINUX_FALSE = @VGP_X86_LINUX_FALSE@
 VGP_X86_LINUX_TRUE = @VGP_X86_LINUX_TRUE@
-VG_ARCH = @VG_ARCH@
 VG_ARCH_ALL = @VG_ARCH_ALL@
+VG_ARCH_MAX = @VG_ARCH_MAX@
+VG_ARCH_PRI = @VG_ARCH_PRI@
 VG_OS = @VG_OS@
 VG_PLATFORM_PRI = @VG_PLATFORM_PRI@
 VG_PLATFORM_SEC = @VG_PLATFORM_SEC@
@@ -494,6 +512,7 @@ target_alias = @target_alias@
 # performance and get whatever useful warnings we can out of gcc.
 AM_CFLAGS_BASE = -O2 -g -Wmissing-prototypes -Wall -Wshadow \
                  -Wpointer-arith -Wstrict-prototypes -Wmissing-declarations \
+		 @FLAG_W_NO_FORMAT_ZERO_LENGTH@ \
                  -fno-strict-aliasing
 
 
@@ -550,8 +569,8 @@ AM_CCASFLAGS_PRI = $(AM_CCASFLAGS_@VG_PLATFORM_PRI@)
 
 # Baseline link flags for making dynamic shared objects.
 #
-PRELOAD_LDFLAGS_COMMON_LINUX = -nostdlib -shared -Wl,-z,interpose,-z,initfirst
-PRELOAD_LDFLAGS_COMMON_AIX5 = -nostdlib -shared -Wl,-G -Wl,-bnogc
+PRELOAD_LDFLAGS_COMMON_LINUX = -nodefaultlibs -shared -Wl,-z,interpose,-z,initfirst
+PRELOAD_LDFLAGS_COMMON_AIX5 = -nodefaultlibs -shared -Wl,-G -Wl,-bnogc
 PRELOAD_LDFLAGS_X86_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
 PRELOAD_LDFLAGS_AMD64_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M64@
 PRELOAD_LDFLAGS_PPC32_LINUX = $(PRELOAD_LDFLAGS_COMMON_LINUX) @FLAG_M32@
@@ -567,6 +586,7 @@ noinst_SCRIPTS = \
 	filter_cmdline0 filter_linenos \
 	filter_fdleak filter_none_discards filter_stderr
 
+noinst_HEADERS = fdleak.h
 EXTRA_DIST = $(noinst_SCRIPTS) \
 	ansi.stderr.exp ansi.vgtest \
 	args.stderr.exp args.stdout.exp args.vgtest \
@@ -621,7 +641,9 @@ EXTRA_DIST = $(noinst_SCRIPTS) \
 	mq.stderr.exp mq.vgtest \
 	mremap.stderr.exp mremap.stdout.exp mremap.vgtest \
 	mremap2.stderr.exp \
-	mremap2.stdout.exp mremap2.stdout.exp2 mremap2.vgtest \
+	mremap2.stdout.exp mremap2.stdout.exp2 \
+	mremap2.stdout.exp-glibc28-amd64 \
+	mremap2.vgtest \
 	munmap_exe.stderr.exp munmap_exe.vgtest \
 	nestedfns.stderr.exp nestedfns.stdout.exp nestedfns.vgtest \
 	pending.stdout.exp pending.stderr.exp pending.vgtest \
@@ -640,8 +662,6 @@ EXTRA_DIST = $(noinst_SCRIPTS) \
 	pth_rwlock.stderr.exp pth_rwlock.vgtest \
 	pth_stackalign.stderr.exp \
 	pth_stackalign.stdout.exp pth_stackalign.vgtest \
-	pth_detached.stderr.exp \
-	pth_detached.stdout.exp pth_detached.vgtest \
 	rcrl.stderr.exp rcrl.stdout.exp rcrl.vgtest \
 	readline1.stderr.exp readline1.stdout.exp \
 	readline1.vgtest \
@@ -688,6 +708,7 @@ manythreads_LDADD = -lpthread
 mq_LDADD = -lrt
 pth_atfork1_LDADD = -lpthread
 pth_blockedsig_LDADD = -lpthread
+pth_cancel1_CFLAGS = $(AM_FLAG_M3264_PRI) -Wno-shadow
 pth_cancel1_LDADD = -lpthread
 pth_cancel2_LDADD = -lpthread
 pth_cvsimple_LDADD = -lpthread
@@ -698,7 +719,6 @@ pth_mutexspeed_LDADD = -lpthread
 pth_once_LDADD = -lpthread
 pth_rwlock_LDADD = -lpthread
 pth_stackalign_LDADD = -lpthread
-pth_detached_LDADD = -lpthread
 @VGO_AIX5_FALSE@res_search_LDADD = -lresolv -lpthread
 @VGO_AIX5_TRUE@res_search_LDADD = -lpthread
 semlimit_LDADD = -lpthread
@@ -737,9 +757,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am $(top_srcdir
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu  none/tests/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign  none/tests/Makefile'; \
 	cd $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu  none/tests/Makefile
+	  $(AUTOMAKE) --foreign  none/tests/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -883,9 +903,6 @@ pth_cancel2$(EXEEXT): $(pth_cancel2_OBJECTS) $(pth_cancel2_DEPENDENCIES)
 pth_cvsimple$(EXEEXT): $(pth_cvsimple_OBJECTS) $(pth_cvsimple_DEPENDENCIES) 
 	@rm -f pth_cvsimple$(EXEEXT)
 	$(LINK) $(pth_cvsimple_LDFLAGS) $(pth_cvsimple_OBJECTS) $(pth_cvsimple_LDADD) $(LIBS)
-pth_detached$(EXEEXT): $(pth_detached_OBJECTS) $(pth_detached_DEPENDENCIES) 
-	@rm -f pth_detached$(EXEEXT)
-	$(LINK) $(pth_detached_LDFLAGS) $(pth_detached_OBJECTS) $(pth_detached_LDADD) $(LIBS)
 pth_empty$(EXEEXT): $(pth_empty_OBJECTS) $(pth_empty_DEPENDENCIES) 
 	@rm -f pth_empty$(EXEEXT)
 	$(LINK) $(pth_empty_LDFLAGS) $(pth_empty_OBJECTS) $(pth_empty_LDADD) $(LIBS)
@@ -1024,10 +1041,9 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pending.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pth_atfork1.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pth_blockedsig.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pth_cancel1.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pth_cancel1-pth_cancel1.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pth_cancel2.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pth_cvsimple.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pth_detached.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pth_empty.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pth_exit.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pth_exit2.Po@am__quote@
@@ -1088,6 +1104,20 @@ ansi-ansi.obj: ansi.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ansi.c' object='ansi-ansi.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ansi_CFLAGS) $(CFLAGS) -c -o ansi-ansi.obj `if test -f 'ansi.c'; then $(CYGPATH_W) 'ansi.c'; else $(CYGPATH_W) '$(srcdir)/ansi.c'; fi`
+
+pth_cancel1-pth_cancel1.o: pth_cancel1.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pth_cancel1_CFLAGS) $(CFLAGS) -MT pth_cancel1-pth_cancel1.o -MD -MP -MF "$(DEPDIR)/pth_cancel1-pth_cancel1.Tpo" -c -o pth_cancel1-pth_cancel1.o `test -f 'pth_cancel1.c' || echo '$(srcdir)/'`pth_cancel1.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/pth_cancel1-pth_cancel1.Tpo" "$(DEPDIR)/pth_cancel1-pth_cancel1.Po"; else rm -f "$(DEPDIR)/pth_cancel1-pth_cancel1.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='pth_cancel1.c' object='pth_cancel1-pth_cancel1.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pth_cancel1_CFLAGS) $(CFLAGS) -c -o pth_cancel1-pth_cancel1.o `test -f 'pth_cancel1.c' || echo '$(srcdir)/'`pth_cancel1.c
+
+pth_cancel1-pth_cancel1.obj: pth_cancel1.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pth_cancel1_CFLAGS) $(CFLAGS) -MT pth_cancel1-pth_cancel1.obj -MD -MP -MF "$(DEPDIR)/pth_cancel1-pth_cancel1.Tpo" -c -o pth_cancel1-pth_cancel1.obj `if test -f 'pth_cancel1.c'; then $(CYGPATH_W) 'pth_cancel1.c'; else $(CYGPATH_W) '$(srcdir)/pth_cancel1.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/pth_cancel1-pth_cancel1.Tpo" "$(DEPDIR)/pth_cancel1-pth_cancel1.Po"; else rm -f "$(DEPDIR)/pth_cancel1-pth_cancel1.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='pth_cancel1.c' object='pth_cancel1-pth_cancel1.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(pth_cancel1_CFLAGS) $(CFLAGS) -c -o pth_cancel1-pth_cancel1.obj `if test -f 'pth_cancel1.c'; then $(CYGPATH_W) 'pth_cancel1.c'; else $(CYGPATH_W) '$(srcdir)/pth_cancel1.c'; fi`
 
 tls_so-tls_so.o: tls_so.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tls_so_CFLAGS) $(CFLAGS) -MT tls_so-tls_so.o -MD -MP -MF "$(DEPDIR)/tls_so-tls_so.Tpo" -c -o tls_so-tls_so.o `test -f 'tls_so.c' || echo '$(srcdir)/'`tls_so.c; \
@@ -1296,7 +1326,7 @@ distdir: $(DISTFILES)
 check-am: all-am
 	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS)
 check: check-recursive
-all-am: Makefile $(SCRIPTS)
+all-am: Makefile $(SCRIPTS) $(HEADERS)
 installdirs: installdirs-recursive
 installdirs-am:
 install: install-recursive

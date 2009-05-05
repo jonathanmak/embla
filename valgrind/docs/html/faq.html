@@ -204,7 +204,7 @@ collect2: ld returned 1 exit status
 <tr><td colspan="2"> </td></tr>
 <tr class="question">
 <td align="left" valign="top">
-<a name="faq.glibc_devel"></a><a name="id2531422"></a><b>2.2.</b>
+<a name="faq.glibc_devel"></a><a name="id2570729"></a><b>2.2.</b>
 </td>
 <td align="left" valign="top"><b>When I try to build Valgrind, 'make' fails with
 <pre class="programlisting">
@@ -705,9 +705,13 @@ int main(void)
 <a name="a-undeferrors"></a><b></b>
 </td>
 <td align="left" valign="top">
-<p>We'd love to improve these errors, but we don't know how to do it
-    without huge performance penalties.</p>
-<p>You can use the client request
+<p>Prior to version 3.4.0, the answer was "we don't know how to do it
+    without huge performance penalties".  As of 3.4.0, try using the
+    <code class="option">--track-origins=yes</code> flag.  It will run slower than
+    usual, but will give you extra information about the origin of
+    uninitialised values.</p>
+<p>Or if you want to do it the old fashioned way, you can use the
+    client request
     <code class="computeroutput">VALGRIND_CHECK_VALUE_IS_DEFINED</code> to help
     track these errors down -- work backwards from the point where the
     uninitialised error occurs, checking suspect values until you find the

@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2008 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -717,6 +717,8 @@ void LibVEX_default_VexArchInfo ( /*OUT*/VexArchInfo* vai )
 void LibVEX_default_VexAbiInfo ( /*OUT*/VexAbiInfo* vbi )
 {
    vbi->guest_stack_redzone_size       = 0;
+   vbi->guest_amd64_assume_fs_is_zero  = False;
+   vbi->guest_amd64_assume_gs_is_0x60  = False;
    vbi->guest_ppc_zap_RZ_at_blr        = False;
    vbi->guest_ppc_zap_RZ_at_bl         = NULL;
    vbi->guest_ppc_sc_continues_at_LR   = False;

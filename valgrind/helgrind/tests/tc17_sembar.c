@@ -7,10 +7,11 @@
 
 /* This is really a test of semaphore handling
    (sem_{init,destroy,post,wait}).  Using semaphores a barrier
-   function is created.  Thrcheck does understand the barrier
-   semantics implied by the barrier, as pieced together from
-   happens-before relationships obtained from the component
-   semaphores.  However, it does falsely report one race.  Ah well. */
+   function is created.  Helgrind-3.3 (p.k.a Thrcheck) does understand
+   the barrier semantics implied by the barrier, as pieced together
+   from happens-before relationships obtained from the component
+   semaphores.  However, it does falsely report one race.  Ah well.
+   Helgrind-3.4 is pure h-b and so reports no races (yay!). */
 
 /* This code is derived from
    gcc-4.3-20071012/libgomp/config/posix/bar.c, which is
@@ -150,7 +151,7 @@ static gomp_barrier_t bar;
    and this is interesting background:
      www.hpl.hp.com/techreports/2004/HPL-2004-209.pdf
 */
-volatile static long unprotected = 0;
+static volatile long unprotected = 0;
 
 void* child ( void* argV )
 {

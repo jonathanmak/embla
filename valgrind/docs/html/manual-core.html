@@ -346,7 +346,12 @@ don't want to fix, yet you don't want to continuously be reminded of
 them.</p>
 <p><b>Note: </b>By far the easiest way to add
 suppressions is to use the <code class="option">--gen-suppressions=yes</code> flag
-described in <a href="manual-core.html#manual-core.flags">Command-line flags for the Valgrind core</a>.</p>
+described in <a href="manual-core.html#manual-core.flags">Command-line flags for the Valgrind core</a>.  This generates
+suppressions automatically.  For best results,
+though, you may want to edit the output
+    of  <code class="option">--gen-suppressions=yes</code> by hand, in which
+case it would be advisable to read through this section.
+</p>
 <p>Each error to be suppressed is described very specifically, to
 minimise the possibility that a suppression-directive inadvertantly
 suppresses a bunch of similar errors which you did want to see.  The
@@ -398,8 +403,8 @@ tool_name1,tool_name2:suppression_name</pre>
 <p>Remaining lines: This is the calling context for the error --
     the chain of function calls that led to it.  There can be up to 24
     of these lines.</p>
-<p>Locations may be either names of shared objects/executables or
-    wildcards matching function names.  They begin
+<p>Locations may be names of either shared objects or
+    functions.  They begin
     <code class="computeroutput">obj:</code> and
     <code class="computeroutput">fun:</code> respectively.  Function and
     object names to match against may use the wildcard characters
@@ -408,7 +413,21 @@ tool_name1,tool_name2:suppression_name</pre>
 <p><span><strong class="command">Important note: </strong></span> C++ function names must be
     <span><strong class="command">mangled</strong></span>.  If you are writing suppressions by
     hand, use the <code class="option">--demangle=no</code> option to get the
-    mangled names in your error messages.</p>
+    mangled names in your error messages.  An example of a mangled
+    C++ name is  <code class="computeroutput">_ZN9QListView4showEv</code>.
+    This is the form that the GNU C++ compiler uses internally, and
+    the form that must be used in suppression files.  The equivalent
+    demangled name, <code class="computeroutput">QListView::show()</code>,
+    is what you see at the C++ source code level.
+    </p>
+<p>A location line may also be
+    simply "<code class="computeroutput">...</code>" (three dots).  This is
+    a frame-level wildcard, which matches zero or more frames.  Frame
+    level wildcards are useful because they make it easy to ignore
+    varying numbers of uninteresting frames in between frames of
+    interest.  That is often important when writing suppressions which
+    are intended to be robust against variations in the amount of
+    function inlining done by compilers.</p>
 </li>
 <li><p>Finally, the entire suppression must be between curly
     braces. Each brace must be the first character on its own
@@ -445,7 +464,7 @@ on the specifics of Memcheck's suppression kinds.)</p>
   obj:/usr/X11R6/lib/libX11.so.6.2
   obj:/usr/X11R6/lib/libXaw.so.7.0
 }</pre>
-<p>Suppress any size 4 uninitialised-value error which occurs
+<p>This suppresses any size 4 uninitialised-value error which occurs
 anywhere in <code class="filename">libX11.so.6.2</code>, when called from
 anywhere in the same library, when called from anywhere in
 <code class="filename">libXaw.so.7.0</code>.  The inexact specification of
@@ -455,6 +474,27 @@ was made have had their symbol tables removed.</p>
 <p>Although the above two examples do not make this clear, you can
 freely mix <code class="computeroutput">obj:</code> and
 <code class="computeroutput">fun:</code> lines in a suppression.</p>
+<p>Finally, here's an example using three frame-level wildcards:</p>
+<pre class="programlisting">
+{
+   a-contrived-example
+   Memcheck:Leak
+   fun:malloc
+   ...
+   fun:ddd
+   ...
+   fun:ccc
+   ...
+   fun:main
+}
+</pre>
+This suppresses Memcheck memory-leak errors, in the case where
+the allocation was done by <code class="computeroutput">main</code>
+calling (though any number of intermediaries, including zero)
+<code class="computeroutput">ccc</code>,
+calling onwards via
+<code class="computeroutput">ddd</code> and eventually
+to <code class="computeroutput">malloc.</code>.
 </div>
 <div class="sect1" lang="en">
 <div class="titlepage"><div><div><h2 class="title" style="clear: both">
@@ -610,7 +650,8 @@ categories.</p>
 <p><code class="option">%p</code> is replaced with the current process ID.
       This is very useful for program that invoke multiple processes.
       WARNING: If you use <code class="option">--trace-children=yes</code> and your
-      program invokes multiple processes and you don't use this specifier
+      program invokes multiple processes OR your program forks without
+      calling exec afterwards, and you don't use this specifier
       (or the <code class="option">%q</code> specifier below), the Valgrind output from
       all those processes will go into one file, possibly jumbled up, and
       possibly incomplete.</p>
@@ -749,8 +790,8 @@ that can report errors, e.g. Memcheck, but not Cachegrind.</p>
     </span>
 </dt>
 <dd><p>Specifies an extra file from which to read descriptions of
-      errors to suppress.  You may use as many extra suppressions files
-      as you like.</p></dd>
+      errors to suppress.  You may use up to 100 extra suppression
+      files.</p></dd>
 <dt>
 <a name="opt.gen-suppressions"></a><span class="term">
       <code class="option">--gen-suppressions=&lt;yes|no|all&gt; [default: no] </code>
@@ -775,8 +816,14 @@ that can report errors, e.g. Memcheck, but not Cachegrind.</p>
       prints out the suppressions with mangled names, as
       required.</p>
 <p>Note that the suppressions printed are as specific as
-      possible.  You may want to common up similar ones, eg. by adding
-      wildcards to function names.  Sometimes two different errors
+      possible.  You may want to common up similar ones, by adding
+      wildcards to function names, and by using frame-level wildcards.
+      The wildcarding facilities are powerful yet flexible, and with a
+      bit of careful editing, you may be able to suppress a whole
+      family of related errors with only a few suppressions.  For
+      details on how to do this, see
+      <a href="manual-core.html#manual-core.suppress">Suppressing errors</a>.</p>
+<p>Sometimes two different errors
       are suppressed by the same suppression, in which case Valgrind
       will output the suppression more than once, but you only need to
       have one copy in your suppression file (but having more than one
@@ -808,16 +855,6 @@ that can report errors, e.g. Memcheck, but not Cachegrind.</p>
       continue from inside the debugger doesn't work.</p>
 <p><code class="varname">C Ret</code> or <code class="varname">c Ret</code> causes
       Valgrind not to start a debugger, and not to ask again.</p>
-<p><span><strong class="command">Note:</strong></span> <code class="option">--db-attach=yes</code>
-      conflicts with <code class="option">--trace-children=yes</code>.  You can't
-      use them together.  Valgrind refuses to start up in this
-      situation.</p>
-<p>May 2002: this is a historical relic which could be easily
-      fixed if it gets in your way.  Mail us and complain if this is a
-      problem for you.</p>
-<p>Nov 2002: if you're sending output to a logfile or to a
-      network socket, I guess this option doesn't make any sense.
-      Caveat emptor.</p>
 </dd>
 <dt>
 <a name="opt.db-command"></a><span class="term">
@@ -889,6 +926,52 @@ that can report errors, e.g. Memcheck, but not Cachegrind.</p>
       for heap-allocated data than for stack-allocated data.  If you
       have to use this flag, you may wish to consider rewriting your
       code to allocate on the heap rather than on the stack.</p>
+</dd>
+<dt>
+<a name="opt.main-stacksize"></a><span class="term">
+      <code class="option">--main-stacksize=&lt;number&gt;
+               [default: use current 'ulimit' value] </code>
+    </span>
+</dt>
+<dd>
+<p>Specifies the size of the main thread's stack.</p>
+<p>To simplify its memory management, Valgrind reserves all
+      required space for the main thread's stack at startup.  That
+      means it needs to know the required stack size at
+      startup.</p>
+<p>By default, Valgrind uses the current "ulimit" value for
+      the stack size, or 16 MB, whichever is lower.  In many cases
+      this gives a stack size in the range 8 to 16 MB, which almost
+      never overflows for most applications.</p>
+<p>If you need a larger total stack size,
+      use <code class="option">--main-stacksize</code> to specify it.  Only set
+      it as high as you need, since reserving far more space than you
+      need (that is, hundreds of megabytes more than you need)
+      constrains Valgrind's memory allocators and may reduce the total
+      amount of memory that Valgrind can use.  This is only really of
+      significance on 32-bit machines.</p>
+<p>On Linux, you may request a stack of size up to 2GB.
+      Valgrind will stop with a diagnostic message if the stack cannot
+      be allocated.  On AIX5 the allowed stack size is restricted to
+      128MB.</p>
+<p><code class="option">--main-stacksize</code> only affects the stack
+      size for the program's initial thread.  It has no bearing on the
+      size of thread stacks, as Valgrind does not allocate
+      those.</p>
+<p>You may need to use both <code class="option">--main-stacksize</code>
+      and <code class="option">--max-stackframe</code> together.  It is important
+      to understand that <code class="option">--main-stacksize</code> sets the
+      maximum total stack size,
+      whilst <code class="option">--max-stackframe</code> specifies the largest
+      size of any one stack frame.  You will have to work out
+      the <code class="option">--main-stacksize</code> value for yourself
+      (usually, if your applications segfaults).  But Valgrind will
+      tell you the needed <code class="option">--max-stackframe</code> size, if
+      necessary.</p>
+<p>As discussed further in the description
+      of <code class="option">--max-stackframe</code>, a requirement for a large
+      stack is a sign of potential portability problems.  You are best
+      advised to place all large data in heap-allocated memory.</p>
 </dd>
 </dl>
 </div>
@@ -1049,7 +1132,14 @@ processed earlier; for example, options in
 precedence over those in
 <code class="computeroutput">~/.valgrindrc</code>.  The first two
 are particularly useful for setting the default tool to
-use.</p>
+use.
+</p>
+<p>Please note that the <code class="computeroutput">./.valgrindrc</code>
+file is ignored if it is marked as world writeable or not owned 
+by the current user. This is because the .valgrindrc can contain options
+that are potentially harmful or can be used by a local attacker to
+execute code under your user account.
+</p>
 <p>Any tool-specific options put in
 <code class="computeroutput">$VALGRIND_OPTS</code> or the
 <code class="computeroutput">.valgrindrc</code> files should be
@@ -1132,7 +1222,7 @@ will create a core dump in the usual way.</p>
 <code class="computeroutput">make</code>, <code class="computeroutput">make
 install</code> mechanism, and we have attempted to
 ensure that it works on machines with kernel 2.4 or 2.6 and glibc
-2.2.X to 2.5.X.  Once you have completed 
+2.2.X to 2.9.X.  Once you have completed 
 <code class="computeroutput">make install</code> you may then want 
 to run the regression tests
 with <code class="computeroutput">make regtest</code>.

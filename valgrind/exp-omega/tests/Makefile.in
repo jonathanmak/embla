@@ -13,7 +13,6 @@
 # PARTICULAR PURPOSE.
 
 @SET_MAKE@
-
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
 VPATH = @srcdir@
@@ -36,12 +35,6 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-check_PROGRAMS = overwrite1$(EXEEXT) overwrite2$(EXEEXT) \
-	overwrite3$(EXEEXT) overwrite4$(EXEEXT) overwrite5$(EXEEXT) \
-	scope1$(EXEEXT) scope2$(EXEEXT) scope3$(EXEEXT) \
-	scope4$(EXEEXT) scope5$(EXEEXT) scope6$(EXEEXT) \
-	block1$(EXEEXT) block2$(EXEEXT) block3$(EXEEXT) \
-	shadow1$(EXEEXT) static1$(EXEEXT)
 subdir = exp-omega/tests
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -51,92 +44,28 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
-block1_SOURCES = block1.c
-block1_OBJECTS = block1.$(OBJEXT)
-block1_LDADD = $(LDADD)
-block2_SOURCES = block2.c
-block2_OBJECTS = block2.$(OBJEXT)
-block2_LDADD = $(LDADD)
-block3_SOURCES = block3.c
-block3_OBJECTS = block3.$(OBJEXT)
-block3_LDADD = $(LDADD)
-overwrite1_SOURCES = overwrite1.c
-overwrite1_OBJECTS = overwrite1.$(OBJEXT)
-overwrite1_LDADD = $(LDADD)
-overwrite2_SOURCES = overwrite2.c
-overwrite2_OBJECTS = overwrite2.$(OBJEXT)
-overwrite2_LDADD = $(LDADD)
-overwrite3_SOURCES = overwrite3.c
-overwrite3_OBJECTS = overwrite3.$(OBJEXT)
-overwrite3_LDADD = $(LDADD)
-overwrite4_SOURCES = overwrite4.c
-overwrite4_OBJECTS = overwrite4.$(OBJEXT)
-overwrite4_LDADD = $(LDADD)
-overwrite5_SOURCES = overwrite5.c
-overwrite5_OBJECTS = overwrite5.$(OBJEXT)
-overwrite5_LDADD = $(LDADD)
-scope1_SOURCES = scope1.c
-scope1_OBJECTS = scope1.$(OBJEXT)
-scope1_LDADD = $(LDADD)
-scope2_SOURCES = scope2.c
-scope2_OBJECTS = scope2.$(OBJEXT)
-scope2_LDADD = $(LDADD)
-scope3_SOURCES = scope3.c
-scope3_OBJECTS = scope3.$(OBJEXT)
-scope3_LDADD = $(LDADD)
-am_scope4_OBJECTS = scope4.$(OBJEXT)
-scope4_OBJECTS = $(am_scope4_OBJECTS)
-scope4_LDADD = $(LDADD)
-scope5_SOURCES = scope5.c
-scope5_OBJECTS = scope5.$(OBJEXT)
-scope5_LDADD = $(LDADD)
-scope6_SOURCES = scope6.c
-scope6_OBJECTS = scope6.$(OBJEXT)
-scope6_LDADD = $(LDADD)
-shadow1_SOURCES = shadow1.c
-shadow1_OBJECTS = shadow1.$(OBJEXT)
-shadow1_LDADD = $(LDADD)
-static1_SOURCES = static1.c
-static1_OBJECTS = static1.$(OBJEXT)
-static1_LDADD = $(LDADD)
-SCRIPTS = $(noinst_SCRIPTS)
-DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
-depcomp = $(SHELL) $(top_srcdir)/depcomp
-am__depfiles_maybe = depfiles
-COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
-	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
-CCLD = $(CC)
-LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
-	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
-CXXLD = $(CXX)
-CXXLINK = $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
-	-o $@
-SOURCES = block1.c block2.c block3.c overwrite1.c overwrite2.c \
-	overwrite3.c overwrite4.c overwrite5.c scope1.c scope2.c \
-	scope3.c $(scope4_SOURCES) scope5.c scope6.c shadow1.c \
-	static1.c
-DIST_SOURCES = block1.c block2.c block3.c overwrite1.c overwrite2.c \
-	overwrite3.c overwrite4.c overwrite5.c scope1.c scope2.c \
-	scope3.c $(scope4_SOURCES) scope5.c scope6.c shadow1.c \
-	static1.c
-ETAGS = etags
-CTAGS = ctags
+SOURCES =
+DIST_SOURCES =
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMDEP_FALSE = @AMDEP_FALSE@
 AMDEP_TRUE = @AMDEP_TRUE@
 AMTAR = @AMTAR@
+AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+BOOST_CFLAGS = @BOOST_CFLAGS@
+BOOST_LIBS = @BOOST_LIBS@
 BUILD_MPIWRAP_PRI_FALSE = @BUILD_MPIWRAP_PRI_FALSE@
 BUILD_MPIWRAP_PRI_TRUE = @BUILD_MPIWRAP_PRI_TRUE@
 BUILD_MPIWRAP_SEC_FALSE = @BUILD_MPIWRAP_SEC_FALSE@
 BUILD_MPIWRAP_SEC_TRUE = @BUILD_MPIWRAP_SEC_TRUE@
 BUILD_SSE3_TESTS_FALSE = @BUILD_SSE3_TESTS_FALSE@
 BUILD_SSE3_TESTS_TRUE = @BUILD_SSE3_TESTS_TRUE@
+BUILD_SSSE3_TESTS_FALSE = @BUILD_SSSE3_TESTS_FALSE@
+BUILD_SSSE3_TESTS_TRUE = @BUILD_SSSE3_TESTS_TRUE@
 CC = @CC@
 CCAS = @CCAS@
 CCASFLAGS = @CCASFLAGS@
@@ -164,8 +93,22 @@ FLAG_MAIX32 = @FLAG_MAIX32@
 FLAG_MAIX64 = @FLAG_MAIX64@
 FLAG_MMMX = @FLAG_MMMX@
 FLAG_MSSE = @FLAG_MSSE@
+FLAG_UNLIMITED_INLINE_UNIT_GROWTH = @FLAG_UNLIMITED_INLINE_UNIT_GROWTH@
 FLAG_WDECL_AFTER_STMT = @FLAG_WDECL_AFTER_STMT@
+FLAG_W_EXTRA = @FLAG_W_EXTRA@
+FLAG_W_NO_FORMAT_ZERO_LENGTH = @FLAG_W_NO_FORMAT_ZERO_LENGTH@
 GDB = @GDB@
+GLIBC_VERSION = @GLIBC_VERSION@
+HAS_ALTIVEC_FALSE = @HAS_ALTIVEC_FALSE@
+HAS_ALTIVEC_TRUE = @HAS_ALTIVEC_TRUE@
+HAVE_ALTIVEC_H_FALSE = @HAVE_ALTIVEC_H_FALSE@
+HAVE_ALTIVEC_H_TRUE = @HAVE_ALTIVEC_H_TRUE@
+HAVE_BOOST_1_35_FALSE = @HAVE_BOOST_1_35_FALSE@
+HAVE_BOOST_1_35_TRUE = @HAVE_BOOST_1_35_TRUE@
+HAVE_OPENMP_FALSE = @HAVE_OPENMP_FALSE@
+HAVE_OPENMP_TRUE = @HAVE_OPENMP_TRUE@
+HAVE_QTCORE_FALSE = @HAVE_QTCORE_FALSE@
+HAVE_QTCORE_TRUE = @HAVE_QTCORE_TRUE@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
@@ -215,8 +158,9 @@ VGP_PPC64_LINUX_FALSE = @VGP_PPC64_LINUX_FALSE@
 VGP_PPC64_LINUX_TRUE = @VGP_PPC64_LINUX_TRUE@
 VGP_X86_LINUX_FALSE = @VGP_X86_LINUX_FALSE@
 VGP_X86_LINUX_TRUE = @VGP_X86_LINUX_TRUE@
-VG_ARCH = @VG_ARCH@
 VG_ARCH_ALL = @VG_ARCH_ALL@
+VG_ARCH_MAX = @VG_ARCH_MAX@
+VG_ARCH_PRI = @VG_ARCH_PRI@
 VG_OS = @VG_OS@
 VG_PLATFORM_PRI = @VG_PLATFORM_PRI@
 VG_PLATFORM_SEC = @VG_PLATFORM_SEC@
@@ -261,16 +205,26 @@ sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
-noinst_SCRIPTS = 
-AM_CFLAGS = $(WERROR) -Winline -Wall -Wshadow -O0 -g 
-AM_CXXFLAGS = $(AM_CFLAGS) -Wall -O0 -g 
+EXTRA_DIST = block1.c \
+		block2.c \
+		block3.c \
+		overwrite1.c \
+		overwrite2.c \
+		overwrite3.c \
+		overwrite4.c \
+		overwrite5.c \
+		scope1.c \
+		scope2.c \
+		scope3.c \
+		scope4.cpp \
+		scope5.c \
+		scope6.c \
+		shadow1.c \
+		static1.c
 
-# C++ tests
-scope4_SOURCES = scope4.cpp
 all: all-am
 
 .SUFFIXES:
-.SUFFIXES: .c .cpp .o .obj
 $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -280,9 +234,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__confi
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu  exp-omega/tests/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign  exp-omega/tests/Makefile'; \
 	cd $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu  exp-omega/tests/Makefile
+	  $(AUTOMAKE) --foreign  exp-omega/tests/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -300,157 +254,13 @@ $(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
-
-clean-checkPROGRAMS:
-	-test -z "$(check_PROGRAMS)" || rm -f $(check_PROGRAMS)
-block1$(EXEEXT): $(block1_OBJECTS) $(block1_DEPENDENCIES) 
-	@rm -f block1$(EXEEXT)
-	$(LINK) $(block1_LDFLAGS) $(block1_OBJECTS) $(block1_LDADD) $(LIBS)
-block2$(EXEEXT): $(block2_OBJECTS) $(block2_DEPENDENCIES) 
-	@rm -f block2$(EXEEXT)
-	$(LINK) $(block2_LDFLAGS) $(block2_OBJECTS) $(block2_LDADD) $(LIBS)
-block3$(EXEEXT): $(block3_OBJECTS) $(block3_DEPENDENCIES) 
-	@rm -f block3$(EXEEXT)
-	$(LINK) $(block3_LDFLAGS) $(block3_OBJECTS) $(block3_LDADD) $(LIBS)
-overwrite1$(EXEEXT): $(overwrite1_OBJECTS) $(overwrite1_DEPENDENCIES) 
-	@rm -f overwrite1$(EXEEXT)
-	$(LINK) $(overwrite1_LDFLAGS) $(overwrite1_OBJECTS) $(overwrite1_LDADD) $(LIBS)
-overwrite2$(EXEEXT): $(overwrite2_OBJECTS) $(overwrite2_DEPENDENCIES) 
-	@rm -f overwrite2$(EXEEXT)
-	$(LINK) $(overwrite2_LDFLAGS) $(overwrite2_OBJECTS) $(overwrite2_LDADD) $(LIBS)
-overwrite3$(EXEEXT): $(overwrite3_OBJECTS) $(overwrite3_DEPENDENCIES) 
-	@rm -f overwrite3$(EXEEXT)
-	$(LINK) $(overwrite3_LDFLAGS) $(overwrite3_OBJECTS) $(overwrite3_LDADD) $(LIBS)
-overwrite4$(EXEEXT): $(overwrite4_OBJECTS) $(overwrite4_DEPENDENCIES) 
-	@rm -f overwrite4$(EXEEXT)
-	$(LINK) $(overwrite4_LDFLAGS) $(overwrite4_OBJECTS) $(overwrite4_LDADD) $(LIBS)
-overwrite5$(EXEEXT): $(overwrite5_OBJECTS) $(overwrite5_DEPENDENCIES) 
-	@rm -f overwrite5$(EXEEXT)
-	$(LINK) $(overwrite5_LDFLAGS) $(overwrite5_OBJECTS) $(overwrite5_LDADD) $(LIBS)
-scope1$(EXEEXT): $(scope1_OBJECTS) $(scope1_DEPENDENCIES) 
-	@rm -f scope1$(EXEEXT)
-	$(LINK) $(scope1_LDFLAGS) $(scope1_OBJECTS) $(scope1_LDADD) $(LIBS)
-scope2$(EXEEXT): $(scope2_OBJECTS) $(scope2_DEPENDENCIES) 
-	@rm -f scope2$(EXEEXT)
-	$(LINK) $(scope2_LDFLAGS) $(scope2_OBJECTS) $(scope2_LDADD) $(LIBS)
-scope3$(EXEEXT): $(scope3_OBJECTS) $(scope3_DEPENDENCIES) 
-	@rm -f scope3$(EXEEXT)
-	$(LINK) $(scope3_LDFLAGS) $(scope3_OBJECTS) $(scope3_LDADD) $(LIBS)
-scope4$(EXEEXT): $(scope4_OBJECTS) $(scope4_DEPENDENCIES) 
-	@rm -f scope4$(EXEEXT)
-	$(CXXLINK) $(scope4_LDFLAGS) $(scope4_OBJECTS) $(scope4_LDADD) $(LIBS)
-scope5$(EXEEXT): $(scope5_OBJECTS) $(scope5_DEPENDENCIES) 
-	@rm -f scope5$(EXEEXT)
-	$(LINK) $(scope5_LDFLAGS) $(scope5_OBJECTS) $(scope5_LDADD) $(LIBS)
-scope6$(EXEEXT): $(scope6_OBJECTS) $(scope6_DEPENDENCIES) 
-	@rm -f scope6$(EXEEXT)
-	$(LINK) $(scope6_LDFLAGS) $(scope6_OBJECTS) $(scope6_LDADD) $(LIBS)
-shadow1$(EXEEXT): $(shadow1_OBJECTS) $(shadow1_DEPENDENCIES) 
-	@rm -f shadow1$(EXEEXT)
-	$(LINK) $(shadow1_LDFLAGS) $(shadow1_OBJECTS) $(shadow1_LDADD) $(LIBS)
-static1$(EXEEXT): $(static1_OBJECTS) $(static1_DEPENDENCIES) 
-	@rm -f static1$(EXEEXT)
-	$(LINK) $(static1_LDFLAGS) $(static1_OBJECTS) $(static1_LDADD) $(LIBS)
-
-mostlyclean-compile:
-	-rm -f *.$(OBJEXT)
-
-distclean-compile:
-	-rm -f *.tab.c
-
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/block1.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/block2.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/block3.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/overwrite1.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/overwrite2.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/overwrite3.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/overwrite4.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/overwrite5.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scope1.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scope2.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scope3.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scope4.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scope5.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scope6.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/shadow1.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/static1.Po@am__quote@
-
-.c.o:
-@am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/$*.Tpo" "$(DEPDIR)/$*.Po"; else rm -f "$(DEPDIR)/$*.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(COMPILE) -c $<
-
-.c.obj:
-@am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ `$(CYGPATH_W) '$<'`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/$*.Tpo" "$(DEPDIR)/$*.Po"; else rm -f "$(DEPDIR)/$*.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(COMPILE) -c `$(CYGPATH_W) '$<'`
-
-.cpp.o:
-@am__fastdepCXX_TRUE@	if $(CXXCOMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/$*.Tpo" "$(DEPDIR)/$*.Po"; else rm -f "$(DEPDIR)/$*.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXXCOMPILE) -c -o $@ $<
-
-.cpp.obj:
-@am__fastdepCXX_TRUE@	if $(CXXCOMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ `$(CYGPATH_W) '$<'`; \
-@am__fastdepCXX_TRUE@	then mv -f "$(DEPDIR)/$*.Tpo" "$(DEPDIR)/$*.Po"; else rm -f "$(DEPDIR)/$*.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 uninstall-info-am:
-
-ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
-	list='$(SOURCES) $(HEADERS) $(LISP) $(TAGS_FILES)'; \
-	unique=`for i in $$list; do \
-	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
-	  done | \
-	  $(AWK) '    { files[$$0] = 1; } \
-	       END { for (i in files) print i; }'`; \
-	mkid -fID $$unique
 tags: TAGS
+TAGS:
 
-TAGS:  $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
-		$(TAGS_FILES) $(LISP)
-	tags=; \
-	here=`pwd`; \
-	list='$(SOURCES) $(HEADERS)  $(LISP) $(TAGS_FILES)'; \
-	unique=`for i in $$list; do \
-	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
-	  done | \
-	  $(AWK) '    { files[$$0] = 1; } \
-	       END { for (i in files) print i; }'`; \
-	if test -z "$(ETAGS_ARGS)$$tags$$unique"; then :; else \
-	  test -n "$$unique" || unique=$$empty_fix; \
-	  $(ETAGS) $(ETAGSFLAGS) $(AM_ETAGSFLAGS) $(ETAGS_ARGS) \
-	    $$tags $$unique; \
-	fi
 ctags: CTAGS
-CTAGS:  $(HEADERS) $(SOURCES)  $(TAGS_DEPENDENCIES) \
-		$(TAGS_FILES) $(LISP)
-	tags=; \
-	here=`pwd`; \
-	list='$(SOURCES) $(HEADERS)  $(LISP) $(TAGS_FILES)'; \
-	unique=`for i in $$list; do \
-	    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
-	  done | \
-	  $(AWK) '    { files[$$0] = 1; } \
-	       END { for (i in files) print i; }'`; \
-	test -z "$(CTAGS_ARGS)$$tags$$unique" \
-	  || $(CTAGS) $(CTAGSFLAGS) $(AM_CTAGSFLAGS) $(CTAGS_ARGS) \
-	     $$tags $$unique
+CTAGS:
 
-GTAGS:
-	here=`$(am__cd) $(top_builddir) && pwd` \
-	  && cd $(top_srcdir) \
-	  && gtags -i $(GTAGS_ARGS) $$here
-
-distclean-tags:
-	-rm -f TAGS ID GTAGS GRTAGS GSYMS GPATH tags
 
 distdir: $(DISTFILES)
 	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
@@ -480,9 +290,8 @@ distdir: $(DISTFILES)
 	  fi; \
 	done
 check-am: all-am
-	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS)
 check: check-am
-all-am: Makefile $(SCRIPTS)
+all-am: Makefile
 installdirs:
 install: install-am
 install-exec: install-exec-am
@@ -510,13 +319,11 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-checkPROGRAMS clean-generic mostlyclean-am
+clean-am: clean-generic mostlyclean-am
 
 distclean: distclean-am
-	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
-distclean-am: clean-am distclean-compile distclean-generic \
-	distclean-tags
+distclean-am: clean-am distclean-generic
 
 dvi: dvi-am
 
@@ -539,13 +346,12 @@ install-man:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-	-rm -rf ./$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
 mostlyclean: mostlyclean-am
 
-mostlyclean-am: mostlyclean-compile mostlyclean-generic
+mostlyclean-am: mostlyclean-generic
 
 pdf: pdf-am
 
@@ -557,17 +363,17 @@ ps-am:
 
 uninstall-am: uninstall-info-am
 
-.PHONY: CTAGS GTAGS all all-am check check-am clean \
-	clean-checkPROGRAMS clean-generic ctags distclean \
-	distclean-compile distclean-generic distclean-tags distdir dvi \
-	dvi-am html html-am info info-am install install-am \
-	install-data install-data-am install-exec install-exec-am \
-	install-info install-info-am install-man install-strip \
-	installcheck installcheck-am installdirs maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-compile \
-	mostlyclean-generic pdf pdf-am ps ps-am tags uninstall \
-	uninstall-am uninstall-info-am
+.PHONY: all all-am check check-am clean clean-generic distclean \
+	distclean-generic distdir dvi dvi-am html html-am info info-am \
+	install install-am install-data install-data-am install-exec \
+	install-exec-am install-info install-info-am install-man \
+	install-strip installcheck installcheck-am installdirs \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-generic pdf pdf-am ps ps-am uninstall uninstall-am \
+	uninstall-info-am
 
+
+###--- The original Makefile.am begins here ---###
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

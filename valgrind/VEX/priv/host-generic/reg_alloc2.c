@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2008 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -215,6 +215,17 @@ Int findMostDistantlyMentionedVReg (
 }
 
 
+/* Check that this vreg has been assigned a sane spill offset. */
+static inline void sanity_check_spill_offset ( VRegLR* vreg )
+{
+   if (vreg->reg_class == HRcVec128 || vreg->reg_class == HRcFlt64) {
+      vassert(0 == ((UShort)vreg->spill_offset % 16));
+   } else {
+      vassert(0 == ((UShort)vreg->spill_offset % 8));
+   }
+}
+
+
 /* Double the size of the real-reg live-range array, if needed. */
 static void ensureRRLRspace ( RRegLR** info, Int* size, Int used )
 {
@@ -396,8 +407,9 @@ HInstrArray* doRegisterAllocation (
       not at each insn processed. */
    Bool do_sanity_check;
 
-   vassert(0 == LibVEX_N_SPILL_BYTES % 16);
-   vassert(0 == guest_sizeB % 8);
+   vassert(0 == (guest_sizeB % 16));
+   vassert(0 == (LibVEX_N_SPILL_BYTES % 16));
+   vassert(0 == (N_SPILL64S % 2));
 
    /* The live range numbers are signed shorts, and so limiting the
       number of insns to 10000 comfortably guards against them
@@ -789,6 +801,16 @@ HInstrArray* doRegisterAllocation (
       64 bits to spill (classes Flt64 and Vec128), we have to allocate
       two spill slots.
 
+      For Vec128-class on PowerPC, the spill slot's actual address
+      must be 16-byte aligned.  Since the spill slot's address is
+      computed as an offset from the guest state pointer, and since
+      the user of the generated code must set that pointer to a
+      16-aligned value, we have the residual obligation here of
+      choosing a 16-aligned spill slot offset for Vec128-class values.
+      Since each spill slot is 8 bytes long, that means for
+      Vec128-class values we must allocated a spill slot number which
+      is zero mod 2.
+
       Do a rank-based allocation of vregs to spill slot numbers.  We
       put as few values as possible in spill slots, but nevertheless
       need to have a spill slot available for all vregs, just in case.
@@ -817,16 +839,19 @@ HInstrArray* doRegisterAllocation (
           || vreg_lrs[j].reg_class == HRcFlt64) {
 
          /* Find two adjacent free slots in which between them provide
-            up to 128 bits in which to spill the vreg. */
+            up to 128 bits in which to spill the vreg.  Since we are
+            trying to find an even:odd pair, move along in steps of 2
+            (slots). */
 
-         for (k = 0; k < N_SPILL64S-1; k++)
+         for (k = 0; k < N_SPILL64S-1; k += 2)
             if (ss_busy_until_before[k] <= vreg_lrs[j].live_after
                 && ss_busy_until_before[k+1] <= vreg_lrs[j].live_after)
                break;
-         if (k == N_SPILL64S-1) {
+         if (k >= N_SPILL64S-1) {
             vpanic("LibVEX_N_SPILL_BYTES is too low.  " 
                    "Increase and recompile.");
          }
+         if (0) vex_printf("16-byte spill offset in spill slot %d\n", (Int)k);
          ss_busy_until_before[k+0] = vreg_lrs[j].dead_before;
          ss_busy_until_before[k+1] = vreg_lrs[j].dead_before;
 
@@ -849,10 +874,12 @@ HInstrArray* doRegisterAllocation (
       }
 
       /* This reflects LibVEX's hard-wired knowledge of the baseBlock
-         layout: the guest state, then an equal sized area following
-         it for shadow state, and then the spill area. */
-      vreg_lrs[j].spill_offset = toShort(guest_sizeB * 2 + k * 8);
+         layout: the guest state, then two equal sized areas following
+         it for two sets of shadow state, and then the spill area. */
+      vreg_lrs[j].spill_offset = toShort(guest_sizeB * 3 + k * 8);
 
+      /* Independent check that we've made a sane choice of slot */
+      sanity_check_spill_offset( &vreg_lrs[j] );
       /* if (j > max_ss_no) */
       /*    max_ss_no = j; */
    }
@@ -1308,7 +1335,15 @@ HInstrArray* doRegisterAllocation (
                EMIT_INSTR( (*genReload)( rreg_state[k].rreg,
                                          vreg_lrs[m].spill_offset,
                                          mode64 ) );
-               rreg_state[k].eq_spill_slot = True;
+               /* This rreg is read or modified by the instruction.
+                  If it's merely read we can claim it now equals the
+                  spill slot, but not so if it is modified. */
+               if (reg_usage.mode[j] == HRmRead) {
+                  rreg_state[k].eq_spill_slot = True;
+               } else {
+                  vassert(reg_usage.mode[j] == HRmModify);
+                  rreg_state[k].eq_spill_slot = False;
+               }
             } else {
                rreg_state[k].eq_spill_slot = False;
             }
@@ -1397,11 +1432,19 @@ HInstrArray* doRegisterAllocation (
             EMIT_INSTR( (*genReload)( rreg_state[spillee].rreg,
                                       vreg_lrs[m].spill_offset,
                                       mode64 ) );
-            rreg_state[spillee].eq_spill_slot = True;
+            /* This rreg is read or modified by the instruction.
+               If it's merely read we can claim it now equals the
+               spill slot, but not so if it is modified. */
+            if (reg_usage.mode[j] == HRmRead) {
+               rreg_state[spillee].eq_spill_slot = True;
+            } else {
+               vassert(reg_usage.mode[j] == HRmModify);
+               rreg_state[spillee].eq_spill_slot = False;
+            }
          }
 
          /* So after much twisting and turning, we have vreg mapped to
-            rreg_state[furthest_k].rreg.  Note that in the map. */
+            rreg_state[spillee].rreg.  Note that in the map. */
          addToHRegRemap(&remap, vreg, rreg_state[spillee].rreg);
 
       } /* iterate over registers in this instruction. */

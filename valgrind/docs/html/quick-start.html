@@ -60,14 +60,14 @@ Other tools you may find useful are:</p>
     the codebase.  They can be distinguished by the "exp-" prefix on
     their names.  Experimental tools are not subject to the same
     quality control standards that apply to our production-grade tools
-    (Memcheck, Cachegrind, Callgrind, Massif and Helgrind).</p></li>
+    (Memcheck, Cachegrind, Callgrind, Massif, Helgrind and DRD).</p></li>
 </ul></div>
 <p>The rest of this guide discusses only the Memcheck tool.  For
 full documentation on the other tools, and for Memcheck, see the
 Valgrind User Manual.</p>
 <p>What follows is the minimum information you need to start
 detecting memory errors in your program with Memcheck.  Note that this
-guide applies to Valgrind version 3.3.0 and later.  Some of the
+guide applies to Valgrind version 3.4.0 and later.  Some of the
 information is not quite right for earlier versions.</p>
 </div>
 <div class="sect1" lang="en">
@@ -79,7 +79,8 @@ numbers.  Using <code class="computeroutput">-O0</code> is also a good
 idea, if you can tolerate the slowdown.  With
 <code class="computeroutput">-O1</code> line numbers in error messages can
 be inaccurate, although generally speaking Memchecking code compiled at
-<code class="computeroutput">-O1</code> works fairly well.  Use of
+<code class="computeroutput">-O1</code> works fairly well and is
+recommended.  Use of
 <code class="computeroutput">-O2</code> and above is not recommended as
 Memcheck occasionally reports uninitialised-value errors which don't
 really exist.</p>
@@ -87,20 +88,14 @@ really exist.</p>
 <div class="sect1" lang="en">
 <div class="titlepage"><div><div><h2 class="title" style="clear: both">
 <a name="quick-start.mcrun"></a>3. Running your program under Memcheck</h2></div></div></div>
-<p>If you normally run your program like this:
-</p>
+<p>If you normally run your program like this:</p>
 <pre class="programlisting">    myprog arg1 arg2
 </pre>
-<p>
-
-Use this command line:
-</p>
+<p>Use this command line:</p>
 <pre class="programlisting">    valgrind --leak-check=yes myprog arg1 arg2
 </pre>
-<p>
-
-Memcheck is the default tool.  The <code class="option">--leak-check</code> option
-turns on the detailed memory leak detector.</p>
+<p>Memcheck is the default tool.  The <code class="option">--leak-check</code>
+option turns on the detailed memory leak detector.</p>
 <p>Your program will run much slower (eg. 20 to 30 times) than
 normal, and use a lot more memory.  Memcheck will issue messages about
 memory errors and leaks that it detects.</p>
@@ -108,9 +103,8 @@ memory errors and leaks that it detects.</p>
 <div class="sect1" lang="en">
 <div class="titlepage"><div><div><h2 class="title" style="clear: both">
 <a name="quick-start.interpret"></a>4. Interpreting Memcheck's output</h2></div></div></div>
-<p>Here's an example C program with a memory error and a memory leak.
-
-</p>
+<p>Here's an example C program with a memory error and a memory
+leak.</p>
 <pre class="programlisting">
   #include &lt;stdlib.h&gt;
 
@@ -126,12 +120,8 @@ memory errors and leaks that it detects.</p>
      return 0;
   }
 </pre>
-<p>
-
-Most error messages look like the following, which describes problem 1,
-the heap block overrun:
-
-</p>
+<p>Most error messages look like the following, which describes
+problem 1, the heap block overrun:</p>
 <pre class="programlisting">
   ==19182== Invalid write of size 4
   ==19182==    at 0x804838F: f (example.c:6)
@@ -141,11 +131,7 @@ the heap block overrun:
   ==19182==    by 0x8048385: f (example.c:5)
   ==19182==    by 0x80483AB: main (example.c:11)
 </pre>
-<p>
-
-Things to notice:
-
-</p>
+<p>Things to notice:</p>
 <div class="itemizedlist"><ul type="disc">
 <li><p>There is a lot of information in each error message; read it
    carefully.</p></li>
@@ -166,29 +152,22 @@ Things to notice:
     is just past the end of a block allocated with malloc() on line 5 of
     example.c.</p></li>
 </ul></div>
-<p>
-
-It's worth fixing errors in the order they are reported, as later
-errors can be caused by earlier errors.  Failing to do this is a
+<p>It's worth fixing errors in the order they are reported, as
+later errors can be caused by earlier errors.  Failing to do this is a
 common cause of difficulty with Memcheck.</p>
-<p>Memory leak messages look like this:
-
-</p>
+<p>Memory leak messages look like this:</p>
 <pre class="programlisting">
   ==19182== 40 bytes in 1 blocks are definitely lost in loss record 1 of 1
   ==19182==    at 0x1B8FF5CD: malloc (vg_replace_malloc.c:130)
   ==19182==    by 0x8048385: f (a.c:5)
   ==19182==    by 0x80483AB: main (a.c:11)
 </pre>
-<p>
-
-The stack trace tells you where the leaked memory was allocated.
-Memcheck cannot tell you why the memory leaked, unfortunately.  (Ignore
-the "vg_replace_malloc.c", that's an implementation detail.)</p>
+<p>The stack trace tells you where the leaked memory was allocated.
+Memcheck cannot tell you why the memory leaked, unfortunately.
+(Ignore the "vg_replace_malloc.c", that's an implementation
+detail.)</p>
 <p>There are several kinds of leaks; the two most important
-categories are:
-
-</p>
+categories are:</p>
 <div class="itemizedlist"><ul type="disc">
 <li><p>"definitely lost": your program is leaking memory -- fix
     it!</p></li>
@@ -196,9 +175,13 @@ categories are:
     doing funny things with pointers (such as moving them to point to
     the middle of a heap block).</p></li>
 </ul></div>
-<p>
-
-If you don't understand an error message, please consult 
+<p>It can be difficult to track down the root causes of
+uninitialised-value errors reported by Memcheck.  Try using
+the <code class="option">--track-origins=yes</code> to get extra information.
+This makes Memcheck run slower, but the extra information you get
+often saves a lot of time figuring out where the uninitialised values
+are coming from.</p>
+<p>If you don't understand an error message, please consult
 <a href="mc-manual.html#mc-manual.errormsgs">Explanation of error messages from Memcheck</a> in the <a href="manual.html">Valgrind User Manual</a>
 which has examples of all the error messages Memcheck produces.</p>
 </div>

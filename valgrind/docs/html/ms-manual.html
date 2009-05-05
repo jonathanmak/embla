@@ -1,39 +1,40 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
-<title>8. Massif: a heap profiler</title>
+<title>9. Massif: a heap profiler</title>
 <link rel="stylesheet" href="vg_basic.css" type="text/css">
 <meta name="generator" content="DocBook XSL Stylesheets V1.69.1">
 <link rel="start" href="index.html" title="Valgrind Documentation">
 <link rel="up" href="manual.html" title="Valgrind User Manual">
-<link rel="prev" href="hg-manual.html" title="7. Helgrind: a thread error detector">
-<link rel="next" href="nl-manual.html" title='9. Nulgrind: the "null" tool'>
+<link rel="prev" href="drd-manual.html" title="8. DRD: a thread error detector">
+<link rel="next" href="pc-manual.html" title="10. Ptrcheck: an (experimental) pointer checking tool">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
 <div><table class="nav" width="100%" cellspacing="3" cellpadding="3" border="0" summary="Navigation header"><tr>
-<td width="22px" align="center" valign="middle"><a accesskey="p" href="hg-manual.html"><img src="images/prev.png" width="18" height="21" border="0" alt="Prev"></a></td>
+<td width="22px" align="center" valign="middle"><a accesskey="p" href="drd-manual.html"><img src="images/prev.png" width="18" height="21" border="0" alt="Prev"></a></td>
 <td width="25px" align="center" valign="middle"><a accesskey="u" href="manual.html"><img src="images/up.png" width="21" height="18" border="0" alt="Up"></a></td>
 <td width="31px" align="center" valign="middle"><a accesskey="h" href="index.html"><img src="images/home.png" width="27" height="20" border="0" alt="Up"></a></td>
 <th align="center" valign="middle">Valgrind User Manual</th>
-<td width="22px" align="center" valign="middle"><a accesskey="n" href="nl-manual.html"><img src="images/next.png" width="18" height="21" border="0" alt="Next"></a></td>
+<td width="22px" align="center" valign="middle"><a accesskey="n" href="pc-manual.html"><img src="images/next.png" width="18" height="21" border="0" alt="Next"></a></td>
 </tr></table></div>
 <div class="chapter" lang="en">
 <div class="titlepage"><div><div><h2 class="title">
-<a name="ms-manual"></a>8. Massif: a heap profiler</h2></div></div></div>
+<a name="ms-manual"></a>9. Massif: a heap profiler</h2></div></div></div>
 <div class="toc">
 <p><b>Table of Contents</b></p>
 <dl>
-<dt><span class="sect1"><a href="ms-manual.html#ms-manual.spaceprof">8.1. Heap profiling</a></span></dt>
-<dt><span class="sect1"><a href="ms-manual.html#ms-manual.using">8.2. Using Massif</a></span></dt>
+<dt><span class="sect1"><a href="ms-manual.html#ms-manual.spaceprof">9.1. Heap profiling</a></span></dt>
+<dt><span class="sect1"><a href="ms-manual.html#ms-manual.using">9.2. Using Massif</a></span></dt>
 <dd><dl>
-<dt><span class="sect2"><a href="ms-manual.html#ms-manual.anexample">8.2.1. An Example Program</a></span></dt>
-<dt><span class="sect2"><a href="ms-manual.html#ms-manual.theoutputpreamble">8.2.2. The Output Preamble</a></span></dt>
-<dt><span class="sect2"><a href="ms-manual.html#ms-manual.theoutputgraph">8.2.3. The Output Graph</a></span></dt>
-<dt><span class="sect2"><a href="ms-manual.html#ms-manual.thesnapshotdetails">8.2.4. The Snapshot Details</a></span></dt>
+<dt><span class="sect2"><a href="ms-manual.html#ms-manual.anexample">9.2.1. An Example Program</a></span></dt>
+<dt><span class="sect2"><a href="ms-manual.html#ms-manual.theoutputpreamble">9.2.2. The Output Preamble</a></span></dt>
+<dt><span class="sect2"><a href="ms-manual.html#ms-manual.theoutputgraph">9.2.3. The Output Graph</a></span></dt>
+<dt><span class="sect2"><a href="ms-manual.html#ms-manual.thesnapshotdetails">9.2.4. The Snapshot Details</a></span></dt>
+<dt><span class="sect2"><a href="ms-manual.html#ms-manual.forkingprograms">9.2.5. Forking Programs</a></span></dt>
 </dl></dd>
-<dt><span class="sect1"><a href="ms-manual.html#ms-manual.options">8.3. Massif Options</a></span></dt>
-<dt><span class="sect1"><a href="ms-manual.html#ms-manual.ms_print-options">8.4. ms_print Options</a></span></dt>
-<dt><span class="sect1"><a href="ms-manual.html#ms-manual.fileformat">8.5. Massif's output file format</a></span></dt>
+<dt><span class="sect1"><a href="ms-manual.html#ms-manual.options">9.3. Massif Options</a></span></dt>
+<dt><span class="sect1"><a href="ms-manual.html#ms-manual.ms_print-options">9.4. ms_print Options</a></span></dt>
+<dt><span class="sect1"><a href="ms-manual.html#ms-manual.fileformat">9.5. Massif's output file format</a></span></dt>
 </dl>
 </div>
 <span class="emphasis"><em>Please note that this documentation describes Massif version 3.3.0
@@ -44,7 +45,7 @@ and so this documentation only pertains to the later versions.</em></span><p>To 
 command line.</p>
 <div class="sect1" lang="en">
 <div class="titlepage"><div><div><h2 class="title" style="clear: both">
-<a name="ms-manual.spaceprof"></a>8.1. Heap profiling</h2></div></div></div>
+<a name="ms-manual.spaceprof"></a>9.1. Heap profiling</h2></div></div></div>
 <p>Massif is a heap profiler.  It measures how much heap memory your
 program uses.  This includes both the useful space, and the extra bytes
 allocated for book-keeping purposes and alignment purposes.  It can also
@@ -74,7 +75,7 @@ which parts of your program are responsible for allocating the heap memory.
 </div>
 <div class="sect1" lang="en">
 <div class="titlepage"><div><div><h2 class="title" style="clear: both">
-<a name="ms-manual.using"></a>8.2. Using Massif</h2></div></div></div>
+<a name="ms-manual.using"></a>9.2. Using Massif</h2></div></div></div>
 <p>First off, as for the other Valgrind tools, you should compile with
 debugging info (the <code class="computeroutput">-g</code> flag).  It shouldn't
 matter much what optimisation level you compile your program with, as this
@@ -103,7 +104,7 @@ presentation, and means that new methods of presenting the data can be added in
 the future.</p>
 <div class="sect2" lang="en">
 <div class="titlepage"><div><div><h3 class="title">
-<a name="ms-manual.anexample"></a>8.2.1. An Example Program</h3></div></div></div>
+<a name="ms-manual.anexample"></a>9.2.1. An Example Program</h3></div></div></div>
 <p>An example will make things clear.  Consider the following C program
 (annotated with line numbers) which allocates a number of different blocks
 on the heap.</p>
@@ -144,7 +145,7 @@ on the heap.</p>
 </div>
 <div class="sect2" lang="en">
 <div class="titlepage"><div><div><h3 class="title">
-<a name="ms-manual.theoutputpreamble"></a>8.2.2. The Output Preamble</h3></div></div></div>
+<a name="ms-manual.theoutputpreamble"></a>9.2.2. The Output Preamble</h3></div></div></div>
 <p>After running this program under Massif, the first part of ms_print's
 output contains a preamble which just states how the program, Massif and
 ms_print were each invoked:</p>
@@ -158,7 +159,7 @@ ms_print arguments: massif.out.12797
 </div>
 <div class="sect2" lang="en">
 <div class="titlepage"><div><div><h3 class="title">
-<a name="ms-manual.theoutputgraph"></a>8.2.3. The Output Graph</h3></div></div></div>
+<a name="ms-manual.theoutputgraph"></a>9.2.3. The Output Graph</h3></div></div></div>
 <p>The next part is the graph that shows how memory consumption occurred
 as the program executed:</p>
 <pre class="screen">
@@ -300,7 +301,7 @@ written KiB, MiB, GiB, etc.</p>
 </div>
 <div class="sect2" lang="en">
 <div class="titlepage"><div><div><h3 class="title">
-<a name="ms-manual.thesnapshotdetails"></a>8.2.4. The Snapshot Details</h3></div></div></div>
+<a name="ms-manual.thesnapshotdetails"></a>9.2.4. The Snapshot Details</h3></div></div></div>
 <p>Returning to our example, the graph is followed by the detailed
 information for each snapshot.  The first nine snapshots are normal, so only
 a small amount of information is recorded for each one:</p>
@@ -462,14 +463,24 @@ responsible for more than 1% of useful memory bytes, and ms_print likewise
 only prints the details for code locations responsible for more than 1%.
 The entries that do not meet this threshold are aggregated.  This avoids
 filling up the output with large numbers of unimportant entries.  The
-thresholds threshold can be changed with the
+thresholds can be changed with the
 <code class="computeroutput">--threshold</code> option that both Massif and
 ms_print support.</p>
+</div>
+<div class="sect2" lang="en">
+<div class="titlepage"><div><div><h3 class="title">
+<a name="ms-manual.forkingprograms"></a>9.2.5. Forking Programs</h3></div></div></div>
+<p>If your program forks, the child will inherit all the profiling data that
+has been gathered for the parent.</p>
+<p>If the output file format string (controlled by
+<code class="option">--massif-out-file</code>) does not contain <code class="option">%p</code>, then
+the outputs from the parent and child will be intermingled in a single output
+file, which will almost certainly make it unreadable by ms_print.</p>
 </div>
 </div>
 <div class="sect1" lang="en">
 <div class="titlepage"><div><div><h2 class="title" style="clear: both">
-<a name="ms-manual.options"></a>8.3. Massif Options</h2></div></div></div>
+<a name="ms-manual.options"></a>9.3. Massif Options</h2></div></div></div>
 <p>Massif-specific options are:</p>
 <div class="variablelist">
 <a name="ms.opts.list"></a><dl>
@@ -626,7 +637,7 @@ operator new[](unsigned long, std::nothrow_t const&amp;)
 </div>
 <div class="sect1" lang="en">
 <div class="titlepage"><div><div><h2 class="title" style="clear: both">
-<a name="ms-manual.ms_print-options"></a>8.4. ms_print Options</h2></div></div></div>
+<a name="ms-manual.ms_print-options"></a>9.4. ms_print Options</h2></div></div></div>
 <p>ms_print's options are:</p>
 <div class="itemizedlist"><ul type="disc">
 <li>
@@ -651,9 +662,9 @@ operator new[](unsigned long, std::nothrow_t const&amp;)
 </div>
 <div class="sect1" lang="en">
 <div class="titlepage"><div><div><h2 class="title" style="clear: both">
-<a name="ms-manual.fileformat"></a>8.5. Massif's output file format</h2></div></div></div>
+<a name="ms-manual.fileformat"></a>9.5. Massif's output file format</h2></div></div></div>
 <p>Massif's file format is plain text (i.e. not binary) and deliberately
-easy to read for both humands and machines.  Nonetheless, the exact format
+easy to read for both humans and machines.  Nonetheless, the exact format
 is not described here.  This is because the format is currently very
 Massif-specific.  We plan to make the format more general, and thus suitable
 for possible use with other tools.  Once this has been done, the format will
@@ -664,9 +675,9 @@ be documented here.</p>
 <br><table class="nav" width="100%" cellspacing="3" cellpadding="2" border="0" summary="Navigation footer">
 <tr>
 <td rowspan="2" width="40%" align="left">
-<a accesskey="p" href="hg-manual.html">&lt;&lt; 7. Helgrind: a thread error detector</a> </td>
+<a accesskey="p" href="drd-manual.html">&lt;&lt; 8. DRD: a thread error detector</a> </td>
 <td width="20%" align="center"><a accesskey="u" href="manual.html">Up</a></td>
-<td rowspan="2" width="40%" align="right"> <a accesskey="n" href="nl-manual.html">9. Nulgrind: the "null" tool &gt;&gt;</a>
+<td rowspan="2" width="40%" align="right"> <a accesskey="n" href="pc-manual.html">10. Ptrcheck: an (experimental) pointer checking tool &gt;&gt;</a>
 </td>
 </tr>
 <tr><td width="20%" align="center"><a accesskey="h" href="index.html">Home</a></td></tr>

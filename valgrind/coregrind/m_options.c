@@ -8,7 +8,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2007 Nicholas Nethercote
+   Copyright (C) 2000-2008 Nicholas Nethercote
       njn@valgrind.org
 
    This program is free software; you can redistribute it and/or
@@ -75,16 +75,18 @@ Bool   VG_(clo_debug_dump_line) = False;
 Bool   VG_(clo_debug_dump_frames) = False;
 Bool   VG_(clo_trace_redir)    = False;
 Bool   VG_(clo_trace_sched)    = False;
-Bool   VG_(clo_trace_pthreads) = False;
+Bool   VG_(clo_profile_heap)   = False;
 Int    VG_(clo_dump_error)     = 0;
 Int    VG_(clo_backtrace_size) = 12;
 Char*  VG_(clo_sim_hints)      = NULL;
 Bool   VG_(clo_sym_offsets)    = False;
+Bool   VG_(clo_read_var_info)  = False;
 Bool   VG_(clo_run_libc_freeres) = True;
 Bool   VG_(clo_track_fds)      = False;
 Bool   VG_(clo_show_below_main)= False;
 Bool   VG_(clo_show_emwarns)   = False;
 Word   VG_(clo_max_stackframe) = 2000000;
+Word   VG_(clo_main_stacksize) = 0; /* use client's rlimit.stack */
 Bool   VG_(clo_wait_for_gdb)   = False;
 VgSmc  VG_(clo_smc_check)      = Vg_SmcStack;
 HChar* VG_(clo_kernel_variant) = NULL;
@@ -151,7 +153,7 @@ Char* VG_(expand_file_name)(Char* option_name, Char* format)
 
    // The 10 is slop, it should be enough in most cases.
    len = j + VG_(strlen)(format) + 10;
-   out = VG_(malloc)( len );
+   out = VG_(malloc)( "options.efn.1", len );
    if (format[0] != '/') {
       VG_(strcpy)(out, base_dir);
       out[j++] = '/';
@@ -160,7 +162,7 @@ Char* VG_(expand_file_name)(Char* option_name, Char* format)
 #define ENSURE_THIS_MUCH_SPACE(x) \
    if (j + x >= len) { \
       len += (10 + x); \
-      out = VG_(realloc)(out, len); \
+      out = VG_(realloc)("options.efn.2(multiple)", out, len); \
    }
 
    while (format[i]) {
@@ -238,7 +240,8 @@ Char* VG_(expand_file_name)(Char* option_name, Char* format)
 
   bad: {
    Char* opt =    // 2:  1 for the '=', 1 for the NUL.
-      VG_(malloc)( VG_(strlen)(option_name) + VG_(strlen)(format) + 2 );
+      VG_(malloc)( "options.efn.3",
+                   VG_(strlen)(option_name) + VG_(strlen)(format) + 2 );
    VG_(strcpy)(opt, option_name);
    VG_(strcat)(opt, "=");
    VG_(strcat)(opt, format);

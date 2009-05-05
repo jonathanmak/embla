@@ -88,6 +88,74 @@ the following problems:</p>
 <div class="variablelist">
 <a name="mc.opts.list"></a><dl>
 <dt>
+<a name="opt.undef-value-errors"></a><span class="term">
+      <code class="option">--undef-value-errors=&lt;yes|no&gt; [default: yes] </code>
+    </span>
+</dt>
+<dd><p>Controls whether <code class="constant">memcheck</code> reports
+      uses of undefined value errors.  Set this to
+      <code class="varname">no</code> if you don't want to see undefined value
+      errors.  It also has the side effect of speeding up
+      <code class="constant">memcheck</code> somewhat.
+      </p></dd>
+<dt>
+<a name="opt.track-origins"></a><span class="term">
+      <code class="option">--track-origins=&lt;yes|no&gt; [default: no] </code>
+    </span>
+</dt>
+<dd>
+<p>Controls whether <code class="constant">memcheck</code> tracks
+        the origin of uninitialised values.  By default, it does not,
+        which means that although it can tell you that an
+        uninitialised value is being used in a dangerous way, it
+        cannot tell you where the uninitialised value came from.  This
+        often makes it difficult to track down the root problem.
+        </p>
+<p>When set
+        to <code class="varname">yes</code>, <code class="constant">memcheck</code> keeps
+        track of the origins of all uninitialised values.  Then, when
+        an uninitialised value error is
+        reported, <code class="constant">memcheck</code> will try to show the
+        origin of the value.  An origin can be one of the following
+        four places: a heap block, a stack allocation, a client
+        request, or miscellaneous other sources (eg, a call
+        to <code class="varname">brk</code>).
+        </p>
+<p>For uninitialised values originating from a heap
+        block, <code class="constant">memcheck</code> shows where the block was
+        allocated.  For uninitialised values originating from a stack
+        allocation, <code class="constant">memcheck</code> can tell you which
+        function allocated the value, but no more than that -- typically
+        it shows you the source location of the opening brace of the
+        function.  So you should carefully check that all of the
+        function's local variables are initialised properly.
+        </p>
+<p>Performance overhead: origin tracking is expensive.  It
+        halves <code class="constant">memcheck</code>'s speed and increases
+        memory use by a minimum of 100MB, and possibly more.
+        Nevertheless it can drastically reduce the effort required to
+        identify the root cause of uninitialised value errors, and so
+        is often a programmer productivity win, despite running
+        more slowly.
+        </p>
+<p>Accuracy: <code class="constant">memcheck</code> tracks origins
+        quite accurately.  To avoid very large space and time
+        overheads, some approximations are made.  It is possible,
+        although unlikely, that
+        <code class="constant">memcheck</code> will report an incorrect origin,
+        or not be able to identify any origin.
+        </p>
+<p>Note that the combination
+        <code class="option">--track-origins=yes</code>
+        and <code class="option">--undef-value-errors=no</code> is
+        nonsensical.  <code class="constant">memcheck</code> checks for and
+        rejects this combination at startup.
+        </p>
+<p>Origin tracking is a new feature, introduced in Valgrind
+        version 3.4.0.
+        </p>
+</dd>
+<dt>
 <a name="opt.leak-check"></a><span class="term">
       <code class="option">--leak-check=&lt;no|summary|yes|full&gt; [default: summary] </code>
     </span>
@@ -204,17 +272,6 @@ the following problems:</p>
       at all possible, such code should be fixed.  This flag should be
       used only as a last resort.</p>
 </dd>
-<dt>
-<a name="opt.undef-value-errors"></a><span class="term">
-      <code class="option">--undef-value-errors=&lt;yes|no&gt; [default: yes] </code>
-    </span>
-</dt>
-<dd><p>Controls whether <code class="constant">memcheck</code> detects
-      dangerous uses of undefined value errors.  Set this to
-      <code class="varname">no</code> if you don't like seeing undefined value
-      errors; it also has the side effect of speeding
-      <code class="constant">memcheck</code> up somewhat.
-      </p></dd>
 <dt>
 <a name="opt.malloc-fill"></a><span class="term">
       <code class="option">--malloc-fill=&lt;hexnumber&gt; </code>
@@ -334,6 +391,10 @@ complains.</p>
     you create an object with new, its fields will be uninitialised
     until you (or the constructor) fill them in.</p></li>
 </ul></div>
+<p>To see information on the sources of uninitialised data in your
+program, use the <code class="option">--track-origins=yes</code> flag.  This
+makes Memcheck run more slowly, but can make it much easier to track down
+the root causes of uninitialised value errors.</p>
 </div>
 <div class="sect2" lang="en">
 <div class="titlepage"><div><div><h3 class="title">

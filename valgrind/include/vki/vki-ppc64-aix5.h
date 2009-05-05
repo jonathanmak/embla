@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2006-2007 OpenWorks LLP
+   Copyright (C) 2006-2008 OpenWorks LLP
       info@open-works.co.uk
 
    This program is free software; you can redistribute it and/or
@@ -79,6 +79,7 @@
 #define VKI_S_IXGRP  0x00000008
 #define VKI_S_IXOTH  0x00000001
 #define VKI_S_IWUSR  0x00000080
+#define VKI_S_IWOTH  0x00000002
 #define VKI_S_ISUID  0x00000800
 #define VKI_S_ISGID  0x00000400
 #define VKI_S_IFMT   0x0000f000
@@ -292,6 +293,7 @@ struct vki_sigaction {
 #define VKI_SEGV_MAPERR 50
 
 #define VKI_TRAP_TRACE 61
+#define VKI_TRAP_BRKPT 60
 #define VKI_BUS_OBJERR 3
 #define VKI_BUS_ADRERR 2
 #define VKI_BUS_ADRALN 1
