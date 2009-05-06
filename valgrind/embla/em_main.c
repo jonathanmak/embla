@@ -246,6 +246,7 @@ static int swaw =      0;     // Track WAW dependencies statically...
 static int track_stack_name_deps = 0; // ...including/except WAR/WAW dependencies on stack
 static int track_hidden =   0;     // Track HIDDEN dependencies
 static int para_non_calls = 0;     // Allows lines to be executed in parallel even if they don't contain function calls
+static int early_spawns = 0;  // Allows function calls to be spawned as early as dependencies allow
 
 #define  MASK_RAW        1
 #define  MASK_WAR        2
@@ -638,11 +639,6 @@ static INode *new_INode(LineInfo *line) {
    inode->cpLength = -9999999;
    inode->cp = NULL;
    inode->numParents = 0;
-   if (!para_non_calls && currFrame->lastNonCallNode != NULL) {
-     addDep(currFrame->lastNonCallNode, inode);
-   } else {
-     currFrame->roots = consINode(currFrame->roots, inode);
-   }
    currFrame->currNode = inode;
 
    if (static_deps) {
@@ -786,8 +782,26 @@ static long long int critPathNodes(void) {
   return currCpLength;
 }
 
+static void finaliseOldNode(void) {
+  INode *node = currFrame->currNode;
+  if (!para_non_calls && // We're focusing only on function-call level parallelism
+      currFrame->lastNonCallNode != NULL && // There is something to depend on
+      // If we're allowing early function spawns, then check the node is not a callnode
+      (!early_spawns || !(node->callNode))) { 
+    addDep(currFrame->lastNonCallNode, node);
+  } else {
+    currFrame->roots = consINode(currFrame->roots, node);
+  }
+  if (!(node->callNode)) {
+    currFrame->lastNonCallNode = node;
+  }
+}
+
 static void retNode(void) {
-  long long int cpLength = critPathNodes();
+  long long int cpLength;
+
+  finaliseOldNode();
+  cpLength = critPathNodes();
   currFrame->callerNode->cost += cpLength;
   currFrame--;
 }
@@ -803,9 +817,7 @@ static void newInstr(LineInfo *line) {
   if (node != NULL && line != node->line) {
 //  VG_(message)(Vg_UserMsg, "Cost of line %s:%d = %d", node->line->file, node->line->line, node->cost);
     // Finalise old node
-    if (!(node->callNode)) {
-      currFrame->lastNonCallNode = node;
-    }
+    finaliseOldNode();
 
     // Starting a new node
     currFrame->currNode = NULL;
@@ -1350,6 +1362,8 @@ static Bool em_process_cmd_line_option(Char* arg)
   else
   VG_XACT_CLO(arg, "--para-non-calls", para_non_calls)
   else
+  VG_XACT_CLO(arg, "--early-spawns", early_spawns)
+  else
     return False;
 #if 0
   tl_assert(trace_file_name);
@@ -1381,6 +1395,7 @@ static void em_print_usage(void)
 "    --sample_freq=<n>         frequency for outputting critical paths. 0 means never output\n"
 "    --sample_threshold=<n>    output critical paths above this threshold. 0 means never output\n"
 "    --para-non-calls          consider parallelism even for lines without function calls\n"
+"    --early-spawns            consider parallelism where function calls can be executed as early as dependencies allow\n"
    );
 }
 
@@ -3332,7 +3347,7 @@ void recordRet(Addr32 sp, InstrInfo *i_info, Addr32 target)
 
 #if CRITPATH_ANALYSIS
 static VG_REGPARM(0)
-void recordBranch() 
+void recordBranch(void) 
 {
    branchNode();
 }
@@ -4584,6 +4599,7 @@ static void finaliseCritPath(void) {
 //    newInstr(dummy_instr_info.line);
     retNode();
   }
+  finaliseOldNode();
   cpLength = critPathNodes();//->cpLength;
   // To take account of the first 2 manually created TraceRecs
   VG_(message)(Vg_UserMsg, "No. of instructions is %lld", totalCost);
