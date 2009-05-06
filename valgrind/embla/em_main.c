@@ -233,8 +233,8 @@ static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
 // For Critical Path Analysis
 //
 #define  N_FRAMES         1000  // Nesting level
-static int dyn_only =  0;     // Only track dynamic dependencies
-static int sta_only =  0;     // Only track static dependencies
+static int static_deps =  0;    // We're tracking some static dependencies (for efficiency)
+static int no_dyn_deps =  0;    // We're not tracking any dynamic dependencies (for efficiency)
 static int dctl =      0;     // Track control dependencies dynamically (ignore joins)
 static int draw =      0;     // Track RAW dependencies dynamically
 static int dwar =      0;     // Track WAR dependencies dynamically...
@@ -645,7 +645,7 @@ static INode *new_INode(LineInfo *line) {
    }
    currFrame->currNode = inode;
 
-   if (!dyn_only) {
+   if (static_deps) {
      // Add all the static dependencies
      addStaticDeps(inode);
      // Update latest node table
@@ -1336,6 +1336,8 @@ static Bool em_process_cmd_line_option(Char* arg)
   else
   VG_XACT_CLO(arg, "--swaw", swaw)
   else
+  VG_XACT_CLO(arg, "--no-dyn-deps", no_dyn_deps)
+  else
   VG_XACT_CLO(arg, "--track-stack-name-deps", track_stack_name_deps)
   else
   VG_XACT_CLO(arg, "--track-hidden", track_hidden)
@@ -1372,6 +1374,7 @@ static void em_print_usage(void)
 "    --sraw                    track static RAW dependencies\n"
 "    --swar                    track static WAR dependencies\n"
 "    --swaw                    track static WAW dependencies\n"
+"    --no-dyn-deps             do not track any dynamic data dependencies (for efficiency)\n"
 "    --track-stack-name-deps   track WAR/WAW dependencies on stack\n"
 "    --track-hidden            track hidden dependencies\n"
 "    --n_trace_recs=<n>        maximum number of trace records allowed\n"
@@ -4199,21 +4202,23 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
              tmpExpr = stIn->Ist.WrTmp.data;
              switch( tmpExpr->tag ) {
                case Iex_Load:
-                 currII = mk_i_info( currII, guestIAddr, guestILen );
-                 ref_size = sizeofIRType( tmpExpr->Iex.Load.ty );
+                 if (!no_dyn_deps) {
+                   currII = mk_i_info( currII, guestIAddr, guestILen );
+                   ref_size = sizeofIRType( tmpExpr->Iex.Load.ty );
 #if TRACE_REG_DEPS
-                 flags = 0;
-                 if( sr_index == -1 ) {
-                    IRTemp t = stIn->Ist.WrTmp.tmp;
-                    offset = sr_check( bbIn, bbIn_idx, t, SR_RESTORE, ref_size );
-                    if( offset!=0 ) { 
-                       sr_index = offset;
-                       flags = SI_SAVE_REST;
-                       sr_code = SR_RESTORE;
-                    }
-                 }
+                   flags = 0;
+                   if( sr_index == -1 ) {
+                      IRTemp t = stIn->Ist.WrTmp.tmp;
+                      offset = sr_check( bbIn, bbIn_idx, t, SR_RESTORE, ref_size );
+                      if( offset!=0 ) { 
+                         sr_index = offset;
+                         flags = SI_SAVE_REST;
+                         sr_code = SR_RESTORE;
+                      }
+                   }
 #endif
-                 instrumentLoad( bbOut, currII, tmpExpr->Iex.Load.addr, ref_size, flags );
+                   instrumentLoad( bbOut, currII, tmpExpr->Iex.Load.addr, ref_size, flags );
+                 }
                  break;
 #if TRACE_REG_DEPS
                case Iex_Get: // similar to above
@@ -4255,13 +4260,15 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
              break;
          case Ist_Store:
              // This is a store instruction, so it should be instrumented
+             if (!no_dyn_deps) {
 #if TRACE_REG_DEPS
-             flags = sr_index==bbIn_idx ? SI_SAVE_REST : 0;
+               flags = sr_index==bbIn_idx ? SI_SAVE_REST : 0;
 #endif
-             currII = mk_i_info( currII, guestIAddr, guestILen );
-             // should handle save restore
-             ref_size = sizeofIRType( typeOfIRExpr( bbIn->tyenv, stIn->Ist.Store.data ) );
-             instrumentStore( bbOut, currII, stIn->Ist.Store.addr, ref_size, flags );
+               currII = mk_i_info( currII, guestIAddr, guestILen );
+               // should handle save restore
+               ref_size = sizeofIRType( typeOfIRExpr( bbIn->tyenv, stIn->Ist.Store.data ) );
+               instrumentStore( bbOut, currII, stIn->Ist.Store.addr, ref_size, flags );
+             }
              break;
          case Ist_Dirty:
              // This should maybe be instrumented, but we'll leave it for later
@@ -4546,10 +4553,9 @@ static void em_post_clo_init_deps(void)
    readHiddenFuncs( );
 
    // For efficiency purposes
-   dyn_only = !(sctl || sraw || swar || swaw);
-   sta_only = !(dctl || draw || dwar || dwaw);
+   static_deps = sctl || sraw || swar || swaw;
 
-   if (!dyn_only) {
+   if (static_deps) {
      readDeps();
    }
 }
