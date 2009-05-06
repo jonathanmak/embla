@@ -233,9 +233,16 @@ static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
 // For Critical Path Analysis
 //
 #define  N_FRAMES         1000  // Nesting level
-static int track_raw =      0;     // Track RAW dependencies
-static int track_war =      0;     // Track ALL WAR dependencies...
-static int track_waw =      0;     // Track ALL WAW dependencies...
+static int dyn_only =  0;     // Only track dynamic dependencies
+static int sta_only =  0;     // Only track static dependencies
+static int dctl =      0;     // Track control dependencies dynamically (ignore joins)
+static int draw =      0;     // Track RAW dependencies dynamically
+static int dwar =      0;     // Track WAR dependencies dynamically...
+static int dwaw =      0;     // Track WAW dependencies dynamically...
+static int sctl =      0;     // Track control dependencies statically (consider joins)
+static int sraw =      0;     // Track RAW dependencies statically
+static int swar =      0;     // Track WAR dependencies statically...
+static int swaw =      0;     // Track WAW dependencies statically...
 static int track_stack_name_deps = 0; // ...including/except WAR/WAW dependencies on stack
 static int track_hidden =   0;     // Track HIDDEN dependencies
 static int para_non_calls = 0;     // Allows lines to be executed in parallel even if they don't contain function calls
@@ -243,6 +250,9 @@ static int para_non_calls = 0;     // Allows lines to be executed in parallel ev
 #define  MASK_RAW        1
 #define  MASK_WAR        2
 #define  MASK_WAW        4
+#define  MASK_CTL        8
+#define  MASK_HIDDEN     16
+#define  MASK_STACK      32
 
 static int sample_freq =    0;
 static int sample_count =   0;
@@ -291,7 +301,7 @@ typedef
    }
    RTEntry;
 
-static RTEntry mock_rtentry = {"mock", "", 0, 'o', 0, 0, 'c', 'c', 0, 0, 0, /*NULL, NULL,*/ NULL};
+// static RTEntry mock_rtentry = {"mock", "", 0, 'o', 0, 0, 'c', 'c', 0, 0, 0, /*NULL, NULL,*/ NULL};
 
 /********************************************************************************
  *                                                                              *
@@ -310,6 +320,7 @@ typedef struct _LineInfo {
    RTEntry  *entries[RT_ENTRIES_PER_LINE];
 #endif
 #if RECORD_CF_EDGES
+   LineList *deps;
    LineList *pred[PRED_ENTRIES_PER_LINE];
 #endif
    unsigned line;
@@ -320,9 +331,9 @@ typedef struct _LineInfo {
 
 #if RECORD_CF_EDGES
 #if PRINT_RESULTS_TABLE
-static LineInfo dummy_line_info = { { }, { }, 0, "", "", NULL };
+static LineInfo dummy_line_info = { { }, NULL, { }, 0, "", "", NULL };
 #else
-static LineInfo dummy_line_info = { { }, 0, "", "", NULL };
+static LineInfo dummy_line_info = { NULL, { }, 0, "", "", NULL };
 #endif
 #else
 #if PRINT_RESULTS_TABLE
@@ -429,12 +440,24 @@ typedef struct _INodeSet {
   int numBuckets; // Must be power of 2
   INodeList **buckets;
 } INodeSet;
-       
+
+typedef struct {
+  INodeList     **table;
+  int             idx_bits, 
+                  n_items;
+} LatestNodeTable;
+
+static INodeList *empty_latest_node_list = NULL;
+
+static LatestNodeTable initial_LatestNodeTable = { &empty_latest_node_list, 0, 0 };
+
 typedef struct _FrameGraph {
   INodeList *roots;
   INode *currNode;
   INode *lastNonCallNode;
+  INode *lastBranchNode; // for adding dynamic control dependencies
   INode *callerNode;
+  LatestNodeTable latestNodesTbl;
 } FrameGraph;
 
 static FrameGraph *firstFrame;
@@ -510,6 +533,99 @@ static void addDep(INode *fromNode, INode *toNode) {
   }
 }
 
+static void addStaticDeps(INode *node) {
+  LineList *ll; 
+  INodeList **table = currFrame->latestNodesTbl.table;
+  int idx_bits = currFrame->latestNodesTbl.idx_bits;
+  for( ll = node->line->deps; ll != NULL; ll = ll->next ) {
+     LineInfo *line = ll->line;
+     int idx = ( line->line ) & ( ( 1 << idx_bits ) - 1 );
+     INodeList *p = table[ idx ];
+
+     while( p != NULL && p->node->line != line ) {
+        p = p->next;
+     }
+
+     if (p != NULL) {
+       addDep(p->node, node);
+     }
+  }
+}
+
+static void doubleLatestNodeTbl( void )
+{
+   LatestNodeTable *lnt = &(currFrame->latestNodesTbl);
+   int i, idx_bits = lnt->idx_bits;
+   INodeList **newTbl = (INodeList **) VG_(calloc)( 1 << (idx_bits+1), sizeof(INodeList *) );
+
+   check( newTbl != NULL, "Out of memory" );
+
+   for( i=0; i < (1 << (idx_bits+1)); i++ ) {
+      newTbl[i] = NULL;
+   }
+
+   for( i=0; i < (1 << idx_bits); i++ ) {
+      INodeList *q = lnt->table[i], *next;
+      while( q != NULL ) {
+         int n_idx = q->node->line->line & ( ( 1 << (idx_bits+1) ) - 1 );
+         next = q->next;
+         q->next = newTbl[ n_idx ];
+         newTbl[ n_idx ] = q;
+         q = next;
+      }
+   }
+   if( lnt->table != &empty_latest_node_list ) VG_(free)( lnt->table );
+   lnt->idx_bits++;
+   lnt->table = newTbl;
+} 
+
+static void updateLatestNodeTbl(INode *node) {
+  INodeList **table = currFrame->latestNodesTbl.table;
+  int idx_bits = currFrame->latestNodesTbl.idx_bits;
+  int idx;
+  INodeList *p;
+  LineInfo *line = node->line;
+
+  idx = ( line->line ) & ( ( 1 << idx_bits ) - 1 );
+  p = table[ idx ];
+
+  while( p != NULL && p->node->line != line ) {
+     p = p->next;
+  }
+
+  if( p == NULL ) {
+     if( currFrame->latestNodesTbl.n_items + 2 > ( 1 << idx_bits ) ) {
+       doubleLatestNodeTbl( );
+       table = currFrame->latestNodesTbl.table;
+       idx_bits = currFrame->latestNodesTbl.idx_bits;
+       idx = ( line->line ) & ( ( 1 << idx_bits ) - 1 );
+     }
+
+     p = consINode(table[idx], node);
+     table[idx] = p;
+     currFrame->latestNodesTbl.n_items++;
+  } else {
+     p->node = node;
+  }
+}
+
+static void clearLatestNodeTbl( void )
+{
+   int i, n = 1 << (currFrame->latestNodesTbl.idx_bits);
+   INodeList *l,*t;
+
+   for( i=0; i<n; i++ ) {
+     for( l = currFrame->latestNodesTbl.table[i]; l != NULL; l = t ) {
+        t = l->next;
+        VG_(free)(l);
+     }
+   }
+   if( currFrame->latestNodesTbl.table != &empty_latest_node_list ) VG_(free)( currFrame->latestNodesTbl.table );
+   currFrame->latestNodesTbl.idx_bits = 0;
+   currFrame->latestNodesTbl.n_items = 0;
+   currFrame->latestNodesTbl.table = &empty_latest_node_list;
+}
+
 static INode *new_INode(LineInfo *line) {
    INode *inode = VG_(malloc)(sizeof (INode));
    if(inode == NULL) {
@@ -528,6 +644,18 @@ static INode *new_INode(LineInfo *line) {
      currFrame->roots = consINode(currFrame->roots, inode);
    }
    currFrame->currNode = inode;
+
+   if (!dyn_only) {
+     // Add all the static dependencies
+     addStaticDeps(inode);
+     // Update latest node table
+     updateLatestNodeTbl(inode);
+   }
+
+   if (dctl && currFrame->lastBranchNode != NULL) {
+     addDep(currFrame->lastBranchNode, inode);
+   }
+
    return inode;
 }
 
@@ -540,7 +668,9 @@ static void newNodeFrame(INode *callerNode) {
   currFrame->roots = NULL;
   currFrame->currNode = NULL;
   currFrame->lastNonCallNode = NULL;
+  currFrame->lastBranchNode = NULL;
   currFrame->callerNode = callerNode;
+  currFrame->latestNodesTbl = initial_LatestNodeTable;
 }
 
 #define PRINT_CP(currNode, currCp, countdown) \
@@ -652,6 +782,7 @@ static long long int critPathNodes(void) {
   }
   
   VG_(free)(workStack);
+  clearLatestNodeTbl();
   return currCpLength;
 }
 
@@ -659,6 +790,10 @@ static void retNode(void) {
   long long int cpLength = critPathNodes();
   currFrame->callerNode->cost += cpLength;
   currFrame--;
+}
+
+static void branchNode(void) {
+  currFrame->lastBranchNode = currFrame->currNode;
 }
 
 static void newInstr(LineInfo *line) {
@@ -1116,6 +1251,7 @@ static LineInfo *mk_line_info_l( char *file, unsigned line, char *func )
       for( i=0; i<PRED_ENTRIES_PER_LINE; i++ ) {
          info->pred[i] = NULL;
       }
+      info->deps = NULL;
 #endif
       info->line = line;
       info->file = i_file;
@@ -1184,11 +1320,21 @@ static Bool em_process_cmd_line_option(Char* arg)
   else
   VG_XACT_CLO(arg, "--span", measure_span)
   else
-  VG_XACT_CLO(arg, "--track-raw", track_raw)
+  VG_XACT_CLO(arg, "--dctl", dctl)
   else
-  VG_XACT_CLO(arg, "--track-war", track_war)
+  VG_XACT_CLO(arg, "--draw", draw)
   else
-  VG_XACT_CLO(arg, "--track-waw", track_waw)
+  VG_XACT_CLO(arg, "--dwar", dwar)
+  else
+  VG_XACT_CLO(arg, "--dwaw", dwaw)
+  else
+  VG_XACT_CLO(arg, "--sctl", sctl)
+  else
+  VG_XACT_CLO(arg, "--sraw", sraw)
+  else
+  VG_XACT_CLO(arg, "--swar", swar)
+  else
+  VG_XACT_CLO(arg, "--swaw", swaw)
   else
   VG_XACT_CLO(arg, "--track-stack-name-deps", track_stack_name_deps)
   else
@@ -1218,9 +1364,14 @@ static void em_print_usage(void)
 "    --dep-file=<name>         read dependencies for span calculation from <name> [embla.deps]\n"
 "    --hidden-func-file=<name> read names of hidden functions <name> [embla.hidden-funcs]\n"
 "    --span                    measure critical path instead of collecting deps\n"
-"    --track-raw               track RAW dependencies\n"
-"    --track-war               track WAR dependencies\n"
-"    --track-waw               track WAW dependencies\n"
+"    --dctl                    track dynamic control dependencies (ignore joins)\n"
+"    --draw                    track dynamic RAW dependencies\n"
+"    --dwar                    track dynamic WAR dependencies\n"
+"    --dwaw                    track dynamic WAW dependencies\n"
+"    --sctl                    track static control dependencies (consider joins)\n"
+"    --sraw                    track static RAW dependencies\n"
+"    --swar                    track static WAR dependencies\n"
+"    --swaw                    track static WAW dependencies\n"
 "    --track-stack-name-deps   track WAR/WAW dependencies on stack\n"
 "    --track-hidden            track hidden dependencies\n"
 "    --n_trace_recs=<n>        maximum number of trace records allowed\n"
@@ -2238,25 +2389,25 @@ static Int result_entry_compare(const RTEntry * e1, const RTEntry * e2)
 #endif
 
 /********************************
- * Main getResultEntry routine  *
+ * Main updResultEntry routine  *
  ********************************/
 
-unsigned long long getResultEntry_calls, getResultEntry_nca, getResultEntry_entry;
+unsigned long long updResultEntry_calls, updResultEntry_nca, updResultEntry_entry;
 
 #if MOCK_RTENTRY
 
-static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
+static void updResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
                                Event old_event,
                                Addr32 ref_addr, Event new_event, int addNodeDep)
 {
-   return &mock_rtentry;
+   return;
 }
 
 #else
 
 int nnn = 0;
 
-static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
+static void XXupdResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
                                Event old_event,
                                Addr32 ref_addr, Event new_event, int depType)
 {
@@ -2275,7 +2426,7 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
 
    IFDID( nnn++; );
 
-   PROFILE( getResultEntry_calls++; )    // counting
+   PROFILE( updResultEntry_calls++; )    // counting
 
    // The tail (source) of the dependence is related to the old reference
    // The head (sink)   of the dependence is related to the new reference
@@ -2287,7 +2438,7 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
    //   the address of the call site in the nca
 
    while( TP_GET_FLAGS( nca_tr->link ) != TPT_OPEN ) {   // tag 1 is open header
-       PROFILE( getResultEntry_nca++; )                  // counting
+       PROFILE( updResultEntry_nca++; )                  // counting
        old_tr = nca_tr;
        nca_tr = ToTrP( nca_tr->link );
    }
@@ -2321,10 +2472,16 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
    }
 
    if( r_code == DF_FALSE ) {
-       return &mock_rtentry;
+       return;
    }
 
    code = DF_MK_KEY( r_code, h_code, t_code );
+
+#if CRITPATH_ANALYSIS
+   if (old_tr->inode == new_tr->inode) {
+     return;
+   }
+#endif
 
    // We now have all necessary info to look up the dependence
 
@@ -2336,7 +2493,7 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
 
 //   while( entry!=NULL && ( entry->t_line != t_line || entry->code != code || entry->t_tr != old_tr || entry->h_tr != new_tr ) ) {
    while( entry!=NULL && ( entry->t_line != t_line || entry->code != code ) ) {
-      PROFILE( getResultEntry_entry++; )       // counting
+      PROFILE( updResultEntry_entry++; )       // counting
       entry = entry->next;
    }
 
@@ -2368,10 +2525,10 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
 #if CRITPATH_ANALYSIS
    // Exclude hidden dependencies?
    if (track_hidden || h_code != DF_HIDDEN || t_code != DF_HIDDEN) {
-       if (track_raw && (depType & MASK_RAW)) {
+       if (draw && (depType & MASK_RAW)) {
            // RAW dependency
            addNodeDependency(old_tr, new_tr);
-       } else if ((track_war && (depType & MASK_WAR)) || (track_waw && (depType & MASK_WAW))) {
+       } else if ((dwar && (depType & MASK_WAR)) || (dwaw && (depType & MASK_WAW))) {
            // WAR/WAW dependency
 
            // Exclude WAR/WAW dependencies on the stack?
@@ -2384,27 +2541,26 @@ static RTEntry* XXgetResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
 #endif
 
 #if PRINT_RESULTS_TABLE
-   return entry;
-#else
-   return NULL;
+   if (depType & MASK_RAW) entry->n_raw++;
+   if (depType & MASK_WAR) entry->n_war++;
+   if (depType & MASK_WAW) entry->n_waw++;
 #endif
 
 }
 
-static RTEntry* getResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
+static void updResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
                                Event old_event,
                                Addr32 ref_addr, Event new_event, int depType)
 {
-    RTEntry *e;
 
     // IFDID( BONK( "{" ); );
-    e = XXgetResultEntry(curr_ctx, curr_info, old_event, ref_addr, new_event, depType);
+    XXupdResultEntry(curr_ctx, curr_info, old_event, ref_addr, new_event, depType);
     // IFDID( BONK( "}" ); );
     // if( nnn>30 ) check( 0, "Found an exit" );
 
 
 
-    return e;
+    return;
 }
 
 #endif
@@ -2599,6 +2755,13 @@ void recordRet(Addr32 sp, InstrInfo *i_info, Addr32 target)
 {
 }
 
+#if CRITPATH_ANALYSIS
+static VG_REGPARM(0)
+void recordBranch() 
+{
+}
+#endif
+
 #if TRACE_REG_DEPS
 
 static VG_REGPARM(1)
@@ -2663,7 +2826,6 @@ static VG_REGPARM(2)
 void recordLoad(StmInfo *s_info, Addr32 addr )
 {
     RefInfo     *refp;
-    RTEntry     *res_entry;
     int          size = s_info->size;
     InstrInfo   *i_info = s_info->i_info;
 #if TRACE_REG_DEPS
@@ -2689,17 +2851,13 @@ void recordLoad(StmInfo *s_info, Addr32 addr )
         new_event = newRegularEvent( current_stack_frame, i_info );
         refp->lastRead = consEvent( new_event, refp->lastRead );
 
-        res_entry = getResultEntry( current_stack_frame,
+        updResultEntry( current_stack_frame,
                                     i_info, 
                                     refp->lastWrite, 
                                     addr,
                                     new_event,
                                     MASK_RAW );
     
-#if PRINT_RESULTS_TABLE
-        res_entry->n_raw++;
-#endif
-
 #if TRACE_REG_DEPS
         if( static_sr ) {
           // the load part of a potential restore
@@ -2728,16 +2886,12 @@ void recordLoad(StmInfo *s_info, Addr32 addr )
                 new_event = newRegularEvent( current_stack_frame, i_info );
                 refp[i].lastRead = consEvent( new_event, refp[i].lastRead );
 
-                res_entry = getResultEntry( current_stack_frame,
+                updResultEntry( current_stack_frame,
                                             i_info, 
                                             refp[i].lastWrite, 
                                             addr,
                                             new_event,
                                             MASK_RAW );
-#if PRINT_RESULTS_TABLE
-                res_entry->n_raw++;
-#endif
-
             }
 
             // BONK( "done\n" );
@@ -2765,7 +2919,6 @@ void recordStore( StmInfo *s_info, Addr32 addr )
     int          static_sr = s_info->flags & SI_SAVE_REST;
 #endif
     RefInfo     *refp;
-    RTEntry     *res_entry;
     EventList   *ev_list, *ev_next;
     int         l_addr = addr, l_size = size, iters = 0;
     Event        new_event;
@@ -2800,27 +2953,21 @@ void recordStore( StmInfo *s_info, Addr32 addr )
             // is it a WAR or a WAW?
             if( refp[i].lastRead == NULL ) {        // DONE !
                 // last reference was a write: a WAW
-                res_entry = getResultEntry( current_stack_frame,
+                updResultEntry( current_stack_frame,
                                             i_info, 
                                             refp[i].lastWrite, 
                                             addr,
                                             new_event,
                                             MASK_WAW );
-#if PRINT_RESULTS_TABLE
-                res_entry->n_waw++;
-#endif
             } else {
                 // last reference was a read: a WAR
                 for( ev_list = refp[i].lastRead; ev_list!=NULL; ev_list = ev_list->next ) {
-                    res_entry = getResultEntry( current_stack_frame,
+                    updResultEntry( current_stack_frame,
                                                 i_info, 
                                                 ev_list->ev, 
                                                 addr,
                                                 new_event,
                                                 MASK_WAR );
-#if PRINT_RESULTS_TABLE
-                    res_entry->n_war++;
-#endif
                 }
             }
 
@@ -2955,6 +3102,8 @@ void recordGet(StmInfo *s_info)
 
         // check( p->offsize > 0, "Funny offsize\n" );
 
+        // Doesn't work now - I've changed it from "RTEntry* getResultEntry(...)" 
+        // to "void updResultEntry(...)
         res_entry = getResultEntry( current_stack_frame, 
                                     i_info,
                                     regp->lastWrite,
@@ -3044,6 +3193,8 @@ void recordGetI(StmInfo *s_info, Int ix)
 
     for( p = regp; p < regp+size; p = p + p->offsize ) {
 
+        // Doesn't work now - I've changed it from "RTEntry* getResultEntry(...)" 
+        // to "void updResultEntry(...)
         res_entry = getResultEntry( current_stack_frame, 
                                     i_info,
                                     regp->lastWrite,
@@ -3175,6 +3326,14 @@ void recordRet(Addr32 sp, InstrInfo *i_info, Addr32 target)
    gc( );
 
 }
+
+#if CRITPATH_ANALYSIS
+static VG_REGPARM(0)
+void recordBranch() 
+{
+   branchNode();
+}
+#endif
 
 #if RECORD_CF_EDGES
 
@@ -3386,7 +3545,7 @@ static void emitSpChange(IRSB *bbOut)
 // implicit Exit at the end of each block
 
 static void instrumentExit(IRSB *bbOut, IRJumpKind jk, InstrInfo *i_info, IRExpr *tgt,
-                           unsigned int loc_instr)
+                           unsigned int loc_instr, IRExpr *guard)
 {
     switch( jk ) {
 
@@ -3423,7 +3582,15 @@ static void instrumentExit(IRSB *bbOut, IRJumpKind jk, InstrInfo *i_info, IRExpr
           break;
 
       default: 
-          // Do nothing
+#if CRITPATH_ANALYSIS
+          if (dctl && guard != NULL) {
+             HChar *hname = "recordBranch";
+             void  *haddr = &recordBranch;
+             IRExpr **args = mkIRExprVec_0();
+             IRDirty *dy = unsafeIRDirty_0_N( 0, hname, haddr, args );
+             addStmtToIRSB( bbOut, IRStmt_Dirty(dy) );
+          }
+#endif
           break;
     }
 }
@@ -3700,7 +3867,7 @@ void recordInstr(InstrInfo *i_info, Word n)  // n is the number of skipped instr
        TimeStamp max_t = 0;
 
        setTimeStamp( &( sp->stamps ), sp->current_line, sp->span+n );
-       for( ll = i_info->line->pred[0]; ll != NULL; ll = ll->next ) {
+       for( ll = i_info->line->deps; ll != NULL; ll = ll->next ) {
           TimeStamp t = getTimeStamp( &( sp->stamps ), ll->line );
           if( t > max_t ) max_t = t;
        }
@@ -3988,7 +4155,7 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
          case Ist_Exit: 
              currII = mk_i_info( currII, guestIAddr, guestILen );
 	     instrumentExit( bbOut, stIn->Ist.Exit.jk, currII, 
-                             IRExpr_Const( stIn->Ist.Exit.dst ), loc_instr );
+                             IRExpr_Const( stIn->Ist.Exit.dst ), loc_instr, stIn->Ist.Exit.guard );
 #if !PRECISE_ICOUNT
              emitIncrementGlobal( bbOut, &instructions, loc_instr );
              loc_instr = 0;
@@ -4118,7 +4285,7 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
        stack_modified = 0;
     }
     currII = mk_i_info( currII, guestIAddr, guestILen );
-    instrumentExit( bbOut, bbIn->jumpkind, currII, bbIn->next, loc_instr );
+    instrumentExit( bbOut, bbIn->jumpkind, currII, bbIn->next, loc_instr, NULL );
 #endif
 #if PRINT_BB
     vex_printf("BBOUT_START\n");
@@ -4217,33 +4384,57 @@ static Int readWord( ReadHandle* rh, Char *o_buf, Int len )
    return n-len;
 }
 
+#define ADD_STATIC_DEP(li_src,li_tgt) (li_tgt)->deps = consLL( (li_src), (li_tgt)->deps )
 
 static void readDeps( void )
 {
    const int bs = 1000;
-   Char fn[bs];
-   Char s1[bs];
-   Char s2[bs];
+   Char filename[bs];
+   Char fnname[bs];
+   Char s_deptype[bs];
+   Char s_tgt[bs];
+   Char s_src[bs];
    ReadHandle *rh;
    
 
    rh = openRH( dep_file_name );
    
+   // Format: "<file-name> <fn-name> <dependency type(s)> <target-line num> <source-line num>"
    while( 1 ) {
-      int n1 = readWord( rh, fn, bs );
-      int n2 = readWord( rh, s1, bs );
-      int n3 = readWord( rh, s2, bs );
-      LineInfo *li1, *li2;
-      long l1,l2;
+      int n1 = readWord( rh, filename, bs );
+      int n2 = readWord( rh, fnname, bs );
+      int n3 = readWord( rh, s_deptype, bs );
+      int n4 = readWord( rh, s_tgt, bs );
+      int n5 = readWord( rh, s_src, bs );
+      LineInfo *li_tgt, *li_src;
+      long n_tgt,n_src;
+      int depType;
 
-      if( !n1 || !n2 || !n3 ) break;
+      if( !n1 || !n2 || !n3 || !n4 || !n5 ) break;
 
-      l1 = VG_(atoll)( s1 );
-      l2 = VG_(atoll)( s2 );
-      li1 = mk_line_info_l( fn, l1, NULL );
-      li2 = mk_line_info_l( fn, l2, NULL );
+      n_tgt = VG_(atoll)( s_tgt );
+      n_src = VG_(atoll)( s_src );
+      depType = VG_(atoll16)( s_deptype );
+      li_tgt = mk_line_info_l( filename, n_tgt, fnname );
+      li_src = mk_line_info_l( filename, n_src, fnname );
 
-      li1->pred[0] = consLL( li2, li1->pred[0] );
+      // Exclude hidden dependencies?
+      if (track_hidden || !(depType & MASK_HIDDEN)) {
+          if (sraw && (depType & MASK_RAW)) {
+              // RAW dependency
+              ADD_STATIC_DEP(li_src,li_tgt);
+          } else if ((swar && (depType & MASK_WAR)) || (swaw && (depType & MASK_WAW))) {
+              // WAR/WAW dependency
+
+              // Exclude WAR/WAW dependencies on the stack?
+              // Already excluded by DF_FALSE it seems......
+              if (track_stack_name_deps || !(depType & MASK_STACK)) {
+                 ADD_STATIC_DEP(li_src,li_tgt);
+              }
+          } else if (sctl && (depType & MASK_CTL)) {
+              ADD_STATIC_DEP(li_src,li_tgt);
+          }
+      }
    }
 
    closeRH( rh );
@@ -4318,6 +4509,7 @@ static void em_post_clo_init_deps(void)
        VG_(tool_panic)("Out of memory!");
    }
    currFrame = firstFrame;
+   currFrame->latestNodesTbl = initial_LatestNodeTable;
 #endif
 
    opt.elim_stack_alias = 1;
@@ -4352,6 +4544,14 @@ static void em_post_clo_init_deps(void)
    sample_count = sample_freq;
 
    readHiddenFuncs( );
+
+   // For efficiency purposes
+   dyn_only = !(sctl || sraw || swar || swaw);
+   sta_only = !(dctl || draw || dwar || dwaw);
+
+   if (!dyn_only) {
+     readDeps();
+   }
 }
 
 static void em_post_clo_init(void)
@@ -4375,7 +4575,7 @@ static void finaliseCritPath(void) {
   long long int cpLength;
 
   while (currFrame > firstFrame) {
-    newInstr(dummy_instr_info.line);
+//    newInstr(dummy_instr_info.line);
     retNode();
   }
   cpLength = critPathNodes();//->cpLength;
@@ -4623,11 +4823,11 @@ static void em_fini_deps(Int exitcode)
    VG_(message)(Vg_UserMsg, "allAndDirtyFrags %lu %lu (%lu)", 
                             all_frags, dirty_frags, 
                             smdiv(10*dirty_frags, all_frags));
-   VG_(message)(Vg_UserMsg, "getResultEntry %llu nca:%llu(%llu) entry:%llu(%llu)", 
-                            getResultEntry_calls, getResultEntry_nca, 
-                            smdiv(10*getResultEntry_nca, getResultEntry_calls),
-                            getResultEntry_entry,
-                            smdiv(10*getResultEntry_entry, getResultEntry_calls));
+   VG_(message)(Vg_UserMsg, "updResultEntry %llu nca:%llu(%llu) entry:%llu(%llu)", 
+                            updResultEntry_calls, updResultEntry_nca, 
+                            smdiv(10*updResultEntry_nca, updResultEntry_calls),
+                            updResultEntry_entry,
+                            smdiv(10*updResultEntry_entry, updResultEntry_calls));
 #endif
 }
 
