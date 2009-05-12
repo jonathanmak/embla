@@ -54,7 +54,7 @@
 #define  DO_NOT_INSTRUMENT  0
 #define  MOCK_RTENTRY       0
 #define  FULL_CONTOURS      0
-#define  INSTRUMENT_GC      0
+#define  INSTRUMENT_GC      1
 #define  LIGHT_IGC          1
 #define  DUMP_TRACE_PILE    0
 #define  DUMP_MEMORY_MAP    0
@@ -1661,7 +1661,7 @@ static TraceRec *forwardTR( TraceRec *ap, TraceRec *tp, TraceRec *ecae )
 {
    TraceRec *tmp = remapTR( tp->i_info, ecae, tp );
 
-   GCBONK( "+" );
+   // GCBONK( "+" );
    if( tmp == NULL ) {
       tp->link = mkTaggedPtr2( ap, TPT_REG_OR_CLOSED_LIVE );
       return ap-1;
@@ -1750,13 +1750,13 @@ static void compact(void)
    sp = current_stack_frame;
    mp = smarks+topMark;
    while( tp >= first_new_tr ) {
-      GCBONK( "." );
+      // GCBONK( "." );
       // Maybe start a new aeon
       if( mp->tr >= tp ) {
         ecae = tp+1;
-        GCBONK( "s" );
+        // GCBONK( "s" );
       }
-      GCBONK( "," );
+      // GCBONK( "," );
       if( tp->i_info != NULL ) {
         switch( TP_GET_FLAGS( tp->link ) ) {
           // Regular
@@ -1770,7 +1770,7 @@ static void compact(void)
             ap--;
             // Start new aeon
             ecae = tp;
-            GCBONK( "o" );
+            // GCBONK( "o" );
             break;
 
           // Closed header
