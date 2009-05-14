@@ -3,6 +3,7 @@
 
 cfgfile=$1
 outfile=$2
+bindir=`dirname $0`
 
 cat /dev/null > $outfile
 for sfile in `awk '{print $1}' $cfgfile | sort -u`; do
@@ -10,7 +11,7 @@ for sfile in `awk '{print $1}' $cfgfile | sort -u`; do
   do
      cat $cfgfile \
      | awk -v fil=$sfile -v fn=$sfname '$1==fil && $2==fn {print $3 " " $4}' \
-     | awk -f dominance.awk -v cda=1 \
+     | awk -f $bindir/dominance.awk -v cda=1 \
      | sort -n \
      | awk -v fil=$sfile -v fn=$sfname '{print fil " " fn " C " $1 " " $2}' \
      | cat >> $outfile
