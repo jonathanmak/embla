@@ -1632,7 +1632,7 @@ static TraceRec *remapTR( InstrInfo *i_info, TraceRec *eoae, TraceRec *curr )
 {
    AeonItem *ai = lookupAI( i_info );
 
-   if( 1 || ai->t_rec == NULL || ai->t_rec >= eoae ) {
+   if( ai->t_rec == NULL || ai->t_rec >= eoae ) { // One disabling (not anymore)
      ai->t_rec = curr;
      return NULL;
    } else {
@@ -1666,7 +1666,7 @@ static TraceRec *forwardTR( TraceRec *ap, TraceRec *tp, TraceRec *ecae )
       tp->link = mkTaggedPtr2( ap, TPT_REG_OR_CLOSED_LIVE );
       return ap-1;
    } else {
-      tp->link = mkTaggedPtr2( tmp, TPT_REG_OR_CLOSED_LIVE );
+      tp->link = mkTaggedPtr2( tmp, TP_GET_FLAGS( tp->link ) );
       return ap;
    }
 }
@@ -2110,7 +2110,8 @@ static void compact(void)
 }
 
 
-#define N_LEAST 9800000
+#define N_LEAST 1000
+// #define N_LEAST 9800000
 static unsigned max_use = 0,
                 heap_limit = N_LEAST;
 
