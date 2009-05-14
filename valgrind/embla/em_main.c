@@ -557,7 +557,7 @@ static void doubleLatestNodeTbl( void )
 {
    LatestNodeTable *lnt = &(currFrame->latestNodesTbl);
    int i, idx_bits = lnt->idx_bits;
-   INodeList **newTbl = (INodeList **) VG_(calloc)( 1 << (idx_bits+1), sizeof(INodeList *) );
+   INodeList **newTbl = (INodeList **) VG_(calloc)( "", 1 << (idx_bits+1), sizeof(INodeList *) );
 
    check( newTbl != NULL, "Out of memory" );
 
@@ -4407,6 +4407,12 @@ static Int readWord( ReadHandle* rh, Char *o_buf, Int len )
 }
 
 #define ADD_STATIC_DEP(li_src,li_tgt) (li_tgt)->deps = consLL( (li_src), (li_tgt)->deps )
+#define FLAG_RAW        'T'
+#define FLAG_WAR        'A'
+#define FLAG_WAW        'O'
+#define FLAG_CTL        'C'
+#define FLAG_HIDDEN     'H'
+#define FLAG_STACK      'S'
 
 static void readDeps( void )
 {
@@ -4430,13 +4436,20 @@ static void readDeps( void )
       int n5 = readWord( rh, s_src, bs );
       LineInfo *li_tgt, *li_src;
       long n_tgt,n_src;
-      int depType;
+      int depType = 0;
 
       if( !n1 || !n2 || !n3 || !n4 || !n5 ) break;
 
       n_tgt = VG_(atoll)( s_tgt );
       n_src = VG_(atoll)( s_src );
-      depType = VG_(atoll16)( s_deptype );
+
+      if (VG_(strchr)(s_deptype, FLAG_RAW)) depType |= MASK_RAW;
+      if (VG_(strchr)(s_deptype, FLAG_WAR)) depType |= MASK_WAR;
+      if (VG_(strchr)(s_deptype, FLAG_WAW)) depType |= MASK_WAW;
+      if (VG_(strchr)(s_deptype, FLAG_CTL)) depType |= MASK_CTL;
+      if (VG_(strchr)(s_deptype, FLAG_HIDDEN)) depType |= MASK_HIDDEN;
+      if (VG_(strchr)(s_deptype, FLAG_STACK)) depType |= MASK_STACK;
+
       li_tgt = mk_line_info_l( filename, n_tgt, fnname );
       li_src = mk_line_info_l( filename, n_src, fnname );
 
@@ -4487,7 +4500,7 @@ static void readHiddenFuncs( void)
    ReadHandle *rh;
 
    numHiddenFuncs = 0;
-   hiddenFuncs = VG_(malloc)(guess_size * sizeof(Char *));
+   hiddenFuncs = VG_(malloc)("", guess_size * sizeof(Char *));
    rh = openRH( hidden_func_file_name );
    
    while( 1 ) {
@@ -4495,7 +4508,7 @@ static void readHiddenFuncs( void)
 
       if( !n ) break;
 
-      hiddenFuncs[numHiddenFuncs] = VG_(malloc)(FN_LEN * sizeof(Char));
+      hiddenFuncs[numHiddenFuncs] = VG_(malloc)("", FN_LEN * sizeof(Char));
       VG_(strcpy)(hiddenFuncs[numHiddenFuncs], fn);
       numHiddenFuncs++;
 
@@ -4503,7 +4516,7 @@ static void readHiddenFuncs( void)
 
    closeRH( rh );
 
-   VG_(realloc)(hiddenFuncs, numHiddenFuncs);
+   VG_(realloc)("", hiddenFuncs, numHiddenFuncs);
 }
 
 static void em_post_clo_init_deps(void)
@@ -4758,7 +4771,7 @@ static void printCFG(const Char * cfgFileName)
    for (i = 0; i < num_results; ++i)
    {
      CFEdge *e = result_array + i;
-     VG_(sprintf)( buf, "%s %d %d\n", e->from->file, e->from->line, e->to->line );
+     VG_(sprintf)( buf, "%s %s %d %d\n", e->from->file, e->from->func, e->from->line, e->to->line );
      if( fd != -1 )
        VG_(write)( fd, buf, VG_(strlen)( buf ) );
      else
