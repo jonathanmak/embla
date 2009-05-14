@@ -4603,7 +4603,8 @@ static void finaliseCritPath(void) {
   cpLength = critPathNodes();//->cpLength;
   // To take account of the first 2 manually created TraceRecs
   VG_(message)(Vg_UserMsg, "No. of instructions is %lld", totalCost);
-  VG_(message)(Vg_UserMsg, "Length of Critical path is %lld.", cpLength);
+  VG_(message)(Vg_UserMsg, "Length of Critical path is %lld", cpLength);
+  VG_(message)(Vg_UserMsg, "Average parallelism is %lld", totalCost / cpLength);
 }
 
 #endif
