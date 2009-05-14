@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2008 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -446,6 +446,7 @@ typedef
       Iop_CmpNEZ8, Iop_CmpNEZ16,  Iop_CmpNEZ32,  Iop_CmpNEZ64,
       Iop_CmpwNEZ32, Iop_CmpwNEZ64, /* all-0s -> all-Os; other -> all-1s */
       Iop_Left8, Iop_Left16, Iop_Left32, Iop_Left64, /*  \x -> x | -x */
+      Iop_Max32U, /* unsigned max */
 
       /* PowerPC-style 3-way integer comparisons.  Without them it is
          difficult to simulate PPC efficiently.
@@ -629,6 +630,10 @@ typedef
 
       /* :: F64 -> F64 */
       Iop_Est5FRSqrt,    /* reciprocal square root estimate, 5 good bits */
+      Iop_RoundF64toF64_NEAREST, /* frin */
+      Iop_RoundF64toF64_NegINF,  /* frim */ 
+      Iop_RoundF64toF64_PosINF,  /* frip */
+      Iop_RoundF64toF64_ZERO,    /* friz */
 
       /* :: F64 -> F32 */
       Iop_TruncF64asF32, /* do F64->F32 truncation as per 'fsts' */
@@ -658,7 +663,7 @@ typedef
       Iop_QSub8Sx8, Iop_QSub16Sx4,
 
       /* MULTIPLICATION (normal / high half of signed/unsigned) */
-      Iop_Mul16x4,
+      Iop_Mul16x4, Iop_Mul32x2,
       Iop_MulHi16Ux4,
       Iop_MulHi16Sx4,
 
@@ -677,7 +682,7 @@ typedef
       Iop_CmpGT8Sx8, Iop_CmpGT16Sx4, Iop_CmpGT32Sx2,
 
       /* VECTOR x SCALAR SHIFT (shift amt :: Ity_I8) */
-                   Iop_ShlN16x4, Iop_ShlN32x2,
+      Iop_ShlN8x8, Iop_ShlN16x4, Iop_ShlN32x2,
                    Iop_ShrN16x4, Iop_ShrN32x2,
       Iop_SarN8x8, Iop_SarN16x4, Iop_SarN32x2,
 
@@ -691,6 +696,19 @@ typedef
          arg. */
       Iop_InterleaveHI8x8, Iop_InterleaveHI16x4, Iop_InterleaveHI32x2,
       Iop_InterleaveLO8x8, Iop_InterleaveLO16x4, Iop_InterleaveLO32x2,
+
+      /* CONCATENATION -- build a new value by concatenating either
+         the even or odd lanes of both operands.  Note that
+         Cat{Odd,Even}Lanes32x2 are identical to Interleave{HI,LO}32x2
+         and so are omitted. */
+      Iop_CatOddLanes16x4, Iop_CatEvenLanes16x4,
+
+      /* PERMUTING -- copy src bytes to dst,
+         as indexed by control vector bytes:
+            for i in 0 .. 7 . result[i] = argL[ argR[i] ] 
+         argR[i] values may only be in the range 0 .. 7, else behaviour
+         is undefined. */
+      Iop_Perm8x8,
 
       /* ------------------ 128-bit SIMD FP. ------------------ */
 
@@ -1199,6 +1217,8 @@ typedef
       Ijk_Sys_syscall,    /* amd64 'syscall', ppc 'sc' */
       Ijk_Sys_int32,      /* amd64/x86 'int $0x20' */
       Ijk_Sys_int128,     /* amd64/x86 'int $0x80' */
+      Ijk_Sys_int129,     /* amd64/x86 'int $0x81' */
+      Ijk_Sys_int130,     /* amd64/x86 'int $0x82' */
       Ijk_Sys_sysenter    /* x86 'sysenter'.  guest_EIP becomes 
                              invalid at the point this happens. */
    }
@@ -1322,7 +1342,9 @@ typedef
    enum { 
       Imbe_Fence=0x18000, 
       Imbe_BusLock, 
-      Imbe_BusUnlock
+      Imbe_BusUnlock,
+      Imbe_SnoopedStoreBegin,
+      Imbe_SnoopedStoreEnd
    }
    IRMBusEvent;
 
@@ -1398,14 +1420,17 @@ typedef
             that a given chunk of address space, [base .. base+len-1],
             has become undefined.  This is used on amd64-linux and
             some ppc variants to pass stack-redzoning hints to whoever
-            wants to see them.
+            wants to see them.  It also indicates the address of the
+            next (dynamic) instruction that will be executed.  This is
+            to help Memcheck to origin tracking.
 
-            ppIRExpr output: ====== AbiHint(<base>, <len>) ======
-                         eg. ====== AbiHint(t1, 16) ======
+            ppIRExpr output: ====== AbiHint(<base>, <len>, <nia>) ======
+                         eg. ====== AbiHint(t1, 16, t2) ======
          */
          struct {
             IRExpr* base;     /* Start  of undefined chunk */
             Int     len;      /* Length of undefined chunk */
+            IRExpr* nia;      /* Address of next (guest) insn */
          } AbiHint;
 
          /* Write a guest register, at a fixed offset in the guest state.
@@ -1492,7 +1517,7 @@ typedef
 /* Statement constructors. */
 extern IRStmt* IRStmt_NoOp    ( void );
 extern IRStmt* IRStmt_IMark   ( Addr64 addr, Int len );
-extern IRStmt* IRStmt_AbiHint ( IRExpr* base, Int len );
+extern IRStmt* IRStmt_AbiHint ( IRExpr* base, Int len, IRExpr* nia );
 extern IRStmt* IRStmt_Put     ( Int off, IRExpr* data );
 extern IRStmt* IRStmt_PutI    ( IRRegArray* descr, IRExpr* ix, Int bias, 
                                 IRExpr* data );

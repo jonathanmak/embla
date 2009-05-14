@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2008 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -141,6 +141,16 @@ void LibVEX_default_VexArchInfo ( /*OUT*/VexArchInfo* vai );
       guest is amd64-linux                ==> 128
       guest is other                      ==> inapplicable
 
+   guest_amd64_assume_fs_is_zero
+      guest is amd64-linux                ==> True
+      guest is amd64-darwin               ==> False
+      guest is other                      ==> inapplicable
+
+   guest_amd64_assume_gs_is_0x60
+      guest is amd64-darwin               ==> True
+      guest is amd64-linux                ==> False
+      guest is other                      ==> inapplicable
+
    guest_ppc_zap_RZ_at_blr
       guest is ppc64-linux                ==> True
       guest is ppc32-linux                ==> False
@@ -178,6 +188,16 @@ typedef
       /* PPC and AMD64 GUESTS only: how many bytes below the 
          stack pointer are validly addressible? */
       Int guest_stack_redzone_size;
+
+      /* AMD64 GUESTS only: should we translate %fs-prefixed
+         instructions using the assumption that %fs always contains
+         zero? */
+      Bool guest_amd64_assume_fs_is_zero;
+
+      /* AMD64 GUESTS only: should we translate %gs-prefixed
+         instructions using the assumption that %gs always contains
+         0x60? */
+      Bool guest_amd64_assume_gs_is_0x60;
 
       /* PPC GUESTS only: should we zap the stack red zone at a 'blr'
          (function return) ? */
@@ -319,6 +339,9 @@ typedef
       /* Whereabouts is the stack pointer? */
       Int offset_SP;
       Int sizeof_SP; /* 4 or 8 */
+      /* Whereabouts is the frame pointer? */
+      Int offset_FP;
+      Int sizeof_FP; /* 4 or 8 */
       /* Whereabouts is the instruction pointer? */
       Int offset_IP;
       Int sizeof_IP; /* 4 or 8 */
@@ -335,14 +358,18 @@ typedef
 /* A note about guest state layout.
 
    LibVEX defines the layout for the guest state, in the file
-   pub/libvex_guest_<arch>.h.  The struct will have an 8-aligned size.
-   Each translated bb is assumed to be entered with a specified
-   register pointing at such a struct.  Beyond that is a shadow
-   state area with the same size as the struct.  Beyond that is
-   a spill area that LibVEX may spill into.  It must have size
+   pub/libvex_guest_<arch>.h.  The struct will have an 16-aligned
+   size.  Each translated bb is assumed to be entered with a specified
+   register pointing at such a struct.  Beyond that is two copies of
+   the shadow state area with the same size as the struct.  Beyond
+   that is a spill area that LibVEX may spill into.  It must have size
    LibVEX_N_SPILL_BYTES, and this must be a 16-aligned number.
 
-   On entry, the baseblock pointer register must be 8-aligned.
+   On entry, the baseblock pointer register must be 16-aligned.
+
+   There must be no holes in between the primary guest state, its two
+   copies, and the spill area.  In short, all 4 areas must have a
+   16-aligned size and be 16-aligned, and placed back-to-back.
 */
 
 #define LibVEX_N_SPILL_BYTES 2048

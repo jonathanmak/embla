@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2008 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -162,6 +162,9 @@ extern ULong x86g_dirtyhelper_RDTSC ( void );
 extern UInt x86g_dirtyhelper_IN  ( UInt portno, UInt sz/*1,2 or 4*/ );
 extern void x86g_dirtyhelper_OUT ( UInt portno, UInt data, 
                                    UInt sz/*1,2 or 4*/ );
+
+extern VexEmWarn
+            x86g_dirtyhelper_FXRSTOR ( VexGuestX86State*, HWord );
 
 extern VexEmWarn
             x86g_dirtyhelper_FRSTOR ( VexGuestX86State*, HWord );

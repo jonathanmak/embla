@@ -7,7 +7,7 @@
    This file is part of Valgrind, a dynamic binary instrumentation
    framework.
 
-   Copyright (C) 2000-2007 Julian Seward 
+   Copyright (C) 2000-2008 Julian Seward 
       jseward@acm.org
 
    This program is free software; you can redistribute it and/or
@@ -35,7 +35,8 @@
 #include "pub_core_libcbase.h"
 #include "pub_core_machine.h"
 #include "pub_core_cpuid.h"
-#include "pub_core_libcsignal.h"   // for ppc32 messing with SIGILL
+#include "pub_core_libcsignal.h"   // for ppc32 messing with SIGILL and SIGFPE
+#include "pub_core_debuglog.h"
 
 
 #define INSTR_PTR(regs)    ((regs).vex.VG_INSTR_PTR)
@@ -78,35 +79,77 @@ void VG_(set_IP) ( ThreadId tid, Addr ip )
    INSTR_PTR( VG_(threads)[tid].arch ) = ip;
 }
 
-
-void VG_(get_shadow_regs_area) ( ThreadId tid, OffT offset, SizeT size,
-                                 UChar* area )
+void VG_(set_syscall_return_shadows) ( ThreadId tid,
+                                       /* shadow vals for the result */
+                                       UWord s1res, UWord s2res,
+                                       /* shadow vals for the error val */
+                                       UWord s1err, UWord s2err )
 {
-   ThreadState* tst;
-
-   vg_assert(VG_(is_valid_tid)(tid));
-   tst = & VG_(threads)[tid];
-
-   // Bounds check
-   vg_assert(0 <= offset && offset < sizeof(VexGuestArchState));
-   vg_assert(offset + size <= sizeof(VexGuestArchState));
-
-   VG_(memcpy)( area, (void*)(((Addr)&(tst->arch.vex_shadow)) + offset), size);
+#  if defined(VGP_x86_linux)
+   VG_(threads)[tid].arch.vex_shadow1.guest_EAX = s1res;
+   VG_(threads)[tid].arch.vex_shadow2.guest_EAX = s2res;
+#  elif defined(VGP_amd64_linux)
+   VG_(threads)[tid].arch.vex_shadow1.guest_RAX = s1res;
+   VG_(threads)[tid].arch.vex_shadow2.guest_RAX = s2res;
+#  elif defined(VGP_ppc32_linux) || defined(VGP_ppc64_linux)
+   VG_(threads)[tid].arch.vex_shadow1.guest_GPR3 = s1res;
+   VG_(threads)[tid].arch.vex_shadow2.guest_GPR3 = s2res;
+#  elif defined(VGP_ppc32_aix5) || defined(VGP_ppc64_aix5)
+   VG_(threads)[tid].arch.vex_shadow1.guest_GPR3 = s1res;
+   VG_(threads)[tid].arch.vex_shadow2.guest_GPR3 = s2res;
+   VG_(threads)[tid].arch.vex_shadow1.guest_GPR4 = s1err;
+   VG_(threads)[tid].arch.vex_shadow2.guest_GPR4 = s2err;
+#  else
+#    error "Unknown plat"
+#  endif
 }
 
-void VG_(set_shadow_regs_area) ( ThreadId tid, OffT offset, SizeT size,
-                                 const UChar* area )
+void
+VG_(get_shadow_regs_area) ( ThreadId tid, 
+                            /*DST*/UChar* dst,
+                            /*SRC*/Int shadowNo, OffT offset, SizeT size )
 {
+   void*        src;
    ThreadState* tst;
-
+   vg_assert(shadowNo == 0 || shadowNo == 1 || shadowNo == 2);
    vg_assert(VG_(is_valid_tid)(tid));
-   tst = & VG_(threads)[tid];
-
    // Bounds check
    vg_assert(0 <= offset && offset < sizeof(VexGuestArchState));
    vg_assert(offset + size <= sizeof(VexGuestArchState));
+   // Copy
+   tst = & VG_(threads)[tid];
+   src = NULL;
+   switch (shadowNo) {
+      case 0: src = (void*)(((Addr)&(tst->arch.vex)) + offset); break;
+      case 1: src = (void*)(((Addr)&(tst->arch.vex_shadow1)) + offset); break;
+      case 2: src = (void*)(((Addr)&(tst->arch.vex_shadow2)) + offset); break;
+   }
+   tl_assert(src != NULL);
+   VG_(memcpy)( dst, src, size);
+}
 
-   VG_(memcpy)( (void*)(((Addr)(&tst->arch.vex_shadow)) + offset), area, size);
+void
+VG_(set_shadow_regs_area) ( ThreadId tid, 
+                            /*DST*/Int shadowNo, OffT offset, SizeT size,
+                            /*SRC*/const UChar* src )
+{
+   void*        dst;
+   ThreadState* tst;
+   vg_assert(shadowNo == 0 || shadowNo == 1 || shadowNo == 2);
+   vg_assert(VG_(is_valid_tid)(tid));
+   // Bounds check
+   vg_assert(0 <= offset && offset < sizeof(VexGuestArchState));
+   vg_assert(offset + size <= sizeof(VexGuestArchState));
+   // Copy
+   tst = & VG_(threads)[tid];
+   dst = NULL;
+   switch (shadowNo) {
+      case 0: dst = (void*)(((Addr)&(tst->arch.vex)) + offset); break;
+      case 1: dst = (void*)(((Addr)&(tst->arch.vex_shadow1)) + offset); break;
+      case 2: dst = (void*)(((Addr)&(tst->arch.vex_shadow2)) + offset); break;
+   }
+   tl_assert(dst != NULL);
+   VG_(memcpy)( dst, src, size);
 }
 
 
@@ -193,22 +236,23 @@ void VG_(apply_to_GP_regs)(void (*f)(UWord))
    }
 }
 
-static ThreadId thread_stack_iter = VG_INVALID_THREADID;
-
-void VG_(thread_stack_reset_iter)(void)
+void VG_(thread_stack_reset_iter)(/*OUT*/ThreadId* tid)
 {
-   thread_stack_iter = 1;
+   *tid = (ThreadId)(-1);
 }
 
-Bool VG_(thread_stack_next)(ThreadId* tid, Addr* stack_min, Addr* stack_max)
+Bool VG_(thread_stack_next)(/*MOD*/ThreadId* tid,
+                            /*OUT*/Addr* stack_min, 
+                            /*OUT*/Addr* stack_max)
 {
    ThreadId i;
-   for (i = thread_stack_iter; i < VG_N_THREADS; i++) {
+   for (i = (*tid)+1; i < VG_N_THREADS; i++) {
+      if (i == VG_INVALID_THREADID)
+         continue;
       if (VG_(threads)[i].status != VgTs_Empty) {
          *tid       = i;
          *stack_min = VG_(get_SP)(i);
          *stack_max = VG_(threads)[i].client_stack_highest_word;
-         thread_stack_iter = i + 1;
          return True;
       }
    }
@@ -220,6 +264,13 @@ Addr VG_(thread_get_stack_max)(ThreadId tid)
    vg_assert(0 <= tid && tid < VG_N_THREADS && tid != VG_INVALID_THREADID);
    vg_assert(VG_(threads)[tid].status != VgTs_Empty);
    return VG_(threads)[tid].client_stack_highest_word;
+}
+
+SizeT VG_(thread_get_stack_size)(ThreadId tid)
+{
+   vg_assert(0 <= tid && tid < VG_N_THREADS && tid != VG_INVALID_THREADID);
+   vg_assert(VG_(threads)[tid].status != VgTs_Empty);
+   return VG_(threads)[tid].client_stack_szB;
 }
 
 //-------------------------------------------------------------
@@ -283,8 +334,8 @@ ULong VG_(machine_ppc64_has_VMX) = 0;
 
 #if defined(VGA_ppc32) || defined(VGA_ppc64)
 #include <setjmp.h> // For jmp_buf
-static jmp_buf env_sigill;
-static void handler_sigill ( Int x ) { __builtin_longjmp(env_sigill,1); }
+static jmp_buf env_unsup_insn;
+static void handler_unsup_insn ( Int x ) { __builtin_longjmp(env_unsup_insn,1); }
 #endif
 
 Bool VG_(machine_get_hwcaps)( void )
@@ -343,38 +394,55 @@ Bool VG_(machine_get_hwcaps)( void )
    return True;
 
 #elif defined(VGA_ppc32)
-   { /* ppc32 doesn't seem to have a sane way to find out what insn
-        sets the CPU supports.  So we have to arse around with
-        SIGILLs.  Yuck. */
+   {
+     /* Find out which subset of the ppc32 instruction set is supported by
+        verifying whether various ppc32 instructions generate a SIGILL
+        or a SIGFPE. An alternative approach is to check the AT_HWCAP and
+        AT_PLATFORM entries in the ELF auxiliary table -- see also
+        the_iifii.client_auxv in m_main.c.
+      */
      vki_sigset_t         saved_set, tmp_set;
-     struct vki_sigaction saved_act, tmp_act;
+     struct vki_sigaction saved_sigill_act, tmp_sigill_act;
+     struct vki_sigaction saved_sigfpe_act, tmp_sigfpe_act;
 
      volatile Bool have_F, have_V, have_FX, have_GX;
      Int r;
 
      VG_(sigemptyset)(&tmp_set);
      VG_(sigaddset)(&tmp_set, VKI_SIGILL);
+     VG_(sigaddset)(&tmp_set, VKI_SIGFPE);
 
      r = VG_(sigprocmask)(VKI_SIG_UNBLOCK, &tmp_set, &saved_set);
      vg_assert(r == 0);
 
-     r = VG_(sigaction)(VKI_SIGILL, NULL, &saved_act);
+     r = VG_(sigaction)(VKI_SIGILL, NULL, &saved_sigill_act);
      vg_assert(r == 0);
-     tmp_act = saved_act;
+     tmp_sigill_act = saved_sigill_act;
+
+     r = VG_(sigaction)(VKI_SIGFPE, NULL, &saved_sigfpe_act);
+     vg_assert(r == 0);
+     tmp_sigfpe_act = saved_sigfpe_act;
 
      /* NODEFER: signal handler does not return (from the kernel's point of
         view), hence if it is to successfully catch a signal more than once,
         we need the NODEFER flag. */
-     tmp_act.sa_flags &= ~VKI_SA_RESETHAND;
-     tmp_act.sa_flags &= ~VKI_SA_SIGINFO;
-     tmp_act.sa_flags |=  VKI_SA_NODEFER;
+     tmp_sigill_act.sa_flags &= ~VKI_SA_RESETHAND;
+     tmp_sigill_act.sa_flags &= ~VKI_SA_SIGINFO;
+     tmp_sigill_act.sa_flags |=  VKI_SA_NODEFER;
+     tmp_sigill_act.ksa_handler = handler_unsup_insn;
+     r = VG_(sigaction)(VKI_SIGILL, &tmp_sigill_act, NULL);
+     vg_assert(r == 0);
+
+     tmp_sigfpe_act.sa_flags &= ~VKI_SA_RESETHAND;
+     tmp_sigfpe_act.sa_flags &= ~VKI_SA_SIGINFO;
+     tmp_sigfpe_act.sa_flags |=  VKI_SA_NODEFER;
+     tmp_sigfpe_act.ksa_handler = handler_unsup_insn;
+     r = VG_(sigaction)(VKI_SIGFPE, &tmp_sigfpe_act, NULL);
+     vg_assert(r == 0);
 
      /* standard FP insns */
      have_F = True;
-     tmp_act.ksa_handler = handler_sigill;
-     r = VG_(sigaction)(VKI_SIGILL, &tmp_act, NULL);
-     vg_assert(r == 0);
-     if (__builtin_setjmp(env_sigill)) {
+     if (__builtin_setjmp(env_unsup_insn)) {
         have_F = False;
      } else {
         __asm__ __volatile__(".long 0xFC000090"); /*fmr 0,0 */
@@ -382,10 +450,7 @@ Bool VG_(machine_get_hwcaps)( void )
 
      /* Altivec insns */
      have_V = True;
-     tmp_act.ksa_handler = handler_sigill;
-     r = VG_(sigaction)(VKI_SIGILL, &tmp_act, NULL);
-     vg_assert(r == 0);
-     if (__builtin_setjmp(env_sigill)) {
+     if (__builtin_setjmp(env_unsup_insn)) {
         have_V = False;
      } else {
         /* Unfortunately some older assemblers don't speak Altivec (or
@@ -398,10 +463,7 @@ Bool VG_(machine_get_hwcaps)( void )
 
      /* General-Purpose optional (fsqrt, fsqrts) */
      have_FX = True;
-     tmp_act.ksa_handler = handler_sigill;
-     r = VG_(sigaction)(VKI_SIGILL, &tmp_act, NULL);
-     vg_assert(r == 0);
-     if (__builtin_setjmp(env_sigill)) {
+     if (__builtin_setjmp(env_unsup_insn)) {
         have_FX = False;
      } else {
         __asm__ __volatile__(".long 0xFC00002C"); /*fsqrt 0,0 */
@@ -409,23 +471,20 @@ Bool VG_(machine_get_hwcaps)( void )
 
      /* Graphics optional (stfiwx, fres, frsqrte, fsel) */
      have_GX = True;
-     tmp_act.ksa_handler = handler_sigill;
-     r = VG_(sigaction)(VKI_SIGILL, &tmp_act, NULL);
-     vg_assert(r == 0);
-     if (__builtin_setjmp(env_sigill)) {
+     if (__builtin_setjmp(env_unsup_insn)) {
         have_GX = False;
      } else {
         __asm__ __volatile__(".long 0xFC000034"); /* frsqrte 0,0 */
      }
 
-     r = VG_(sigaction)(VKI_SIGILL, &saved_act, NULL);
+     r = VG_(sigaction)(VKI_SIGILL, &saved_sigill_act, NULL);
+     vg_assert(r == 0);
+     r = VG_(sigaction)(VKI_SIGFPE, &saved_sigfpe_act, NULL);
      vg_assert(r == 0);
      r = VG_(sigprocmask)(VKI_SIG_SETMASK, &saved_set, NULL);
      vg_assert(r == 0);
-     /*
-        VG_(printf)("F %d V %d FX %d GX %d\n", 
+     VG_(debugLog)(1, "machine", "F %d V %d FX %d GX %d\n", 
                     (Int)have_F, (Int)have_V, (Int)have_FX, (Int)have_GX);
-     */
      /* Make FP a prerequisite for VMX (bogusly so), and for FX and GX. */
      if (have_V && !have_F)
         have_V = False;
@@ -451,32 +510,45 @@ Bool VG_(machine_get_hwcaps)( void )
    }
 
 #elif defined(VGA_ppc64)
-   { /* Same idiocy as for ppc32 - arse around with SIGILLs. */
+   {
+     /* Same instruction set detection algorithm as for ppc32. */
      vki_sigset_t         saved_set, tmp_set;
-     struct vki_sigaction saved_act, tmp_act;
+     struct vki_sigaction saved_sigill_act, tmp_sigill_act;
+     struct vki_sigaction saved_sigfpe_act, tmp_sigfpe_act;
 
      volatile Bool have_F, have_V, have_FX, have_GX;
 
      VG_(sigemptyset)(&tmp_set);
      VG_(sigaddset)(&tmp_set, VKI_SIGILL);
+     VG_(sigaddset)(&tmp_set, VKI_SIGFPE);
 
      VG_(sigprocmask)(VKI_SIG_UNBLOCK, &tmp_set, &saved_set);
 
-     VG_(sigaction)(VKI_SIGILL, NULL, &saved_act);
-     tmp_act = saved_act;
+     VG_(sigaction)(VKI_SIGILL, NULL, &saved_sigill_act);
+     tmp_sigill_act = saved_sigill_act;
+
+     VG_(sigaction)(VKI_SIGFPE, NULL, &saved_sigfpe_act);
+     tmp_sigfpe_act = saved_sigfpe_act;
+
 
      /* NODEFER: signal handler does not return (from the kernel's point of
         view), hence if it is to successfully catch a signal more than once,
         we need the NODEFER flag. */
-     tmp_act.sa_flags &= ~VKI_SA_RESETHAND;
-     tmp_act.sa_flags &= ~VKI_SA_SIGINFO;
-     tmp_act.sa_flags |=  VKI_SA_NODEFER;
+     tmp_sigill_act.sa_flags &= ~VKI_SA_RESETHAND;
+     tmp_sigill_act.sa_flags &= ~VKI_SA_SIGINFO;
+     tmp_sigill_act.sa_flags |=  VKI_SA_NODEFER;
+     tmp_sigill_act.ksa_handler = handler_unsup_insn;
+     VG_(sigaction)(VKI_SIGILL, &tmp_sigill_act, NULL);
+
+     tmp_sigfpe_act.sa_flags &= ~VKI_SA_RESETHAND;
+     tmp_sigfpe_act.sa_flags &= ~VKI_SA_SIGINFO;
+     tmp_sigfpe_act.sa_flags |=  VKI_SA_NODEFER;
+     tmp_sigfpe_act.ksa_handler = handler_unsup_insn;
+     VG_(sigaction)(VKI_SIGFPE, &tmp_sigfpe_act, NULL);
 
      /* standard FP insns */
      have_F = True;
-     tmp_act.ksa_handler = handler_sigill;
-     VG_(sigaction)(VKI_SIGILL, &tmp_act, NULL);
-     if (__builtin_setjmp(env_sigill)) {
+     if (__builtin_setjmp(env_unsup_insn)) {
         have_F = False;
      } else {
         __asm__ __volatile__("fmr 0,0");
@@ -484,9 +556,7 @@ Bool VG_(machine_get_hwcaps)( void )
 
      /* Altivec insns */
      have_V = True;
-     tmp_act.ksa_handler = handler_sigill;
-     VG_(sigaction)(VKI_SIGILL, &tmp_act, NULL);
-     if (__builtin_setjmp(env_sigill)) {
+     if (__builtin_setjmp(env_unsup_insn)) {
         have_V = False;
      } else {
         __asm__ __volatile__(".long 0x10000484"); /*vor 0,0,0*/
@@ -494,9 +564,7 @@ Bool VG_(machine_get_hwcaps)( void )
 
      /* General-Purpose optional (fsqrt, fsqrts) */
      have_FX = True;
-     tmp_act.ksa_handler = handler_sigill;
-     VG_(sigaction)(VKI_SIGILL, &tmp_act, NULL);
-     if (__builtin_setjmp(env_sigill)) {
+     if (__builtin_setjmp(env_unsup_insn)) {
         have_FX = False;
      } else {
         __asm__ __volatile__(".long 0xFC00002C"); /*fsqrt 0,0*/
@@ -504,21 +572,17 @@ Bool VG_(machine_get_hwcaps)( void )
 
      /* Graphics optional (stfiwx, fres, frsqrte, fsel) */
      have_GX = True;
-     tmp_act.ksa_handler = handler_sigill;
-     VG_(sigaction)(VKI_SIGILL, &tmp_act, NULL);
-     if (__builtin_setjmp(env_sigill)) {
+     if (__builtin_setjmp(env_unsup_insn)) {
         have_GX = False;
      } else {
         __asm__ __volatile__(".long 0xFC000034"); /*frsqrte 0,0*/
      }
 
-     VG_(sigaction)(VKI_SIGILL, &saved_act, NULL);
+     VG_(sigaction)(VKI_SIGILL, &saved_sigill_act, NULL);
+     VG_(sigaction)(VKI_SIGFPE, &saved_sigfpe_act, NULL);
      VG_(sigprocmask)(VKI_SIG_SETMASK, &saved_set, NULL);
-     /*
-     if (0)
-        VG_(printf)("F %d V %d FX %d GX %d\n", 
+     VG_(debugLog)(1, "machine", "F %d V %d FX %d GX %d\n", 
                     (Int)have_F, (Int)have_V, (Int)have_FX, (Int)have_GX);
-     */
      /* on ppc64, if we don't even have FP, just give up. */
      if (!have_F)
         return False;
@@ -554,7 +618,7 @@ void VG_(machine_ppc32_set_clszB)( Int szB )
    vg_assert(vai.ppc_cache_line_szB == 0
              || vai.ppc_cache_line_szB == szB);
 
-   vg_assert(szB == 32 || szB == 128);
+   vg_assert(szB == 32 || szB == 64 || szB == 128);
    vai.ppc_cache_line_szB = szB;
 }
 #endif
@@ -572,7 +636,7 @@ void VG_(machine_ppc64_set_clszB)( Int szB )
    vg_assert(vai.ppc_cache_line_szB == 0
              || vai.ppc_cache_line_szB == szB);
 
-   vg_assert(szB == 32 || szB == 128);
+   vg_assert(szB == 32 || szB == 64 || szB == 128);
    vai.ppc_cache_line_szB = szB;
 }
 #endif

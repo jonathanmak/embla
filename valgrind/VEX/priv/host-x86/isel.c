@@ -10,7 +10,7 @@
    This file is part of LibVEX, a library for dynamic binary
    instrumentation and translation.
 
-   Copyright (C) 2004-2007 OpenWorks LLP.  All rights reserved.
+   Copyright (C) 2004-2008 OpenWorks LLP.  All rights reserved.
 
    This library is made available under a dual licensing scheme.
 
@@ -926,6 +926,17 @@ static HReg iselIntExpr_R_wrk ( ISelEnv* env, IRExpr* e )
       }
 
       /* Handle misc other ops. */
+
+      if (e->Iex.Binop.op == Iop_Max32U) {
+         HReg src1 = iselIntExpr_R(env, e->Iex.Binop.arg1);
+         HReg dst  = newVRegI(env);
+         HReg src2 = iselIntExpr_R(env, e->Iex.Binop.arg2);
+         addInstr(env, mk_iMOVsd_RR(src1,dst));
+         addInstr(env, X86Instr_Alu32R(Xalu_CMP, X86RMI_Reg(src2), dst));
+         addInstr(env, X86Instr_CMov32(Xcc_B, X86RM_Reg(src2), dst));
+         return dst;
+      }
+
       if (e->Iex.Binop.op == Iop_8HLto16) {
          HReg hi8  = newVRegI(env);
          HReg lo8  = newVRegI(env);
@@ -1546,7 +1557,7 @@ static X86RI* iselIntExpr_RI ( ISelEnv* env, IRExpr* e )
    switch (ri->tag) {
       case Xri_Imm:
          return ri;
-      case Xrmi_Reg:
+      case Xri_Reg:
          vassert(hregClass(ri->Xri.Reg.reg) == HRcInt32);
          vassert(hregIsVirtual(ri->Xri.Reg.reg));
          return ri;
@@ -2324,6 +2335,12 @@ static void iselInt64Expr_wrk ( HReg* rHi, HReg* rLo, ISelEnv* env, IRExpr* e )
             fn = (HWord)h_generic_calc_InterleaveHI32x2; goto binnish;
          case Iop_InterleaveLO32x2:
             fn = (HWord)h_generic_calc_InterleaveLO32x2; goto binnish;
+         case Iop_CatOddLanes16x4:
+            fn = (HWord)h_generic_calc_CatOddLanes16x4; goto binnish;
+         case Iop_CatEvenLanes16x4:
+            fn = (HWord)h_generic_calc_CatEvenLanes16x4; goto binnish;
+         case Iop_Perm8x8:
+            fn = (HWord)h_generic_calc_Perm8x8; goto binnish;
 
          case Iop_Max8Ux8:
             fn = (HWord)h_generic_calc_Max8Ux8; goto binnish;
@@ -2336,6 +2353,8 @@ static void iselInt64Expr_wrk ( HReg* rHi, HReg* rLo, ISelEnv* env, IRExpr* e )
 
          case Iop_Mul16x4:
             fn = (HWord)h_generic_calc_Mul16x4; goto binnish;
+         case Iop_Mul32x2:
+            fn = (HWord)h_generic_calc_Mul32x2; goto binnish;
          case Iop_MulHi16Sx4:
             fn = (HWord)h_generic_calc_MulHi16Sx4; goto binnish;
          case Iop_MulHi16Ux4:
@@ -2401,6 +2420,8 @@ static void iselInt64Expr_wrk ( HReg* rHi, HReg* rLo, ISelEnv* env, IRExpr* e )
             fn = (HWord)h_generic_calc_ShlN32x2; goto shifty;
          case Iop_ShlN16x4:
             fn = (HWord)h_generic_calc_ShlN16x4; goto shifty;
+         case Iop_ShlN8x8:
+            fn = (HWord)h_generic_calc_ShlN8x8;  goto shifty;
          case Iop_ShrN32x2:
             fn = (HWord)h_generic_calc_ShrN32x2; goto shifty;
          case Iop_ShrN16x4:

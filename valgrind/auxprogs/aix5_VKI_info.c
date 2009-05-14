@@ -61,6 +61,7 @@ int main ( void )
    printf("#define VKI_S_IXGRP  0x%08x\n", S_IXGRP);
    printf("#define VKI_S_IXOTH  0x%08x\n", S_IXOTH);
    printf("#define VKI_S_IWUSR  0x%08x\n", S_IWUSR);
+   printf("#define VKI_S_IWOTH  0x%08x\n", S_IWOTH);
    printf("#define VKI_S_ISUID  0x%08x\n", S_ISUID);
    printf("#define VKI_S_ISGID  0x%08x\n", S_ISGID);
    printf("#define VKI_S_IFMT   0x%08x\n", S_IFMT);
@@ -268,6 +269,7 @@ int main ( void )
    printf("#define VKI_SEGV_MAPERR %d\n", SEGV_MAPERR);
    printf("\n");
    printf("#define VKI_TRAP_TRACE %d\n", TRAP_TRACE);
+   printf("#define VKI_TRAP_BRKPT %d\n", TRAP_BRKPT);
    printf("#define VKI_BUS_OBJERR %d\n", BUS_OBJERR);
    printf("#define VKI_BUS_ADRERR %d\n", BUS_ADRERR);
    printf("#define VKI_BUS_ADRALN %d\n", BUS_ADRALN);

@@ -8,7 +8,7 @@
    This file is part of Cachegrind, a Valgrind tool for cache
    profiling programs.
 
-   Copyright (C) 2002-2007 Nicholas Nethercote
+   Copyright (C) 2002-2008 Nicholas Nethercote
       njn@valgrind.org
 
    This program is free software; you can redistribute it and/or
@@ -112,7 +112,7 @@ typedef struct {
 } LineCC;
 
 // First compare file, then fn, then line.
-static Word cmp_CodeLoc_LineCC(void *vloc, void *vcc)
+static Word cmp_CodeLoc_LineCC(const void *vloc, const void *vcc)
 {
    Word res;
    CodeLoc* a = (CodeLoc*)vloc;
@@ -182,7 +182,7 @@ static Int  no_debugs           = 0;
 /*--- String table operations                              ---*/
 /*------------------------------------------------------------*/
 
-static Word stringCmp( void* key, void* elem )
+static Word stringCmp( const void* key, const void* elem )
 {
    return VG_(strcmp)(*(Char**)key, *(Char**)elem);
 }
@@ -196,7 +196,7 @@ static Char* get_perm_string(Char* s)
       return *s_ptr;
    } else {
       Char** s_node = VG_(OSetGen_AllocNode)(stringTable, sizeof(Char*));
-      *s_node = VG_(strdup)(s);
+      *s_node = VG_(strdup)("cg.main.gps.1", s);
       VG_(OSetGen_Insert)(stringTable, s_node);
       return *s_node;
    }
@@ -1158,18 +1158,12 @@ static cache_t clo_L2_cache = UNDEFINED_CACHE;
 static 
 void check_cache(cache_t* cache, Char *name)
 {
-   /* First check they're all powers of two */
-   if (-1 == VG_(log2)(cache->size)) {
+   /* Simulator requires line size and set count to be powers of two */
+   if (( cache->size % (cache->line_size * cache->assoc) != 0) ||
+       (-1 == VG_(log2)(cache->size/cache->line_size/cache->assoc))) {
       VG_(message)(Vg_UserMsg,
-         "error: %s size of %dB not a power of two; aborting.",
-         name, cache->size);
-      VG_(exit)(1);
-   }
-
-   if (-1 == VG_(log2)(cache->assoc)) {
-      VG_(message)(Vg_UserMsg,
-         "error: %s associativity of %d not a power of two; aborting.",
-         name, cache->assoc);
+         "error: %s set count not a power of two; aborting.",
+         name);
       VG_(exit)(1);
    }
 
@@ -1256,15 +1250,20 @@ static CacheCC  Dw_total;
 static BranchCC Bc_total;
 static BranchCC Bi_total;
 
-// The output file name.  Controlled by --cachegrind-out-file.
-static Char* cachegrind_out_file = NULL;
-
 static void fprint_CC_table_and_calc_totals(void)
 {
    Int     i, fd;
    SysRes  sres;
    Char    buf[512], *currFile = NULL, *currFn = NULL;
    LineCC* lineCC;
+
+   // Setup output filename.  Nb: it's important to do this now, ie. as late
+   // as possible.  If we do it at start-up and the program forks and the
+   // output file format string contains a %p (pid) specifier, both the
+   // parent and child will incorrectly write to the same file;  this
+   // happened in 3.3.0.
+   Char* cachegrind_out_file =
+      VG_(expand_file_name)("--cachegrind-out-file", clo_cachegrind_out_file);
 
    sres = VG_(open)(cachegrind_out_file, VKI_O_CREAT|VKI_O_TRUNC|VKI_O_WRONLY,
                                          VKI_S_IRUSR|VKI_S_IWUSR);
@@ -1276,9 +1275,11 @@ static void fprint_CC_table_and_calc_totals(void)
          cachegrind_out_file );
       VG_(message)(Vg_UserMsg,
          "       ... so simulation results will be missing.");
+      VG_(free)(cachegrind_out_file);
       return;
    } else {
       fd = sres.res;
+      VG_(free)(cachegrind_out_file);
    }
 
    // "desc:" lines (giving I1/D1/L2 cache configuration).  The spaces after
@@ -1602,11 +1603,11 @@ static void cg_fini(Int exitcode)
       VG_(message)(Vg_DebugMsg, "cachegrind: with zero      info:%s (%d)", 
                    buf4, no_debugs);
 
-      VG_(message)(Vg_DebugMsg, "cachegrind: string table size: %u",
+      VG_(message)(Vg_DebugMsg, "cachegrind: string table size: %lu",
                    VG_(OSetGen_Size)(stringTable));
-      VG_(message)(Vg_DebugMsg, "cachegrind: CC table size: %u",
+      VG_(message)(Vg_DebugMsg, "cachegrind: CC table size: %lu",
                    VG_(OSetGen_Size)(CC_table));
-      VG_(message)(Vg_DebugMsg, "cachegrind: InstrInfo table size: %u",
+      VG_(message)(Vg_DebugMsg, "cachegrind: InstrInfo table size: %lu",
                    VG_(OSetGen_Size)(instrInfoTable));
    }
 }
@@ -1725,7 +1726,7 @@ static void cg_pre_clo_init(void)
    VG_(details_version)         (NULL);
    VG_(details_description)     ("a cache and branch-prediction profiler");
    VG_(details_copyright_author)(
-      "Copyright (C) 2002-2007, and GNU GPL'd, by Nicholas Nethercote et al.");
+      "Copyright (C) 2002-2008, and GNU GPL'd, by Nicholas Nethercote et al.");
    VG_(details_bug_reports_to)  (VG_BUGS_TO);
    VG_(details_avg_translation_sizeB) ( 500 );
 
@@ -1752,22 +1753,21 @@ static void cg_post_clo_init(void)
       VG_(exit)(2);
    }
 
-   // Setup output filename.
-   cachegrind_out_file =
-      VG_(expand_file_name)("--cachegrind-out-file", clo_cachegrind_out_file);
-
    CC_table =
       VG_(OSetGen_Create)(offsetof(LineCC, loc),
                           cmp_CodeLoc_LineCC,
-                          VG_(malloc), VG_(free));
+                          VG_(malloc), "cg.main.cpci.1",
+                          VG_(free));
    instrInfoTable =
       VG_(OSetGen_Create)(/*keyOff*/0,
                           NULL,
-                          VG_(malloc), VG_(free));
+                          VG_(malloc), "cg.main.cpci.2",
+                          VG_(free));
    stringTable =
       VG_(OSetGen_Create)(/*keyOff*/0,
                           stringCmp,
-                          VG_(malloc), VG_(free));
+                          VG_(malloc), "cg.main.cpci.3",
+                          VG_(free));
 
    configure_caches(&I1c, &D1c, &L2c);
 

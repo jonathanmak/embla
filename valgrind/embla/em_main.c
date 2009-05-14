@@ -392,7 +392,7 @@ static StmInfo *mkStmInfoI( InstrInfo *i_info, Int base, Int nElems, Int bias,
 {
 
     if( stmInfoIndex >= STM_INFO_BLOCKSIZE ) {
-       stmInfoBlock = (StmInfo *) VG_(calloc)( STM_INFO_BLOCKSIZE, sizeof( StmInfo ) );
+       stmInfoBlock = (StmInfo *) VG_(calloc)( "", STM_INFO_BLOCKSIZE, sizeof( StmInfo ) );
        check( stmInfoBlock != NULL, "Out of memory!" );
        stmInfoIndex = 0;
     }
@@ -466,7 +466,7 @@ static FrameGraph *currFrame;
 static long long int totalCost;
 
 static INodeList *consINode(INodeList *tail, INode *head) {
-  INodeList *newList = VG_(malloc)(sizeof(INodeList));
+  INodeList *newList = VG_(malloc)("", sizeof(INodeList));
   if (newList == NULL) {
     VG_(tool_panic)( "Out of space for INodeLists." );
   }
@@ -476,13 +476,13 @@ static INodeList *consINode(INodeList *tail, INode *head) {
 }
 
 static INodeSet *newINodeSet(void) {
-  INodeSet *newSet = VG_(malloc)(sizeof(INodeSet));
+  INodeSet *newSet = VG_(malloc)("", sizeof(INodeSet));
   if (newSet == NULL) {
     VG_(tool_panic)( "Out of space for INodeSets." );
   }
   newSet->size=0;
   newSet->numBuckets=INODE_SET_INIT_SIZE;
-  newSet->buckets = (INodeList **) VG_(calloc)(INODE_SET_INIT_SIZE, sizeof(INodeList*));
+  newSet->buckets = (INodeList **) VG_(calloc)("", INODE_SET_INIT_SIZE, sizeof(INodeList*));
   if (newSet->buckets == NULL) {
     VG_(tool_panic)( "Out of space for INodeSet's buckets." );
   }
@@ -517,7 +517,7 @@ static void addDep(INode *fromNode, INode *toNode) {
     INodeList **oldBuckets = deps->buckets;
     int oldNumBuckets = deps->numBuckets;
     deps->numBuckets = oldNumBuckets * 2;
-    deps->buckets = (INodeList **) VG_(calloc)(deps->numBuckets, sizeof(INodeList*));
+    deps->buckets = (INodeList **) VG_(calloc)("", deps->numBuckets, sizeof(INodeList*));
     if (deps->buckets == NULL) {
       VG_(tool_panic)( "Out of space for reallocating INodeSet's buckets." );
     }
@@ -628,7 +628,7 @@ static void clearLatestNodeTbl( void )
 }
 
 static INode *new_INode(LineInfo *line) {
-   INode *inode = VG_(malloc)(sizeof (INode));
+   INode *inode = VG_(malloc)("", sizeof (INode));
    if(inode == NULL) {
      VG_(tool_panic)( "Out of space for INodes." );
    }
@@ -688,7 +688,7 @@ static long long int critPathNodes(void) {
   INodeList *nodeIter, *tail, *allNodes = NULL;
   int arrCap = 100, stackSize = 0;
   INode *currNode, *currDep;
-  INode **workStack = (INode **) VG_(malloc)(arrCap * sizeof(INode*));
+  INode **workStack = (INode **) VG_(malloc)("", arrCap * sizeof(INode*));
   long long int currCpLength = -999999;
   INode *currCp = NULL;
   int i;
@@ -703,7 +703,7 @@ static long long int critPathNodes(void) {
       currNode->cp = NULL;
       if (stackSize >= arrCap) {
         arrCap *= 2;
-        workStack = VG_(realloc)(workStack, arrCap * sizeof(INode*));
+        workStack = VG_(realloc)("", workStack, arrCap * sizeof(INode*));
         tl_assert(workStack);
       }
       workStack[stackSize] = currNode;
@@ -737,7 +737,7 @@ static long long int critPathNodes(void) {
         if (currDep->numParents == 0) {
           if (stackSize >= arrCap) {
             arrCap *= 2;
-            workStack = VG_(realloc)(workStack, arrCap * sizeof(INode*));
+            workStack = VG_(realloc)("", workStack, arrCap * sizeof(INode*));
             tl_assert(workStack);
           }
           workStack[stackSize] = currDep;
@@ -1019,7 +1019,7 @@ static EventList *consEvent(Event e, EventList *t)
    EventList *l;
 
    if( freeEvent==NULL ) {
-      freeEvent = (EventList *) VG_(calloc)( N, sizeof( EventList ) );
+      freeEvent = (EventList *) VG_(calloc)( "", N, sizeof( EventList ) );
       if( freeEvent == NULL ) {
          VG_(tool_panic)( "Out of memory for consEvent" );
       }
@@ -1145,7 +1145,7 @@ static void ensureRegisterMap( int size )
 
     if( registerMap == NULL ) {
         registerMapSize = size;
-        registerMap = (RegisterInfo *) VG_(calloc)( size, sizeof( RegisterInfo ) );
+        registerMap = (RegisterInfo *) VG_(calloc)( "", size, sizeof( RegisterInfo ) );
         check( registerMap != NULL, "Out of memory for register map!" );
         for( i=0; i<size; i+=8 ) {
             int j;
@@ -1191,9 +1191,9 @@ static char *intern_string( char *str )
       entry = entry->next;
    }
    if( entry==NULL ) {
-      entry = (StringEntry *) VG_(calloc)( 1, sizeof( StringEntry ) );
+      entry = (StringEntry *) VG_(calloc)( "", 1, sizeof( StringEntry ) );
       check( entry != NULL, "Out of memory" );
-      entry->str = (char *) VG_(calloc)( VG_(strlen)( str ) + 1, sizeof( char ) );
+      entry->str = (char *) VG_(calloc)( "", VG_(strlen)( str ) + 1, sizeof( char ) );
       check( entry->str != NULL, "Out of memory" );
       VG_(strcpy)( entry->str, str );
       entry->next = *entry_p;
@@ -1252,7 +1252,7 @@ static LineInfo *mk_line_info_l( char *file, unsigned line, char *func )
    }
    if( info == NULL ) {
       int i;
-      info = (LineInfo *) VG_(calloc)( 1, sizeof(LineInfo) );
+      info = (LineInfo *) VG_(calloc)( "", 1, sizeof(LineInfo) );
       check( info != NULL, "Out of memory for line info" );
 #if PRINT_RESULTS_TABLE
       for( i=0; i<RT_ENTRIES_PER_LINE; i++ ) {
@@ -1292,7 +1292,7 @@ static InstrInfo *mk_i_info(InstrInfo *curr, Addr32 i_addr, unsigned i_len)
    if( curr != NULL ) return curr;
 
    if( ii_idx == II_CHUNK_SIZE ) {
-      ii_chunk = (InstrInfo *) VG_(calloc)( II_CHUNK_SIZE, sizeof( InstrInfo ) );
+      ii_chunk = (InstrInfo *) VG_(calloc)( "", II_CHUNK_SIZE, sizeof( InstrInfo ) );
       check( ii_chunk != NULL, "Out of memory for ii_chunk" );
       ii_idx = 0;
    }
@@ -1721,7 +1721,7 @@ static OpenCalls *rebuildOpenCalls( OpenCalls *open_calls, StackFrame *top, Trac
    mid++; // should point at the first new stack frame
 
    while( mid <= top ) {
-      OpenCalls *c = (OpenCalls *) VG_(calloc)( 1, sizeof(OpenCalls) );
+      OpenCalls *c = (OpenCalls *) VG_(calloc)( "", 1, sizeof(OpenCalls) );
       check( c != NULL, "Out of memory for open calls" );
       c->call = mid->call_header;
       c->next = oc;
@@ -1759,7 +1759,7 @@ static AeonItem *mkAeonItem( InstrInfo *i_info, TraceRec *t_rec, AeonItem *next 
   AeonItem *tmp;
 
   if( freeAeonItem == NULL ) {
-    freeAeonItem = (AeonItem *) VG_(calloc)( N, sizeof( AeonItem ) );
+    freeAeonItem = (AeonItem *) VG_(calloc)( "", N, sizeof( AeonItem ) );
     check( freeAeonItem != NULL, "Out of memory for aeon list" );
     for( i = 1; i < N; i++ ) {
        freeAeonItem[i-1].next = freeAeonItem + i;
@@ -1788,7 +1788,7 @@ static AeonItem *lookupAI( InstrInfo *i_info )
   AeonItem *item;
   
   if( aeon_map == NULL ) {
-    aeon_map = (AeonItem **) VG_(calloc)( N_AE, sizeof( AeonItem * ) );
+    aeon_map = (AeonItem **) VG_(calloc)( "", N_AE, sizeof( AeonItem * ) );
     check( aeon_map != NULL, "Out of memory for aeon_map" );
     for( i = 0; i < N_AE; i++ ) {
       aeon_map[i] = NULL;
@@ -1838,7 +1838,7 @@ static TraceRec *forwardTR( TraceRec *ap, TraceRec *tp, TraceRec *ecae )
 {
    TraceRec *tmp = remapTR( tp->i_info, ecae, tp );
 
-   GCBONK( "+" );
+   // GCBONK( "+" );
    if( tmp == NULL ) {
       tp->link = mkTaggedPtr2( ap, TPT_REG_OR_CLOSED_LIVE );
       return ap-1;
@@ -1927,13 +1927,13 @@ static void compact(void)
    sp = current_stack_frame;
    mp = smarks+topMark;
    while( tp >= first_new_tr ) {
-      GCBONK( "." );
+      // GCBONK( "." );
       // Maybe start a new aeon
       if( mp->tr >= tp ) {
         ecae = tp+1;
-        GCBONK( "s" );
+        // GCBONK( "s" );
       }
-      GCBONK( "," );
+      // GCBONK( "," );
       if( tp->i_info != NULL ) {
         switch( TP_GET_FLAGS( tp->link ) ) {
           // Regular
@@ -1947,7 +1947,7 @@ static void compact(void)
             ap--;
             // Start new aeon
             ecae = tp;
-            GCBONK( "o" );
+            // GCBONK( "o" );
             break;
 
           // Closed header
@@ -2517,7 +2517,7 @@ static void XXupdResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
 
    if( entry == NULL ) {
        LineInfo *h_line_info = h_info->line;
-       entry = (RTEntry *) VG_(calloc)( 1, sizeof(RTEntry) );
+       entry = (RTEntry *) VG_(calloc)( "", 1, sizeof(RTEntry) );
        if( entry==NULL ) {
            VG_(tool_panic)( "Out of memory" );
        }
@@ -2622,7 +2622,7 @@ static SaveDesc* ensureSaveDesc( SaveDesc *sd )
       int i;
       // BONK( "Allocating dsfl block\n" );
       saveDescFreeList = (SaveDescFreeList *) 
-                             VG_(calloc)( N, sizeof( SaveDescFreeList ) );
+                             VG_(calloc)( "", N, sizeof( SaveDescFreeList ) );
       if( saveDescFreeList == NULL ) {
           VG_(tool_panic)( "Out of memory!" );
       }
@@ -2722,7 +2722,7 @@ static RefInfo* getRefInfo(Addr32 addr)
     // IFDID( BONK( "[" ); );
 
     if( frag==NULL ) {
-        frag = (MapFragment *) VG_(calloc)(1, sizeof(MapFragment));
+        frag = (MapFragment *) VG_(calloc)("", 1, sizeof(MapFragment));
         if( frag==NULL ) {
             VG_(tool_panic)("Out of memory!");
         }
@@ -2856,7 +2856,7 @@ void recordLoad(StmInfo *s_info, Addr32 addr )
     IFINS1( BONK( "Load\n" ) )
 
     if( addr == interesting_address ) {
-      DPRINT3( "Loaded at %s:&u by instruction %llu.\n", 
+      DPRINT3( "Loaded at %s:%u by instruction %llu.\n", 
                 i_info->line->file, i_info->line->line, instructions );
       interesting_address = 0;
     }
@@ -3364,7 +3364,7 @@ static LineList * consLL( LineInfo *line, LineList *next )
     LineList *ll;
 
     if( n_free_edges == 0 ) {
-        free_edge = (LineList *) VG_(calloc)( block_size, sizeof(LineList) );
+        free_edge = (LineList *) VG_(calloc)( "", block_size, sizeof(LineList) );
         check( free_edge != NULL, "Out of memory for CF edges!\n" );
         n_free_edges = block_size;
     }
@@ -3754,7 +3754,7 @@ static LineInfoTimes* newLineInfoTimes(void)
 
   if( LITfree == NULL ) {
      int i;
-     LITfree = (LineInfoTimes *) VG_(calloc)( LITblocksize, sizeof( LineInfoTimes ) );
+     LITfree = (LineInfoTimes *) VG_(calloc)( "", LITblocksize, sizeof( LineInfoTimes ) );
      check( LITfree != NULL, "Out of memory for LITblock" );
      for( i=0; i < LITblocksize-1; i++ ) {
         LITfree[i].next = LITfree + i + 1;
@@ -3809,7 +3809,7 @@ static void doubleLITtable( LITTable *lit )
 {
    int i, idx_bits = lit->idx_bits;
    LineInfoTimes **qable 
-              = (LineInfoTimes **) VG_(calloc)( 1 << (idx_bits+1), sizeof(LineInfoTimes *) );
+              = (LineInfoTimes **) VG_(calloc)( "", 1 << (idx_bits+1), sizeof(LineInfoTimes *) );
 
    check( qable != NULL, "Out of memory" );
 
@@ -3961,7 +3961,7 @@ static void addSeqParSpan( LineInfo *line, TimeStamp seq, TimeStamp par )
 
    if( ll == NULL ) {
      // First time this function
-     ll = (SPTEntry *) VG_(calloc)( 1, sizeof( SPTEntry ) );
+     ll = (SPTEntry *) VG_(calloc)( "", 1, sizeof( SPTEntry ) );
      check( ll != NULL, "Out of memory" );
      ll->seq = 0;
      ll->par = 0;
@@ -4346,7 +4346,7 @@ static ReadHandle* openRH( const Char* name )
    SysRes sr = VG_(open)( name, VKI_O_RDONLY, 0 );
    int    fd = sr.res;
 
-   ReadHandle *rh = (ReadHandle *) VG_(calloc)( 1, sizeof(ReadHandle) );
+   ReadHandle *rh = (ReadHandle *) VG_(calloc)( "", 1, sizeof(ReadHandle) );
 
    check( fd > 0, "Cannot open file" );
    check( rh != NULL, "Cannot allocate read handle" );
@@ -4514,11 +4514,11 @@ static void em_post_clo_init_deps(void)
 
    VG_(message)(Vg_UserMsg, "Initalising dependency profiling");
 
-   map = (MapFragment **) VG_(calloc)(FRAGS_IN_MAP, sizeof(MapFragment*));
-   dirty_map = (unsigned int *) VG_(calloc)( DIRTY_WORDS, sizeof( unsigned int ) );
-   trace_pile = (TraceRec *) VG_(calloc)( n_trace_recs, sizeof( TraceRec ) );
+   map = (MapFragment **) VG_(calloc)("", FRAGS_IN_MAP, sizeof(MapFragment*));
+   dirty_map = (unsigned int *) VG_(calloc)( "", DIRTY_WORDS, sizeof( unsigned int ) );
+   trace_pile = (TraceRec *) VG_(calloc)( "", n_trace_recs, sizeof( TraceRec ) );
 #if CRITPATH_ANALYSIS
-   firstFrame = (FrameGraph *) VG_(calloc)( N_FRAMES, sizeof( FrameGraph ) );
+   firstFrame = (FrameGraph *) VG_(calloc)( "", N_FRAMES, sizeof( FrameGraph ) );
 #endif
 
    if( map==NULL || trace_pile==NULL || dirty_map==NULL ) {
@@ -4615,7 +4615,7 @@ static void printResultTable(const Char * traceFileName)
   int      i,j;
    RTEntry *entry;
    SizeT results_buf_size = 100;
-   RTEntry * result_array = VG_(malloc)(sizeof(RTEntry) * results_buf_size);
+   RTEntry * result_array = VG_(malloc)("", sizeof(RTEntry) * results_buf_size);
    SizeT num_results = 0;
    int fd = -1;
    LineInfo *line_info;
@@ -4640,7 +4640,7 @@ static void printResultTable(const Char * traceFileName)
              if (num_results >= results_buf_size)
              {
                results_buf_size *= 2;
-               result_array = VG_(realloc)(result_array,
+               result_array = VG_(realloc)("", result_array,
                                            sizeof(RTEntry) * results_buf_size);
                tl_assert(result_array);
              }
@@ -4668,7 +4668,7 @@ static void printResultTable(const Char * traceFileName)
    }
    for (i = 0; i < num_results; ++i)
    {
-     VG_(sprintf)( buf, "%s %d %d %d %d %d\n", 
+     VG_(sprintf)( buf, "%s %d %d %d\n", // "%s %d %d %d %d %d\n", 
 		   makeTitle(& result_array[i]), result_array[i].n_raw,
 		   result_array[i].n_war, result_array[i].n_waw);//,
 //                   result_array[i].h_tr->i_info->i_addr, result_array[i].t_tr->i_info->i_addr );
@@ -4705,7 +4705,7 @@ static void printCFG(const Char * cfgFileName)
 {
    int      i,j;
    SizeT results_buf_size = 100;
-   CFEdge * result_array = (CFEdge *) VG_(malloc)(sizeof(CFEdge) * results_buf_size);
+   CFEdge * result_array = (CFEdge *) VG_(malloc)("", sizeof(CFEdge) * results_buf_size);
    SizeT num_results = 0;
    int fd = -1;
    LineInfo *line_info;
@@ -4728,7 +4728,7 @@ static void printCFG(const Char * cfgFileName)
              if (num_results >= results_buf_size)
              {
                results_buf_size *= 2;
-               result_array = (CFEdge *) VG_(realloc)(result_array,
+               result_array = (CFEdge *) VG_(realloc)("", result_array,
                                                       sizeof(CFEdge) * results_buf_size);
                tl_assert(result_array);
              }
@@ -4832,7 +4832,7 @@ static void em_fini_deps(Int exitcode)
                             max_read_list_elements,
                             max_read_list_elements*sizeof( EventList ) );
    VG_(message)(Vg_UserMsg, "Instructions:   %12llu", instructions);
-   VG_(message)(Vg_UserMsg, "# GC:   %lu", did_gc);
+   VG_(message)(Vg_UserMsg, "# GC:   %u", did_gc);
 
    VG_(message)(Vg_UserMsg, "inStack %llu %llu (%llu)", 
                             inStack_calls, inStack_iters, 
@@ -4843,7 +4843,7 @@ static void em_fini_deps(Int exitcode)
    VG_(message)(Vg_UserMsg, "compactReads %llu %llu (%llu)", 
                             compactReads_items, compactReads_iters, 
                             smdiv(10*compactReads_iters, compactReads_items));
-   VG_(message)(Vg_UserMsg, "allAndDirtyFrags %lu %lu (%lu)", 
+   VG_(message)(Vg_UserMsg, "allAndDirtyFrags %u %u (%u)", 
                             all_frags, dirty_frags, 
                             smdiv(10*dirty_frags, all_frags));
    VG_(message)(Vg_UserMsg, "updResultEntry %llu nca:%llu(%llu) entry:%llu(%llu)", 
