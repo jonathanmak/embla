@@ -1087,6 +1087,7 @@ typedef
      EventList *lastRead;
      Event      lastWrite;
      int        offsize;      // Positive => accesssUnit, negative => subordinate
+     int        mallocSize;   // For tracking dependencies
 #if TRACE_REG_DEPS
      SaveDesc  *saveDesc;
 #endif
@@ -2731,6 +2732,7 @@ static RefInfo* getRefInfo(Addr32 addr)
         for(i=0; i<REFS_PER_FRAG; i++) {
             frag->refs[i].lastWrite = mkTaggedPtr2( trace_pile+1, 0 ); // was TPT_REG
             frag->refs[i].lastRead = NULL;
+            frag->refs[i].mallocSize = 0;
             if( i%init_size == 0 ) {
                frag->refs[i].offsize = init_size;
             } else {
@@ -2769,7 +2771,7 @@ void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target)
 }
 
 static VG_REGPARM(3)
-void recordRet(Addr32 sp, InstrInfo *i_info, Addr32 target) 
+void recordRet(void *guest_state, Addr32 sp, InstrInfo *i_info, Addr32 target) 
 {
 }
 
@@ -3235,6 +3237,89 @@ void recordGetI(StmInfo *s_info, Int ix)
 
 #endif
 
+static unsigned int malloc_request_size = 0;
+static Char *malloc_fn = NULL;
+static Addr32 addr_arg = NULL;
+
+static void clearMap(Addr32 ptr, int size) {
+    RefInfo     *refp; 
+    EventList   *ev_list, *ev_next;
+    int         l_addr = ptr, l_size = size, iters = 0;
+
+    do {
+
+        int num_bytes, i;
+        iters++;
+
+        refp = getRefInfo( l_addr );
+
+        if( refp->offsize == l_size ) {
+            // This part of the access is perfect
+            num_bytes = l_size;
+        } else {
+            // This part of the access was smaller or larger or unaligned
+            // num_bytes will be l_size unless access is unaligned
+
+            num_bytes = maybeSplitBlock( refp, l_addr, l_size );
+        }
+
+        for( i = 0; i < num_bytes; i += refp[i].offsize ) {
+
+            // If the access unit in the memory table is smaller than the access size,
+            // since both access and acess unit are aligned the pieces in the 
+            // access unit perfectly fill the access, hence need not be split
+
+            // delete the read list
+            for( ev_list = refp[i].lastRead; ev_list != NULL; ev_list = ev_next ) {
+                ev_next = ev_list->next;
+                deleteEvent( ev_list );
+            }
+            refp[i].lastRead  = NULL;
+            refp[i].lastWrite = mkTaggedPtr2( trace_pile+1, 0 );
+            refp[i].mallocSize = 0;
+        }
+        // merge
+        for( i=refp->offsize; i<num_bytes; i++ ) {
+            refp[i].offsize = -i;
+        }
+        refp->offsize = num_bytes;
+        l_size -= num_bytes;
+        l_addr += num_bytes;
+
+    } while( l_size > 0 );
+
+
+    gc( );
+
+
+}
+
+static void checkIfMallocCall(Addr32 target, Addr32 sp)
+{
+  Char fn[FN_LEN];
+  int *ptr = (int *)sp;
+
+  if (VG_(get_fnname)(target, fn, FN_LEN)) {
+    if (!VG_(strcmp)("malloc", fn)) {
+      malloc_request_size = *(ptr+1);
+      malloc_fn = "malloc";
+    } else if (!VG_(strcmp)("memalign", fn)) {
+      malloc_request_size = *(ptr+2);
+      malloc_fn = "memalign";
+    } else if (!VG_(strcmp)("calloc", fn)) {
+      malloc_request_size = *(ptr+1) * *(ptr+2);
+      malloc_fn = "calloc";
+    } else if (!VG_(strcmp)("realloc", fn)) {
+      malloc_request_size = *(ptr+2);
+      addr_arg = (Addr32) *(ptr+1);
+      malloc_fn = "realloc";
+    } else if (!VG_(strcmp)("free", fn)) {
+      addr_arg = *(ptr+1);
+      malloc_fn = "free";
+    }
+  }
+}
+
 static VG_REGPARM(3)
 void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target) 
 {
@@ -3270,11 +3355,70 @@ void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target)
 #if CRITPATH_ANALYSIS
     newNodeFrame(newTR->inode);
 #endif
+
+    checkIfMallocCall(target, sp);
+
     gc( );
 
 }
 
-static TraceRec *pop_stack_frame(InstrInfo *i_info)
+static void checkIfMallocRet(Addr32 addr, Addr32 target, void *guest_state)
+{
+  Char fn[FN_LEN];
+  Char targetfn[FN_LEN];
+  Addr32 *ptr = (Addr32*) guest_state;
+  RefInfo *refp;
+
+  if (malloc_fn != NULL &&
+      VG_(get_fnname)(addr, fn, FN_LEN) &&
+      VG_(get_fnname)(target, targetfn, FN_LEN)) {
+    if (!VG_(strcmp)(malloc_fn, fn) &&
+        VG_(strcmp)(malloc_fn, targetfn)) {
+      if (!VG_(strcmp)("malloc", fn) ||
+          !VG_(strcmp)("calloc", fn) ||
+          !VG_(strcmp)("memalign", fn)) {
+        Addr32 retValue = ptr[OFFSET_x86_EAX];
+        refp = getRefInfo(retValue);
+        refp->mallocSize = malloc_request_size;
+      } else if (!VG_(strcmp)("realloc", fn)) {
+        Addr32 retValue = ptr[OFFSET_x86_EAX];
+        refp = getRefInfo(addr_arg);
+        tl_assert(refp->mallocSize > 0); // Realloc must only accept a previously malloc'ed pointer
+        if (retValue == addr_arg) {
+          // No copying
+          int delta = malloc_request_size - refp->mallocSize;
+          refp->mallocSize = malloc_request_size;
+          if (delta < 0) {
+            // Shrinking memory (i.e. free)
+            Addr32 freedRegion = addr_arg + malloc_request_size;       
+            clearMap(freedRegion, -delta);
+          } else {
+            // Growing memory (i.e. malloc)
+            // Nothing more needs to be done
+          }
+        } else {
+          // Copying (i.e. free old region, malloc new region)
+          int size;
+          size = refp->mallocSize;
+          tl_assert(size>0); // Can only free somthing if the pointer was previously returned by malloc or friends
+          clearMap(addr_arg, size);
+
+          refp  = getRefInfo( retValue );
+          refp->mallocSize = malloc_request_size;
+        }
+      } else if (!VG_(strcmp)("free", fn)) {
+        int size;
+        refp = getRefInfo( addr_arg );
+        size = refp->mallocSize;
+        tl_assert(size>0); // Can only free somthing if the pointer was previously returned by malloc or friends
+        clearMap(addr_arg, size);
+      }
+      malloc_fn = NULL;
+    }
+  }
+}
+
+static TraceRec *pop_stack_frame(InstrInfo *i_info, Addr32 target, void *guest_state)
 {
    // Change call header to point to parent call header rather than stack
    // thus making it a closed call header
@@ -3295,13 +3439,15 @@ static TraceRec *pop_stack_frame(InstrInfo *i_info)
       current_stack_frame--;
 
       // return trace record insterion goes here
+
+      checkIfMallocRet(i_info->i_addr, target, guest_state );
       return ret_tr;
    }
    return NULL;
 }
 
 static VG_REGPARM(3)
-void recordRet(Addr32 sp, InstrInfo *i_info, Addr32 target) 
+void recordRet(void *guest_state, Addr32 sp, InstrInfo *i_info, Addr32 target) 
 {
    TraceRec *tr = NULL;
     // BONK( "Ret\n" );
@@ -3318,7 +3464,7 @@ void recordRet(Addr32 sp, InstrInfo *i_info, Addr32 target)
 
    while( current_stack_frame-1 >= stack_base && current_stack_frame[-1].sp + 4 < sp ) {
      // we need to unwind the stack
-     tr = pop_stack_frame( i_info );
+     tr = pop_stack_frame( i_info , target , guest_state );
    }
    // we have found the right stack frame
 
@@ -3332,7 +3478,7 @@ void recordRet(Addr32 sp, InstrInfo *i_info, Addr32 target)
        
      }
      // we will not need this retrun address any more
-     tr = pop_stack_frame( i_info );
+     tr = pop_stack_frame( i_info, target , guest_state );
    }
 
    if( current_stack_frame < stack_base ) {
@@ -3573,7 +3719,13 @@ static void instrumentExit(IRSB *bbOut, IRJumpKind jk, InstrInfo *i_info, IRExpr
              void  *haddr = &recordCall;
              IRExpr *exp_sp = emitIRAssign( bbOut, IRExpr_Get(OFFSET_x86_ESP, Ity_I32) );
              IRExpr *exp_tgt = emitIRAssign( bbOut, tgt );
-             emitDC_3( bbOut, hname, haddr, exp_sp, const32( (UInt) i_info ), exp_tgt );
+//             emitDC_3( bbOut, hname, haddr, exp_sp, const32( (UInt) i_info ), exp_tgt );
+             IRExpr **args = mkIRExprVec_3( exp_sp, const32( (UInt) i_info ), exp_tgt );
+             IRDirty *dy = unsafeIRDirty_0_N( 3, hname, haddr, args );
+             dy->mFx = Ifx_Read;
+             dy->mAddr = emitIRAssign( bbOut, IRExpr_Binop(Iop_Add32, exp_sp, IRExpr_Const(IRConst_U32(4))));
+             dy->mSize = 2*sizeof(UInt);
+             addStmtToIRSB( bbOut, IRStmt_Dirty(dy) );
           }
           break;
 
@@ -3592,6 +3744,12 @@ static void instrumentExit(IRSB *bbOut, IRJumpKind jk, InstrInfo *i_info, IRExpr
              if( tgt==NULL ) {
                 VG_(tool_panic)("Ret not at end of BB!");
              }
+
+             dy->needsBBP = True;
+             dy->nFxState = 1;
+             dy->fxState[0].fx = Ifx_Read;
+             dy->fxState[0].offset = OFFSET_x86_EAX;
+             dy->fxState[0].size = sizeof(void *);
 
              addStmtToIRSB( bbOut, IRStmt_WrTmp( tmp_sp, exp_get_sp ) );
              addStmtToIRSB( bbOut, IRStmt_WrTmp( tmp_pc, tgt ) );
