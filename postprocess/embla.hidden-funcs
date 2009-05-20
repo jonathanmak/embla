@@ -1,0 +1,6 @@
+malloc
+calloc
+realloc
+memalign
+free
+rand
