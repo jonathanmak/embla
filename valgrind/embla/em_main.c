@@ -2361,12 +2361,12 @@ static const Char * makeTitle(const RTEntry * e)
 {
   static Char result[BUF_SIZE];
 #if FULL_CONTOURS
-   VG_(sprintf)( result, "%s %s %s %d%s(%s) %d%s(%s)", 
+   VG_(sprintf)( result, "%s\t%s\t%s\t%d%s(%s)\t%d%s(%s)", 
 		 h_file, h_fn, d_inf, h_line, h_inf, h_cont, t_line, t_inf,
 		 t_cont );
 #else						
    tl_assert(e);
-   VG_(sprintf)( result, "%s %s %c %d%c %d%c", 
+   VG_(sprintf)( result, "%s\t%s\t%c\t%d%c\t%d%c", 
 		 e->h_file, e->h_fn, e->d_inf, e->h_line, e->h_inf, e->t_line,
 		 e->t_inf );
 #endif
@@ -2816,6 +2816,9 @@ static int maybeSplitBlock( RefInfo *refp, Addr32 addr, int size )
             // we need to split
             RefInfo *block = refp->offsize > 0 ? refp : refp + refp->offsize;
             splitAccessUnit( block, size );
+        } else if (refp->offsize > 0 && refp->offsize < size ) {
+            // Block size is smaller than size requested
+            return refp->offsize;
         }
         return size;
 
@@ -4537,7 +4540,11 @@ static Char getcRH( ReadHandle *rh )
    if( eofRH( rh ) ) return 0;
    return *( (rh->read_ptr)++ );
 }
-   
+  
+// Same as isspace, except that ' ' is excluded
+static Bool isSpecialSpace(Char c) {
+  return c != ' ' && VG_(isspace)(c);
+}
 
 // A word ends on a space or on the end of input. 
 // The return value signifies length of word read with 0 indicating eof.
@@ -4550,7 +4557,7 @@ static Int readWord( ReadHandle* rh, Char *o_buf, Int len )
    Bool e;
    Int  n = len;
 
-   while( !( e = eofRH( rh ) ) && VG_(isspace)( c = getcRH( rh ) ) ) ;
+   while( !( e = eofRH( rh ) ) && isSpecialSpace( c = getcRH( rh ) ) ) ;
 
    if( !e ) {
       do {
@@ -4558,7 +4565,7 @@ static Int readWord( ReadHandle* rh, Char *o_buf, Int len )
          len--;
          if( eofRH( rh ) ) break;
          c = getcRH( rh );
-      } while( ! VG_(isspace)( c ) && len > 1 );
+      } while( ! isSpecialSpace( c ) && len > 1 );
    }
    *o_buf = 0;
    return n-len;
@@ -4839,7 +4846,7 @@ static void printResultTable(const Char * traceFileName)
    }
    for (i = 0; i < num_results; ++i)
    {
-     VG_(sprintf)( buf, "%s %d %d %d\n", // "%s %d %d %d %d %d\n", 
+     VG_(sprintf)( buf, "%s\t%d\t%d\t%d\n", // "%s %d %d %d %d %d\n", 
 		   makeTitle(& result_array[i]), result_array[i].n_raw,
 		   result_array[i].n_war, result_array[i].n_waw);//,
 //                   result_array[i].h_tr->i_info->i_addr, result_array[i].t_tr->i_info->i_addr );
@@ -4929,7 +4936,7 @@ static void printCFG(const Char * cfgFileName)
    for (i = 0; i < num_results; ++i)
    {
      CFEdge *e = result_array + i;
-     VG_(sprintf)( buf, "%s %s %d %d\n", e->from->file, e->from->func, e->from->line, e->to->line );
+     VG_(sprintf)( buf, "%s\t%s\t%d\t%d\n", e->from->file, e->from->func, e->from->line, e->to->line );
      if( fd != -1 )
        VG_(write)( fd, buf, VG_(strlen)( buf ) );
      else

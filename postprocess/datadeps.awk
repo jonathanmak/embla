@@ -1,4 +1,5 @@
 BEGIN {
+ FS = "\t"
  FLAG_RAW      =  "T"
  FLAG_WAR      =  "A"
  FLAG_WAW      =  "O"
@@ -14,5 +15,5 @@ BEGIN {
   if ($8) depType = depType FLAG_WAW;
   if ($4 ~ /h/ && $5 ~ /h/) depType = depType FLAG_HIDDEN;
   if ($3 == "s") depType = depType FLAG_STACK;
-  printf "%s %s %s %u %u\n", $1, $2, depType, $4 + 0, $5 + 0
+  printf "%s\t%s\t%s\t%u\t%u\n", $1, $2, depType, $4 + 0, $5 + 0
 }
