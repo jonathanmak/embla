@@ -128,21 +128,23 @@ END {
       }
     }
 
-    printf "\n";
+    # printf "\n";
 
-    # Printing the dominator relation
-    for( j=1; j<=lmax; j++ ) {
-      if( j in seen ) {
-        printf "%4d:", j;
-        for( k=1; k<=lmax; k++ ) {
-          if( k in seen ) {
-            if( dom[j,k] == 1 ) {
-              printf " %d", k;
+    # Not printing the dominator relation
+    if( 0 ) {
+      for( j=1; j<=lmax; j++ ) {
+        if( j in seen ) {
+          printf "%4d:", j;
+          for( k=1; k<=lmax; k++ ) {
+            if( k in seen ) {
+              if( dom[j,k] == 1 ) {
+                printf " %d", k;
+              }
             }
           }
+          printf "\n";
         }
-        printf "\n";
       }
     }
-    }
+  }
 }
