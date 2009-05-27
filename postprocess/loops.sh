@@ -19,6 +19,7 @@ for sfile in `awk '{print $1}' $cfgfile | sort -u`; do
      | cat > $cfgfile.TEMP 
      cat $cfgfile.TEMP \
      | awk -f $bindir/dominance.awk -v cda=0 \
+     | sort -n \
      | $bindir/loops $cfgfile.TEMP \
      | awk -v fil=$sfile -v fn=$sfname '{print fil " " fn " " $0}' \
      | cat 
