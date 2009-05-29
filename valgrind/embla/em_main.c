@@ -4022,9 +4022,10 @@ static void setTimeStamp( LITTable *lit, LineInfo *line, TimeStamp time )
      p->line = line;
      table[ idx ] = p;
      lit->n_items++;
+     p->time = time;
+  } else if (time > p->time) {
+     p->time = time;
   }
-
-  p->time = time;
 }
 
 static VG_REGPARM(2)
