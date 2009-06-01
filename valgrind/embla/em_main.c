@@ -970,7 +970,6 @@ typedef
      EventList *lastRead;
      Event      lastWrite;
      int        offsize;      // Positive => accesssUnit, negative => subordinate
-     int        mallocSize;   // For tracking dependencies
 #if TRACE_REG_DEPS
      SaveDesc  *saveDesc;
 #endif
@@ -987,6 +986,118 @@ typedef
    MapFragment;
 
 static MapFragment **map;
+
+typedef
+   struct _MallocSizeList {
+     Addr32 ptr;
+     int mallocSize;
+     struct _MallocSizeList *next;
+   }
+   MallocSizeList;
+
+typedef
+   struct {
+     MallocSizeList **table;
+     int idx_bits;
+     int n_items;
+   }
+   MallocSizeTbl;
+
+static MallocSizeList *empty_MallocSizeList = NULL;
+static MallocSizeTbl mallocSizes = { &empty_MallocSizeList, 0, 0 };
+
+// Hash function - this one removes all trailing 0's and the 1 before it, and
+// then takes the least significant bits as key
+#define MALLOC_SIZE_IDX(ptr) ((((ptr) / ((ptr) & (-(ptr)))) >> 1) & ((1 << (mallocSizes.idx_bits))-1))
+
+static void doubleMallocSizeTbl( void )
+{
+   int i, idx_bits = mallocSizes.idx_bits;
+   MallocSizeList **newTbl = (MallocSizeList **) VG_(calloc)( "", 1 << (idx_bits+1), sizeof(MallocSizeList *) );
+
+   check( newTbl != NULL, "Out of memory" );
+
+   mallocSizes.idx_bits++;
+
+   for( i=0; i < (1 << (idx_bits+1)); i++ ) {
+      newTbl[i] = NULL;
+   }
+
+   for( i=0; i < (1 << idx_bits); i++ ) {
+      MallocSizeList *q = mallocSizes.table[i], *next;
+      while( q != NULL ) {
+         int n_idx = MALLOC_SIZE_IDX(q->ptr);
+         next = q->next;
+         q->next = newTbl[ n_idx ];
+         newTbl[ n_idx ] = q;
+         q = next;
+      }
+   }
+   if( mallocSizes.table != &empty_MallocSizeList ) VG_(free)( mallocSizes.table );
+   mallocSizes.table = newTbl;
+}
+
+static void setMallocSize( Addr32 ptr, int mallocSize)
+{
+  int idx_bits = mallocSizes.idx_bits;
+  int idx = MALLOC_SIZE_IDX(ptr);
+  MallocSizeList **table = mallocSizes.table;
+  MallocSizeList *p = table[ idx ];
+
+  while( p != NULL && p->ptr != ptr ) {
+     p = p->next;
+  }
+
+  if( p == NULL ) {
+     if( mallocSizes.n_items + 2 > ( 1 << mallocSizes.idx_bits ) ) {
+       doubleMallocSizeTbl( );
+       table = mallocSizes.table;
+       idx_bits = mallocSizes.idx_bits;
+       idx = MALLOC_SIZE_IDX(ptr);
+     }
+
+     p = (MallocSizeList *) VG_(malloc)("", sizeof(MallocSizeList));
+     p->ptr = ptr;
+     p->mallocSize = mallocSize;
+     p->next = table[idx];
+     table[idx] = p;
+     mallocSizes.n_items++;
+  } else {
+     p->mallocSize = mallocSize;
+  }
+}
+
+static int getMallocSize( Addr32 ptr )
+{
+  int idx = MALLOC_SIZE_IDX(ptr);
+  MallocSizeList *p = mallocSizes.table[ idx ];
+
+  while( p != NULL && p->ptr != ptr ) {
+     p = p->next;
+  }
+
+  if (p != NULL) {
+    return p->mallocSize;
+  } else {
+    return 0;
+  }
+}
+
+static void clearMallocSize( Addr32 ptr )
+{
+  int idx = MALLOC_SIZE_IDX(ptr);
+  MallocSizeList *p = mallocSizes.table[ idx ];
+
+  while( p != NULL && p->ptr != ptr ) {
+     p = p->next;
+  }
+
+  if (p != NULL) {
+    p->mallocSize = 0 ;
+  } else {
+    VG_(tool_panic)("Pointer not recognised.");
+  }
+}
 
 #if TRACE_REG_DEPS
 typedef
@@ -2615,7 +2726,6 @@ static RefInfo* getRefInfo(Addr32 addr)
         for(i=0; i<REFS_PER_FRAG; i++) {
             frag->refs[i].lastWrite = mkTaggedPtr2( trace_pile+1, 0 ); // was TPT_REG
             frag->refs[i].lastRead = NULL;
-            frag->refs[i].mallocSize = 0;
             if( i%init_size == 0 ) {
                frag->refs[i].offsize = init_size;
             } else {
@@ -3132,6 +3242,8 @@ static void clearMap(Addr32 ptr, int size) {
     EventList   *ev_list, *ev_next;
     int         l_addr = ptr, l_size = size, iters = 0;
 
+    clearMallocSize(ptr);
+
     do {
 
         int num_bytes, i;
@@ -3162,7 +3274,6 @@ static void clearMap(Addr32 ptr, int size) {
             }
             refp[i].lastRead  = NULL;
             refp[i].lastWrite = mkTaggedPtr2( trace_pile+1, 0 );
-            refp[i].mallocSize = 0;
         }
         // merge
         for( i=refp->offsize; i<num_bytes; i++ ) {
@@ -3253,7 +3364,6 @@ static void checkIfMallocRet(Addr32 addr, Addr32 target, void *guest_state)
   Char fn[FN_LEN];
   Char targetfn[FN_LEN];
   Addr32 *ptr = (Addr32*) guest_state;
-  RefInfo *refp;
 
   if (malloc_fn != NULL &&
       VG_(get_fnname)(addr, fn, FN_LEN) &&
@@ -3264,16 +3374,15 @@ static void checkIfMallocRet(Addr32 addr, Addr32 target, void *guest_state)
           !VG_(strcmp)("calloc", fn) ||
           !VG_(strcmp)("memalign", fn)) {
         Addr32 retValue = ptr[OFFSET_x86_EAX];
-        refp = getRefInfo(retValue);
-        refp->mallocSize = malloc_request_size;
+        setMallocSize( retValue, malloc_request_size );
       } else if (!VG_(strcmp)("realloc", fn)) {
         Addr32 retValue = ptr[OFFSET_x86_EAX];
-        refp = getRefInfo(addr_arg);
-        tl_assert(refp->mallocSize > 0); // Realloc must only accept a previously malloc'ed pointer
+        int mallocSize = getMallocSize(addr_arg);
+        tl_assert(mallocSize > 0); // Realloc must only accept a previously malloc'ed pointer
         if (retValue == addr_arg) {
           // No copying
-          int delta = malloc_request_size - refp->mallocSize;
-          refp->mallocSize = malloc_request_size;
+          int delta = malloc_request_size - mallocSize;
+          setMallocSize(addr_arg, malloc_request_size);
           if (delta < 0) {
             // Shrinking memory (i.e. free)
             Addr32 freedRegion = addr_arg + malloc_request_size;       
@@ -3284,18 +3393,12 @@ static void checkIfMallocRet(Addr32 addr, Addr32 target, void *guest_state)
           }
         } else {
           // Copying (i.e. free old region, malloc new region)
-          int size;
-          size = refp->mallocSize;
-          tl_assert(size>0); // Can only free somthing if the pointer was previously returned by malloc or friends
-          clearMap(addr_arg, size);
+          clearMap(addr_arg, mallocSize);
 
-          refp  = getRefInfo( retValue );
-          refp->mallocSize = malloc_request_size;
+          setMallocSize(retValue, malloc_request_size);
         }
       } else if (!VG_(strcmp)("free", fn)) {
-        int size;
-        refp = getRefInfo( addr_arg );
-        size = refp->mallocSize;
+        int size = getMallocSize(addr_arg);
         tl_assert(size>0); // Can only free somthing if the pointer was previously returned by malloc or friends
         clearMap(addr_arg, size);
       }
