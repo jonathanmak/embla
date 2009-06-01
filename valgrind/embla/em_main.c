@@ -423,24 +423,14 @@ typedef struct _INode {
   LineInfo *line;
   Bool callNode;
   long long int cost;
-  struct _INodeSet *deps;
-  long long int cpLength;
+  long long int cpLength; // Excludes its own cost before node finalisation, includes its own cost after
   struct _INode *cp;
-  int numParents; // For Critical Path Analysis only
 } INode;
 
 typedef struct _INodeList {
   INode *node;
   struct _INodeList *next;
 } INodeList;
-
-// HashSet
-#define INODE_SET_INIT_SIZE 2
-typedef struct _INodeSet {
-  int size;
-  int numBuckets; // Must be power of 2
-  INodeList **buckets;
-} INodeSet;
 
 typedef struct {
   INodeList     **table;
@@ -453,11 +443,13 @@ static INodeList *empty_latest_node_list = NULL;
 static LatestNodeTable initial_LatestNodeTable = { &empty_latest_node_list, 0, 0 };
 
 typedef struct _FrameGraph {
-  INodeList *roots;
+  INodeList *allNodes;
   INode *currNode;
   INode *lastNonCallNode;
   INode *lastBranchNode; // for adding dynamic control dependencies
   INode *callerNode;
+  long long int cpLength;
+  INode *cp;
   LatestNodeTable latestNodesTbl;
 } FrameGraph;
 
@@ -475,62 +467,14 @@ static INodeList *consINode(INodeList *tail, INode *head) {
   return newList;
 }
 
-static INodeSet *newINodeSet(void) {
-  INodeSet *newSet = VG_(malloc)("", sizeof(INodeSet));
-  if (newSet == NULL) {
-    VG_(tool_panic)( "Out of space for INodeSets." );
-  }
-  newSet->size=0;
-  newSet->numBuckets=INODE_SET_INIT_SIZE;
-  newSet->buckets = (INodeList **) VG_(calloc)("", INODE_SET_INIT_SIZE, sizeof(INodeList*));
-  if (newSet->buckets == NULL) {
-    VG_(tool_panic)( "Out of space for INodeSet's buckets." );
-  }
-  return newSet;
-}
-
 static void addDep(INode *fromNode, INode *toNode) {
-  INodeSet *deps = fromNode->deps;
-  INodeList *iter, *last;
-  int index, i;
-
   if (fromNode == toNode) {
     return;
   }
 
-  index = ((int) toNode >> 2) & (deps->numBuckets-1);
-  for (iter = deps->buckets[index]; iter != NULL ; iter = iter->next) {
-    if (iter->node == toNode) {
-      return;
-    }
-    last = iter;
-  }
-
-  // Node doesn't already exist - add it
-  deps->size++;
-  deps->buckets[index] = consINode(deps->buckets[index], toNode);
-  toNode->numParents++;
-  
-  // Check if we need to expand hashtable
-
-  if (deps->numBuckets < ((deps->size * 5) / 4)) {
-    INodeList **oldBuckets = deps->buckets;
-    int oldNumBuckets = deps->numBuckets;
-    deps->numBuckets = oldNumBuckets * 2;
-    deps->buckets = (INodeList **) VG_(calloc)("", deps->numBuckets, sizeof(INodeList*));
-    if (deps->buckets == NULL) {
-      VG_(tool_panic)( "Out of space for reallocating INodeSet's buckets." );
-    }
-    for (i=0; i<oldNumBuckets; i++) {
-      for (iter = oldBuckets[i]; iter != NULL; iter = last) {
-        INode *node = iter->node;
-        index = ((int) node >> 2) & (deps->numBuckets-1);
-        deps->buckets[index] = consINode(deps->buckets[index], node);
-        last = iter->next;
-        VG_(free)(iter);
-      }
-    }
-     VG_(free)(oldBuckets);
+  if (toNode->cp == NULL || fromNode->cpLength > toNode->cpLength) {
+    toNode->cp = fromNode;
+    toNode->cpLength = fromNode->cpLength;
   }
 }
 
@@ -606,7 +550,8 @@ static void updateLatestNodeTbl(INode *node) {
      table[idx] = p;
      currFrame->latestNodesTbl.n_items++;
   } else {
-     p->node = node;
+     if (node->cpLength > p->node->cpLength)
+       p->node = node;
   }
 }
 
@@ -635,23 +580,20 @@ static INode *new_INode(LineInfo *line) {
    inode->line = line;
    inode->callNode = False; // Set to true later if we encounter a call on this line
    inode->cost = 0;
-   inode->deps = newINodeSet();
-   inode->cpLength = -9999999;
+   inode->cpLength = 0;
    inode->cp = NULL;
-   inode->numParents = 0;
    currFrame->currNode = inode;
 
    if (static_deps) {
      // Add all the static dependencies
      addStaticDeps(inode);
-     // Update latest node table
-     updateLatestNodeTbl(inode);
    }
 
    if (dctl && currFrame->lastBranchNode != NULL) {
      addDep(currFrame->lastBranchNode, inode);
    }
 
+   currFrame->allNodes = consINode(currFrame->allNodes, inode);
    return inode;
 }
 
@@ -659,19 +601,21 @@ static void newNodeFrame(INode *callerNode) {
   callerNode->callNode = True;
   currFrame++;
   if (currFrame - N_FRAMES >= firstFrame) {
-    VG_(tool_panic)( "Frame roots stack overflow." );
+    VG_(tool_panic)( "Frame allNodes stack overflow." );
   }
-  currFrame->roots = NULL;
+  currFrame->allNodes = NULL;
   currFrame->currNode = NULL;
   currFrame->lastNonCallNode = NULL;
   currFrame->lastBranchNode = NULL;
   currFrame->callerNode = callerNode;
   currFrame->latestNodesTbl = initial_LatestNodeTable;
+  currFrame->cp = NULL;
+  currFrame->cpLength = -999999;
 }
 
 #define PRINT_CP(currNode, currCp, countdown) \
-        for (currNode = currCp; currNode != NULL; currNode = currNode->cp) { \
-          VG_(printf)("%d(%lld), ", currNode->line->line, currNode->cost); \
+        for ((currNode) = (currCp); (currNode) != NULL; (currNode) = (currNode)->cp) { \
+          VG_(printf)("%d(%lld), ", (currNode)->line->line, (currNode)->cost); \
           if (--countdown == 0) { \
             VG_(printf)("\n"); \
             countdown = 10; \
@@ -679,79 +623,8 @@ static void newNodeFrame(INode *callerNode) {
         } \
         VG_(printf)("\n");
 
-// NON-RECURSIVE (BREADTH FIRST) VERSION - PROBABLY SLOWER
-// DESTRUCTIVE - IT FREES EVERYTHING!
-//
-// Calculates critical path for current frame
-static long long int critPathNodes(void) {
-  INodeSet *deps;
-  INodeList *nodeIter, *tail, *allNodes = NULL;
-  int arrCap = 100, stackSize = 0;
-  INode *currNode, *currDep;
-  INode **workStack = (INode **) VG_(malloc)("", arrCap * sizeof(INode*));
-  long long int currCpLength = -999999;
-  INode *currCp = NULL;
-  int i;
-
-  tl_assert(workStack);
-  // Add all roots to workStack
-  for (nodeIter = currFrame->roots; nodeIter != NULL; nodeIter = tail) {
-    currNode = nodeIter->node;
-    // Just double checking the root hasn't got any parents
-    if (currNode->numParents == 0) {
-      currNode->cpLength = currNode->cost;
-      currNode->cp = NULL;
-      if (stackSize >= arrCap) {
-        arrCap *= 2;
-        workStack = VG_(realloc)("", workStack, arrCap * sizeof(INode*));
-        tl_assert(workStack);
-      }
-      workStack[stackSize] = currNode;
-      stackSize++;
-      allNodes = consINode(allNodes, currNode);
-    }
-    tail = nodeIter->next;
-    VG_(free)(nodeIter);
-  }
-
-  // Keep going through workStack
-  while (stackSize > 0) {
-    stackSize--;
-    currNode = workStack[stackSize];
-    // Look at its CP
-    if (currNode->cpLength > currCpLength) {
-      currCpLength = currNode->cpLength;
-      currCp = currNode;
-    }
-
-    deps = currNode->deps;
-    for (i=0; i<deps->numBuckets; i++) {
-      for (nodeIter = deps->buckets[i]; nodeIter != NULL; nodeIter = tail) {
-        currDep = nodeIter->node;
-//        VG_(printf)("%d->%d; ", currNode->line->line, currDep->line->line);
-        if (currNode->cpLength + currDep->cost > currDep->cpLength) {
-          currDep->cpLength = currNode->cpLength + currDep->cost;
-          currDep->cp = currNode;
-        }
-        currDep->numParents--;
-        if (currDep->numParents == 0) {
-          if (stackSize >= arrCap) {
-            arrCap *= 2;
-            workStack = VG_(realloc)("", workStack, arrCap * sizeof(INode*));
-            tl_assert(workStack);
-          }
-          workStack[stackSize] = currDep;
-          stackSize++;
-          allNodes = consINode(allNodes, currDep);
-        }
-        tail = nodeIter->next;
-        VG_(free)(nodeIter);
-      }
-    }
-    VG_(free)(deps->buckets);
-    VG_(free)(deps);
-//    VG_(free)(currNode);
-  }
+static void printCritPathNodes(void) {
+  INode *currNode;
 
   // Prints out the critical path
   if (currFrame->callerNode != NULL) {
@@ -759,50 +632,60 @@ static long long int critPathNodes(void) {
       sample_count--;
       if (sample_count == 0) {
         int countdown = 10;
-        VG_(printf)("%s:%d(%s)=%lld: ", currFrame->callerNode->line->file, currFrame->callerNode->line->line, currCp->line->file, currCpLength);
-        PRINT_CP(currNode, currCp, countdown);
+        VG_(printf)("%s:%d(%s)=%lld: ", currFrame->callerNode->line->file, currFrame->callerNode->line->line, currFrame->cp->line->file, currFrame->cpLength);
+        PRINT_CP(currNode, currFrame->cp, countdown);
         sample_count = sample_freq;
       }
     }
-    if (sample_threshold > 0 && currCpLength >= sample_threshold) {
+    if (sample_threshold > 0 && currFrame->cpLength >= sample_threshold) {
         int countdown = 10;
-        VG_(printf)("!%s:%d(%s)=%lld: ", currFrame->callerNode->line->file, currFrame->callerNode->line->line, currCp->line->file, currCpLength);
-        PRINT_CP(currNode, currCp, countdown);
+        VG_(printf)("!%s:%d(%s)=%lld: ", currFrame->callerNode->line->file, currFrame->callerNode->line->line, currFrame->cp->line->file, currFrame->cpLength);
+        PRINT_CP(currNode, currFrame->cp, countdown);
     }
   }
-
-  for (nodeIter = allNodes; nodeIter != NULL; nodeIter = tail) {
-    tail = nodeIter->next;
-    VG_(free)(nodeIter->node);
-    VG_(free)(nodeIter);
-  }
-  
-  VG_(free)(workStack);
-  clearLatestNodeTbl();
-  return currCpLength;
 }
 
 static void finaliseOldNode(void) {
   INode *node = currFrame->currNode;
+
   if (!para_non_calls && // We're focusing only on function-call level parallelism
       currFrame->lastNonCallNode != NULL && // There is something to depend on
       // If we're allowing early function spawns, then check the node is not a callnode
       (!early_spawns || !(node->callNode))) { 
     addDep(currFrame->lastNonCallNode, node);
-  } else {
-    currFrame->roots = consINode(currFrame->roots, node);
   }
+
   if (!(node->callNode)) {
     currFrame->lastNonCallNode = node;
+  }
+
+  node->cpLength += node->cost;
+
+  if (currFrame->cp == NULL || node->cpLength > currFrame->cpLength) {
+    currFrame->cp = node;
+    currFrame->cpLength = node->cpLength;
+  }
+
+  if (static_deps) {
+    // Update latest node table
+    updateLatestNodeTbl(node);
   }
 }
 
 static void retNode(void) {
-  long long int cpLength;
-
+  INodeList *nodeIter, *tail;
   finaliseOldNode();
-  cpLength = critPathNodes();
-  currFrame->callerNode->cost += cpLength;
+  currFrame->callerNode->cost += currFrame->cpLength;
+  printCritPathNodes();
+
+  // Free up memory
+  for (nodeIter = currFrame->allNodes; nodeIter != NULL; nodeIter = tail) {
+    tail = nodeIter->next;
+    VG_(free)(nodeIter->node);
+    VG_(free)(nodeIter);
+  }
+  clearLatestNodeTbl();
+
   currFrame--;
 }
 
@@ -4779,7 +4662,8 @@ static void finaliseCritPath(void) {
     retNode();
   }
   finaliseOldNode();
-  cpLength = critPathNodes();//->cpLength;
+  printCritPathNodes();//->cpLength;
+  cpLength = currFrame->cpLength;
   // To take account of the first 2 manually created TraceRecs
   VG_(message)(Vg_UserMsg, "No. of instructions is %lld", totalCost);
   VG_(message)(Vg_UserMsg, "Length of Critical path is %lld", cpLength);
