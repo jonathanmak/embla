@@ -15,7 +15,7 @@ for sfile in `awk -F"\t" '{print $1}' $cfgfile | sort -u`; do
      | awk -F"\t" -v fil=$sfile -v fn=$sfname '$1==fil && $2==fn {print $3 "\t" $4}' \
      | awk -F"\t" -f $bindir/dominance.awk -v cda=1 \
      | sort -n \
-     | awk -v fil=$sfile -v fn=$sfname '{print fil " " fn " C " $1 " " $2}' \
+     | awk -v fil=$sfile -v fn=$sfname '{print fil "\t" fn "\tC\t" $1 "\t" $2}' \
      | cat
   done
 done
