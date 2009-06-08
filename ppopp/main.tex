@@ -1,0 +1,82 @@
+\documentclass{sig-alternate}
+%\documentclass{../acm_proc_article-sp}
+
+\usepackage{subfigure}
+
+% Define subfloat environment
+\newbox\subfigbox % Create a box to hold the subfigure.
+\makeatletter
+\newenvironment{subfloat}% % Create the new environment.
+{\def\caption##1{\gdef\subcapsave{\relax##1}}%
+\let\subcapsave=\@empty % Save the subcaption text.
+\let\sf@oldlabel=\label
+\def\label##1{\xdef\sublabsave{\noexpand\label{##1}}}%
+\let\sublabsave\relax % Save the label key.
+\setbox\subfigbox\hbox
+\bgroup}% % Open the box...
+{\egroup % ... close the box and call \subfigure.
+\let\label=\sf@oldlabel
+\subfigure[\subcapsave]{\box\subfigbox}}%
+\makeatother
+
+\special{papersize=8.5in,11in}
+\pdfpagewidth=8.5in
+\pdfpageheight=11in
+
+\begin{document}
+
+\title{Studying task-level parallelism in sequential programs using Embla}
+\numberofauthors{4}
+\author{
+% 1st. author
+\alignauthor
+Jonathan Mak\\
+       \affaddr{University of Cambridge Computer Laboratory}\\
+       \affaddr{15 JJ Thomson Avenue}\\
+       \affaddr{Cambridge CB3 0FD, UK}\\
+       \email{Jonathan.Mak@cl.cam.ac.uk}
+% 2nd. author
+\alignauthor
+Karl-Filip Fax\'en\\
+       \affaddr{Swedish Institute of Computer Science}\\
+       \affaddr{Box 1263}\\
+       \affaddr{SE-164 29 Kista, Sweden}\\
+       \email{kff@sics.se}
+\and
+% 3rd. author
+\alignauthor
+Sverker Janson\\
+       \affaddr{Swedish Institute of Computer Science}\\
+       \affaddr{Box 1263}\\
+       \affaddr{SE-164 29 Kista, Sweden}\\
+       \email{sverker@sics.se}
+% 4th. author
+\alignauthor
+Alan Mycroft\\
+       \affaddr{University of Cambridge Computer Laboratory}\\
+       \affaddr{15 JJ Thomson Avenue}\\
+       \affaddr{Cambridge CB3 0FD, UK}\\
+       \email{Alan.Mycroft@cl.cam.ac.uk}
+}
+\date{} % do not add a date
+
+\maketitle % optional
+
+\input{abstract}
+
+% \category{D.3.4}{Programming Languages}{Processors}[Compilers]
+% \terms{Languages, Measurement}
+% \keywords{Limits of parallelism, dynamic dependency graph, spaghetti stack}
+
+\input{introduction}
+\input{methodology}
+\input{implementation}
+\input{results}
+\input{related_work}
+\input{conclusions}
+
+\bibliographystyle{abbrv}
+\bibliography{bib.bib}{}
+
+\end{document}
+
