@@ -45,7 +45,8 @@
 #define  TRACE_REG_DEPS     0
 #define  RECORD_CF_EDGES    1
 #define  CHECK_DIRTY_FRAGS  1
-#define  GENERATIONAL_COMPACT 1
+#define  GENERATIONAL_COMPACT 0
+#define  AEON_COMPACT       1
 
 #define  DEBUG_PRINT        1
 #define  EMPTY_RECORD       0
@@ -94,6 +95,8 @@ unsigned interesting_address=0;
 #define  II_CHUNK_SIZE      1000000
 // #define  STRING_TABLE         10007  // smallest prime >= 10000
 
+static Char dbuf[BUF_SIZE] __attribute__((unused));
+
 //#define  RT_IDX_BITS                        8
 #define  RT_IDX_BITS                        3
 #define  RT_ENTRIES_PER_LINE (1<<RT_IDX_BITS)  // must be power of 2
@@ -138,6 +141,7 @@ static unsigned int * dirty_map;
 #define  DPRINT2(s,x,y)   { VG_(sprintf)( dbuf, s, x, y );    BONK( dbuf ); }
 #define  DPRINT3(s,x,y,z) { VG_(sprintf)( dbuf, s, x, y, z ); BONK( dbuf ); }
 #define  DPRINT4(s,w,x,y,z) { VG_(sprintf)( dbuf, s, w, x, y, z ); BONK( dbuf ); }
+#define  DPRINT(...) { VG_(sprintf)( dbuf, __VA_ARGS__ ); BONK( dbuf ); }
 
 #else
 
@@ -146,6 +150,7 @@ static unsigned int * dirty_map;
 #define DPRINT2(s,x,y) { }
 #define DPRINT3(s,x,y,z) { }
 #define DPRINT4(s,w,x,y,z) { }
+#define DPRINT(...) { }
 
 #endif
 
@@ -332,17 +337,19 @@ typedef struct _LineInfo {
    struct _LineInfo *next;
 } LineInfo;
 
+static struct _LoopInfo outOfTheLoop;
+
 #if RECORD_CF_EDGES
 #if PRINT_RESULTS_TABLE
-static LineInfo dummy_line_info = { { }, NULL, { }, 0, "", "", NULL };
+static LineInfo dummy_line_info = { { }, NULL, { }, 0, "", "", &outOfTheLoop, NULL };
 #else
-static LineInfo dummy_line_info = { NULL, { }, 0, "", "", NULL };
+static LineInfo dummy_line_info = { NULL, { }, 0, "", "", &outOfTheLoop, NULL };
 #endif
 #else
 #if PRINT_RESULTS_TABLE
-static LineInfo dummy_line_info = { { }, 0, "", "", NULL };
+static LineInfo dummy_line_info = { { }, 0, "", "", &outOfTheLoop, NULL };
 #else
-static LineInfo dummy_line_info = { 0, "", "", NULL };
+static LineInfo dummy_line_info = { 0, "", "", &outOfTheLoop, NULL };
 #endif
 #endif
 
@@ -842,6 +849,7 @@ static void newInstr(LineInfo *line) {
   node = currFrame->currNode;
   if (node == NULL) {
     node = new_INode(line);
+    tl_assert(currFrame->currNode == node);
     currFrame->currNode = node;
   }
 
@@ -851,6 +859,7 @@ static void newInstr(LineInfo *line) {
 }
 
 static INode *getINode(void) {
+  // DPRINT( "%d\n", currFrame - firstFrame ); 
   tl_assert(currFrame->currNode);
   return currFrame->currNode;
 }
@@ -866,8 +875,6 @@ static INode *getINode(void) {
 
 
 static Addr32 lowest_shadow_sp=0xffffffff, highest_shadow_sp=0;
-
-static Char dbuf[BUF_SIZE] __attribute__((unused));
 
 typedef unsigned TaggedPtr;
 
@@ -1837,7 +1844,7 @@ static TraceRec *remapTR( InstrInfo *i_info, TraceRec *eoae, TraceRec *curr )
 {
    AeonItem *ai = lookupAI( i_info );
 
-   if( ai->t_rec == NULL || ai->t_rec >= eoae ) { // One disabling (not anymore)
+   if( !AEON_COMPACT ||ai->t_rec == NULL || ai->t_rec >= eoae ) { // One disabling (not anymore)
      ai->t_rec = curr;
      return NULL;
    } else {
@@ -2054,7 +2061,7 @@ static void compact(void)
          (flag!=TPT_RET_LIVE || i_info!=NULL) ) 
      { 
        // jchm2: Does this ever happen?
-        VG_(tool_panic)("We've found an example!");
+        // VG_(tool_panic)("We've found an example!");
         mp->tr = mp==smarks ? trace_pile : (mp-1)->tr;
      } else if( flag==TPT_RET_LIVE && i_info==NULL ) {
         TraceRec * header = ToTrP( mp->tr->link );
@@ -3354,6 +3361,8 @@ static void recordOrFakeCall(Addr32 sp, InstrInfo *i_info, Addr32 target, int fa
     Addr32 ca = i_info->i_addr, ra = ca + i_info->i_len;
     TraceRec * newTR = newTraceRec( i_info, mkTaggedPtr2( newFrame, TPT_OPEN ) );
 
+    // DPRINT( "Call, faking = %d, stack = %d\n", fake, current_stack_frame - stack_base );
+
     // BONK( "Call\n" );
     // validateRegisterMap( );
 
@@ -3396,6 +3405,8 @@ static void recordOrFakeCall(Addr32 sp, InstrInfo *i_info, Addr32 target, int fa
 static VG_REGPARM(3)
 void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target) 
 {
+  // DPRINT( "True call with currFrame = %d and currNode = %u\n", 
+  //          currFrame - firstFrame, (unsigned) currFrame->currNode );
   recordOrFakeCall( sp, i_info, target, 0 );
 }
 
@@ -3573,7 +3584,11 @@ static void fakeReturn( LoopInfo *l_info )
 
 static void fakeCall( LoopInfo *l_info )
 {
+  // DPRINT( "Fake call with currFrame = %d and currNode = %u\n", 
+  //          currFrame - firstFrame, (unsigned) currFrame->currNode );
+
   recordOrFakeCall( 0, l_info->call, 0, 1 /* Yep, we're faking! */ );
+  new_INode( l_info->call->line );
 }
 
 static void fakeCallsAndReturns( LineInfo *fromLine, LineInfo *toLine )
@@ -3581,6 +3596,8 @@ static void fakeCallsAndReturns( LineInfo *fromLine, LineInfo *toLine )
 
   LoopInfo *fromLoop = fromLine->loop, *toLoop = toLine->loop;
   int       depth, mindepth, i;
+
+  // DPRINT( "%u %u %u\n", (unsigned) fromLoop, (unsigned) toLoop, (unsigned) &outOfTheLoop );
 
   if( fromLoop == toLoop ) {
     return;
