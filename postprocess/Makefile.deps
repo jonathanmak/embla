@@ -1,0 +1,29 @@
+# Uses the variable ${prog} and ${args}
+# Say 'make -f Makefile.deps prog=<prog> args=<args>' to run
+# where <prog> is the executable and <args> are its arguments
+
+${prog}.s-span: ${prog}.deps ${prog}.loops
+	embla.sh --sctl --sraw --swar --swaw --span \
+	         --dep-file=${prog}.deps --loop-file=${prog}.loops \
+	         ./${prog} ${args} 2> ${prog}.s-span
+
+${prog}.deps: ${prog}.d-deps ${prog}.c-deps
+	sort -u ${prog}.d-deps ${prog}.c-deps > ${prog}.deps
+
+${prog}.d-deps: ${prog}.loops ${prog}.c-deps
+	embla.sh --trace-file=${prog}.d-deps --loop-file=${prog}.loops \
+	--edge-file=/dev/null ./${prog} ${args}
+
+${prog}.c-deps: ${prog}.edges
+	./cfa.sh ${prog}.edges > ${prog}.c-deps
+
+${prog}.loops: ${prog}.edges
+	./loops.sh ${prog}.edges > ${prog}.loops
+
+${prog}.edges:
+	embla.sh --edge-file=${prog}.edges \
+	         --loop-file=/dev/null ./${prog} ${args}
+
+clean: 
+	rm ${prog}.c-deps ${prog}.d-deps ${prog}.deps ${prog}.edges \
+	   ${prog}.s-span ${prog}.loops
