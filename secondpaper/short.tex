@@ -39,8 +39,8 @@ applications.  In this paper, we present a novel tool for aiding
 programmers in parallelizing programs. The tool, Embla, is based on the
 Valgrind framework, and allows the user to
 discover the data dependences in a sequential program, thereby exposing
-opportunities for parallelization.  Embla performs a dynamic analysis,
-and records dependences as they
+opportunities for parallelization.  Embla performs an off-line dynamic 
+analysis, and records dependences as they
 arise during program execution.  It reports an optimistic view of
 parallelizable sequences, and ignores dependences that do not arise during
 execution.  
@@ -51,7 +51,7 @@ Since Embla finds the dependencies that occur for particular
 executions, the confidence one would assign to its results depend on
 whether different executions yield different (bad) or largely the same
 (good) dependencies. We present a preliminary investigation into this
-issue using 88 different inputs to the SPEC CPU2006 benchmark 403.gcc.
+issue using 84 different inputs to the SPEC CPU2006 benchmark 403.gcc.
 The results indicate that there is a strong correlation between coverage
 and finding dependencies; executing the entire program is likely to 
 reveal all dependencies.
@@ -107,8 +107,7 @@ We are interested in the following methodology for constructing
 parallel programs: Start from a sequential program, identify
 independent parts of that program (here Embla can be used) and rewrite
 the program to obtain parallel execution of the independent parts.
-
-We will focus on introducing
+We focus on introducing
 fork-join parallelism~\cite{Conway63}, a framework used
 in many parallel programming environments~\cite{BJKLR96, Lea00, DM98, LF00}.
 
@@ -129,7 +128,7 @@ activities to terminate (cf. Cilk~\cite{BJKLR96}).
 % performance carries over to the parallel version.
 
 Embla aims at helping programmers find independent parts of the 
-program code.  The availability independent program parts depends on
+program code.  The availability of independent program parts depends on
 the algorithms used and can be further
 limited by sequential programming artifacts, such as re-use of
 variables and sequential book-keeping in an otherwise parallelizable
@@ -170,11 +169,13 @@ missing dependence.  Thus, the programming methodology supported by
 Embla replaces the problem of finding synchronization errors in the
 parallelized, nondeterministic, program with the problem of finding
 all of the relevant dependencies in the sequential program.
-
+This is in contrast to tools such as the Intel Thread Checker that
+observes fundamentally nondeterministic executions of already 
+parallelized programs.
 
 In addition to data dependences, Embla can be extended to
-detect I/O dependences that limit parallelism.  Another potential
-extension is to measure the potential speed
+detect I/O and control dependences that limit parallelism.  Another potential
+extension is to measure the possible speed
 improvement for parallelizing independent program parts and produce a
 report with suggested program transforms that will yield the maximum
 benefit.  Moreover, Embla presents rich and detailed information; in order
@@ -191,8 +192,8 @@ presents the mechanism for collecting runtime data dependence information.
 
 \begin{figure} 
 \small
-\input{ex7.depgraph}
-\caption{Example program with dependence graph} \label{ffirstex}
+\input{ex7.depgraph.ed}
+\caption{Code with dependence graph} \label{ffirstex}
 \end{figure}
 
 To get a feeling for what dependence profiling is and what Embla can do, 
@@ -210,9 +211,9 @@ the assignment to {\tt q} (the {\em early} endpoint) followed by its use
 as an argument in {\tt inc(q)} (the {\em late} endpoint). Embla
 distinguishes between flow (RAW), anti (WAR) and output (WAW) 
 dependences and is able to present them to the user, but we do not make
-that distinction in this paper. Embla 
-can be instructed to show dependence types, which can be
-useful for figuring out the reasons for individual dependences.
+that distinction in this paper. 
+% Embla can be instructed to show dependence types, which can be
+% useful for figuring out the reasons for individual dependences.
 
 The endpoints of the dependence arrow discussed above are parts of
 the code for {\tt main} itself, but Embla also tracks references made 
@@ -278,20 +279,20 @@ for our example, capturing the calls of {\tt inc} and lines 14, 15 and
 
 Embla traces dependences between individual instructions in the binary
 code during program execution. The endpoints of these dependences belong
-in general to different function calls. For instance, on
-Figure~\ref{ffextree} read {\tt *q} in the call of {\tt inc} at line 16
-of {\tt main} (node {\it D}) depends on write {\tt *q=...} in the call
+in general to different function calls. For instance, in
+Figure~\ref{ffextree} the read {\tt *q} in the call of {\tt inc} at line 16
+of {\tt main} (node {\it D}) depends on the write {\tt *q=...} in the call
 of {\tt inc} at line 14 (node {\it B}).
 
 Every dependence between two source lines in a single function call,
 like the one between lines 14 and 16 in our example, is caused by an
-instruction-level dependence. Embla computes the source-level depedences
+instruction-level dependence. Embla computes the source-level dependences
 from the instruction-level ones using the execution tree as follows. For
 every instruction-level dependence, Embla identifies the function calls
-where the endpoints occured (nodes {\it B} and {\it D} for the example
+where the endpoints occurred (nodes {\it B} and {\it D} for the example
 above), and computes the {\em nearest common ancestor} node (NCA) of
 those nodes in the execution tree. The NCA corresponds to a function
-call with two source-level instructions that are dependent because of
+call with two instructions that are dependent because of
 the instruction-level dependence (lines 14 and 16 in {\tt main} in the
 example).
 
@@ -320,36 +321,34 @@ the write depends on all of the reads and
 all subsequent references depend on the write.
 
 The \tracepile\ contains the nodes of the execution tree in the same order
-as in the instruction trace. For each node {\tt n}, {\tt n.line} is the 
-source line associated with the instruction (leaf) or procedure call
-(internal) 
-corresponding to {\tt n}, {\tt n.parent} is the parent node in the execution tree 
-and, if {\tt n} is 
-on the path between the root node of the tree and the most recent 
-event (leaf node), {\tt n.next} is the last child of {\tt n} (the node one step 
-closer to the most recent one
-along that path), so {\tt n.next.parent} = {\tt n}. This
-path corresponds to the call stack; {\tt n.next} is the stack frame on
-top of {\tt n}.
-
-Path compression can be used to decrease the number of iterations of the 
-{\tt while} loop.
+as in the instruction trace. For each node {\tt n}, 
+% {\tt n.line} is the source line associated with the instruction 
+% (leaf) or procedure call (internal) corresponding to {\tt n}, 
+{\tt n.parent} is the parent node in the execution tree (there is also 
+other information associated with a node, such as what source line 
+corresponds to the node).
+% and, if {\tt n} is 
+% on the path between the root node of the tree and the most recent 
+% event (leaf node), {\tt n.next} is the last child of {\tt n} (the node 
+% one step closer to the most recent one
+% along that path), so {\tt n.next.parent} = {\tt n}. This
+% path corresponds to the call stack; {\tt n.next} is the stack frame on
+% top of {\tt n}.
+The NCA is computed by following the {\tt parent} links, starting at the
+early endpoint, until a node corresponding to an activation record currently 
+on the call stack is found. This is the NCA since the late endpoint, and hence
+all of its ancestors, are on the stack.
+Path compression can be used to speed up this computation.
 Every node {\tt n} that is visited but is not on the stack can have its 
 {\tt parent} field set
 to its closest ancestor on the stack. We conjecture that this reduces the 
 complexity of the algorithm to essentially constant time. 
-% We can however do even better since the output of the tree dependence 
-% calculation does only depend on the immediate
-% descendants of nodes on the stack. Thus every subtree $T$ of the call tree, 
-% including the events at its leaves, such
-% that the root of $T$ is not on the stack can be represented by the root of $T$
-% alone.
-
 
 We can do better than path compression by {\em compacting} the \tracepile. 
 Once a procedure call has returned, we will not distinguish between 
 different events in the subtree corresponding to its (completed) 
-execution. They will all be represented by the root node of the subtree.
+execution. They will all be represented by the root node of the subtree
+(the call instruction).
 We periodically compact the \tracepile, replacing subtrees
 corresponding to completed calls by their root nodes. Since the 
 memory table contains pointers into the \tracepile, compaction
@@ -357,7 +356,7 @@ entails forwarding these pointers to the root nodes of the compacted
 subtrees.
 After compaction, the \tracepile\ contains the
 tree nodes corresponding to the stack and their immediate children,
-with non-leaf subtrees abridged to just the call and return events.
+with subtrees abridged to just the call and return events.
 
 After forwarding, pointers to previously distinct events in the same read list 
 now may point at the same 
@@ -367,16 +366,25 @@ crucial in practice.
 
 \subsection{Prototype implementation}
 
-Embla uses the Valgrind instrumentation infrastructure.  It emulates
-the hardware, and there is no code rewriting.  Our examples of profiling
+Embla uses the Valgrind instrumentation infrastructure which emulates
+the user mode instruction set architecture. An interseting alternative
+would be to sample dependencies using hardware data breakpoints
+(Accumem's Virtual Performance Expert uses this approach for cache
+profiling, but since single dependencies are much more important than
+single cache misses, it is not clear if sampling is suitable for
+dependence analysis).
+
+Our examples of profiling
 output use C, but
-the profiling is done on the instruction level, and the information is
-mapped to the source level using debugging information.
+the profiling is done at instruction level, and the result is
+mapped to source level using debugging information.
+
+
 
 
 % End algorithm -----------------------
 
-\begin{table}
+\begin{table} \small
 \begin{center} \newcommand{\sms}{\hskip0.4em}
 \begin{tabular}{|@{\sms}l@{\sms}|r@{\sms}r|r@{\sms}r@{\sms}r|r@{\sms}r@{\sms}r|} \hline
  & & & \multicolumn{3}{|c|}{No RLC} & 
@@ -419,41 +427,46 @@ We note that Embla finds the expected independence of the recursive calls
 in the recursive divide-and-conquer programs {\tt qs} and
 {\tt fib}, even though {\tt qs} is an in-place version coded 
 with pointers and pointer arithmetic, something that is well known to be 
-difficult to deal with for static analyzers. We have also done naive
-hand parallelization of these programs according to the information 
-yielded by Embla and obtained the expected good speedup.
+difficult to deal with for static analyzers. 
+% We have also done naive
+% hand parallelization of these programs according to the information 
+% yielded by Embla and obtained the expected good speedup.
 % Need backup for this statement.  What was the speedup?
 
-\begin{table*}
+\begin{table*} \small
 \[
-\begin{tabular}{|l|rrrr@{\ }r|rrrr@{\ }r|rr@{\,}r|r|} \hline
-Filter & \multicolumn{5}{c|}{\# Dependencies} 
-     & \multicolumn{5}{c|}{Size of deltas}
-     & \multicolumn{3}{c|}{Relative sizes (\%)}
-     & \# $\emptyset$  \\
+\begin{tabular}{|l|rrrr@{\ }r|rrr@{\ }rr|rrrrr|} \hline
+Filter & \multicolumn{5}{c|}{No. of Dependencies ($\#D_i$)} 
+     & \multicolumn{5}{c|}{Deltas relative to $\cal A$ ($\#D_i^{\ast}$)}
+     & \multicolumn{5}{c|}{Deltas relative to random covering $R$} \\
      & max & min & avg & total & \% of N
-     & max & min & avg & total & \% of N
-     & max & min & g-mean & \\ \hline \hline
-\multicolumn{15}{|c|}{ All 403.gcc source files } \\ \hline
-N & 57733 & 8070 & 37589  & 80876 &  & 492 & 0 & 74  & 6502 &  & 1.08 & 0.00 & 0.09 & 9 \\
-T & 39654 & 5637 & 26654  & 58336 & 72.1  & 434 & 0 & 41  & 3630 & 55.8  & 1.33 & 0.00 & 0.06 & 14 \\
+     & max & avg & total & \% of N & \%$\emptyset$ 
+     & max & avg & total & \% of N & \%$\emptyset$ 
+     \\ \hline \hline
+\multicolumn{16}{|c|}{ All 403.gcc source files } \\ \hline
+N & 91374 & 11653 & 57828  & 125041 &  & 774 & 111  & 9321 &  & 11 & 171 & 28.5 & 1536 & & 4 \\
+T & 55676 & 7509 & 36751  & 82750 & 66.2  & 601 & 58  & 4857 & 52.1  & 15 & 30 & 6.2 & 372 & 24.2 & 6 \\
 \hline \hline
-\multicolumn{15}{|c|}{ {\tt c-parse.c}, {\tt combine.c}, 
+\multicolumn{16}{|c|}{ {\tt c-parse.c}, {\tt combine.c}, 
   {\tt insn-recog.c}, and {\tt toplev.c} } \\
 \hline
-N & 13218 & 718 & 7099  & 22158 &  & 215 & 0 & 33  & 2885 &  & 1.92 & 0.00 & 0.24 & 15 \\
-T & 6499 & 636 & 3657  & 12001 & 54.2  & 134 & 0 & 13  & 1154 & 40.0  & 2.96 & 0.00 & 0.18 & 28 \\
-C & 5008 & 398 & 2978  & 7166 & 32.3  & 64 & 0 & 6  & 568 & 19.7  & 1.53 & 0.00 & 0.14 & 40 \\
-CT & 3139 & 347 & 1901  & 4936 & 22.3  & 39 & 0 & 4  & 331 & 11.5  & 1.44 & 0.00 & 0.22 & 56 \\
+N & 23676 & 1298 & 12679 & 38807 &      & 479 & 55 & 4597 &      & 14 & 143 & 22.8 & 1185 &      &  7 \\
+T &  9948 & 1060 &  5562 & 19141 & 49.3 & 249 & 21 & 1785 & 38.8 & 24 &  21 &  4.1 &  240 & 20.3 & 13 \\
+C & 11612 &  514 &  6048 &  8472 & 21.8 &  94 &  8 &  654 & 14.2 & 55 &   8 &  0.6 &   30 &  2.5 & 73 \\
+CT & 3823 &  417 &  2272 &  5865 & 15.1 &  90 &  6 &  465 & 10.1 & 64 &   2 &  0.1 &    7 &  0.6 & 92 \\
 \hline
 \end{tabular}
 \]
 Filters are {\bf N}one, {\bf T}ransitive or {\bf C}ontrol flow, \# Dependencies and Size of deltas
-give maximum, minimum and average sizes of $D_i$ and $D_i^{\ast}$, respectively, over $i\in \cal A$
-as well as sizes of $\cup_{i \in \cal A} D_i$ and $\cup_{i \in \cal A} D_i^{\ast}$. \% of N gives 
-the total for the row as a percentage of the total of the N row. Relative sizes give the maximum, 
-minimum and geometric mean size of $D_i^{\ast}$ as a percentage of $D_i$. Finally, \#~$\emptyset$
-gives the number of inputs that yielded empty $D_i^{\ast}$.
+give maximum, minimum and average sizes of $D_i$ over $i\in \cal A$
+as well as sizes of $\cup_{i \in \cal A} D_i$. \% of N gives 
+the total for the row as a percentage of the total of the N row. 
+For dependencies relative to $\cal A$ and to random covering $R$ we give 
+maximum (the minimums are 0 in all cases) and average sizes of $D_i^{\ast}$ and $D_i^R$, respectively,
+ over $i\in \cal A$
+as well as sizes of $\cup_{i \in \cal A} D_i$.\% of N gives 
+the total for the row as a percentage of the total of the N row. $\%\emptyset$ gives the percentage
+of cases where $D_i^{\ast}$ and $D_i^R$, respectively, were empty.
 \caption{Dependence statistics} \label{tdepstat}
 \end{table*}
 
@@ -471,7 +484,7 @@ Compiler. This is a very challenging program since, being an
 optimizing compiler, it essentially looks for a large set of patterns
 in its input an applies different code to different patterns.
 
-We have collected flow (RAW) data dependencies for 84 different files
+We have collected data dependencies for 84 different files
 (6--6328 lines of pre-processed C code) drawn from the code base of
 403.gcc itself. These dependencies do not include dependencies due to
 {\tt malloc} and friends.
@@ -493,7 +506,7 @@ this build of GCC. Evidently, the dependencies are rather sparse due
 in part to the large number of lines that do not contain memory references at all.
 The number of unique source lines that occur in some dependence is
 51323 (hence lines that occur in dependencies do so in on the average
-about 2.4 lines, another measure of their sparseness).
+about 2.4 lines). % , another measure of their sparseness).
 
 To quantify the effect of differences between inputs on the set of 
 dependencies found, we compute {\em dependency deltas}; sets of
@@ -502,43 +515,86 @@ reference set of inputs. Thus, if the dependencies found with input data set $i$
 $D_i$, we study \[D_j^I = D_j \setminus \bigcup_{i \in I} D_i\] for
 some set of inputs $I$ not containing $j$. In particular, we have
 $D_j^\ast = D_j^{{\cal A} \setminus j}$ where $\cal A$ is the set of
-all the 88 inputs.
+all the 84 inputs.
 
 Table~\ref{tdepstat} shows some statistics on the dependencies found
-in 403.gcc. From the relative sizes columns we see that at most about 1\% of the 
+in 403.gcc. From the max column of the first row in the relative to $\cal A$ group of columns
+we see that at most 774
 dependencies in any $D_i$ are preserved in $D_i^{\ast}$; these are the dependencies 
-that are only provoked by input $i$. The \#~$\emptyset$ column shows that 9 out of the
-88 $D_i^{\ast}$ were empty, meaning that these inputs generated no dependencies
+that are only provoked by input $i$. The $\emptyset$ column shows that 11\%, or 9 out of the
+84 $D_i^{\ast}$ were empty, meaning that these inputs generated no dependencies
 that were not generated by other inputs.
 
 Looking at the dependencies in the $D_i^{\ast}$ sets, we noticed that many of them were 
 transitively implied by others. That is, for many $(f, l_1 \leftarrow l_2) 
 \in D_i^{\ast}$ there were $(f, l_1 \leftarrow l), (f, l \leftarrow l_2) \in D_i$ for some $l$.
 These dependencies give the same constraints on parallelization and make $(f, l_1 \leftarrow l_2)$
-redundant. The T filter removes these redundant dependencies, yielding a 28\% reduction in 
-overall dependence numbers and a 44\% reduction in the $D_i^{\ast}$ sets.
+redundant. The T filter removes these redundant dependencies, yielding a 34\% reduction in 
+overall dependence numbers and a 48\% reduction in the $D_i^{\ast}$ sets (second row).
+
+\begin{figure} \small
+\hrulefill
+\begin{alltt}
+{\it 1:}   if( cond1 )
+{\it 2:}     a();
+{\it 3:}   else
+{\it 4:}     b();
+{\it 5:}   if( cond2 )
+{\it 6:}     c();
+{\it 7:}   else \{
+{\it 8:}     d();
+{\it 9:}     e();
+{\it 10:}  \}
+\end{alltt}
+\hrulefill
+\caption{Control flow analysis example} \label{fcfa}
+\end{figure}
 
 We next noticed many data dependencies that were subsumed by control
-dependencies (which Embla currently does not capture). To get an idea
+dependencies (which Embla currently does not capture). In the model we
+aim at, only code with the same control dependence can be executed in 
+parallel (statements belonging to the same block).
+To get an idea
 of the magnitude of this contribution, we implemented an approximate
 control flow analysis by hand for four modules of 403.gcc that were
 top contributors to the $D_i^{\ast}$ sets and appeared to have
-nontrivial control flow. We also moved dependence endpoints up in the
-syntax tree, e.g. from a branch in an if statement to the if statement
-itself in a fashion analogous to the NCA computation discussed in
-section~\ref{snca}.
+nontrivial control flow. 
+Based on this information we moved dependence endpoints up in the
+syntax tree in a fashion analogous to the NCA computation discussed in
+section~\ref{snca}. 
+
+Consider the example in figure~\ref{fcfa} where we have two 
+sequential if-statements: 
+% \begin{itemize}
+% \item
+% $4 \leftarrow 2$, a dependence between line 2 and line 4 (the then 
+% and else branch of the same if-statement) would be removed by control flow 
+% filtering since it has no effect on possible parallelization.
+% \item
+$6 \leftarrow 2$, (a 
+dependence between the then branches)
+is remapped to $5 \leftarrow 1$ (between the if-statements
+themselves) since line 2 and line 6 do not have the same control dependence.
+% \item
+Similarly, $5 \leftarrow 2$ becomes $5 \leftarrow 1$.
+% \item
+$9 \leftarrow 8$ is however not remapped since they have the same control
+dependence and could be executed in parallel. 
+% in the absence of a $9 \leftarrow 8$ data dependence.
+% \end{itemize}
 
 The results are given in the four bottom rows of Table~\ref{tdepstat}
 where we focus exclusively on dependencies $(f,l_1 \leftarrow l_2)$ where f is
-one of the four modules. We see from the first row that these modules
+one of the four control flow analysed 
+modules. We see from the first row that these modules
 account for almost half of the size of the $D_i^{\ast}$ sets. Looking
 at the rightmost column, we see that control flow filtering alone makes
-almost half of the $D_i^{\ast}$ sets empty, and that together with
+about 55\% of the $D_i^{\ast}$ sets empty, and that together with
 transitive filtering almost two thirds are eliminated.
 
 
 \begin{figure*}
-\input{plot1} \input{plot2}
+\input{plot.nocf} \input{plot.cf.4}
 \caption{Coverage deltas (x-axis) versus dependence deltas (y-axis)
 for no (left) or CT filtering} \label{fplot}
 \end{figure*}
@@ -553,10 +609,38 @@ data for the CT-filtered four modules. The left hand plot shows a very
 clear correlation between execution coverage and dependence
 coverage whereas the right hand plot is less conclusive; it will be
 interesting to see the effect of control flow filtering of all
-modules. However, of the 30 inputs that yielded empty $L_i^{\ast}$ sets, only one
-had a nonempty (actually singleton) $D_i^{\ast}$ set.
+modules once we automate it. 
+However, all of the 30 inputs that yield empty $L_i^{\ast}$ sets have 
+empty $D_i^{\ast}$ sets under CT filtering!
 
+To further investigate the relation between execution coverage and 
+dependence coverage we randomly selected 300 pairs $(i,R)$  such that 
+\begin{itemize}
+\item % where 
+$i\in \cal A$ is an input and $R \subseteq {\cal A} \setminus \{i\}$ is a 
+subset of the inputs and
+\item % such that 
+$L_i^R = \emptyset$ (the inputs in $R$ 
+make 403.gcc execute all code that $i$ makes it execute). 
+\end{itemize}
+The average size of the $R$ sets was 28. For each pair 
+$(i,R)$ we then computed $D_i^R$, the dependencies provoked by $i$ but 
+not by any $j\in R$. The smaller these sets are, the better. The results are in the 
+last group of columns in the table. % ; the average size of the $R$ sets was 28.
 
+The combination of dependence remapping based on control flow analysis
+and coverage is very effective; table~\ref{tdepstat} shows that in 92\% of
+the cases, execution coverage implied dependence coverage. To get an 
+intuition about why, consider again the example in figure~\ref{fcfa}.
+Suppose that input $i$ yields the path 1,2,5,6 (both conditions true)
+and the dependence $6 \leftarrow 2$
+(between the then-branches). Similarly, suppose that $R=\{j\}$ where $j$ 
+yields paths 1,2,5,8,9 (true, then false) and 1,4,5,6 (false, then true)
+with dependence $8 \leftarrow 2$ from the first of these paths. We now have
+$L_i = \{1,2,5,6\} \subseteq \{1,2,4,5,6,8,9\} = L_j$ so $L_i^R$ is empty, 
+as required, whereas $D_i^R$ contains $6 \leftarrow 2$. Control flow analysis
+remaps both dependencies to $5 \leftarrow 1$, making $D_i^R$ empty. In a sense,
+this filter bridges part of the gap between line coverage and path coverage.
 
 \section{Conclusion}
 
