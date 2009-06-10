@@ -1,0 +1,18 @@
+\section{Related work}
+
+% Explicit task level parallelism
+A lot of languages and libraries have been created to allow easy expression of task-level parallelism.
+Cilk's \cite{blumofe96cilk} model of fork/join parallelism matches our function-spawning model most closely, although we find that Cilk only allows joining of all active threads rather than one specific thread.
+OpenMP \cite{dagum98openmp}, on the other hand, focuses on loop-level parallelism.
+Other notable examples include Java's concurrency library \cite{lea00java} and  X10 \cite{charles05x10}.
+
+% Other limits surveys
+Several studies have been made on instruction-level parallelism \cite{wall91limits, postiff99limits, austin92dynamic, lam92limits, mak09limits}, but fewer have tried to separate out task-level parallelism from instruction-level parallelism.
+Kreaseck et al. \cite{Kreaseck00limitsof} explored limits of speculative task-level parallelism by pre-emptively executing function calls, similar to the way we hoist spawns.
+Warg and Stenstr\"{o}m \cite{warg01limits} focused on finding function-call-level parallelism, with an emphasis on comparing object-oriented programs with ordinary imperative ones.
+
+% Race detection
+
+% Automatic parallelisation
+
+% Thread-level speculation
