@@ -3566,6 +3566,27 @@ static LineList * consLL( LineInfo *line, LineList *next )
     return ll;
 }
 
+static void checkIfNewLine( LineInfo *line )
+{
+    LineList *ll, **llp;
+    LineInfo *prev_line = current_stack_frame->current_line;
+
+    if (line != prev_line) {
+      current_stack_frame->current_line = line;
+
+      if( prev_line != NULL ) {
+
+        llp = &( line->pred[prev_line->line & (PRED_ENTRIES_PER_LINE-1)] );
+        for( ll = *llp; ll != NULL && ll->line != prev_line; ll = ll->next ) ;
+
+        if( ll == NULL ) {
+            *llp = consLL( prev_line, *llp );
+        }
+      }
+    }
+
+}
+
 static void fakeReturn( LoopInfo *l_info )
 {
   pop_stack_frame( NULL, 0, NULL );
@@ -3576,14 +3597,16 @@ static void fakeCall( LoopInfo *l_info )
   // DPRINT( "Fake call with currFrame = %d and currNode = %u\n", 
   //          currFrame - firstFrame, (unsigned) currFrame->currNode );
 
+  LineInfo *fakeline = l_info->call->line;
+  newInstr(fakeline);
+  checkIfNewLine(fakeline);
   recordOrFakeCall( 0, l_info->call, 0, 1 /* Yep, we're faking! */ );
-  new_INode( l_info->call->line );
 }
 
 static void fakeCallsAndReturns( LineInfo *fromLine, LineInfo *toLine )
 {
 
-  LoopInfo *fromLoop = fromLine->loop, *toLoop = toLine->loop;
+  LoopInfo *fromLoop = fromLine == NULL ?  &outOfTheLoop : fromLine->loop, *toLoop = toLine->loop;
   int       depth, mindepth, i;
 
   // DPRINT( "%u %u %u\n", (unsigned) fromLoop, (unsigned) toLoop, (unsigned) &outOfTheLoop );
@@ -3614,25 +3637,18 @@ static void fakeCallsAndReturns( LineInfo *fromLine, LineInfo *toLine )
 static VG_REGPARM(1)
 void recordEdge( LineInfo *line ) // Need to know line, the line of the current instruction
 {
-    LineList *ll, **llp;
     LineInfo *prev_line = current_stack_frame->current_line;
+
+    if ( line != prev_line ) {
+      fakeCallsAndReturns( prev_line, line );
+    }
 
 #if CRITPATH_ANALYSIS
     newInstr(line);
 #endif
 
-    if( line == prev_line ) return;
-    current_stack_frame->current_line = line;
-    if( prev_line == NULL ) return;
+    checkIfNewLine(line);
 
-    fakeCallsAndReturns( prev_line, line );
-    
-    llp = &( line->pred[prev_line->line & (PRED_ENTRIES_PER_LINE-1)] );
-    for( ll = *llp; ll != NULL && ll->line != prev_line; ll = ll->next ) ;
-
-    if( ll == NULL ) {
-        *llp = consLL( prev_line, *llp );
-    }
 }
 
 #endif
@@ -4649,7 +4665,7 @@ static Bool eolRH( ReadHandle *rh )
      Char c = getcRH( rh );
      if( c == '\n' ) {
        return 1;
-     } else if( ! VG_(isspace)( c ) ) {
+     } else if( c!=0 && ! VG_(isspace)( c ) ) {
        ungetcRH( rh, c );
        return 0;
      }
