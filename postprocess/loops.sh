@@ -10,20 +10,23 @@
 
 cfgfile=$1
 bindir=`dirname $0`
+O=$IFS
+IFS=$(echo -en "\n\b")
 
-for sfile in `awk '{print $1}' $cfgfile | sort -u`; do
-  for sfname in `awk -v file=$sfile '$1==file {print $2}' $cfgfile | sort -u`
+for sfile in `awk -F"\t" '{print $1}' $cfgfile | sort -u`; do
+  for sfname in `awk -F"\t" -v file=$sfile '$1==file {print $2}' $cfgfile | sort -u`
   do
      cat $cfgfile \
-     | awk -v fil=$sfile -v fn=$sfname '$1==fil && $2==fn {print $3 " " $4}' \
+     | awk -F"\t" -v fil=$sfile -v fn=$sfname '$1==fil && $2==fn {print $3 "\t" $4}' \
      | cat > $cfgfile.TEMP 
      cat $cfgfile.TEMP \
-     | awk -f $bindir/dominance.awk -v cda=0 \
+     | awk -F"\t" -f $bindir/dominance.awk -v cda=0 \
      | sort -n \
      | $bindir/loops $cfgfile.TEMP \
-     | awk -v fil=$sfile -v fn=$sfname '{print fil " " fn " " $0}' \
+     | awk -v fil=$sfile -v fn=$sfname '{print fil "\t" fn "\t" $0}' \
      | cat 
   done
 done
 rm $cfgfile.TEMP
 
+IFS=$O
