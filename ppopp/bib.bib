@@ -183,7 +183,7 @@
 @inproceedings{ mak09limits,
     author = {J. Mak and A. Mycroft},
     title = {Limits of Parallelism Using Dynamic Dependency Graphs},
-    booktitle = {WODA '09: Proceedings of the 2009 international workshop on dynamic analysis},
+    booktitle = {WODA '09: Proceedings of the 2009 International Workshop on Dynamic Analysis},
     publisher = {ACM},
     address = {Chicago, Illinois, USA},
     year = {2009}
@@ -198,5 +198,175 @@
  pages = {221--230},
  publisher = {IEEE Computer Society},
  address = {Washington, DC, USA},
- }
+}
+
+@inproceedings{oplinger99insearch,
+ author = {Oplinger, Jeffrey T. and Heine, David L. and Lam, Monica S.},
+ title = {In Search of Speculative Thread-Level Parallelism},
+ booktitle = {PACT '99: Proceedings of the 1999 International Conference on Parallel Architectures and Compilation Techniques},
+ year = {1999},
+ isbn = {0-7695-0425-6},
+ pages = {303},
+ publisher = {IEEE Computer Society},
+ address = {Washington, DC, USA},
+}
+
+@inproceedings{MellorCrummey91onthefly,
+  x-author =     {John Mellor-Crummey},
+  author =       {J. Mellor-Crummey},
+  title =        {On-the-fly detection of data races for programs with
+                  nested fork-join parallelism},
+  booktitle =    {Proceedings of Supercomputing '91},
+  pages =        {24--33},
+  year =         {1991},
+  publisher =    {ACM Press},
+  isbn =         {0-89791-459-7},
+  x-location =   {mc-ontf-dr-fjp.pdf.gz}
+}
+
+@inproceedings{ha02space,
+  x-author =     {Keum-Sook Ha and Eun-Kyung Ryu and Kee-Young Yoo},
+  author =       {K.-S. Ha and E.-K. Ryu and K.-Y. Yoo},
+  title =        {Space-Efficient First Race Detection in Shared
+                  Memory Programs with Nested Parallelism},
+  year =         {2002},
+  pages =        {253-263},
+  editor =       {Juha Fagerholm and Juha Haataja and Jari
+                  J{\"a}rvinen and Mikko Lyly and Peter R{\aa}back and
+                  Ville Savolainen},
+  booktitle =    {Applied Parallel Computing Advanced Scientific
+                  Computing, 6th International Conference (PARA 2002)},
+  address =      {Espoo, Finland},
+  month =        jun#" 15--18 ",
+  publisher =    {Springer},
+  series =       {LNCS},
+  volume =       {2367},
+  isbn =         {3-540-43786-X},
+  x-note =       not_here
+}
+
+@article{savage97eraser,
+  x-author =     {Stefan Savage and Michael Burrows and Greg Nelson
+                  and Patrick Sobalvarro and Thomas Anderson},
+  author =       {S. Savage and M. Burrows and G. Nelson and
+                  P. Sobalvarro and T. Anderson},
+  title =        {Eraser: a dynamic data race detector for
+                  multithreaded programs},
+  journal =      {ACM Transactions on Computer Systems},
+  volume =       {15},
+  number =       {4},
+  year =         {1997},
+  issn =         {0734-2071},
+  pages =        {391--411},
+  publisher =    {ACM Press},
+  address =      {New York, NY, USA},
+  abstract =     {Multithreaded programming is difficult and error
+                  prone. It is easy to make a mistake in
+                  synchronization that produces a data race, yet it
+                  can be extremely hard to locate this mistake during
+                  debugging. This article describes a new tool, called
+                  Eraser, for dynamically detecting data races in
+                  lock-based multithreaded programs. Eraser uses
+                  binary rewriting techniques to monitor every
+                  shared-monory reference and verify that consistent
+                  locking behavior is observed. We present several
+                  case studies, including undergraduate coursework and
+                  a multithreaded Web search engine, that demonstrate
+                  the effectiveness of this approach.},
+  x-location =   {savage-eraser.pdf.gz}
+}
+
+@INPROCEEDINGS{Blume94polaris,
+    author = {Bill Blume and Rudolf Eigenmann and Keith Faigin and John Grout and Jay Hoe and David Padua and Paul Petersen and Bill Pottenger and Lawrence Rauchwerger and Peng Tu and Stephen Weatherford},
+    title = {Polaris: The Next Generation in Parallelizing Compilers},
+    booktitle = {Proceedings of the Workshop on Languages and Compilers for Parallel Computing},
+    year = {1994},
+    pages = {10--1},
+    publisher = {Springer-Verlag, Berlin/Heidelberg}
+}
+
+@inproceedings{ottoni05automatic,
+  author = {Guilherme Ottoni and Ram Rangan and Adam Stoler and David I. August},
+  title = {Automatic Thread Extraction with Decoupled Software Pipelining},
+  booktitle = {MICRO 38: Proceedings of the 38th annual IEEE/ACM International Symposium on Microarchitecture},
+  year = {2005},
+  isbn = {0-7695-2440-0},
+  pages = {105--118},
+  location = {Barcelona, Spain},
+  doi = {http://dx.doi.org/10.1109/MICRO.2005.13},
+  publisher = {IEEE Computer Society},
+  address = {Washington, DC, USA}
+}
+
+@inproceedings{ottoni07global,
+  author = {Guilherme Ottoni and David I. August},
+  title = {Global multi-threaded instruction scheduling},
+  booktitle = {Proceedings of the 40th annual IEEE/ACM International Symposium on Microarchitecture},
+  year = {2007},
+  pages = {56--68}
+}
+
+@article{gregory05stampede,
+ author = {J. Gregory Steffan and Christopher Colohan and Antonia Zhai and Todd C. Mowry},
+ title = {The STAMPede approach to thread-level speculation},
+ journal = {ACM Trans. Comput. Syst.},
+ volume = {23},
+ number = {3},
+ year = {2005},
+ issn = {0734-2071},
+ pages = {253--300},
+ doi = {http://doi.acm.org/10.1145/1082469.1082471},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+}
+
+@ARTICLE{Rundberg01anall-software,
+  author = {P Rundberg and P Stenstr\"om},
+  title = {An All-Software Thread-Level Data Dependence Speculation System for Multiprocessors},
+  journal = {Journal of Instruction-Level Parallelism},
+  year = {2001},
+  number = {3},
+  pages = {2002}
+}
+
+@inproceedings{welc05safe,
+ author = {Adam Welc and Suresh Jagannathan and Antony Hosking},
+ title = {Safe futures for Java},
+ booktitle = {OOPSLA '05: Proceedings of the 20th annual ACM SIGPLAN conference on Object oriented programming, systems,
+ languages, and applications},
+ year = {2005},
+ isbn = {1-59593-031-0},
+ pages = {439--453},
+ location = {San Diego, CA, USA},
+ doi = {http://doi.acm.org/10.1145/1094811.1094845},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+}
+
+@article{johnson04mincut,
+ author = {Troy A. Johnson and Rudolf Eigenmann and T. N. Vijaykumar},
+ title = {Min-cut program decomposition for thread-level speculation},
+ journal = {SIGPLAN Not.},
+ volume = {39},
+ number = {6},
+ year = {2004},
+ issn = {0362-1340},
+ pages = {59--70},
+ doi = {http://doi.acm.org/10.1145/996893.996851},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+}
+
+@inproceedings{liu06posh,
+ author = {Wei Liu and James Tuck and Luis Ceze and Wonsun Ahn and Karin Strauss and Jose Renau and Josep Torrellas},
+ title = {POSH: a TLS compiler that exploits program structure},
+ booktitle = {PPoPP '06: Proceedings of the eleventh ACM SIGPLAN symposium on Principles and practice of parallel programming},
+ year = {2006},
+ isbn = {1-59593-189-9},
+ pages = {158--167},
+ location = {New York, New York, USA},
+ doi = {http://doi.acm.org/10.1145/1122971.1122997},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+}
 
