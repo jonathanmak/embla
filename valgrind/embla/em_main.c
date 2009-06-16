@@ -715,7 +715,7 @@ static void branchNode(void) {
   currFrame->lastBranchNode = currFrame->currNode;
 }
 
-static void newInstr(LineInfo *line) {
+static void newInstr(LineInfo *line, Bool fake) {
   INode *node = currFrame->currNode;
 
   // Reset field if this is a new line
@@ -736,9 +736,11 @@ static void newInstr(LineInfo *line) {
     currFrame->currNode = node;
   }
 
-  // Incrememt cost
-  node->cost++;
-  totalCost++;
+  if (!fake) {
+    // Incrememt cost
+    node->cost++;
+    totalCost++;
+  }
 }
 
 static INode *getINode(void) {
@@ -3598,7 +3600,7 @@ static void fakeCall( LoopInfo *l_info )
   //          currFrame - firstFrame, (unsigned) currFrame->currNode );
 
   LineInfo *fakeline = l_info->call->line;
-  newInstr(fakeline);
+  newInstr(fakeline, True);
   checkIfNewLine(fakeline);
   recordOrFakeCall( 0, l_info->call, 0, 1 /* Yep, we're faking! */ );
 }
@@ -3644,7 +3646,7 @@ void recordEdge( LineInfo *line ) // Need to know line, the line of the current 
     }
 
 #if CRITPATH_ANALYSIS
-    newInstr(line);
+    newInstr(line, False);
 #endif
 
     checkIfNewLine(line);
@@ -4969,11 +4971,11 @@ static void em_post_clo_init_deps(void)
    trace_pile[1].link = mkTaggedPtr2(trace_pile, TPT_REG);
 
 #if CRITPATH_ANALYSIS
-   newInstr(trace_pile[0].i_info->line);
+   newInstr(trace_pile[0].i_info->line, True);
    trace_pile[0].inode = getINode();
    newNodeFrame(trace_pile[0].inode);
 
-   newInstr(trace_pile[1].i_info->line);
+   newInstr(trace_pile[1].i_info->line, True);
    trace_pile[1].inode = getINode();
 #endif
 
