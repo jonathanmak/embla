@@ -46,7 +46,7 @@
 #define  RECORD_CF_EDGES    1
 #define  CHECK_DIRTY_FRAGS  1
 #define  GENERATIONAL_COMPACT 0
-#define  AEON_COMPACT       1
+#define  AEON_COMPACT       0
 
 #define  DEBUG_PRINT        1
 #define  EMPTY_RECORD       0
@@ -3279,7 +3279,6 @@ static void clearMap(Addr32 ptr, int size) {
     EventList   *ev_list, *ev_next;
     int         l_addr = ptr, l_size = size, iters = 0;
 
-    clearMallocSize(ptr);
 
     do {
 
@@ -3443,6 +3442,7 @@ static void checkIfMallocRet(Addr32 addr, Addr32 target, void *guest_state)
           }
         } else {
           // Copying (i.e. free old region, malloc new region)
+          clearMallocSize(addr_arg);
           clearMap(addr_arg, mallocSize);
 
           setMallocSize(retValue, malloc_request_size);
@@ -3450,6 +3450,7 @@ static void checkIfMallocRet(Addr32 addr, Addr32 target, void *guest_state)
       } else if (!VG_(strcmp)("free", fn)) {
         int size = getMallocSize(addr_arg);
         tl_assert(size>0); // Can only free somthing if the pointer was previously returned by malloc or friends
+        clearMallocSize(addr_arg);
         clearMap(addr_arg, size);
       }
       malloc_fn = NULL;
