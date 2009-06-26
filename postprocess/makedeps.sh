@@ -28,4 +28,4 @@ $bindir/cfa.sh $controlfile >$outfile
 
 awk -f $bindir/datadeps.awk $datafile >>$outfile
 
-$bindir/loops.sh $controlfile >$loopfile
+# $bindir/loops.sh $controlfile >$loopfile
