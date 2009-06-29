@@ -45,7 +45,8 @@
 #define  TRACE_REG_DEPS     0
 #define  RECORD_CF_EDGES    1
 #define  CHECK_DIRTY_FRAGS  1
-#define  GENERATIONAL_COMPACT 1
+#define  GENERATIONAL_COMPACT 0
+#define  AEON_COMPACT       1
 
 #define  DEBUG_PRINT        1
 #define  EMPTY_RECORD       0
@@ -94,6 +95,8 @@ unsigned interesting_address=0;
 #define  II_CHUNK_SIZE      1000000
 // #define  STRING_TABLE         10007  // smallest prime >= 10000
 
+static Char dbuf[BUF_SIZE] __attribute__((unused));
+
 //#define  RT_IDX_BITS                        8
 #define  RT_IDX_BITS                        3
 #define  RT_ENTRIES_PER_LINE (1<<RT_IDX_BITS)  // must be power of 2
@@ -138,6 +141,7 @@ static unsigned int * dirty_map;
 #define  DPRINT2(s,x,y)   { VG_(sprintf)( dbuf, s, x, y );    BONK( dbuf ); }
 #define  DPRINT3(s,x,y,z) { VG_(sprintf)( dbuf, s, x, y, z ); BONK( dbuf ); }
 #define  DPRINT4(s,w,x,y,z) { VG_(sprintf)( dbuf, s, w, x, y, z ); BONK( dbuf ); }
+#define  DPRINT(...) { VG_(sprintf)( dbuf, __VA_ARGS__ ); BONK( dbuf ); }
 
 #else
 
@@ -146,6 +150,7 @@ static unsigned int * dirty_map;
 #define DPRINT2(s,x,y) { }
 #define DPRINT3(s,x,y,z) { }
 #define DPRINT4(s,w,x,y,z) { }
+#define DPRINT(...) { }
 
 #endif
 
@@ -284,6 +289,7 @@ const char * trace_file_name = "embla.trace";
 const char * edge_file_name = "embla.edges";
 const char * dep_file_name = "embla.deps";
 const char * hidden_func_file_name = "embla.hidden-funcs";
+const char * loop_file_name = "embla.loops";
 
 typedef
    struct _RTEntry {
@@ -324,23 +330,26 @@ typedef struct _LineInfo {
    LineList *deps;
    LineList *pred[PRED_ENTRIES_PER_LINE];
 #endif
-   unsigned line;
+   int      line;
    char    *file;
    char    *func;
+   struct _LoopInfo *loop;
    struct _LineInfo *next;
 } LineInfo;
 
+static struct _LoopInfo outOfTheLoop;
+
 #if RECORD_CF_EDGES
 #if PRINT_RESULTS_TABLE
-static LineInfo dummy_line_info = { { }, NULL, { }, 0, "", "", NULL };
+static LineInfo dummy_line_info = { { }, NULL, { }, 0, "", "", &outOfTheLoop, NULL };
 #else
-static LineInfo dummy_line_info = { NULL, { }, 0, "", "", NULL };
+static LineInfo dummy_line_info = { NULL, { }, 0, "", "", &outOfTheLoop, NULL };
 #endif
 #else
 #if PRINT_RESULTS_TABLE
-static LineInfo dummy_line_info = { { }, 0, "", "", NULL };
+static LineInfo dummy_line_info = { { }, 0, "", "", &outOfTheLoop, NULL };
 #else
-static LineInfo dummy_line_info = { 0, "", "", NULL };
+static LineInfo dummy_line_info = { 0, "", "", &outOfTheLoop, NULL };
 #endif
 #endif
 
@@ -369,6 +378,19 @@ typedef struct {
 #endif
 
 static InstrInfo dummy_instr_info = {1, 0, &dummy_line_info, NULL DUMMY_II_INITIALIZER};
+
+typedef struct _LoopInfo {
+  Char             *file;
+  Char             *func;
+  int               id;    // Unique within a file/func pair, not consecutive
+  int               no;    // Unique within the program, consequtive, used for output
+  struct _LoopInfo *next;
+  InstrInfo        *call;
+  int               depth;  // outermost loops have depth 1
+  struct _LoopInfo *nest[]; // nest[0] is the outermost loop, nest[depth-1] is this loop
+} LoopInfo;
+
+static LoopInfo outOfTheLoop = { NULL, NULL, 0, 0, NULL, &dummy_instr_info, 0 };
 
 #define SI_SAVE_REST  1
 #define SI_MOV_SP     2
@@ -710,6 +732,7 @@ static void newInstr(LineInfo *line) {
   node = currFrame->currNode;
   if (node == NULL) {
     node = new_INode(line);
+    tl_assert(currFrame->currNode == node);
     currFrame->currNode = node;
   }
 
@@ -719,6 +742,7 @@ static void newInstr(LineInfo *line) {
 }
 
 static INode *getINode(void) {
+  // DPRINT( "%d\n", currFrame - firstFrame ); 
   tl_assert(currFrame->currNode);
   return currFrame->currNode;
 }
@@ -734,8 +758,6 @@ static INode *getINode(void) {
 
 
 static Addr32 lowest_shadow_sp=0xffffffff, highest_shadow_sp=0;
-
-static Char dbuf[BUF_SIZE] __attribute__((unused));
 
 typedef unsigned TaggedPtr;
 
@@ -1230,7 +1252,7 @@ static void logTranslation( Addr32 addr )
 
 static LineInfo *line_table[RESULT_ENTRIES];
 
-static LineInfo *mk_line_info_l( char *file, unsigned line, char *func )
+static LineInfo *mk_line_info_l( char *file, int line, char *func )
 {
    char     *i_file, buffer[BUF_SIZE];
    LineInfo *info,**info_p;
@@ -1263,6 +1285,7 @@ static LineInfo *mk_line_info_l( char *file, unsigned line, char *func )
       info->line = line;
       info->file = i_file;
       info->func = intern_string( func == NULL ? "???" : func );
+      info->loop = &outOfTheLoop;  // Should be updated for lines in loops
       info->next = *info_p;
       *info_p = info;
    }
@@ -1276,38 +1299,46 @@ static LineInfo *mk_line_info( Addr32 i_addr )
 
    getDebugInfo( i_addr, file, func, &line );
 
-   return mk_line_info_l( file, line, func );
+   return mk_line_info_l( file, (int) line, func );
 }
 
 static InstrInfo *ii_chunk = NULL;
 static unsigned   ii_idx = II_CHUNK_SIZE;
 
-static InstrInfo *mk_i_info(InstrInfo *curr, Addr32 i_addr, unsigned i_len)
+static InstrInfo *new_i_info( void )
 {
-   if( curr != NULL ) return curr;
-
    if( ii_idx == II_CHUNK_SIZE ) {
       ii_chunk = (InstrInfo *) VG_(calloc)( "", II_CHUNK_SIZE, sizeof( InstrInfo ) );
       check( ii_chunk != NULL, "Out of memory for ii_chunk" );
       ii_idx = 0;
    }
-   
-   ii_chunk[ii_idx].i_addr    = i_addr;
-   ii_chunk[ii_idx].i_len     = i_len;
-   ii_chunk[ii_idx].aeon      = NULL;
-   ii_chunk[ii_idx].line      = mk_line_info( i_addr );
+   return ii_chunk + ii_idx++;
+}   
+
+static InstrInfo *mk_i_info(InstrInfo *curr, Addr32 i_addr, unsigned i_len)
+{
+   InstrInfo *info;
+
+   if( curr != NULL ) return curr;
+
+   info = new_i_info( );
+
+   info->i_addr    = i_addr;
+   info->i_len     = i_len;
+   info->aeon      = NULL;
+   info->line      = mk_line_info( i_addr );
 
 #if INSTR_LVL_DEPS
    {
        int i;
 
        for( i=0; i<N_INSTR_DEPS; i++ ) {
-          ii_chunk[ii_idx].i_deps[i] = NULL;
+          info->i_deps[i] = NULL;
        }
    }
 #endif
 
-   return ii_chunk + ii_idx++;
+   return info;
 }
 
 
@@ -1324,6 +1355,8 @@ static Bool em_process_cmd_line_option(Char* arg)
   VG_STR_CLO(arg, "--dep-file", dep_file_name)
   else
   VG_STR_CLO(arg, "--hidden-func-file", hidden_func_file_name)
+  else
+  VG_STR_CLO(arg, "--loop-file", loop_file_name)
   else
   VG_XACT_CLO(arg, "--span", measure_span)
   else
@@ -1374,6 +1407,7 @@ static void em_print_usage(void)
 "    --edge-file=<name>        store control flow data in <name> [embla.edges]\n"
 "    --dep-file=<name>         read dependencies for span calculation from <name> [embla.deps]\n"
 "    --hidden-func-file=<name> read names of hidden functions <name> [embla.hidden-funcs]\n"
+"    --loop-file=<name>        read loop structure from <name> [embla.loops]\n"
 "    --span                    measure critical path instead of collecting deps\n"
 "    --dctl                    track dynamic control dependencies (ignore joins)\n"
 "    --draw                    track dynamic RAW dependencies\n"
@@ -1804,7 +1838,7 @@ static TraceRec *remapTR( InstrInfo *i_info, TraceRec *eoae, TraceRec *curr )
 {
    AeonItem *ai = lookupAI( i_info );
 
-   if( ai->t_rec == NULL || ai->t_rec >= eoae ) { // One disabling (not anymore)
+   if( !AEON_COMPACT ||ai->t_rec == NULL || ai->t_rec >= eoae ) { // One disabling (not anymore)
      ai->t_rec = curr;
      return NULL;
    } else {
@@ -2021,7 +2055,7 @@ static void compact(void)
          (flag!=TPT_RET_LIVE || i_info!=NULL) ) 
      { 
        // jchm2: Does this ever happen?
-        VG_(tool_panic)("We've found an example!");
+        // VG_(tool_panic)("We've found an example!");
         mp->tr = mp==smarks ? trace_pile : (mp-1)->tr;
      } else if( flag==TPT_RET_LIVE && i_info==NULL ) {
         TraceRec * header = ToTrP( mp->tr->link );
@@ -3236,7 +3270,7 @@ void recordGetI(StmInfo *s_info, Int ix)
 
 static unsigned int malloc_request_size = 0;
 static Char *malloc_fn = NULL;
-static Addr32 addr_arg = NULL;
+static Addr32 addr_arg = 0; // Was NULL
 
 static void clearMap(Addr32 ptr, int size) {
     RefInfo     *refp; 
@@ -3318,12 +3352,13 @@ static void checkIfMallocCall(Addr32 target, Addr32 sp)
   }
 }
 
-static VG_REGPARM(3)
-void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target) 
-{
+static void recordOrFakeCall(Addr32 sp, InstrInfo *i_info, Addr32 target, int fake)
+{ 
     StackFrame * newFrame = current_stack_frame + 1;
     Addr32 ca = i_info->i_addr, ra = ca + i_info->i_len;
     TraceRec * newTR = newTraceRec( i_info, mkTaggedPtr2( newFrame, TPT_OPEN ) );
+
+    // DPRINT( "Call, faking = %d, stack = %d\n", fake, current_stack_frame - stack_base );
 
     // BONK( "Call\n" );
     // validateRegisterMap( );
@@ -3347,17 +3382,29 @@ void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target)
     current_stack_frame = newFrame;
 
     // Set hiddenness (recheck)
-    checkIfHidden( current_stack_frame, target, 0 );
+    if( !fake ) {
+      checkIfHidden( current_stack_frame, target, 0 );
+    }
     // call trace record insertion goes here 
 
 #if CRITPATH_ANALYSIS
     newNodeFrame(newTR->inode);
 #endif
 
-    checkIfMallocCall(target, sp);
+    if( !fake ) {
+      checkIfMallocCall(target, sp);
+    }
 
     gc( );
 
+}
+
+static VG_REGPARM(3)
+void recordCall(Addr32 sp, InstrInfo *i_info, Addr32 target) 
+{
+  // DPRINT( "True call with currFrame = %d and currNode = %u\n", 
+  //          currFrame - firstFrame, (unsigned) currFrame->currNode );
+  recordOrFakeCall( sp, i_info, target, 0 );
 }
 
 static void checkIfMallocRet(Addr32 addr, Addr32 target, void *guest_state)
@@ -3428,9 +3475,11 @@ static TraceRec *pop_stack_frame(InstrInfo *i_info, Addr32 target, void *guest_s
 
       current_stack_frame--;
 
-      // return trace record insterion goes here
-
-      checkIfMallocRet(i_info->i_addr, target, guest_state );
+      // return trace record insertion goes here
+      if( i_info != NULL ) {
+        // Only do this for non fake calls, for safety's sake
+        checkIfMallocRet(i_info->i_addr, target, guest_state );
+      }
       return ret_tr;
    }
    return NULL;
@@ -3442,6 +3491,9 @@ void recordRet(void *guest_state, Addr32 sp, InstrInfo *i_info, Addr32 target)
    TraceRec *tr = NULL;
     // BONK( "Ret\n" );
     // validateRegisterMap( );
+
+   // First check if this is a fake return from a fake call!
+   // Nope, they are nested such that this is not needed!
 
    // Should check that we are really returning to the next stack frame
    // and in that case make it the current stack frame
@@ -3514,27 +3566,89 @@ static LineList * consLL( LineInfo *line, LineList *next )
     return ll;
 }
 
+static void checkIfNewLine( LineInfo *line )
+{
+    LineList *ll, **llp;
+    LineInfo *prev_line = current_stack_frame->current_line;
+
+    if (line != prev_line) {
+      current_stack_frame->current_line = line;
+
+      if( prev_line != NULL ) {
+
+        llp = &( line->pred[prev_line->line & (PRED_ENTRIES_PER_LINE-1)] );
+        for( ll = *llp; ll != NULL && ll->line != prev_line; ll = ll->next ) ;
+
+        if( ll == NULL ) {
+            *llp = consLL( prev_line, *llp );
+        }
+      }
+    }
+
+}
+
+static void fakeReturn( LoopInfo *l_info )
+{
+  pop_stack_frame( NULL, 0, NULL );
+}
+
+static void fakeCall( LoopInfo *l_info )
+{
+  // DPRINT( "Fake call with currFrame = %d and currNode = %u\n", 
+  //          currFrame - firstFrame, (unsigned) currFrame->currNode );
+
+  LineInfo *fakeline = l_info->call->line;
+  newInstr(fakeline);
+  checkIfNewLine(fakeline);
+  recordOrFakeCall( 0, l_info->call, 0, 1 /* Yep, we're faking! */ );
+}
+
+static void fakeCallsAndReturns( LineInfo *fromLine, LineInfo *toLine )
+{
+
+  LoopInfo *fromLoop = fromLine == NULL ?  &outOfTheLoop : fromLine->loop, *toLoop = toLine->loop;
+  int       depth, mindepth, i;
+
+  // DPRINT( "%u %u %u\n", (unsigned) fromLoop, (unsigned) toLoop, (unsigned) &outOfTheLoop );
+
+  if( fromLoop == toLoop ) {
+    return;
+  }
+
+  mindepth = fromLoop->depth < toLoop->depth ? fromLoop->depth : toLoop->depth;
+
+  for( i = 0; i < mindepth; i++ ) {
+    if( fromLoop->nest[i] != toLoop->nest[i] ) {
+      break;
+    }
+  }
+  depth = i;
+
+  for( i = fromLoop->depth - 1; i >= depth; i-- ) {
+    fakeReturn( fromLoop->nest[i] );
+  }
+  for( i = depth; i < toLoop->depth; i++ ) {
+    fakeCall( toLoop->nest[i] );
+  }
+
+}
+
 
 static VG_REGPARM(1)
 void recordEdge( LineInfo *line ) // Need to know line, the line of the current instruction
 {
-    LineList *ll, **llp;
     LineInfo *prev_line = current_stack_frame->current_line;
+
+    if ( line != prev_line ) {
+      fakeCallsAndReturns( prev_line, line );
+    }
 
 #if CRITPATH_ANALYSIS
     newInstr(line);
 #endif
 
-    if( line == prev_line ) return;
-    current_stack_frame->current_line = line;
-    if( prev_line == NULL ) return;
-    
-    llp = &( line->pred[prev_line->line & (PRED_ENTRIES_PER_LINE-1)] );
-    for( ll = *llp; ll != NULL && ll->line != prev_line; ll = ll->next ) ;
+    checkIfNewLine(line);
 
-    if( ll == NULL ) {
-        *llp = consLL( prev_line, *llp );
-    }
 }
 
 #endif
@@ -4534,6 +4648,32 @@ static Bool isSpecialSpace(Char c) {
   return c != ' ' && VG_(isspace)(c);
 }
 
+static void ungetcRH( ReadHandle *rh, Char c )
+{
+  if( rh->buf < rh->read_ptr ) {
+    *( -- (rh->read_ptr) ) = c;
+  } else {
+    VG_(tool_panic)( "No room for ungetcRH!\n" );
+  }
+}
+   
+// Skips space to either a non space character or newline
+
+static Bool eolRH( ReadHandle *rh )
+{
+   do {
+     Char c = getcRH( rh );
+     if( c == '\n' ) {
+       return 1;
+     } else if( c!=0 && ! VG_(isspace)( c ) ) {
+       ungetcRH( rh, c );
+       return 0;
+     }
+   } while( !eofRH( rh ) );
+
+   return 1; // end of file is also end of line
+}
+
 // A word ends on a space or on the end of input. 
 // The return value signifies length of word read with 0 indicating eof.
 // The first character in the word returned is not a space.
@@ -4628,6 +4768,118 @@ static void readDeps( void )
    closeRH( rh );
 }
 
+#define LOOP_HASH_BITS    8
+#define LOOP_HASH_ENTRIES (1 << LOOP_HASH_BITS)
+#define LOOP_HASH_MASK    (LOOP_HASH_ENTRIES-1)
+
+static LoopInfo *findLoop( LoopInfo **table, Char *file, Char *func, int id ) {
+   LoopInfo *loop_i = table[ id & LOOP_HASH_MASK ];
+
+   while( loop_i != NULL && loop_i->id != id && loop_i->file == file && loop_i->func == func ) {
+     loop_i = loop_i->next;
+   }
+   if( loop_i == NULL || loop_i->file != file || loop_i->func != func ) {
+     return NULL;
+   } else {
+     return loop_i;
+   }
+}
+
+static InstrInfo *mk_fake_call( Char *file, Char *func, int ctr )
+{
+   InstrInfo *i_info;
+   LineInfo  *l_info;
+   int i;
+
+   l_info = mk_line_info_l( file, - ctr, func );
+   i_info = new_i_info();
+
+   i_info->i_addr = 0;
+   i_info->i_len = 0;
+   i_info->line = l_info;
+   i_info->aeon = NULL;
+#if INSTR_LVL_DEPS
+   for( i = 0; i < N_INSTR_DEPS; i++ ) {
+     i_info->i_deps[i] = NULL;
+   }
+#endif
+   return i_info;
+}
+
+static void read_loops( void )
+{
+   ReadHandle *rh;
+   const int bufsize = 500;
+   Char buf[bufsize];
+   LoopInfo  *table[LOOP_HASH_ENTRIES];
+   int i;
+   int fake_call_ctr = 0;
+
+   for( i = 0; i < LOOP_HASH_ENTRIES; i++ ) {
+     table[i] = NULL;
+   }
+
+   rh = openRH( loop_file_name );
+
+   while( !eofRH( rh ) ) {
+     int n, id, p_id, depth, l_exit;
+     Char *file, *func;
+     LoopInfo *loop, *parent;
+
+     fake_call_ctr++;
+
+     n  = readWord( rh, buf, bufsize );
+     file = intern_string( buf );
+
+     n  = readWord( rh, buf, bufsize );
+     func = intern_string( buf );
+
+     n  = readWord( rh, buf, bufsize );
+     id = VG_(atoll)( buf );
+
+     n  = readWord( rh, buf, bufsize );
+     p_id = VG_(atoll)( buf );
+
+     parent = p_id == id ? &outOfTheLoop : findLoop( table, file, func, p_id );
+     depth = parent->depth+1;
+
+     loop = (LoopInfo *) VG_(calloc)( "", 1, sizeof(LoopInfo) + depth*sizeof(LoopInfo*) );
+
+     loop->file = file;
+     loop->func = func;
+     loop->id   = id;
+     loop->no   = fake_call_ctr;
+     loop->call = mk_fake_call( file, func, fake_call_ctr );
+     loop->next = table[ id & LOOP_HASH_MASK ];
+     loop->depth = depth;
+
+     for( i = 0; i < depth-1; i++ ) {
+       loop->nest[i] = parent->nest[i];
+     }
+     loop->nest[depth-1] = loop;
+
+     table[ id & LOOP_HASH_MASK ] = loop;
+     
+     n  = readWord( rh, buf, bufsize );
+     l_exit = VG_(atoll)( buf ); // Reading the exit
+
+     while( !eolRH( rh ) ) {
+        n = readWord( rh, buf, bufsize );
+        i = VG_(atoll)( buf );
+
+        if( i != l_exit ) {
+          // ensure that line i in file/func has its loop field set to loop
+          LineInfo *l = mk_line_info_l( file, i, func );
+
+          l->loop = loop;
+        }
+     }
+
+   }
+
+   closeRH( rh );
+}
+
 static void em_post_clo_init_span( void )
 {
    VG_(clo_vex_control).iropt_level = 0;
@@ -4643,6 +4895,7 @@ static void em_post_clo_init_span( void )
    stack_base->call_header = NULL;
 
    readDeps( );
+   read_loops();
 
 }
 
@@ -4739,6 +4992,7 @@ static void em_post_clo_init_deps(void)
    if (static_deps) {
      readDeps();
    }
+   read_loops();
 }
 
 static void em_post_clo_init(void)

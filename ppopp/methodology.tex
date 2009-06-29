@@ -7,7 +7,7 @@ Though such a definition is perhaps restrictive, we feel it is justifiable.
 Functions tend to contain a substantial amount of work---it is rare that a function would be defined simply to execute one statement.
 As for loops, loop iterations would tend to have close execution times, and should therefore lead to small load imbalance when parallelised.
 Also, the use of existing programming constructs means that the task-level parallelism that we discover can be extracted by both programmer and compiler easily.
-It is no surprise that popular parallel programming languages such as Cilk \cite{cilk546referencemanual} and OpenMP \cite{dagum98openmp} also use function calls and loops as their primary parallel constructs.
+It is no surprise that popular parallel programming languages such as Cilk \cite{blumofe96cilk} and OpenMP \cite{dagum98openmp} also use function calls and loops as their primary parallel constructs.
 
 The way we calculate potential parallelism is by the construction of a dynamic dependency graph for each function call.
 A dynamic dependency graph is a directed acyclic graph $G=(V,E)$ where each node $v\in V$ corresponds to an execution of a line of the program\footnote{Ideally we would like to have each node corresponding to the execution of a statement, but gcc debug information has been inadequate for this.}, and each edge $e\in E$ corresponds to a dependency between two line executions.
