@@ -392,9 +392,9 @@ int main(int argc, char **argv)
     loops = inserted->loop;
     while( loops != NULL ) {
       Line *line = loops->lines;
-      printf( "%d %d %d ", loops->id, loops->leader->id, loops->exit );
+      printf( "%d\t%d\t%d\t", loops->id, loops->leader->id, loops->exit );
       while( line != NULL ) {
-        printf( "%d ", line->line );
+        printf( "%d\t", line->line );
         line = line->next;
       }
       printf( "\n" );

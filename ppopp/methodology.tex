@@ -1,0 +1,182 @@
+\section{Methodology}
+
+The aim of studying task-level parallelism is to separate out instruction-level parallelism, which is already exploited in superscalar and VLIW machines, and coarser-grain parallelism more suited for multiple cores, where threading and communication overheads would nullify gains from fine-grain parallelism.
+However, in order to find the limits of task-level parallelism we must first define what a task is.
+Consistent with many other studies \cite{Kreaseck00limitsof}, we define a task as either a function call or a loop iteration.
+Though such a definition is perhaps restrictive, we feel it is justifiable.
+Functions tend to contain a substantial amount of work---it is rare that a function would be defined simply to execute one statement.
+As for loops, loop iterations would tend to have close execution times, and should therefore lead to small load imbalance when parallelised.
+Also, the use of existing programming constructs means that the task-level parallelism that we discover can be extracted by both programmer and compiler easily.
+It is no surprise that popular parallel programming languages such as Cilk \cite{blumofe96cilk} and OpenMP \cite{dagum98openmp} also use function calls and loops as their primary parallel constructs.
+
+The way we calculate potential parallelism is by the construction of a dynamic dependency graph for each function call.
+A dynamic dependency graph is a directed acyclic graph $G=(V,E)$ where each node $v\in V$ corresponds to an execution of a line of the program\footnote{Ideally we would like to have each node corresponding to the execution of a statement, but gcc debug information has been inadequate for this.}, and each edge $e\in E$ corresponds to a dependency between two line executions.
+Such a dependency means that they cannot be executed in parallel---the source must be completed before the target can begin.
+The critical path $CP$ is then defined as the path in $G$ with the largest total cost.
+The limit of parallelism for a function call is then defined as the cost of serial execution divided by the length of the critical path, i.e. $\frac{\sum_{v\in V} cost(v)}{\sum_{v\in CP} cost(v)}$.
+
+We now examine the exact dependencies that are considered in our analysis.
+
+\subsection{Data dependencies}
+Data dependencies arise when two lines of a program access the same memory location, and at least one of them writes to it.
+These can be categorised into three types---true (read-after-write), anti- (write-after-read) and output (write-after-write) dependencies.
+In our study we consider data dependencies in two ways---dynamic and static.
+
+\begin{figure}
+  \centering
+  \begin{verbatim}
+    void g1(int *a) {
+      ...
+      *a = ...; // Writes to *a
+    }
+  
+    void g2(int *b) {
+      ... = *b; // Reads from *b
+      ...
+    }
+
+    int f(int *a, int *b) {
+      int x;
+      g1(a);
+      g2(b);
+    }
+
+    int main(int argc, char *argv[]) {
+      int x=0, y=1;
+      f(&x, &y);
+      f(&x, &x);
+    }
+  \end{verbatim}
+  \caption{}
+  \label{datadeps}
+\end{figure}
+
+When considering dynamic data dependencies, each function call is analysed independently to find its data dependencies.
+With static data dependencies, however, the same set of dependencies is used for all calls to the same function.
+The difference can be illustrated in the program in figure \ref{datadeps}, where there is a potential dependency between the calls to \texttt{g1} and \texttt{g2} in \texttt{f}.
+A model using static data dependencies would place that dependency in all calls to \texttt{f}, while one using dynamic dependencies would only place it in the second call.
+
+\subsection{Control dependencies}
+When whether a line is executed is not known until the execution of another, the former line is said to be control dependent on the latter.
+In our study we consider three models of control dependencies: Last Executed Branch (LEB), Control Flow Analysis (CFA) and None.
+
+\begin{description}
+
+\item[Last Executed Branch (LEB)]
+We make every line dependent on the last executed line that included a branch (i.e. an \texttt{if} conditional or a \texttt{switch}).
+This prevents a conditional from being evaluated at the same time of anything that comes after it.
+It provides a safe approximation to actual control dependencies but requires no static analysis.
+
+\item[Control Flow Analysis (CFA)]
+The LEB model could be over-conservative, as control flow merges are not considered.
+That is, in that model a statement coming after an \texttt{if-else} block would still be control dependent on the conditional of that block even though that statement would be executed whichever way the branch went.
+To resolve this issue we perform static control flow analysis on the program, by constructing a Control Dependence Graph \cite{ferrante87program} for each function in the program.
+The result means we would only enforce a control dependency where it is actually necessary.
+
+\item[None]
+Our final model ignores control dependencies completely.
+In effect this gives us the limits of parallelism in the presence of control speculation, or in other words how much parallelism is achievable if we can predict which way a branch goes with 100\% accuracy.
+Previous studies on branch prediction \cite{smith98study} suggest that even simple and compile-time prediction algorithms can result in high accuracies for many programs, and therefore this model may not actually be so unrealistic.
+
+\end{description}
+
+\subsection{Loops}
+As mentioned above, we have defined a task to be either a function call or a loop iteration.
+While function calls are easy to recognise, loops are harder to identify during runtime.
+Furthermore, care needs to be taken when marking boundaries of a loop iteration.
+For instance, if the statement that increments the loop induction variable is included in the task, then there would be no parallelism possible as each task would read from and then update this loop induction variable, resulting in a dependency between each iteration and the next.
+In our analysis loop-level parallelism is studied in two ways.
+
+\subsubsection{Line-level parallelism}
+So far, because we would like to identify only function-call level parallelism and not instruction-level parallelism, we insert dependencies to the execution of each line from the last executed line that does not contain a function call.
+This has the effect of allowing only lines containing function calls to be spawned, meaning leaf functions (those that do not make any function calls) would exhibit no task-level parallelism.
+This, however, would also rule out any loop-level parallelism.
+Thus one way to consider loop-level parallelism is by not inserting such dependencies, giving us limits on `line-level' parallelism.
+The results would then contain loop-level as well as function-level parallelism, but would also include inter-line instruction-level parallelism (intra-line instruction-level parallelism would still be excluded).
+
+\subsubsection{Natural loop identification}
+In order to investigate loop-level parallelism without including instruction-level parallelism in the process, we employ an established natural loop identification algorithm \cite{aho86compilers, muchnick97advanced}.
+This algorithm works by looking for \emph{back edges} in the Control Flow Graph, and searching for lines in between the two ends of each back edge.
+While this does not identify all loops, most straightforward conventional loops would be found.
+We would then consider each iteration, excluding the loop exit line (the one most likely to contain a loop induction variable increment), as a task, just as if it was a function call.
+
+\subsection{Spawn hoisting}
+
+\begin{figure}
+  \centering
+  \begin{subfloat}
+    \begin{minipage}{0.6in}
+      \begin{verbatim}
+int x, y, r=0;
+
+x = fib(n-1);
+r = r + x;
+y = fib(n-2);
+r = r + y;
+return r;
+
+
+      \end{verbatim}
+    \end{minipage}%
+    \label{orig}
+    \caption{Original program}
+  \end{subfloat}%
+  \qquad
+  \begin{subfloat}
+    \begin{minipage}{0.9in}
+      \begin{verbatim}
+int x, y, r=0;
+
+x = spawn fib(n-1);
+sync;
+r = r + x;
+y = spawn fib(n-2);
+sync;
+r = r + y;
+return r;
+      \end{verbatim}
+    \end{minipage}%
+    \label{without}
+    \caption{Without spawn hoisting}
+  \end{subfloat}%
+  \qquad
+  \begin{subfloat}
+    \begin{minipage}{0.9in}
+      \begin{verbatim}
+int x, y, r;
+
+x = spawn fib(n-1);
+y = spawn fib(n-2);
+r=0;
+sync;
+r = r + x;
+r = r + y;
+return r;
+      \end{verbatim}
+    \end{minipage}%
+    \label{with}
+    \caption{With spawn hoisting}
+  \end{subfloat}%
+  \caption{An illustration of spawn hoisting on part of a function that calculates a Fibonacci number.}
+  \label{spawn}
+\end{figure}
+
+Without spawn hoisting, the only parallelism that is possible is by the spawning of certain lines, with no reorderings possible.
+It is however sometimes beneficial to pre-emptively spawn a function call as early as other dependencies allow, rather than waiting for control to reach that program point.
+This is equivalent to hoisting function calls to their earliest positions.
+Figure \ref{spawn} shows a program where spawn hoisting is required to result in any parallelism.
+
+\subsection{Note about `static' dependencies}
+Static analysis aims to extract as much information as possible about the runtime behaviour of a program by only looking at the program source.
+The problem of getting exact information about how a program might behave is undecidable in general, especially in the area of alias analysis\cite{landi92undecidability}, and consequently dependency analysis also.
+As a result, one can only hope for getting a safe but conservative estimate about possible program behaviour.
+Nevertheless, there has been a large body of work that attempts to narrow the gap between the conservative approximation and actual behaviour\cite{kennedy02optimizing}, and advances are still being made (e.g. \cite{raza09automatic}).
+
+In our study, rather than including the state-of-the-art static analysis, which will take a great deal of time and effort as well as risk our results being made irrelevant by newer analysis techniques, we have used a program's runtime behaviour as limits of what can be achieved with static analysis.
+What this means is that when we consider static dependencies we must run the program twice.
+During the first run, we collect data dependencies and control flow for all calls of each function, which are then aggregated into a set of dependencies for each function definition.
+These dependencies are then used for each function call in the second run, regardless of which subset of dependencies would actually arise in each function call.
+
+While our approximation to static analysis is unsafe, it provides a limit on what static analysis can do by aggregating over all calls to the same function over the execution of the program.
+Of course there may be dependencies in a program that happen not to materialise in the entire execution when given a certain kind of inputs, which our analysis would miss.
+However, we would argue that the infrequency of such dependencies if they exist would make them good candidates for thread-level speculation anyway---ignoring them would give us almost the same speed-up as if the dependencies never existed, as roll-backs would only occur occasionally.

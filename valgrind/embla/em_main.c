@@ -445,24 +445,14 @@ typedef struct _INode {
   LineInfo *line;
   Bool callNode;
   long long int cost;
-  struct _INodeSet *deps;
-  long long int cpLength;
+  long long int cpLength; // Excludes its own cost before node finalisation, includes its own cost after
   struct _INode *cp;
-  int numParents; // For Critical Path Analysis only
 } INode;
 
 typedef struct _INodeList {
   INode *node;
   struct _INodeList *next;
 } INodeList;
-
-// HashSet
-#define INODE_SET_INIT_SIZE 2
-typedef struct _INodeSet {
-  int size;
-  int numBuckets; // Must be power of 2
-  INodeList **buckets;
-} INodeSet;
 
 typedef struct {
   INodeList     **table;
@@ -475,11 +465,13 @@ static INodeList *empty_latest_node_list = NULL;
 static LatestNodeTable initial_LatestNodeTable = { &empty_latest_node_list, 0, 0 };
 
 typedef struct _FrameGraph {
-  INodeList *roots;
+  INodeList *allNodes;
   INode *currNode;
   INode *lastNonCallNode;
   INode *lastBranchNode; // for adding dynamic control dependencies
   INode *callerNode;
+  long long int cpLength;
+  INode *cp;
   LatestNodeTable latestNodesTbl;
 } FrameGraph;
 
@@ -497,62 +489,14 @@ static INodeList *consINode(INodeList *tail, INode *head) {
   return newList;
 }
 
-static INodeSet *newINodeSet(void) {
-  INodeSet *newSet = VG_(malloc)("", sizeof(INodeSet));
-  if (newSet == NULL) {
-    VG_(tool_panic)( "Out of space for INodeSets." );
-  }
-  newSet->size=0;
-  newSet->numBuckets=INODE_SET_INIT_SIZE;
-  newSet->buckets = (INodeList **) VG_(calloc)("", INODE_SET_INIT_SIZE, sizeof(INodeList*));
-  if (newSet->buckets == NULL) {
-    VG_(tool_panic)( "Out of space for INodeSet's buckets." );
-  }
-  return newSet;
-}
-
 static void addDep(INode *fromNode, INode *toNode) {
-  INodeSet *deps = fromNode->deps;
-  INodeList *iter, *last;
-  int index, i;
-
   if (fromNode == toNode) {
     return;
   }
 
-  index = ((int) toNode >> 2) & (deps->numBuckets-1);
-  for (iter = deps->buckets[index]; iter != NULL ; iter = iter->next) {
-    if (iter->node == toNode) {
-      return;
-    }
-    last = iter;
-  }
-
-  // Node doesn't already exist - add it
-  deps->size++;
-  deps->buckets[index] = consINode(deps->buckets[index], toNode);
-  toNode->numParents++;
-  
-  // Check if we need to expand hashtable
-
-  if (deps->numBuckets < ((deps->size * 5) / 4)) {
-    INodeList **oldBuckets = deps->buckets;
-    int oldNumBuckets = deps->numBuckets;
-    deps->numBuckets = oldNumBuckets * 2;
-    deps->buckets = (INodeList **) VG_(calloc)("", deps->numBuckets, sizeof(INodeList*));
-    if (deps->buckets == NULL) {
-      VG_(tool_panic)( "Out of space for reallocating INodeSet's buckets." );
-    }
-    for (i=0; i<oldNumBuckets; i++) {
-      for (iter = oldBuckets[i]; iter != NULL; iter = last) {
-        INode *node = iter->node;
-        index = ((int) node >> 2) & (deps->numBuckets-1);
-        deps->buckets[index] = consINode(deps->buckets[index], node);
-        last = iter->next;
-        VG_(free)(iter);
-      }
-    }
-     VG_(free)(oldBuckets);
+  if (toNode->cp == NULL || fromNode->cpLength > toNode->cpLength) {
+    toNode->cp = fromNode;
+    toNode->cpLength = fromNode->cpLength;
   }
 }
 
@@ -628,7 +572,8 @@ static void updateLatestNodeTbl(INode *node) {
      table[idx] = p;
      currFrame->latestNodesTbl.n_items++;
   } else {
-     p->node = node;
+     if (node->cpLength > p->node->cpLength)
+       p->node = node;
   }
 }
 
@@ -657,23 +602,20 @@ static INode *new_INode(LineInfo *line) {
    inode->line = line;
    inode->callNode = False; // Set to true later if we encounter a call on this line
    inode->cost = 0;
-   inode->deps = newINodeSet();
-   inode->cpLength = -9999999;
+   inode->cpLength = 0;
    inode->cp = NULL;
-   inode->numParents = 0;
    currFrame->currNode = inode;
 
    if (static_deps) {
      // Add all the static dependencies
      addStaticDeps(inode);
-     // Update latest node table
-     updateLatestNodeTbl(inode);
    }
 
    if (dctl && currFrame->lastBranchNode != NULL) {
      addDep(currFrame->lastBranchNode, inode);
    }
 
+   currFrame->allNodes = consINode(currFrame->allNodes, inode);
    return inode;
 }
 
@@ -681,19 +623,21 @@ static void newNodeFrame(INode *callerNode) {
   callerNode->callNode = True;
   currFrame++;
   if (currFrame - N_FRAMES >= firstFrame) {
-    VG_(tool_panic)( "Frame roots stack overflow." );
+    VG_(tool_panic)( "Frame allNodes stack overflow." );
   }
-  currFrame->roots = NULL;
+  currFrame->allNodes = NULL;
   currFrame->currNode = NULL;
   currFrame->lastNonCallNode = NULL;
   currFrame->lastBranchNode = NULL;
   currFrame->callerNode = callerNode;
   currFrame->latestNodesTbl = initial_LatestNodeTable;
+  currFrame->cp = NULL;
+  currFrame->cpLength = -999999;
 }
 
 #define PRINT_CP(currNode, currCp, countdown) \
-        for (currNode = currCp; currNode != NULL; currNode = currNode->cp) { \
-          VG_(printf)("%d(%lld), ", currNode->line->line, currNode->cost); \
+        for ((currNode) = (currCp); (currNode) != NULL; (currNode) = (currNode)->cp) { \
+          VG_(printf)("%d(%lld), ", (currNode)->line->line, (currNode)->cost); \
           if (--countdown == 0) { \
             VG_(printf)("\n"); \
             countdown = 10; \
@@ -701,79 +645,8 @@ static void newNodeFrame(INode *callerNode) {
         } \
         VG_(printf)("\n");
 
-// NON-RECURSIVE (BREADTH FIRST) VERSION - PROBABLY SLOWER
-// DESTRUCTIVE - IT FREES EVERYTHING!
-//
-// Calculates critical path for current frame
-static long long int critPathNodes(void) {
-  INodeSet *deps;
-  INodeList *nodeIter, *tail, *allNodes = NULL;
-  int arrCap = 100, stackSize = 0;
-  INode *currNode, *currDep;
-  INode **workStack = (INode **) VG_(malloc)("", arrCap * sizeof(INode*));
-  long long int currCpLength = -999999;
-  INode *currCp = NULL;
-  int i;
-
-  tl_assert(workStack);
-  // Add all roots to workStack
-  for (nodeIter = currFrame->roots; nodeIter != NULL; nodeIter = tail) {
-    currNode = nodeIter->node;
-    // Just double checking the root hasn't got any parents
-    if (currNode->numParents == 0) {
-      currNode->cpLength = currNode->cost;
-      currNode->cp = NULL;
-      if (stackSize >= arrCap) {
-        arrCap *= 2;
-        workStack = VG_(realloc)("", workStack, arrCap * sizeof(INode*));
-        tl_assert(workStack);
-      }
-      workStack[stackSize] = currNode;
-      stackSize++;
-      allNodes = consINode(allNodes, currNode);
-    }
-    tail = nodeIter->next;
-    VG_(free)(nodeIter);
-  }
-
-  // Keep going through workStack
-  while (stackSize > 0) {
-    stackSize--;
-    currNode = workStack[stackSize];
-    // Look at its CP
-    if (currNode->cpLength > currCpLength) {
-      currCpLength = currNode->cpLength;
-      currCp = currNode;
-    }
-
-    deps = currNode->deps;
-    for (i=0; i<deps->numBuckets; i++) {
-      for (nodeIter = deps->buckets[i]; nodeIter != NULL; nodeIter = tail) {
-        currDep = nodeIter->node;
-//        VG_(printf)("%d->%d; ", currNode->line->line, currDep->line->line);
-        if (currNode->cpLength + currDep->cost > currDep->cpLength) {
-          currDep->cpLength = currNode->cpLength + currDep->cost;
-          currDep->cp = currNode;
-        }
-        currDep->numParents--;
-        if (currDep->numParents == 0) {
-          if (stackSize >= arrCap) {
-            arrCap *= 2;
-            workStack = VG_(realloc)("", workStack, arrCap * sizeof(INode*));
-            tl_assert(workStack);
-          }
-          workStack[stackSize] = currDep;
-          stackSize++;
-          allNodes = consINode(allNodes, currDep);
-        }
-        tail = nodeIter->next;
-        VG_(free)(nodeIter);
-      }
-    }
-    VG_(free)(deps->buckets);
-    VG_(free)(deps);
-//    VG_(free)(currNode);
-  }
+static void printCritPathNodes(void) {
+  INode *currNode;
 
   // Prints out the critical path
   if (currFrame->callerNode != NULL) {
@@ -781,50 +654,60 @@ static long long int critPathNodes(void) {
       sample_count--;
       if (sample_count == 0) {
         int countdown = 10;
-        VG_(printf)("%s:%d(%s)=%lld: ", currFrame->callerNode->line->file, currFrame->callerNode->line->line, currCp->line->file, currCpLength);
-        PRINT_CP(currNode, currCp, countdown);
+        VG_(printf)("%s:%d(%s)=%lld: ", currFrame->callerNode->line->file, currFrame->callerNode->line->line, currFrame->cp->line->file, currFrame->cpLength);
+        PRINT_CP(currNode, currFrame->cp, countdown);
         sample_count = sample_freq;
       }
     }
-    if (sample_threshold > 0 && currCpLength >= sample_threshold) {
+    if (sample_threshold > 0 && currFrame->cpLength >= sample_threshold) {
         int countdown = 10;
-        VG_(printf)("!%s:%d(%s)=%lld: ", currFrame->callerNode->line->file, currFrame->callerNode->line->line, currCp->line->file, currCpLength);
-        PRINT_CP(currNode, currCp, countdown);
+        VG_(printf)("!%s:%d(%s)=%lld: ", currFrame->callerNode->line->file, currFrame->callerNode->line->line, currFrame->cp->line->file, currFrame->cpLength);
+        PRINT_CP(currNode, currFrame->cp, countdown);
     }
   }
-
-  for (nodeIter = allNodes; nodeIter != NULL; nodeIter = tail) {
-    tail = nodeIter->next;
-    VG_(free)(nodeIter->node);
-    VG_(free)(nodeIter);
-  }
-  
-  VG_(free)(workStack);
-  clearLatestNodeTbl();
-  return currCpLength;
 }
 
 static void finaliseOldNode(void) {
   INode *node = currFrame->currNode;
+
   if (!para_non_calls && // We're focusing only on function-call level parallelism
       currFrame->lastNonCallNode != NULL && // There is something to depend on
       // If we're allowing early function spawns, then check the node is not a callnode
       (!early_spawns || !(node->callNode))) { 
     addDep(currFrame->lastNonCallNode, node);
-  } else {
-    currFrame->roots = consINode(currFrame->roots, node);
   }
+
   if (!(node->callNode)) {
     currFrame->lastNonCallNode = node;
+  }
+
+  node->cpLength += node->cost;
+
+  if (currFrame->cp == NULL || node->cpLength > currFrame->cpLength) {
+    currFrame->cp = node;
+    currFrame->cpLength = node->cpLength;
+  }
+
+  if (static_deps) {
+    // Update latest node table
+    updateLatestNodeTbl(node);
   }
 }
 
 static void retNode(void) {
-  long long int cpLength;
-
+  INodeList *nodeIter, *tail;
   finaliseOldNode();
-  cpLength = critPathNodes();
-  currFrame->callerNode->cost += cpLength;
+  currFrame->callerNode->cost += currFrame->cpLength;
+  printCritPathNodes();
+
+  // Free up memory
+  for (nodeIter = currFrame->allNodes; nodeIter != NULL; nodeIter = tail) {
+    tail = nodeIter->next;
+    VG_(free)(nodeIter->node);
+    VG_(free)(nodeIter);
+  }
+  clearLatestNodeTbl();
+
   currFrame--;
 }
 
@@ -1109,7 +992,6 @@ typedef
      EventList *lastRead;
      Event      lastWrite;
      int        offsize;      // Positive => accesssUnit, negative => subordinate
-     int        mallocSize;   // For tracking dependencies
 #if TRACE_REG_DEPS
      SaveDesc  *saveDesc;
 #endif
@@ -1126,6 +1008,118 @@ typedef
    MapFragment;
 
 static MapFragment **map;
+
+typedef
+   struct _MallocSizeList {
+     Addr32 ptr;
+     int mallocSize;
+     struct _MallocSizeList *next;
+   }
+   MallocSizeList;
+
+typedef
+   struct {
+     MallocSizeList **table;
+     int idx_bits;
+     int n_items;
+   }
+   MallocSizeTbl;
+
+static MallocSizeList *empty_MallocSizeList = NULL;
+static MallocSizeTbl mallocSizes = { &empty_MallocSizeList, 0, 0 };
+
+// Hash function - this one removes all trailing 0's and the 1 before it, and
+// then takes the least significant bits as key
+#define MALLOC_SIZE_IDX(ptr) ((((ptr) / ((ptr) & (-(ptr)))) >> 1) & ((1 << (mallocSizes.idx_bits))-1))
+
+static void doubleMallocSizeTbl( void )
+{
+   int i, idx_bits = mallocSizes.idx_bits;
+   MallocSizeList **newTbl = (MallocSizeList **) VG_(calloc)( "", 1 << (idx_bits+1), sizeof(MallocSizeList *) );
+
+   check( newTbl != NULL, "Out of memory" );
+
+   mallocSizes.idx_bits++;
+
+   for( i=0; i < (1 << (idx_bits+1)); i++ ) {
+      newTbl[i] = NULL;
+   }
+
+   for( i=0; i < (1 << idx_bits); i++ ) {
+      MallocSizeList *q = mallocSizes.table[i], *next;
+      while( q != NULL ) {
+         int n_idx = MALLOC_SIZE_IDX(q->ptr);
+         next = q->next;
+         q->next = newTbl[ n_idx ];
+         newTbl[ n_idx ] = q;
+         q = next;
+      }
+   }
+   if( mallocSizes.table != &empty_MallocSizeList ) VG_(free)( mallocSizes.table );
+   mallocSizes.table = newTbl;
+}
+
+static void setMallocSize( Addr32 ptr, int mallocSize)
+{
+  int idx_bits = mallocSizes.idx_bits;
+  int idx = MALLOC_SIZE_IDX(ptr);
+  MallocSizeList **table = mallocSizes.table;
+  MallocSizeList *p = table[ idx ];
+
+  while( p != NULL && p->ptr != ptr ) {
+     p = p->next;
+  }
+
+  if( p == NULL ) {
+     if( mallocSizes.n_items + 2 > ( 1 << mallocSizes.idx_bits ) ) {
+       doubleMallocSizeTbl( );
+       table = mallocSizes.table;
+       idx_bits = mallocSizes.idx_bits;
+       idx = MALLOC_SIZE_IDX(ptr);
+     }
+
+     p = (MallocSizeList *) VG_(malloc)("", sizeof(MallocSizeList));
+     p->ptr = ptr;
+     p->mallocSize = mallocSize;
+     p->next = table[idx];
+     table[idx] = p;
+     mallocSizes.n_items++;
+  } else {
+     p->mallocSize = mallocSize;
+  }
+}
+
+static int getMallocSize( Addr32 ptr )
+{
+  int idx = MALLOC_SIZE_IDX(ptr);
+  MallocSizeList *p = mallocSizes.table[ idx ];
+
+  while( p != NULL && p->ptr != ptr ) {
+     p = p->next;
+  }
+
+  if (p != NULL) {
+    return p->mallocSize;
+  } else {
+    return 0;
+  }
+}
+
+static void clearMallocSize( Addr32 ptr )
+{
+  int idx = MALLOC_SIZE_IDX(ptr);
+  MallocSizeList *p = mallocSizes.table[ idx ];
+
+  while( p != NULL && p->ptr != ptr ) {
+     p = p->next;
+  }
+
+  if (p != NULL) {
+    p->mallocSize = 0 ;
+  } else {
+    VG_(tool_panic)("Pointer not recognised.");
+  }
+}
 
 #if TRACE_REG_DEPS
 typedef
@@ -2396,12 +2390,12 @@ static const Char * makeTitle(const RTEntry * e)
 {
   static Char result[BUF_SIZE];
 #if FULL_CONTOURS
-   VG_(sprintf)( result, "%s %s %s %d%s(%s) %d%s(%s)", 
+   VG_(sprintf)( result, "%s\t%s\t%s\t%d%s(%s)\t%d%s(%s)", 
 		 h_file, h_fn, d_inf, h_line, h_inf, h_cont, t_line, t_inf,
 		 t_cont );
 #else						
    tl_assert(e);
-   VG_(sprintf)( result, "%s %s %c %d%c %d%c", 
+   VG_(sprintf)( result, "%s\t%s\t%c\t%d%c\t%d%c", 
 		 e->h_file, e->h_fn, e->d_inf, e->h_line, e->h_inf, e->t_line,
 		 e->t_inf );
 #endif
@@ -2767,7 +2761,6 @@ static RefInfo* getRefInfo(Addr32 addr)
         for(i=0; i<REFS_PER_FRAG; i++) {
             frag->refs[i].lastWrite = mkTaggedPtr2( trace_pile+1, 0 ); // was TPT_REG
             frag->refs[i].lastRead = NULL;
-            frag->refs[i].mallocSize = 0;
             if( i%init_size == 0 ) {
                frag->refs[i].offsize = init_size;
             } else {
@@ -2851,6 +2844,9 @@ static int maybeSplitBlock( RefInfo *refp, Addr32 addr, int size )
             // we need to split
             RefInfo *block = refp->offsize > 0 ? refp : refp + refp->offsize;
             splitAccessUnit( block, size );
+        } else if (refp->offsize > 0 && refp->offsize < size ) {
+            // Block size is smaller than size requested
+            return refp->offsize;
         }
         return size;
 
@@ -3281,6 +3277,8 @@ static void clearMap(Addr32 ptr, int size) {
     EventList   *ev_list, *ev_next;
     int         l_addr = ptr, l_size = size, iters = 0;
 
+    clearMallocSize(ptr);
+
     do {
 
         int num_bytes, i;
@@ -3311,7 +3309,6 @@ static void clearMap(Addr32 ptr, int size) {
             }
             refp[i].lastRead  = NULL;
             refp[i].lastWrite = mkTaggedPtr2( trace_pile+1, 0 );
-            refp[i].mallocSize = 0;
         }
         // merge
         for( i=refp->offsize; i<num_bytes; i++ ) {
@@ -3415,7 +3412,6 @@ static void checkIfMallocRet(Addr32 addr, Addr32 target, void *guest_state)
   Char fn[FN_LEN];
   Char targetfn[FN_LEN];
   Addr32 *ptr = (Addr32*) guest_state;
-  RefInfo *refp;
 
   if (malloc_fn != NULL &&
       VG_(get_fnname)(addr, fn, FN_LEN) &&
@@ -3426,16 +3422,15 @@ static void checkIfMallocRet(Addr32 addr, Addr32 target, void *guest_state)
           !VG_(strcmp)("calloc", fn) ||
           !VG_(strcmp)("memalign", fn)) {
         Addr32 retValue = ptr[OFFSET_x86_EAX];
-        refp = getRefInfo(retValue);
-        refp->mallocSize = malloc_request_size;
+        setMallocSize( retValue, malloc_request_size );
       } else if (!VG_(strcmp)("realloc", fn)) {
         Addr32 retValue = ptr[OFFSET_x86_EAX];
-        refp = getRefInfo(addr_arg);
-        tl_assert(refp->mallocSize > 0); // Realloc must only accept a previously malloc'ed pointer
+        int mallocSize = getMallocSize(addr_arg);
+        tl_assert(mallocSize > 0); // Realloc must only accept a previously malloc'ed pointer
         if (retValue == addr_arg) {
           // No copying
-          int delta = malloc_request_size - refp->mallocSize;
-          refp->mallocSize = malloc_request_size;
+          int delta = malloc_request_size - mallocSize;
+          setMallocSize(addr_arg, malloc_request_size);
           if (delta < 0) {
             // Shrinking memory (i.e. free)
             Addr32 freedRegion = addr_arg + malloc_request_size;       
@@ -3446,18 +3441,12 @@ static void checkIfMallocRet(Addr32 addr, Addr32 target, void *guest_state)
           }
         } else {
           // Copying (i.e. free old region, malloc new region)
-          int size;
-          size = refp->mallocSize;
-          tl_assert(size>0); // Can only free somthing if the pointer was previously returned by malloc or friends
-          clearMap(addr_arg, size);
+          clearMap(addr_arg, mallocSize);
 
-          refp  = getRefInfo( retValue );
-          refp->mallocSize = malloc_request_size;
+          setMallocSize(retValue, malloc_request_size);
         }
       } else if (!VG_(strcmp)("free", fn)) {
-        int size;
-        refp = getRefInfo( addr_arg );
-        size = refp->mallocSize;
+        int size = getMallocSize(addr_arg);
         tl_assert(size>0); // Can only free somthing if the pointer was previously returned by malloc or friends
         clearMap(addr_arg, size);
       }
@@ -3577,6 +3566,27 @@ static LineList * consLL( LineInfo *line, LineList *next )
     return ll;
 }
 
+static void checkIfNewLine( LineInfo *line )
+{
+    LineList *ll, **llp;
+    LineInfo *prev_line = current_stack_frame->current_line;
+
+    if (line != prev_line) {
+      current_stack_frame->current_line = line;
+
+      if( prev_line != NULL ) {
+
+        llp = &( line->pred[prev_line->line & (PRED_ENTRIES_PER_LINE-1)] );
+        for( ll = *llp; ll != NULL && ll->line != prev_line; ll = ll->next ) ;
+
+        if( ll == NULL ) {
+            *llp = consLL( prev_line, *llp );
+        }
+      }
+    }
+
+}
+
 static void fakeReturn( LoopInfo *l_info )
 {
   pop_stack_frame( NULL, 0, NULL );
@@ -3587,14 +3597,16 @@ static void fakeCall( LoopInfo *l_info )
   // DPRINT( "Fake call with currFrame = %d and currNode = %u\n", 
   //          currFrame - firstFrame, (unsigned) currFrame->currNode );
 
+  LineInfo *fakeline = l_info->call->line;
+  newInstr(fakeline);
+  checkIfNewLine(fakeline);
   recordOrFakeCall( 0, l_info->call, 0, 1 /* Yep, we're faking! */ );
-  new_INode( l_info->call->line );
 }
 
 static void fakeCallsAndReturns( LineInfo *fromLine, LineInfo *toLine )
 {
 
-  LoopInfo *fromLoop = fromLine->loop, *toLoop = toLine->loop;
+  LoopInfo *fromLoop = fromLine == NULL ?  &outOfTheLoop : fromLine->loop, *toLoop = toLine->loop;
   int       depth, mindepth, i;
 
   // DPRINT( "%u %u %u\n", (unsigned) fromLoop, (unsigned) toLoop, (unsigned) &outOfTheLoop );
@@ -3625,25 +3637,18 @@ static void fakeCallsAndReturns( LineInfo *fromLine, LineInfo *toLine )
 static VG_REGPARM(1)
 void recordEdge( LineInfo *line ) // Need to know line, the line of the current instruction
 {
-    LineList *ll, **llp;
     LineInfo *prev_line = current_stack_frame->current_line;
+
+    if ( line != prev_line ) {
+      fakeCallsAndReturns( prev_line, line );
+    }
 
 #if CRITPATH_ANALYSIS
     newInstr(line);
 #endif
 
-    if( line == prev_line ) return;
-    current_stack_frame->current_line = line;
-    if( prev_line == NULL ) return;
+    checkIfNewLine(line);
 
-    fakeCallsAndReturns( prev_line, line );
-    
-    llp = &( line->pred[prev_line->line & (PRED_ENTRIES_PER_LINE-1)] );
-    for( ll = *llp; ll != NULL && ll->line != prev_line; ll = ll->next ) ;
-
-    if( ll == NULL ) {
-        *llp = consLL( prev_line, *llp );
-    }
 }
 
 #endif
@@ -4118,9 +4123,10 @@ static void setTimeStamp( LITTable *lit, LineInfo *line, TimeStamp time )
      p->line = line;
      table[ idx ] = p;
      lit->n_items++;
+     p->time = time;
+  } else if (time > p->time) {
+     p->time = time;
   }
-
-  p->time = time;
 }
 
 static VG_REGPARM(2)
@@ -4636,6 +4642,11 @@ static Char getcRH( ReadHandle *rh )
    if( eofRH( rh ) ) return 0;
    return *( (rh->read_ptr)++ );
 }
+  
+// Same as isspace, except that ' ' is excluded
+static Bool isSpecialSpace(Char c) {
+  return c != ' ' && VG_(isspace)(c);
+}
 
 static void ungetcRH( ReadHandle *rh, Char c )
 {
@@ -4654,7 +4665,7 @@ static Bool eolRH( ReadHandle *rh )
      Char c = getcRH( rh );
      if( c == '\n' ) {
        return 1;
-     } else if( ! VG_(isspace)( c ) ) {
+     } else if( c!=0 && ! VG_(isspace)( c ) ) {
        ungetcRH( rh, c );
        return 0;
      }
@@ -4674,7 +4685,7 @@ static Int readWord( ReadHandle* rh, Char *o_buf, Int len )
    Bool e;
    Int  n = len;
 
-   while( !( e = eofRH( rh ) ) && VG_(isspace)( c = getcRH( rh ) ) ) ;
+   while( !( e = eofRH( rh ) ) && isSpecialSpace( c = getcRH( rh ) ) ) ;
 
    if( !e ) {
       do {
@@ -4682,7 +4693,7 @@ static Int readWord( ReadHandle* rh, Char *o_buf, Int len )
          len--;
          if( eofRH( rh ) ) break;
          c = getcRH( rh );
-      } while( ! VG_(isspace)( c ) && len > 1 );
+      } while( ! isSpecialSpace( c ) && len > 1 );
    }
    *o_buf = 0;
    return n-len;
@@ -5009,7 +5020,8 @@ static void finaliseCritPath(void) {
     retNode();
   }
   finaliseOldNode();
-  cpLength = critPathNodes();//->cpLength;
+  printCritPathNodes();//->cpLength;
+  cpLength = currFrame->cpLength;
   // To take account of the first 2 manually created TraceRecs
   VG_(message)(Vg_UserMsg, "No. of instructions is %lld", totalCost);
   VG_(message)(Vg_UserMsg, "Length of Critical path is %lld", cpLength);
@@ -5077,7 +5089,7 @@ static void printResultTable(const Char * traceFileName)
    }
    for (i = 0; i < num_results; ++i)
    {
-     VG_(sprintf)( buf, "%s %d %d %d\n", // "%s %d %d %d %d %d\n", 
+     VG_(sprintf)( buf, "%s\t%d\t%d\t%d\n", // "%s %d %d %d %d %d\n", 
 		   makeTitle(& result_array[i]), result_array[i].n_raw,
 		   result_array[i].n_war, result_array[i].n_waw);//,
 //                   result_array[i].h_tr->i_info->i_addr, result_array[i].t_tr->i_info->i_addr );
@@ -5167,7 +5179,7 @@ static void printCFG(const Char * cfgFileName)
    for (i = 0; i < num_results; ++i)
    {
      CFEdge *e = result_array + i;
-     VG_(sprintf)( buf, "%s %s %d %d\n", e->from->file, e->from->func, e->from->line, e->to->line );
+     VG_(sprintf)( buf, "%s\t%s\t%d\t%d\n", e->from->file, e->from->func, e->from->line, e->to->line );
      if( fd != -1 )
        VG_(write)( fd, buf, VG_(strlen)( buf ) );
      else
