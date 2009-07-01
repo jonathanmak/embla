@@ -2,8 +2,8 @@
 
 We have run our analysis over most of the SPEC CPU 2000 integer benchmarks, using the MinneSPEC reduced data input set \cite{KleinOsowski02minnespec}.
 The results for our baseline model, along with the descriptions of the benchmarks as provided by SPEC \cite{henning00spec}, are provided in Table \ref{baseline}.
-It can be seen from these results that none of these programs contain much task-level parallelism.
-As we will see later, this is mostly due to the fact that the underlying algorithms of most benchmarks are necessarily sequential.
+We can see from these results that none of these programs contain much task-level parallelism.
+As we will see later, this is mostly due to the fact that the underlying algorithms of most benchmarks are sequential.
 We will now proceed to describe the effects of different dependency models on our limits of parallelism, noting that while parallelism does not exceed single figures for any of the models we examine here, gains in relative terms will still give us insight on how greater parallelism may be found.
 We will also suggest reasons why there is so little parallelism in these benchmarks, before providing some examples of other programs that exhibit much more parallelism.
 
@@ -42,7 +42,7 @@ Benchmark & Language & Description & Serial length & Critical path length & Para
 \end{figure}
 
 Figure \ref{spec-data} shows the parallelism limits when considering dynamic data dependencies compared to the baseline model of using static dependencies.
-It is perhaps surprising to note that for many benchmarks the use of dynamic dependencies does not give much of an advantage over static dependencies (in fact it gives only a 3.3\% speed-up on average over the baseline), suggesting that dependencies are perhaps fairly consistent over the execution of a program.
+It is perhaps surprising to note that for many benchmarks the use of dynamic dependencies does not give much of an advantage over static dependencies (in fact it gives only a 3.3\% speed-up on average over the baseline), suggesting that dependencies are fairly consistent over the execution of a program.
 
 \subsection{Control dependencies}
 
@@ -124,7 +124,7 @@ As our results show, this parallelism is mainly loop-level.
 \end{figure}
 
 To ensure that our model can discover all of the parallelism expressible using popular thread libraries, we used a number of example Cilk programs packaged with the version 5.4.6 release of Cilk, the results of which are displayed in Figure \ref{cilk}.
-The leftmost columns show the span measurement that Cilk performs when running these programs on a four-core Linux machine, which is the maximum speed-up given a sufficient number of processors.
+The leftmost columns show the span measurement that Cilk performs when running these programs on a four-core Linux machine [does it matter what machine it is? the numbers should be the same!], which is the maximum speed-up given a sufficient number of processors.
 The others show the results of running Embla over the same programs with the Cilk keywords removed, i.e.\ their sequential versions.
 The span measured by Cilk is in general comparable to the limits computed by Embla using the baseline model, which is the most similar model---this validates that Embla is able to find most if not all of the parallelism expressible in Cilk.
 In fact, our results show there is still room for improvement if we allow loop-level parallelism, which Cilk currently does not support\footnote{We note however that Cilk++, a commercialised version, does support parallel for-loops.}.
