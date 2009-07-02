@@ -1,0 +1,148 @@
+\section{Introduction}
+
+Parallel programming is no longer optional.  In order to enjoy continued
+performance gains with future generation multicore processors,
+application developers must parallelize all software, old and
+new
+% \cite{TEL95,ONHWC96,KAB03,VIAVAC05}
+.  
+% For scalable parallel
+% performance, program execution must be divided into large numbers of
+% independent tasks that can be scheduled on available cores and hardware
+% threads by runtime systems.  
+While automatic parallelization based on static analysis 
+% \cite{KA02}
+is sometimes feasible, currently most software requires manual
+parallelization.
+Since this is a difficult task, there is urgent need for efficient tool support. 
+In particular, tools that assist the programmer in understanding the potential 
+for parallelization in the code, finding promising parts of the code to parallelize, 
+and in validating that the resulting parallel code is correct.
+
+In this paper, we concentrate on the first issue; estimating the potential 
+for parallelism in a sequential program. For explicitly parallel languages, 
+such tools are based on the parallelization provided by the programmer, and 
+estimates the performance of that particular parallel program. For programs written
+in a sequential language,
+a trial parallelization is needed. This requires two kinds of information:
+\begin{itemize}
+\item
+Information about the program, in particular about the dependencies between 
+different parts, since these determine which parallelization is legal (this 
+information is also needed to find parallelization opportunities and validating 
+correctness).
+\item
+Information about the parallel execution mechanisms and how these are going
+to be integrated into the program, that is, what parallelizing transformations 
+are envisioned.
+\end{itemize}
+We have implemented a parallelism measurement tool by extending the existing
+tool Embla [cite!] with functionality for simulating the effects of various parallel 
+programming models, all based on independent fork-join task parallelism
+%\cite{Conway63}
+, a framework used in many parallel programming environments.
+%\cite{BJKLR96, Lea00, DM98, LF00}.
+
+\begin{figure}
+\small
+\hrulefill
+\[
+\begin{minipage}[t]{3cm}
+\begin{alltt}
+   p();
+   q();
+   r();
+\end{alltt}
+\end{minipage}
+\begin{minipage}[t]{3cm}
+\begin{alltt}
+   spawn p();
+   q();
+   sync;
+   r();
+\end{alltt}
+\end{minipage} 
+\]
+\hrulefill
+\caption{Example of fork-join parallelism.}
+\label{fforkjoin}
+\end{figure}
+
+Consider the program fragment in
+Figure~\ref{fforkjoin} (left):
+Suppose that the calls to {\tt p()} and {\tt q()} are independent,
+but that the call to {\tt r()} depends on the earlier calls. Then
+the call to {\tt p()} can be
+executed in parallel with
+the call to {\tt q()}, as shown to the right.
+Here we assume the availability of a construct {\tt spawn} to start
+the call in parallel and {\tt sync} to wait for all {\tt spawn}'d
+activities to terminate (cf. Cilk
+%\cite{BJKLR96}
+).
+% As long as {\tt p()} and {\tt q()} are
+% independent, the parallel program will produce identical results to
+% the sequential version.  Therefore it is sufficient to understand
+% (debug, verify, \ldots) the sequential program; everything except
+% performance carries over to the parallel version.
+
+Embla aims at helping programmers find independent parts of the 
+program code.  The availability of independent program parts depends on
+the algorithms used and can be further
+limited by sequential programming artifacts, such as re-use of
+variables and sequential book-keeping in an otherwise parallelizable
+algorithm.  Data dependence information can help
+identify and remove such obstacles to parallel execution, but this
+will not be further discussed here.
+
+Parallelizing compilers mostly target loop parallelization based on
+static data dependence analysis methods
+%\cite{KA02}
+.  Such analyzers
+are by necessity conservative, and use approximations that are always
+safe.  Analyzing more general code, e.g., with pointers, remains a
+major challenge. For unsafe languages like C, correctness of static
+analysis results is only guaranteed for well behaved programs; an
+out-of-bounds array index can yield program behaviour not predicted by
+the analysis. Consequently, it has proved difficult to parallelize
+programs automatically, and most production codes are either written
+in an explicitly parallel way or rely on speculative, run-time
+parallelization techniques.
+% \cite{PO03,CL03}.
+
+In contrast, Embla
+observes the actual data dependences that occur during program
+execution, projects them onto relevant program parts, and interprets the
+lack of a runtime data dependence as an indication that the program
+parts involved are likely to be independent.
+Developers will be responsible for selecting
+program inputs that generate representative program executions with
+good coverage. Section~\ref{sgcc} presents an analysis of how the
+dependencies found varies with different inputs.
+
+The methodology mentioned above preserves the
+semantics and determinacy of the sequential program under the
+assumption that all dependencies are found.  Should a dependence
+remain undetected, it might manifest itself as a difference in
+behavior between the parallel and sequential versions of the program
+for some input. Given that the sequential program is deterministic,
+rerunning it under Embla with the offending input will yield the
+missing dependence.  Thus, the programming methodology supported by
+Embla replaces the problem of finding synchronization errors in the
+parallelized, nondeterministic, program with the problem of finding
+all of the relevant dependencies in the sequential program.
+This is in contrast to tools such as the Intel Thread Checker that
+observes fundamentally nondeterministic executions of already 
+parallelized programs.
+
+In addition to data dependences, Embla can be extended to
+detect I/O and control dependences that limit parallelism.  Another potential
+extension is to measure the possible speed
+improvement for parallelizing independent program parts and produce a
+report with suggested program transforms that will yield the maximum
+benefit.  Moreover, Embla presents rich and detailed information; in order
+for the parallelizable code sections to be clearly visible, it must be
+processed and presented concisely.  These extensions are future work.
+This paper
+presents the mechanism for collecting runtime data dependence information.
+
