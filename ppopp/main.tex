@@ -1,9 +1,11 @@
-\documentclass{sig-alternate}
-%\documentclass{../acm_proc_article-sp}
+\documentclass[natbib]{sigplanconf}
 
 \usepackage{graphicx}
 \usepackage{subfigure}
 \usepackage{alltt}
+\usepackage{verbdef}
+\usepackage{color}
+\usepackage{epic}
 
 % Define subfloat environment
 \newbox\subfigbox % Create a box to hold the subfigure.
@@ -27,48 +29,30 @@
 
 \begin{document}
 
-\title{Studying task-level parallelism in sequential programs using Embla}
-\numberofauthors{4}
-\author{
-% 1st. author
-\alignauthor
-Jonathan Mak\\
-       \affaddr{University of Cambridge Computer Laboratory}\\
-       \affaddr{15 JJ Thomson Avenue}\\
-       \affaddr{Cambridge CB3 0FD, UK}\\
-       \email{Jonathan.Mak@cl.cam.ac.uk}
-% 2nd. author
-\alignauthor
-Karl-Filip Fax\'en\\
-       \affaddr{Swedish Institute of Computer Science}\\
-       \affaddr{Box 1263}\\
-       \affaddr{SE-164 29 Kista, Sweden}\\
-       \email{kff@sics.se}
-\and
-% 3rd. author
-\alignauthor
-Sverker Janson\\
-       \affaddr{Swedish Institute of Computer Science}\\
-       \affaddr{Box 1263}\\
-       \affaddr{SE-164 29 Kista, Sweden}\\
-       \email{sverker@sics.se}
-% 4th. author
-\alignauthor
-Alan Mycroft\\
-       \affaddr{University of Cambridge Computer Laboratory}\\
-       \affaddr{15 JJ Thomson Avenue}\\
-       \affaddr{Cambridge CB3 0FD, UK}\\
-       \email{Alan.Mycroft@cl.cam.ac.uk}
-}
-\date{} % do not add a date
+\title{Inherent task-level parallelism discovery with Embla}
 
-\maketitle % optional
+%\authorinfo{Jonathan Mak}
+%           {Computer Laboratory\\
+%            University of Cambridge}
+%           {Jonathan.Mak@cl.cam.ac.uk}
+%\authorinfo{Karl-Filip Fax\'en\and Sverker Janson}
+%           {Swedish Institute of Computer Science}
+%           {\{kff, sverker\}@sics.se}
+%\authorinfo{Alan Mycroft}
+%           {Computer Laboratory\\
+%            University of Cambridge}
+%           {Alan.Mycroft@cl.cam.ac.uk}
+\authorinfo{Authors omitted for review version}{}{}
+          
+\maketitle 
 
 \input{abstract}
 
-% \category{D.3.4}{Programming Languages}{Processors}[Compilers]
-% \terms{Languages, Measurement}
-% \keywords{Limits of parallelism, dynamic dependency graph, spaghetti stack}
+\category{D.3.4}{Programming Languages}{Processors}[Compilers]
+\terms
+Languages, Measurement
+\keywords
+Limits of parallelism, dynamic dependency graph, spaghetti stack
 
 \input{introduction}
 \input{methodology}
@@ -77,7 +61,7 @@ Alan Mycroft\\
 \input{related_work}
 \input{conclusions}
 
-\bibliographystyle{abbrv}
+\bibliographystyle{plainnat}
 \bibliography{bib.bib}{}
 
 \end{document}
