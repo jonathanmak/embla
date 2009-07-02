@@ -37,11 +37,44 @@ to be integrated into the program, that is, what parallelizing transformations
 are envisioned.
 \end{itemize}
 We have implemented a parallelism measurement tool by extending the existing
-tool Embla [cite!] with functionality for simulating the effects of various parallel 
+tool Embla [cite!] (which captures dependence information by an instrumented 
+execution of a program) with functionality for simulating the effects of various parallel 
 programming models, all based on independent fork-join task parallelism
 %\cite{Conway63}
 , a framework used in many parallel programming environments.
 %\cite{BJKLR96, Lea00, DM98, LF00}.
+
+In traditional studies of parallelism limits, the focus is typically
+on hardware support for some model of parallel execution. Parameters
+such as the amount of hardware resources (buffer space, function
+units, \ldots) are then varied. Our focus is rather on explicit
+parallelization of the program source code. This leads to a somewhat
+different set of parameters to vary and different constraints for
+parallelization. For instance, we use control dependence information
+in our baseline model since that is typically available for source
+level transformations. On the other hand, our baseline model is
+static, in the sense that each code section is parallelized in one way
+only; this parallelization must be correct in all executions of that
+section. This is consistent with source level parallelization, and
+special measures have to be taken to lift the restriction (for
+instance function cloning). To fully implement this model, speculative 
+execution (dependence speculation) has to be used. Section~\ref{smethod} 
+discusses our parallelization models in depth.
+
+We have used our prototype tool to investigate the potential for 
+parallelization of three collections of programs; the SPEC CPU 2000 
+integer programs, miBench and the example programs distributed with
+the Cilk 5.4.6 distribution. While the two first collections contain
+sequential programs, the last one is made up of explicitly parallel 
+programs in the Cilk 5 language. These have the property that eliding
+the parallel construct leaves correct sequential code, and we have run 
+our tool on that code as validation of our approach. We can thus contrast 
+programs from these different sources as well as show the behaviour of 
+the different models, including the effects of control and dependence speculation.
+Section~\ref{sresults} reports the results of these experiments.
+
+
+
 
 \begin{figure}
 \small
@@ -86,63 +119,4 @@ activities to terminate (cf. Cilk
 % (debug, verify, \ldots) the sequential program; everything except
 % performance carries over to the parallel version.
 
-Embla aims at helping programmers find independent parts of the 
-program code.  The availability of independent program parts depends on
-the algorithms used and can be further
-limited by sequential programming artifacts, such as re-use of
-variables and sequential book-keeping in an otherwise parallelizable
-algorithm.  Data dependence information can help
-identify and remove such obstacles to parallel execution, but this
-will not be further discussed here.
-
-Parallelizing compilers mostly target loop parallelization based on
-static data dependence analysis methods
-%\cite{KA02}
-.  Such analyzers
-are by necessity conservative, and use approximations that are always
-safe.  Analyzing more general code, e.g., with pointers, remains a
-major challenge. For unsafe languages like C, correctness of static
-analysis results is only guaranteed for well behaved programs; an
-out-of-bounds array index can yield program behaviour not predicted by
-the analysis. Consequently, it has proved difficult to parallelize
-programs automatically, and most production codes are either written
-in an explicitly parallel way or rely on speculative, run-time
-parallelization techniques.
-% \cite{PO03,CL03}.
-
-In contrast, Embla
-observes the actual data dependences that occur during program
-execution, projects them onto relevant program parts, and interprets the
-lack of a runtime data dependence as an indication that the program
-parts involved are likely to be independent.
-Developers will be responsible for selecting
-program inputs that generate representative program executions with
-good coverage. Section~\ref{sgcc} presents an analysis of how the
-dependencies found varies with different inputs.
-
-The methodology mentioned above preserves the
-semantics and determinacy of the sequential program under the
-assumption that all dependencies are found.  Should a dependence
-remain undetected, it might manifest itself as a difference in
-behavior between the parallel and sequential versions of the program
-for some input. Given that the sequential program is deterministic,
-rerunning it under Embla with the offending input will yield the
-missing dependence.  Thus, the programming methodology supported by
-Embla replaces the problem of finding synchronization errors in the
-parallelized, nondeterministic, program with the problem of finding
-all of the relevant dependencies in the sequential program.
-This is in contrast to tools such as the Intel Thread Checker that
-observes fundamentally nondeterministic executions of already 
-parallelized programs.
-
-In addition to data dependences, Embla can be extended to
-detect I/O and control dependences that limit parallelism.  Another potential
-extension is to measure the possible speed
-improvement for parallelizing independent program parts and produce a
-report with suggested program transforms that will yield the maximum
-benefit.  Moreover, Embla presents rich and detailed information; in order
-for the parallelizable code sections to be clearly visible, it must be
-processed and presented concisely.  These extensions are future work.
-This paper
-presents the mechanism for collecting runtime data dependence information.
 
