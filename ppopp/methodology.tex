@@ -10,38 +10,38 @@ The main reason for this is that functions are mainly used by programmers as an 
 Also, the use of existing programming constructs such as functions as task boundaries means that the task-level parallelism that we discover can be extracted by both programmer and compiler easily.
 
 In the Embla model, each function call is spawned at its call site as a task.
-The calling thread can then continue to execute statements that follow the function call without waiting for the call to return, until control reaches a statement that has a dependency on the call.
+The calling thread can then continue to execute statements that follow the function call without waiting for the call to return, until control reaches a statement that has a dependence on the call.
 At this point the calling thread must \emph{synchronise} on the task, i.e.\ wait for the task to complete before going any further.
 In addition, each function call must synchronise on all tasks it has spawned that are still running before returning.
 
-We calculate inherent parallelism by constructing a \emph{dynamic dependency graph} for each function call.
-A dynamic dependency graph is a directed acyclic graph $G=(V,E)$ where each node $v\in V$ corresponds to an \emph{instantiation}, or execution of a line of the program\footnote{Ideally we would like to have a node corresponding to the each execution of a statement, but the gcc debug information that we use contains only line not statement information.}, and each edge $e\in E$ corresponds to a dependency between two line instantiations.
-Such a dependency means that they cannot be executed in parallel---the source of the dependency must be completed before the target can begin.
+We calculate inherent parallelism by constructing a \emph{dynamic dependence graph} for each function call.
+A dynamic dependence graph is a directed acyclic graph $G=(V,E)$ where each node $v\in V$ corresponds to an \emph{instantiation}, or execution of a line of the program\footnote{Ideally we would like to have a node corresponding to the each execution of a statement, but the gcc debug information that we use contains only line not statement information.}, and each edge $e\in E$ corresponds to a dependence between two line instantiations.
+Such a dependence means that they cannot be executed in parallel---the source of the dependence must be completed before the target can begin.
 The critical path $\mathit{CP}$ is the path in $G$ with the largest total cost.
-The limit of parallelism for a function call is then the cost of serial execution divided by the length of the critical path, i.e. $\frac{\sum_{v\in V} cost(v)}{\sum_{v\in \mathit{CP}} cost(v)}$.
+The limit of parallelism for a function call is then the cost of serial execution divided by the length of the critical path, i.e. $\sum_{v\in V} cost(v)/\sum_{v\in \mathit{CP}} cost(v)$.
 The graph is constructed hierarchically---the critical path of a function call is included in the cost of the caller node in its parent call.
-Figure~\ref{example-depgraph} shows the dynamic dependency graph of an example program.
+Figure~\ref{example-depgraph} shows the dynamic dependence graph of an example program.
 
 \begin{figure}
   \begin{center}
   \small
   \input{example.depgraph}
   \end{center}
-  \nocaptionrule \caption{Example dependency graph from Embla}
+  \nocaptionrule \caption{Example dependence graph from Embla}
   \label{example-depgraph}
 \end{figure}
 
-We now describe in greater detail some aspects of the Embla model, some of which can be varied to examine the effects of certain optimisations.
+We now describe in greater detail some parameters of the Embla model, which can be varied to fit different programming language models and to examine the effects of different optimisations.
 
-\subsection{Data dependencies}
-Data dependencies arise when two lines of a program access the same memory location, and at least one of them writes to it.
-They can be categorised into true (read-after-write), anti- (write-after-read) and output (write-after-write) dependencies.
-In Embla data dependencies can be \emph{exact} or \emph{aggregated}.
-With exact dependencies, each instantiation of a line has its own set of dependencies---different instantiations of the same line may therefore have different dependencies, e.g.\ if they access different memory locations.
-When data dependencies are aggregated, however, there is just one set of dependencies for each line, namely the union of the dependencies for each instantiation.
-This means that the dynamic dependency graph will be built with each instantiation having all dependencies in the set corresponding to the line.
-The difference between the two can be illustrated in the program in Figure~\ref{datadeps}, where there is a dependency between the calls to \texttt{g1} and \texttt{g2} in \texttt{f} only when \texttt{a} and \texttt{b} alias.
-A model using aggregated data dependencies would ascribe that dependency to all calls to \texttt{f}, resulting in no parallelism, while one using exact dependencies would only place it in the second call, resulting in some parallelism in the first call.
+\subsection{Data dependences}
+Data dependences arise when two lines of a program access the same memory location, and at least one of them writes to it.
+They can be categorised into true (read-after-write), anti- (write-after-read) and output (write-after-write) dependences.
+In Embla data dependences can be \emph{exact} or \emph{aggregated}.
+With exact dependences, each instantiation of a line has its own set of dependences---different instantiations of the same line may therefore have different dependences, e.g.\ if they access different memory locations.
+When data dependences are aggregated, however, there is just one set of dependences for each line, namely the union of the dependences for each instantiation.
+This means that the dynamic dependence graph will be built with each instantiation of a line having the same set of dependences.
+The difference between the two can be illustrated in the program in Figure~\ref{datadeps}, where there is a dependence between the calls to \texttt{g1} and \texttt{g2} in \texttt{f} only when \texttt{a} and \texttt{b} alias.
+A model using aggregated data dependences would ascribe that dependence to all calls to \texttt{f}, resulting in no parallelism, while one using exact dependences would only place it in the second call, resulting in some parallelism in the first call.
 
 \begin{figure}
   \begin{center}
@@ -70,20 +70,20 @@ A model using aggregated data dependencies would ascribe that dependency to all 
     }
   \end{verbatim}
   \end{center}
-  \caption{Program illustrating the difference between aggregated and exact data dependencies}
+  \caption{Program illustrating the difference between aggregated and exact data dependences}
   \label{datadeps}
 \end{figure}
 
-Aggregated dependencies are used when we would like to consider parallelism that can be achieved by inserting synchronisation points in source code, necessitating the same synchronisation point for all instantiations of a line.
-Exact dependencies, on the other hand, allow us to consider the parallelism that is possible by more dynamic techniques such as thread-level speculation (TLS)~\cite{Rundberg01anall-software,gregory05stampede, welc05safe}.
+Aggregated dependences are used when we would like to consider parallelism that can be achieved by inserting synchronisation points in source code, necessitating the same synchronisation point for all instantiations of a line.
+Exact dependences, on the other hand, allow us to consider the parallelism that is possible by more dynamic techniques such as thread-level speculation (TLS)~\cite{Rundberg01anall-software,gregory05stampede, welc05safe}.
 This difference can again be illustrated in the example above.
-We cannot statically parallelise the calls to \texttt{g1} and \texttt{g2} as that would lead to a race condition in the second call of \texttt{f}.
+We cannot statically parallelize the calls to \texttt{g1} and \texttt{g2} as that would lead to a race condition in the second call of \texttt{f}.
 With TLS however, we can attempt to run \texttt{g1} and \texttt{g2} in parallel, which results in potential parallelism in the first call to \texttt{f}, at the expense of a possible performance penalty of a rollback in the second call.
 
-\subsection{Control dependencies}
+\subsection{Control dependences}
 When whether a line is executed is not known until the execution of another (typically a branch), the former line is said to be control-dependent on the latter, and must not begin execution until the latter has completed.
-In Embla, control dependencies are calculated by constructing Control Dependence Graphs~\cite{ferrante87program}.
-However, control dependencies can also be turned off completely.
+In Embla, control dependences are calculated by constructing Control Dependence Graphs~\cite{ferrante87program}.
+However, control dependences can also be turned off completely in Embla.
 This in effect gives us the parallelism achievable with perfect (100\% accuracy) control speculation.
 Previous studies on branch prediction~\cite{smith98study} suggest that even simple and compile-time prediction algorithms can result in high accuracies for many programs, meaning that control speculation is probably viable.
 
@@ -91,12 +91,13 @@ Previous studies on branch prediction~\cite{smith98study} suggest that even simp
 In order to restrict parallelism to be task-level only, the default Embla model only spawns lines with function calls.
 Lines with simple statements and not function calls must be executed in order as they are usually too fine-grain.
 Naturally this also excludes other forms of task-level parallelism where tasks are not delineated by functions.
-As a result, Embla also contains an option to spawn all lines, whether they contain function calls or not.
+As a result, Embla also contains an option to relax this constraint and spawn all lines, whether they contain function calls or not.
 While this allows us to see greater task-level parallelism, some of the parallelism discovered will be too fine-grain to be useful.
+Nonetheless, based on the line-level parallelism discovered, the programmer can then decide to refactor certain lines into their own spawnable function, once they have determined that the parallelism is sufficiently coarse-grain.
 
 \subsection{Loop iterations}
-Loops are generally considered to be another source of parallelism, and are the primary parallel programming construct in programming languages such as OpenMP~\cite{dagum98openmp}.
-There is an option to parallelise loops in Embla, where loops are identified using an established natural loop identification algorithm \cite{aho86compilers, muchnick97advanced}, and loop iterations can be spawned as tasks in the same way as function calls.
+Loops are generally considered to be another source of task-level parallelism, and are the primary parallel programming construct in programming languages such as OpenMP~\cite{dagum98openmp}.
+There is an option to parallelize loops in Embla, where an established algorithm \cite{aho86compilers, muchnick97advanced} is used to identify natural loops, iterations of which can be spawned as tasks in the same way as function calls.
 
 \subsection{Spawn hoisting}
 
@@ -136,7 +137,7 @@ return r;
       \end{verbatim}
     \end{minipage}%
     \label{without}
-    \caption{Parallelisation without spawn hoisting}
+    \caption{Best possible parallelization \emph{without} spawn hoisting}
   \end{subfloat}%
   \qquad
   \begin{subfloat}
@@ -154,7 +155,7 @@ return r;
       \end{verbatim}
     \end{minipage}%
     \label{with}
-    \caption{Parallelisation with spawn hoisting}
+    \caption{Best possible parallelization \emph{with} spawn hoisting}
   \end{subfloat}%
   \end{center}
   \caption{An illustration of spawn hoisting on part of a function that calculates a Fibonacci number.}
@@ -163,6 +164,6 @@ return r;
 
 In the default Embla model, a task is only spawned when control reaches its original site.
 It is possible, however, that some tasks can be started earlier, resulting in greater parallelism.
-Thus Embla provides an option that allows each spawn to be hoisted to as early a point as dependencies allow.
+Thus Embla provides an option that allows each spawn to be hoisted to as early a point as dependences allow.
 The effects on parallelism in an example program are illustrated in Figure~\ref{spawn}.
 

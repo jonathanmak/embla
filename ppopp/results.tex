@@ -4,7 +4,7 @@ We have run our analysis over most of the SPEC CPU 2000 integer benchmarks, usin
 The results for our baseline model, along with the descriptions of the benchmarks as provided by SPEC \cite{henning00spec}, are provided in Table \ref{baseline}.
 We can see from these results that none of these programs contain much task-level parallelism.
 As we will see later, this is mostly due to the fact that the underlying algorithms of most benchmarks are sequential.
-We will now proceed to describe the effects of different dependency models on our limits of parallelism, noting that while parallelism does not exceed single figures for any of the models we examine here, gains in relative terms will still give us insight on how greater parallelism may be found.
+We will now proceed to describe the effects of different dependence models on our limits of parallelism, noting that while parallelism does not exceed single figures for any of the models we examine here, gains in relative terms will still give us insight on how greater parallelism may be found.
 We will also suggest reasons why there is so little parallelism in these benchmarks, before providing some examples of other programs that exhibit much more parallelism.
 
 \begin{table*}
@@ -32,30 +32,30 @@ Benchmark & Language & Description & Serial length & Critical path length & Para
 \label{baseline}
 \end{table*}
 
-\subsection{Data dependencies}
+\subsection{Data dependences}
 
 \begin{figure}
  \centering
  \includegraphics[width=3in]{spec-data}
- \caption{Limits of parallelism with static and dynamic data dependencies}
+ \caption{Limits of parallelism with static and dynamic data dependences}
  \label{spec-data}
 \end{figure}
 
-Figure \ref{spec-data} shows the parallelism limits when considering dynamic data dependencies compared to the baseline model of using static dependencies.
-It is perhaps surprising to note that for many benchmarks the use of dynamic dependencies does not give much of an advantage over static dependencies (in fact it gives only a 3.3\% speed-up on average over the baseline), suggesting that dependencies are fairly consistent over the execution of a program.
+Figure \ref{spec-data} shows the parallelism limits when considering dynamic data dependences compared to the baseline model of using static dependences.
+It is perhaps surprising to note that for many benchmarks the use of dynamic dependences does not give much of an advantage over static dependences (in fact it gives only a 3.3\% speed-up on average over the baseline), suggesting that dependences are fairly consistent over the execution of a program.
 
-\subsection{Control dependencies}
+\subsection{Control dependences}
 
 \begin{figure}
  \centering
  \includegraphics[width=3in]{spec-ctl}
- \caption{Limits of parallelism with and without static control dependencies}
+ \caption{Limits of parallelism with and without static control dependences}
  \label{spec-ctl}
 \end{figure}
 
-Figure \ref{spec-ctl} compares the limits of parallelism when ignoring control dependencies to those of the baseline.
-Ignoring control dependencies models the effects of perfect control speculation.
-Here we see that a few benchmarks show a significant improvement, at least in relative terms, when control dependencies are ignored.
+Figure \ref{spec-ctl} compares the limits of parallelism when ignoring control dependences to those of the baseline.
+Ignoring control dependences models the effects of perfect control speculation.
+Here we see that a few benchmarks show a significant improvement, at least in relative terms, when control dependences are ignored.
 The speed-up of Eon ranges between 25\% to 40\%, and the average speed-up across all programs is 9.2\%.
 These figures suggest that control speculation is a valuable technique for increasing parallel performance.
 As noted, simple branch prediction (e.g.\ predicting the same branch as the one last taken) is sufficient for high accuracy \cite{smith98study}, and consequently we believe that such improvements should be attainable.
@@ -73,13 +73,13 @@ The rightmost columns in Figure \ref{spec-gran} shows the improvement in paralle
 Some benchmarks which thus far have displayed hardly any parallelism begin to exhibit more, although it is still low in absolute terms.
 It is unknown how much of this line-level parallelism is too fine-grained to be exploited by multi-processors.
 Nonetheless, the results suggest that perhaps we should look closer at other ways of delineating tasks, in addition to using function calls, in order to achieve greater parallelism.
-This model also does not in general include loop-level parallelism, as we cannot distinguish between loop-independent and loop-carried dependencies in our current static model, meaning that parallel loops would still be linearised.
+This model also does not in general include loop-level parallelism, as we cannot distinguish between loop-independent and loop-carried dependences in our current static model, meaning that parallel loops would still be linearised.
 
 \subsection{Loops}
 
 The middle columns in Figure \ref{spec-gran} show the limits of parallelism when natural loop iterations are also spawned as tasks in the same way as function calls.
 They show the effects of exploiting DOALL parallelism, where loop iterations that are completely independent from each other can be executed in parallel.
-At the same time, however, spawning a task for each loop iteration means that if there are cross-iteration dependencies then no parallelism is possible, thus precluding DOACROSS parallelism or software pipelining.
+At the same time, however, spawning a task for each loop iteration means that if there are cross-iteration dependences then no parallelism is possible, thus precluding DOACROSS parallelism or software pipelining.
 The balance between DOALL and DOACROSS loops would therefore determine whether parallelism rises or falls compared to the baseline.
 The results, as expected, show a mixed picture.
 Benchmarks such as gzip and twolf show a marked improvement, as they appear to have a few DOALL loops.
@@ -142,9 +142,9 @@ Using Embla, we have examined several programs in more detail, and we now presen
 Crafty is a chess-playing program that uses a Minimax-like algorithm to find the best move through searching a game tree.
 In theory game tree searching is an easily parallelisable activity, as demonstrated by the success of multi-threaded chess-playing programs \cite{Dailey01usingcilk}.
 However, Embla does not find plenty of parallelism in Crafty for a number of reasons.
-Firstly, Crafty uses one global chessboard, which is updated when a move is considered and then reverted afterwards, creating a chain of data dependencies that linearise the search.
+Firstly, Crafty uses one global chessboard, which is updated when a move is considered and then reverted afterwards, creating a chain of data dependences that linearise the search.
 Furthermore, various pruning techniques used mean that later searches are influenced by the results of earlier ones.
-This shows that algorithmic changes are required before such a program can be parallelised.
+This shows that algorithmic changes are required before such a program can be parallelized.
 
 \subsubsection{164.gzip}
 
@@ -157,7 +157,7 @@ As such it is easy to see that the program cannot process the later parts of the
 We find that input/output forms a large part of several benchmarks.
 In dijkstra, for example, a tenth of the program's sequential execution time is taken up by calls to \texttt{scanf}.
 In FFT (miBench), printing the results takes up around 80\% of processing time.
-If we assume that input/output is unparallelisable, Amdahl's law would mean that the maximum speed-up, even if we were able to parallelise the rest of the program perfectly, would still be low.
+If we assume that input/output is unparallelisable, Amdahl's law would mean that the maximum speed-up, even if we were able to parallelize the rest of the program perfectly, would still be low.
 This suggests that for some of the benchmarks examined, a parallel implementation of input/output would be very useful.
 
 \subsubsection{Getting more parallelism from loops}
@@ -208,8 +208,8 @@ n = dc_bitcnts(seed, iterations, i);
 Despite the relatively low figures of parallelism, we have found some simple ways of discovering greater parallelism by small program modifications, one of which we present here.
 Figure \ref{dnc} shows the manual transformation applied to a (slightly adapted) loop in the bitcount benchmark.
 In the original program, calls to \texttt{pBitCntFunc[i]} are pure and can be run in parallel with each other.
-However, there is a dependency between increments of the induction variables, \texttt{j} and \texttt{seed}, and between additions to the accumulator \texttt{n}, producing two long chains of data dependencies.
+However, there is a dependence between increments of the induction variables, \texttt{j} and \texttt{seed}, and between additions to the accumulator \texttt{n}, producing two long chains of data dependences.
 However, by recognising that \texttt{n} is a reduction variable we can transform the loop into recursive calls using a divde-and-conquer strategy.
-The lengths of the dependency chains on the induction and reduction variables become logarithmic on the number of iterations instead of linear, resulting in a tenfold speed-up over the original program, despite the overheads of extra function calls.
+The lengths of the dependence chains on the induction and reduction variables become logarithmic on the number of iterations instead of linear, resulting in a tenfold speed-up over the original program, despite the overheads of extra function calls.
 This shows that there are simple transformations that increase potential parallelism significantly.
 
