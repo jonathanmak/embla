@@ -1,7 +1,7 @@
 #!/bin/sh
 
-if [ $# -lt 2 ]; then
-  echo "Usage: $0 <program name> <command>"
+if [ $# -lt 3 ]; then
+  echo "Usage: $0 <benchmark-suite> <program name> <command>"
   exit 1
 fi
 

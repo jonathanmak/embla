@@ -14,3 +14,17 @@ valgrind/auxprogs/valgrind-listener
 
 valgrind/coregrind/no_op_client_for_valgrind
 valgrind/coregrind/valgrind
+secondpaper/main.log
+secondpaper/main.dvi
+ppopp/main.aux
+ppopp/main.bbl
+ppopp/main.blg
+ppopp/main.dvi
+ppopp/main.log
+ppopp/main.pdf
+ppopp/main.ps
+secondpaper/main.pdf
+secondpaper/main.ps
+valgrind/VEX/TAG_amd64_linux
+valgrind/docs/.nfs000000000087bb5800000011
+valgrind/embla/tags
