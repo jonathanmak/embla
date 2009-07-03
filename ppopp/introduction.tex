@@ -20,11 +20,17 @@ for parallelization in the code, finding promising parts of the code to parallel
 and in validating that the resulting parallel code is correct.
 
 In this paper, we concentrate on the first issue; estimating the potential 
-for parallelism in a sequential program. For explicitly parallel languages, 
+for parallelism in a sequential program. The objective is to construct a tool
+which, when given a sequential program and an input, can estimate the 
+amount of parallelism that would be available if the program was parallelized
+using a language like OpenMP or Cilk. We validate our results against span 
+measurements of explicitly parallel Cilk programs.
+
+For explicitly parallel languages, 
 such tools are based on the parallelization provided by the programmer, and 
 estimates the performance of that particular parallel program. For programs written
-in a sequential language,
-a trial parallelization is needed. This requires two kinds of information:
+in a sequential language, the tool must construct
+an {\em estimated parallelization}. This requires two kinds of information:
 \begin{itemize}
 \item
 Information about the program, in particular about the dependencies between 
@@ -34,7 +40,7 @@ correctness).
 \item
 Information about the parallel execution mechanisms and how these are going
 to be integrated into the program, that is, what parallelizing transformations 
-are envisioned.
+will be used.
 \end{itemize}
 We have implemented a parallelism measurement tool by extending the existing
 tool Embla [cite!] (which captures dependence information by an instrumented 
@@ -45,19 +51,23 @@ programming models, all based on independent fork-join task parallelism
 %\cite{BJKLR96, Lea00, DM98, LF00}.
 
 In traditional studies of parallelism limits, the focus is typically
-on hardware support for some model of parallel execution. Parameters
+on hardware support for some model of parallel execution, for instance 
+instruction level parallelism in the seminal study by Wall \cite{wall91limits} 
+or speculative module level parallelism \cite{warg01limits}. Parameters
 such as the amount of hardware resources (buffer space, function
 units, \ldots) are then varied. Our focus is rather on explicit
 parallelization of the program source code. This leads to a somewhat
 different set of parameters to vary and different constraints for
-parallelization. For instance, we use control dependence information
+parallelization. For instance, in contrast to e.g. Wall, 
+we use control dependence information
 in our baseline model since that is typically available for source
 level transformations. On the other hand, our baseline model is
 static, in the sense that each code section is parallelized in one way
 only; this parallelization must be correct in all executions of that
 section. This is consistent with source level parallelization, and
 special measures have to be taken to lift the restriction (for
-instance function cloning). To fully implement this model, speculative 
+instance function cloning, to allow code to be parallelized for some 
+call sites and not for others). To fully implement this model, speculative 
 execution (dependence speculation) has to be used. Section~\ref{smethod} 
 discusses our parallelization models in depth.
 
