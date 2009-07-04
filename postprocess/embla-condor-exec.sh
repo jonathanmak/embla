@@ -4,7 +4,7 @@ WORKDIR=$1
 GENID=$2
 SUITE=$3
 PROGNAME=$4
-shift 3
+shift 4
 CLIENT_PROG=$*
 EMBLA_BIN=/home/jchm2/gscratch/embla-bin
 SCRIPT_DIR=/home/jchm2/Work/embla/postprocess
