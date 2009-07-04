@@ -1,0 +1,10 @@
+\begin{abstract}
+
+Manual parallelization of existing sequential programs is difficult and error-prone.
+When presented with a sequential program, a programmer currently has few ways to estimate the amount of potential parallelism inherent in such a program.
+We present an extension of Embla, a Valgrind-based dependency profiler, which can discover the amount of task-level parallelism inherent in a sequentially written program.
+Embla's models of fork-join parallelism closely match popular parallel programming environments, giving a realistic estimate of possible speed-up, and an evaluation of the effectiveness of various program transformations.
+Embla also outputs observed dependences to help the programmer correctly insert parallel constructs, and critical paths to focus the programmer on bottlenecks.
+Using Embla, we are able to discover most of the parallelism in Cilk programs, and use the results for SPECint 2000 and miBench to suggest algorithmic changes that would produce greater parallelism.
+
+\end{abstract}
