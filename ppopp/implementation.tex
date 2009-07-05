@@ -1,5 +1,38 @@
 \section{Implementation}
 
+Our tool is based on the data dependence profiler Embla \cite{embla:08},
+which computes static data and control dependence information.  Both Embla
+and, because of its heritage, our tool are based on the Valgrind binary
+instrumentation framework \cite{valgrind:07}. Neither tool uses the 
+source code of the program under investigation, which makes them 
+relatively language independent, with one caveat: If used in a managed
+code environment such as .NET or a Java virtual machine, they profile the
+virtual machine rather than the program running on top of it.
+
+While the tools work entirely on machine code, they report results in terms 
+of the source code of the program, using debugging information to bridge
+the gap. However, since they do not know about the code generator, it is 
+necessary to separate dependencies arising from the program from 
+dependencies arising from artefacts in the code generator, such as 
+register spills and reloads that should not affect the dependencies 
+reported or the span measurements. 
+
+To make the connection between the 
+instruction level (which the tools see) and the source program level 
+(which the user cares about), the tools only record dependencies through 
+memory, not through registers, and do only give safe information about 
+subprograms compiled without optimization. This works well for languages 
+(or implementations) that adhere to the rule that the abstract program 
+state should be in memory at sequence points in the code. This is the 
+case for instance for C. 
+
+The tools still give meaningful information for code that calls code 
+that is optimized and lacks debug informaton since the memory dependencies
+between the optimized code and the unoptimized code are correctly tracked
+and any register based dependencies will be reflected in memory in the
+unoptimizad code.
+
+
 \subsection{Computing dependences}   \label{snca}
 
 \begin{figure} \small
