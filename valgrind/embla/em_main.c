@@ -237,7 +237,7 @@ static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
 //
 // For Critical Path Analysis
 //
-#define  N_FRAMES         1000  // Nesting level
+#define  N_FRAMES         32000  // Nesting level
 static int static_deps =  0;    // We're tracking some static dependencies (for efficiency)
 static int no_dyn_deps =  0;    // We're not tracking any dynamic dependencies (for efficiency)
 static int dctl =      0;     // Track control dependencies dynamically (ignore joins)

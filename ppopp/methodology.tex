@@ -1,6 +1,6 @@
 \section{Models of Parallelism} \label{smethod}
 
-One of the main aims of Embla is to separate out task-level parallelism from instruction-level parallelism in a program.
+One of the main aims of our tool is to separate out task-level parallelism from instruction-level parallelism in a program.
 Instruction-level parallelism is fine-grain, local and typically exploited in superscalar and VLIW machines.
 It is however unsuitable for multi-core processors, as threading and communication overheads would dominate.
 Thus we would like to only consider parallelism at \emph{task}-level, where a task is a set of instructions that can run independently of other concurrent tasks, and is large enough to justify the costs of spawning a new thread to execute it.
@@ -9,7 +9,7 @@ To mirror the task model of popular parallel programming languages such as Cilk~
 The main reason for this is that functions are mainly used by programmers as an abstraction over a sequence of operations, and as such tend to be relatively self-contained and independent and would usually consist of a substantial amount of work.
 Also, the use of existing programming constructs such as functions as task boundaries means that the task-level parallelism that we discover can be extracted by both programmer and compiler easily.
 
-In the Embla model, each function call is spawned at its call site as a task.
+In our model, each function call is spawned at its call site as a task.
 The calling thread can then continue to execute statements that follow the function call without waiting for the call to return, until control reaches a statement that has a dependence on the call.
 At this point the calling thread must \emph{synchronise} on the task, i.e.\ wait for the task to complete before going any further.
 In addition, each function call must synchronise on all tasks it has spawned that are still running before returning.
@@ -31,12 +31,12 @@ Figure~\ref{example-depgraph} shows the dynamic dependence graph of an example p
   \label{example-depgraph}
 \end{figure}
 
-We now describe in greater detail some parameters of the Embla model, which can be varied to fit different programming language models and to examine the effects of different optimisations.
+We now describe in greater detail some parameters of our model, which can be varied to fit different programming language models and to examine the effects of different optimisations.
 
 \subsection{Data dependences}
 Data dependences arise when two lines of a program access the same memory location, and at least one of them writes to it.
 They can be categorised into true (read-after-write), anti- (write-after-read) and output (write-after-write) dependences.
-In Embla data dependences can be \emph{exact} or \emph{aggregated}.
+In our tool data dependences can be \emph{exact} or \emph{aggregated}.
 With exact dependences, each instantiation of a line has its own set of dependences---different instantiations of the same line may therefore have different dependences, e.g.\ if they access different memory locations.
 When data dependences are aggregated, however, there is just one set of dependences for each line, namely the union of the dependences for each instantiation.
 This means that the dynamic dependence graph will be built with each instantiation of a line having the same set of dependences.
@@ -82,22 +82,22 @@ With TLS however, we can attempt to run \texttt{g1} and \texttt{g2} in parallel,
 
 \subsection{Control dependences}
 When whether a line is executed is not known until the execution of another (typically a branch), the former line is said to be control-dependent on the latter, and must not begin execution until the latter has completed.
-In Embla, control dependences are calculated by constructing Control Dependence Graphs~\cite{ferrante87program}.
-However, control dependences can also be turned off completely in Embla.
+In our tool, control dependences are calculated by constructing Control Dependence Graphs~\cite{ferrante87program}.
+However, control dependences can also be turned off completely.
 This in effect gives us the parallelism achievable with perfect (100\% accuracy) control speculation.
 Previous studies on branch prediction~\cite{smith98study} suggest that even simple and compile-time prediction algorithms can result in high accuracies for many programs, meaning that control speculation is probably viable.
 
 \subsection{Granularity}
-In order to restrict parallelism to be task-level only, the default Embla model only spawns lines with function calls.
+In order to restrict parallelism to be task-level only, our default model only spawns lines with function calls.
 Lines with simple statements and not function calls must be executed in order as they are usually too fine-grain.
 Naturally this also excludes other forms of task-level parallelism where tasks are not delineated by functions.
-As a result, Embla also contains an option to relax this constraint and spawn all lines, whether they contain function calls or not.
+As a result, our tool also contains an option to relax this constraint and spawn all lines, whether they contain function calls or not.
 While this allows us to see greater task-level parallelism, some of the parallelism discovered will be too fine-grain to be useful.
 Nonetheless, based on the line-level parallelism discovered, the programmer can then decide to refactor certain lines into their own spawnable function, once they have determined that the parallelism is sufficiently coarse-grain.
 
 \subsection{Loop iterations}
 Loops are generally considered to be another source of task-level parallelism, and are the primary parallel programming construct in programming languages such as OpenMP~\cite{dagum98openmp}.
-There is an option to parallelize loops in Embla, where an established algorithm \cite{aho86compilers, muchnick97advanced} is used to identify natural loops, iterations of which can be spawned as tasks in the same way as function calls.
+There is an option to parallelize loops in our tool, where an established algorithm \cite{aho86compilers, muchnick97advanced} is used to identify natural loops, iterations of which can be spawned as tasks in the same way as function calls.
 
 \subsection{Spawn hoisting}
 
@@ -162,8 +162,8 @@ return r;
   \label{spawn}
 \end{figure}
 
-In the default Embla model, a task is only spawned when control reaches its original site.
+In our default model, a task is only spawned when control reaches its original site.
 It is possible, however, that some tasks can be started earlier, resulting in greater parallelism.
-Thus Embla provides an option that allows each spawn to be hoisted to as early a point as dependences allow.
+Thus our tool provides an option that allows each spawn to be hoisted to as early a point as dependences allow.
 The effects on parallelism in an example program are illustrated in Figure~\ref{spawn}.
 
