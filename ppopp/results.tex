@@ -8,16 +8,16 @@
 \hline
 Program & Description & Parameters \\
 \hline
-cholesky & Matrix decomposition & size=256, nonzeros=1000 \\
-cilksort & Merge sort & size=100000 \\
-fft & Fourier transform & size=512*512 \\
-fib & Na\"ive Fibonacci calculation & n=30 \\
-heat & Differential equation solver & nx=ny=512, nt=1 \\ 
-lu & Matrix decomposition & n=256 \\
-magic & Magic squares search & n=4 \\
-matmul & Matrix multiplication & n=128 \\
-plu & Matrix decomposition & n=128 \\
-strassen & Matrix multiplication & n=512 \\
+cholesky & Matrix decomposition & \texttt{size=256}, \texttt{nonzeros=1000} \\
+cilksort & Merge sort & \texttt{size=100000} \\
+fft & Fourier transform & \texttt{size=512*512} \\
+fib & Na\"ive Fibonacci calculation & \texttt{n=30} \\
+heat & Differential equation solver & \texttt{nx=ny=512}, \texttt{nt=1} \\ 
+lu & Matrix decomposition & \texttt{n=256} \\
+magic & Magic squares search & \texttt{n=4} \\
+matmul & Matrix multiplication & \texttt{n=128} \\
+plu & Matrix decomposition & \texttt{n=128} \\
+strassen & Matrix multiplication & \texttt{n=512} \\
 \hline
 \end{tabular}
 \caption{Description and parameters for Cilk 5.4.6 examples used}
@@ -293,11 +293,12 @@ n = dc_bitcnts(seed, iterations, i);
   \label{dnc}
 \end{figure}
 
-Despite the relatively low figures of parallelism, there are some simple ways of modifying a program to unlocking greater parallelism, one of which we present here.
+Despite the relatively low figures of parallelism, there are some simple ways of modifying a program to unlock greater parallelism, one of which we present here.
 Figure~\ref{dnc} shows a transformation applied to a (slightly adapted) loop in the bitcount benchmark.
 In the original program, calls to \texttt{pBitCntFunc[i]} are pure and can be run in parallel with each other.
 However, there is a dependence between increments of the induction variables, \texttt{j} and \texttt{seed}, and between additions to the accumulator \texttt{n}, producing two long chains of data dependences.
 Nevertheless, by recognising that \texttt{n} is a reduction variable we can transform the loop into recursive calls using a divde-and-conquer strategy.
 The lengths of the dependence chains on the induction and reduction variables become logarithmic on the number of iterations instead of linear, and consequently the critical path found by our tool is a tenth of that in the original program, despite the overheads of extra function calls.
 This shows that simple transformations can sometimes be sufficient to increase the amount of potential parallelism in certain programs.
+In fact, we note that Cilk++, the commercialised version of Cilk, indeed uses a divide-and-conquer strategy for its parallel for-loops, a decision which is justified by our example.
 
