@@ -14,22 +14,27 @@ of the source code of the program, using debugging information to bridge
 the gap. However, since they do not know about the code generator, it is 
 necessary to separate dependencies arising from the program from 
 dependencies arising from artefacts in the code generator, such as 
-register spills and reloads that should not affect the dependencies 
+register spills and reloads, that should not affect the dependencies 
 reported or the span measurements. 
 
-To make the connection between the 
+We use the following strategy to make clar the connection between the 
 instruction level (which the tools see) and the source program level 
-(which the user cares about), the tools only record dependencies through 
-memory, not through registers, and do only give safe information about 
-subprograms compiled without optimization. This works well for languages 
+(which the user cares about) without being confused by artefacts of 
+the code generator:
+Run the tools on code compiled with register allocation turned off and 
+record only dependencies through memory, not through registers.
+This works well for languages 
 (or implementations) that adhere to the rule that the abstract program 
 state should be in memory at sequence points in the code. This is the 
 case for instance for C. 
 
-The tools still give meaningful information for code that calls code 
-that is optimized and lacks debug informaton since the memory dependencies
-between the optimized code and the unoptimized code are correctly tracked
-and any register based dependencies will be reflected in memory in the
+While this strategy only gives safe information about subprograms compiled 
+without optimization, it still allows parts of the program untouched by the 
+parallelizing transformations to be optimized, so for instance pre-compiled 
+libraries can be handled. Memory based dependencies between these and the 
+rest of the code are correctly tracked 
+and any register based dependencies (return values and possibly arguments)
+will be reflected in memory in the
 unoptimizad code.
 
 
@@ -62,6 +67,8 @@ unoptimizad code.
 \label{ffextree}
 \end{figure}
 
+Here we give a quick overview of the Embla tool that we have extended
+implements the mapping from instruction level to source level dependencies.
 Embla traces dependences between individual instructions in the binary
 code during program execution. It then maps these dependences to 
 dependences between pairs of source lines in the same function. The
