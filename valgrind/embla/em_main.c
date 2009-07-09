@@ -237,7 +237,7 @@ static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
 //
 // For Critical Path Analysis
 //
-#define  N_FRAMES         32000  // Nesting level
+#define  N_FRAMES         1000  // Nesting level
 static int static_deps =  0;    // We're tracking some static dependencies (for efficiency)
 static int no_dyn_deps =  0;    // We're not tracking any dynamic dependencies (for efficiency)
 static int dctl =      0;     // Track control dependencies dynamically (ignore joins)
@@ -3363,7 +3363,7 @@ static void recordOrFakeCall(Addr32 sp, InstrInfo *i_info, Addr32 target, int fa
 
     // BONK( "Call\n" );
     // validateRegisterMap( );
-
+ 
     if( newFrame==stack_base+N_STACK_FRAMES ) {
         VG_(tool_panic)("Out of memory!");
     }
@@ -3603,7 +3603,7 @@ static void fakeCall( LoopInfo *l_info )
   LineInfo *fakeline = l_info->call->line;
   newInstr(fakeline, True);
   checkIfNewLine(fakeline);
-  recordOrFakeCall( 0, l_info->call, 0, 1 /* Yep, we're faking! */ );
+  recordOrFakeCall( current_stack_frame->sp, l_info->call, 0, 1 /* Yep, we're faking! */ );
 }
 
 static void fakeCallsAndReturns( LineInfo *fromLine, LineInfo *toLine )
