@@ -1,9 +1,9 @@
 \begin{abstract}
 
-Manual parallelization of programs is known to be difficult and error-prone, and there are currently few ways to measure the amount of potential parallelism in a program.
-We present an extension of Embla, a Valgrind-based dependency profiler that links dynamic dependences back to source code, as a tool to estimate inherent task-level parallelism.
-Using the popular fork-join model, our tool provides a realistic estimate of potential speed-up if parallelised with tools like Cilk or OpenMP.
-In addition, it outputs dependence information to aid the parallelisation of programs with lots of parallelism, as well as critical paths to suggest algorithmic rewrites of programs with little.
+Manual parallelization of programs is known to be difficult and error-prone, and there are currently few ways to measure the amount of potential parallelism in the original sequential code.
+We present an extension of Embla, a Valgrind-based dependency profiler that links dynamic dependences back to source code, to be used as a tool to estimate inherent task-level parallelism.
+Using the popular fork-join model, our tool provides a realistic estimate of potential speed-up for parallelization with frameworks like Cilk or OpenMP.
+In addition, the tool outputs dependence information to aid the parallelisation of programs with lots of parallelism, as well as critical paths to suggest algorithmic rewrites of programs with little.
 We validate our claims by running our tool over sample Cilk programs and C benchmarks, discovering fresh parallelism in the former, and suggesting parallelism-enhancing algorithmic rewrites in the latter.
 
 \end{abstract}
