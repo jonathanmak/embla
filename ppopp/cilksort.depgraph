@@ -1,0 +1,86 @@
+\verbdef\jkffxdie$spawn cilksort(A,tmpA,quarter);$
+\verbdef\jkffxdif$spawn cilksort(B,tmpB,quarter);$
+\verbdef\jkffxdig$spawn cilksort(C,tmpC,quarter);$
+\verbdef\jkffxdih$spawn cilksort(D,tmpD,size-3*quarter);$
+\verbdef\jkffxdii$sync; $
+\verbdef\jkffxdij$$
+\verbdef\jkffxdja$spawn cilkmerge(A,A+quarter-1,B,B+quarter-1,tmpA);$
+\verbdef\jkffxdjb$spawn cilkmerge(C,C+quarter-1,D,low+size-1,tmpC);$
+\verbdef\jkffxdjc$sync;$
+\verbdef\jkffxdjd$$
+\verbdef\jkffxdje$spawn cilkmerge(tmpA,tmpC-1,tmpC,tmpA+size-1,A);$
+\hrulefill
+\[
+\begin{picture}(420,110)(-55,-110)
+
+\put(-55,-10){\makebox(15,10)[r]{\it 384:}}%
+\put(0,-10){\makebox(100,10)[l]{\jkffxdie}}
+{\color{black} \dottedline{3}(-10,-5)(0,-5)}
+\put(-55,-20){\makebox(15,10)[r]{\it 385:}}%
+\put(0,-20){\makebox(100,10)[l]{\jkffxdif}}
+{\color{black} \dottedline{3}(-10,-15)(0,-15)}
+\put(-55,-30){\makebox(15,10)[r]{\it 386:}}%
+\put(0,-30){\makebox(100,10)[l]{\jkffxdig}}
+{\color{black} \dottedline{3}(-10,-25)(0,-25)}
+\put(-55,-40){\makebox(15,10)[r]{\it 387:}}%
+\put(0,-40){\makebox(100,10)[l]{\jkffxdih}}
+{\color{black} \dottedline{3}(-10,-35)(0,-35)}
+\put(-55,-50){\makebox(15,10)[r]{\it 388:}}%
+\put(0,-50){\makebox(100,10)[l]{\jkffxdii}}
+\put(-55,-60){\makebox(15,10)[r]{\it 389:}}%
+\put(0,-60){\makebox(100,10)[l]{\jkffxdij}}
+\put(-55,-70){\makebox(15,10)[r]{\it 390:}}%
+\put(0,-70){\makebox(100,10)[l]{\jkffxdja}}
+{\color{black} \dottedline{3}(-10,-65)(0,-65)}
+\put(-55,-80){\makebox(15,10)[r]{\it 391:}}%
+\put(0,-80){\makebox(100,10)[l]{\jkffxdjb}}
+{\color{black} \dottedline{3}(-10,-75)(0,-75)}
+\put(-55,-90){\makebox(15,10)[r]{\it 392:}}%
+\put(0,-90){\makebox(100,10)[l]{\jkffxdjc}}
+\put(-55,-100){\makebox(15,10)[r]{\it 393:}}%
+\put(0,-100){\makebox(100,10)[l]{\jkffxdjd}}
+\put(-55,-110){\makebox(15,10)[r]{\it 394:}}%
+\put(0,-110){\makebox(100,10)[l]{\jkffxdje}}
+{\color{black} \dottedline{3}(-10,-105)(0,-105)}
+
+\put(-10,-65){\color{black}\circle*{2}}
+\put(-30,-75){\color{black}\circle*{2}}
+\put(-20,-5){\color{black}\circle*{2}}
+\put(-10,-15){\color{black}\circle*{2}}
+\put(-20,-105){\color{black}\circle*{2}}
+\put(-30,-25){\color{black}\circle*{2}}
+\put(-40,-35){\color{black}\circle*{2}}
+{\color{black}\dashline[200]{3}(-19.5,-8.0)(-10.5,-62.0)}%
+{\color{black}\dashline[200]{3}(-10.5,-62.0)(-10.0,-58.9)}%
+{\color{black}\dashline[200]{3}(-10.5,-62.0)(-12.0,-59.2)}%
+{\color{black}\dashline[200]{3}(-20.0,-8.0)(-20.0,-102.0)}%
+{\color{black}\dashline[200]{3}(-20.0,-102.0)(-19.0,-99.0)}%
+{\color{black}\dashline[200]{3}(-20.0,-102.0)(-21.0,-99.0)}%
+{\color{black}\dashline[200]{3}(-10.0,-18.0)(-10.0,-62.0)}%
+{\color{black}\dashline[200]{3}(-10.0,-62.0)(-9.0,-59.0)}%
+{\color{black}\dashline[200]{3}(-10.0,-62.0)(-11.0,-59.0)}%
+{\color{black}\dashline[200]{3}(-10.3,-18.0)(-19.7,-102.0)}%
+{\color{black}\dashline[200]{3}(-19.7,-102.0)(-18.3,-99.1)}%
+{\color{black}\dashline[200]{3}(-19.7,-102.0)(-20.3,-98.9)}%
+{\color{black}\dashline[200]{3}(-30.0,-28.0)(-30.0,-72.0)}%
+{\color{black}\dashline[200]{3}(-30.0,-72.0)(-29.0,-69.0)}%
+{\color{black}\dashline[200]{3}(-30.0,-72.0)(-31.0,-69.0)}%
+{\color{black}\dashline[200]{3}(-29.6,-28.0)(-20.4,-102.0)}%
+{\color{black}\dashline[200]{3}(-20.4,-102.0)(-19.8,-98.9)}%
+{\color{black}\dashline[200]{3}(-20.4,-102.0)(-21.7,-99.2)}%
+{\color{black}\dashline[200]{3}(-39.3,-37.9)(-30.7,-72.1)}%
+{\color{black}\dashline[200]{3}(-30.7,-72.1)(-30.5,-68.9)}%
+{\color{black}\dashline[200]{3}(-30.7,-72.1)(-32.4,-69.4)}%
+{\color{black}\dashline[200]{3}(-39.2,-37.9)(-20.8,-102.1)}%
+{\color{black}\dashline[200]{3}(-20.8,-102.1)(-20.7,-99.0)}%
+{\color{black}\dashline[200]{3}(-20.8,-102.1)(-22.6,-99.5)}%
+{\color{black}\dashline[200]{3}(-10.7,-67.9)(-19.3,-102.1)}%
+{\color{black}\dashline[200]{3}(-19.3,-102.1)(-17.6,-99.4)}%
+{\color{black}\dashline[200]{3}(-19.3,-102.1)(-19.5,-98.9)}%
+{\color{black}\dashline[200]{3}(-29.1,-77.8)(-20.9,-102.2)}%
+{\color{black}\dashline[200]{3}(-20.9,-102.2)(-20.9,-99.0)}%
+{\color{black}\dashline[200]{3}(-20.9,-102.2)(-22.8,-99.6)}%
+\end{picture}
+\]
+\hrulefill
+

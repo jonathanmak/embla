@@ -1,12 +1,12 @@
 \section{Conclusions and Future work}
 
-We have presented an extension to Embla, designed to aid manual parallelisation by estimating and locating inherent parallelism in programs as well as pinpointing bottlenecks.
+We have presented an extension to Embla, designed to aid manual parallelization by estimating and locating inherent parallelism in programs as well as pinpointing bottlenecks.
 It works by profiling dependences and mapping them back to program source.
-The underlying model of parallelism treats each function call as a spawnable task, which is synchronised on as late as dependences allow.
-It also has several parameters that can be altered to reflect various optimisations, such as thread-level data dependence and control speculation, loop parallelization and spawn hoisting.
+The underlying model of parallelism treats each function call as a spawnable task, which is synchronized on as late as dependences allow.
+It also has several parameters that can be altered to reflect various optimizations, such as thread-level data dependence and control speculation, loop parallelization and spawn hoisting.
 
-We have shown that our tool is able to discover all of the declared parallelism in most example Cilk programs, and even to find parallelism in places not explicitly parallelised.
-The only exception is due to the tool's inability to recognise associative reduction variables, and indeed the ability to discount dependences on such variables would be a useful enhancement to the tool.
+We have shown that our tool is able to discover all of the declared parallelism in most example Cilk programs, and even to find parallelism in places not explicitly parallelized.
+The only exception of interest is due to the tool's inability to recognize associative reduction variables, and indeed the ability to discount dependences on such variables would be a useful enhancement to the tool.
 Our results also show that parallel for-loops are good sources of extra parallelism, especially when implemented with a divide-and-conquer strategy.
 
 Having run the same analyses over benchmark programs from the SPEC CPU 2000 and miBench suites, we observed that most of them do not exhibit the level of task-level parallelism of the Cilk examples.
@@ -17,7 +17,7 @@ One future enhancement to our tool is the addition of thread-spawning overheads 
 This would give us an even more realistic estimate of potential speed-up.
 Related to this is an ability to turn off the spawning of threads that are too small, or to aggregate small threads into a bigger thread in order to save overheads.
 
-Another useful extension is to automate some of the parallelisation process.
-Based on dependences from our tool, a compiler can automatically deduce the best points to spawn and synchronise on a task.
-Such parallelisation may not result in a race-free program, as the dependences were taken from only one set of inputs.
-Thus programmer effort is still required, but it would be spent on verifying the parallelisation and correcting it where necessary rather than performing the parallelisation themselves.
+Another useful extension is to automate some of the parallelization process.
+Based on dependences from our tool, a compiler can automatically deduce the best points to spawn and synchronize on a task.
+Such parallelization may not result in a race-free program, as the dependences were taken from only one set of inputs.
+Thus programmer effort is still required, but it would be spent on verifying the parallelization and correcting it where necessary rather than performing the parallelization themselves.

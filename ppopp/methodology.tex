@@ -5,22 +5,23 @@ Instruction-level parallelism is fine-grain, local and typically exploited in su
 It is however unsuitable for multi-core processors, as threading and communication overheads would dominate.
 Thus we would like to only consider parallelism at \emph{task}-level, where a task is a set of instructions that can run independently of other concurrent tasks, and is large enough to justify the costs of spawning a new thread to execute it.
 
-To mirror the task model of popular parallel programming languages such as Cilk~\cite{blumofe96cilk}, Java~\cite{lea00java} and Erlang~\cite{armstrong07programming}, we define a task in Embla as a function call.
+To mirror the task model of popular parallel programming environments such as Cilk~\cite{blumofe96cilk}, Java~\cite{lea00java}, TBB~\cite{reinders07intel} and TPL~\cite{leijen07parallel}, we define a task in Embla as a function call.
 The main reason for this is that functions are mainly used by programmers as an abstraction over a sequence of operations, and as such tend to be relatively self-contained and independent and would usually consist of a substantial amount of work.
 Also, the use of existing programming constructs such as functions as task boundaries means that the task-level parallelism that we discover can be extracted by both programmer and compiler easily.
 
 In our model, each function call is spawned at its call site as a task.
 The calling thread can then continue to execute statements that follow the function call without waiting for the call to return, until control reaches a statement that has a dependence on the call.
-At this point the calling thread must \emph{synchronise} on the task, i.e.\ wait for the task to complete before going any further.
-In addition, each function call must synchronise on all tasks it has spawned that are still running before returning.
+At this point the calling thread must \emph{synchronize} on the task, i.e.\ wait for the task to complete before going any further.
+In addition, each function call must synchronize on all tasks it has spawned that are still running before returning.
 
-We calculate inherent parallelism by constructing a \emph{dynamic dependence graph} for each function call.
-A dynamic dependence graph is a directed acyclic graph $G=(V,E)$ where each node $v\in V$ corresponds to an \emph{instantiation}, or execution of a line of the program\footnote{Ideally we would like to have a node corresponding to the each execution of a statement, but the gcc debug information that we use contains only line not statement information.}, and each edge $e\in E$ corresponds to a dependence between two line instantiations.
+We calculate inherent parallelism by constructing a \emph{dynamic dependence graph} for each function call, an example of which is shown in Figure~\ref{example-depgraph}.
+A dynamic dependence graph is a directed acyclic graph $G=(V,E)$ where each node $v\in V$ corresponds to an \emph{instantiation}, or execution of a \emph{line} of the program\footnote{Ideally we would like to have a node corresponding to the each execution of a \emph{statement}, but the gcc debug information that we use contains only line not statement information.}, and each edge $e\in E$ corresponds to a dependence between two line instantiations.
 Such a dependence means that they cannot be executed in parallel---the source of the dependence must be completed before the target can begin.
-The critical path $\mathit{CP}$ is the path in $G$ with the largest total cost.
-The limit of parallelism for a function call is then the cost of serial execution divided by the length of the critical path, i.e. $\sum_{v\in V} cost(v)/\sum_{v\in \mathit{CP}} cost(v)$.
-The graph is constructed hierarchically---the critical path of a function call is included in the cost of the caller node in its parent call.
-Figure~\ref{example-depgraph} shows the dynamic dependence graph of an example program.
+The \emph{cost} of a node $v$, $\mathit{cost}(v)$, is the minimum time required to execute the instantiation.
+In our model this is basically the number of instructions executed on that line, with the additional requirement that if one of the instructions is a function call, then the length of the critical path of that call is included in the cost of the node.
+The \emph{critical path} $\mathit{CP}$ is the path in $G$ with the largest total cost.
+The amount of inherent parallelism for a function call is then the cost of serial execution divided by the length of the critical path, i.e. $\sum_{v\in V} \mathit{cost}(v)/\sum_{v\in \mathit{CP}} \mathit{cost}(v)$.
+The inherent parallelism in the entire execution of a program is then the inherent parallelism for its \texttt{main} function.
 
 \begin{figure}
   \begin{center}
@@ -31,11 +32,11 @@ Figure~\ref{example-depgraph} shows the dynamic dependence graph of an example p
   \label{example-depgraph}
 \end{figure}
 
-We now describe in greater detail some parameters of our model, which can be varied to fit different programming language models and to examine the effects of different optimisations.
+We now describe in greater detail some parameters of our model, which can be varied to fit different parallel programming models and to examine the effects of different optimizations.
 
 \subsection{Data dependences}
 Data dependences arise when two lines of a program access the same memory location, and at least one of them writes to it.
-They can be categorised into true (read-after-write), anti- (write-after-read) and output (write-after-write) dependences.
+They can be categorized into true (read-after-write), anti- (write-after-read) and output (write-after-write) dependences.
 In our tool data dependences can be \emph{exact} or \emph{aggregated}.
 With exact dependences, each instantiation of a line has its own set of dependences---different instantiations of the same line may therefore have different dependences, e.g.\ if they access different memory locations.
 When data dependences are aggregated, however, there is just one set of dependences for each line, namely the union of the dependences for each instantiation.
@@ -74,7 +75,7 @@ A model using aggregated data dependences would ascribe that dependence to all c
   \label{datadeps}
 \end{figure}
 
-Aggregated dependences are used when we would like to consider parallelism that can be achieved by inserting synchronisation points in source code, necessitating the same synchronisation point for all instantiations of a line.
+Aggregated dependences are used when we would like to consider parallelism that can be achieved by inserting synchronization points in source code, necessitating the same synchronization point for all instantiations of a line.
 Exact dependences, on the other hand, allow us to consider the parallelism that is possible by more dynamic techniques such as thread-level speculation (TLS)~\cite{Rundberg01anall-software,gregory05stampede, welc05safe}.
 This difference can again be illustrated in the example above.
 We cannot statically parallelize the calls to \texttt{g1} and \texttt{g2} as that would lead to a race condition in the second call of \texttt{f}.
@@ -96,7 +97,7 @@ While this allows us to see greater task-level parallelism, some of the parallel
 Nonetheless, based on the line-level parallelism discovered, the programmer can then decide to refactor certain lines into their own spawnable function, once they have determined that the parallelism is sufficiently coarse-grain.
 
 \subsection{Loop iterations}
-Loops are generally considered to be another source of task-level parallelism, and are the primary parallel programming construct in programming languages such as OpenMP~\cite{dagum98openmp}.
+Loops are generally considered to be another source of task-level parallelism, and are the primary parallel programming construct in programming libraries and environments such as OpenMP~\cite{dagum98openmp} and TBB~\cite{reinders07intel}.
 There is an option to parallelize loops in our tool, where an established algorithm \cite{aho86compilers, muchnick97advanced} is used to identify natural loops, iterations of which can be spawned as tasks in the same way as function calls.
 
 \subsection{Spawn hoisting}
@@ -104,7 +105,7 @@ There is an option to parallelize loops in our tool, where an established algori
 \begin{figure}
   \begin{center}
   \scriptsize
-  \begin{subfloat}
+  \begin{SubFloat}{\label{spawn:orig}Original program extract}
     \begin{minipage}{0.7in}
       \begin{verbatim}
 int x, y, r=0;
@@ -118,11 +119,9 @@ return r;
 
       \end{verbatim}
     \end{minipage}%
-    \label{orig}
-    \caption{Original program}
-  \end{subfloat}%
+  \end{SubFloat}%
   \qquad
-  \begin{subfloat}
+  \begin{SubFloat}{\label{spawn:without}Best possible parallelization \emph{without} spawn hoisting}
     \begin{minipage}{1.0in}
       \begin{verbatim}
 int x, y, r=0;
@@ -136,11 +135,9 @@ r = r + y;
 return r;
       \end{verbatim}
     \end{minipage}%
-    \label{without}
-    \caption{Best possible parallelization \emph{without} spawn hoisting}
-  \end{subfloat}%
+  \end{SubFloat}%
   \qquad
-  \begin{subfloat}
+  \begin{SubFloat}{\label{spawn:with}Best possible parallelization \emph{with} spawn hoisting}
     \begin{minipage}{1.0in}
       \begin{verbatim}
 int x, y, r;
@@ -154,9 +151,7 @@ r = r + y;
 return r;
       \end{verbatim}
     \end{minipage}%
-    \label{with}
-    \caption{Best possible parallelization \emph{with} spawn hoisting}
-  \end{subfloat}%
+  \end{SubFloat}%
   \end{center}
   \caption{An illustration of spawn hoisting on part of a function that calculates a Fibonacci number.}
   \label{spawn}
@@ -164,6 +159,8 @@ return r;
 
 In our default model, a task is only spawned when control reaches its original site.
 It is possible, however, that some tasks can be started earlier, resulting in greater parallelism.
-Thus our tool provides an option that allows each spawn to be hoisted to as early a point as dependences allow.
-The effects on parallelism in an example program are illustrated in Figure~\ref{spawn}.
+This is illustrated in Figure~\ref{spawn}, where the line immediately following each call to \texttt{fib} is dependent on the result of the call in the original program (Figure~\ref{spawn:orig}).
+As we need to synchronize on a spawned task before we reach any line that depends on it, we would need to insert a \texttt{sync} immediately after each call (Figure~\ref{spawn:without}).
+If we allow function spawns to be hoisted, however, more opportunities for parallelism exist, as shown in Figure~\ref{spawn:with}, where both calls to \texttt{fib} have been hoisted to the beginning of the program extract.
+provides To examine the extra parallelism this optimization allows, our tool provides an option to allow each spawn to be hoisted to as early a point as dependences allow.
 

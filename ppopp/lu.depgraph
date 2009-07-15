@@ -1,0 +1,67 @@
+\verbdef\jkffxcgg$ spawn schur(M00, V00, W00, hnb);$
+\verbdef\jkffxcgh$ spawn schur(M01, V00, W01, hnb);$
+\verbdef\jkffxcgi$ spawn schur(M10, V10, W00, hnb);$
+\verbdef\jkffxcgj$ spawn schur(M11, V10, W01, hnb);$
+\verbdef\jkffxcha$ sync; $
+\verbdef\jkffxchb$ $
+\verbdef\jkffxchc$ spawn schur(M00, V01, W10, hnb);$
+\verbdef\jkffxchd$ spawn schur(M01, V01, W11, hnb);$
+\verbdef\jkffxche$ spawn schur(M10, V11, W10, hnb);$
+\verbdef\jkffxchf$ spawn schur(M11, V11, W11, hnb);$
+\hrulefill
+\[
+\begin{picture}(420,100)(-65,-100)
+
+\put(-65,-10){\makebox(15,10)[r]{\it 266:}}%
+\put(0,-10){\makebox(100,10)[l]{\jkffxcgg}}
+{\color{black} \dottedline{3}(-10,-5)(0,-5)}
+\put(-65,-20){\makebox(15,10)[r]{\it 267:}}%
+\put(0,-20){\makebox(100,10)[l]{\jkffxcgh}}
+{\color{black} \dottedline{3}(-10,-15)(0,-15)}
+\put(-65,-30){\makebox(15,10)[r]{\it 268:}}%
+\put(0,-30){\makebox(100,10)[l]{\jkffxcgi}}
+{\color{black} \dottedline{3}(-10,-25)(0,-25)}
+\put(-65,-40){\makebox(15,10)[r]{\it 269:}}%
+\put(0,-40){\makebox(100,10)[l]{\jkffxcgj}}
+{\color{black} \dottedline{3}(-10,-35)(0,-35)}
+\put(-65,-50){\makebox(15,10)[r]{\it 270:}}%
+\put(0,-50){\makebox(100,10)[l]{\jkffxcha}}
+\put(-65,-60){\makebox(15,10)[r]{\it 271:}}%
+\put(0,-60){\makebox(100,10)[l]{\jkffxchb}}
+\put(-65,-70){\makebox(15,10)[r]{\it 272:}}%
+\put(0,-70){\makebox(100,10)[l]{\jkffxchc}}
+{\color{black} \dottedline{3}(-10,-65)(0,-65)}
+\put(-65,-80){\makebox(15,10)[r]{\it 273:}}%
+\put(0,-80){\makebox(100,10)[l]{\jkffxchd}}
+{\color{black} \dottedline{3}(-10,-75)(0,-75)}
+\put(-65,-90){\makebox(15,10)[r]{\it 274:}}%
+\put(0,-90){\makebox(100,10)[l]{\jkffxche}}
+{\color{black} \dottedline{3}(-10,-85)(0,-85)}
+\put(-65,-100){\makebox(15,10)[r]{\it 275:}}%
+\put(0,-100){\makebox(100,10)[l]{\jkffxchf}}
+{\color{black} \dottedline{3}(-10,-95)(0,-95)}
+
+\put(-20,-75){\color{black}\circle*{2}}
+\put(-30,-85){\color{black}\circle*{2}}
+\put(-40,-95){\color{black}\circle*{2}}
+\put(-10,-5){\color{black}\circle*{2}}
+\put(-20,-15){\color{black}\circle*{2}}
+\put(-30,-25){\color{black}\circle*{2}}
+\put(-40,-35){\color{black}\circle*{2}}
+\put(-10,-65){\color{black}\circle*{2}}
+{\color{black}\dashline[200]{3}(-10.0,-8.0)(-10.0,-62.0)}%
+{\color{black}\dashline[200]{3}(-10.0,-62.0)(-9.0,-59.0)}%
+{\color{black}\dashline[200]{3}(-10.0,-62.0)(-11.0,-59.0)}%
+{\color{black}\dashline[200]{3}(-20.0,-18.0)(-20.0,-72.0)}%
+{\color{black}\dashline[200]{3}(-20.0,-72.0)(-19.0,-69.0)}%
+{\color{black}\dashline[200]{3}(-20.0,-72.0)(-21.0,-69.0)}%
+{\color{black}\dashline[200]{3}(-30.0,-28.0)(-30.0,-82.0)}%
+{\color{black}\dashline[200]{3}(-30.0,-82.0)(-29.0,-79.0)}%
+{\color{black}\dashline[200]{3}(-30.0,-82.0)(-31.0,-79.0)}%
+{\color{black}\dashline[200]{3}(-40.0,-38.0)(-40.0,-92.0)}%
+{\color{black}\dashline[200]{3}(-40.0,-92.0)(-39.0,-89.0)}%
+{\color{black}\dashline[200]{3}(-40.0,-92.0)(-41.0,-89.0)}%
+\end{picture}
+\]
+\hrulefill
+

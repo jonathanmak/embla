@@ -1,26 +1,28 @@
 \documentclass[preprint,natbib]{sigplanconf}
 
 \usepackage{graphicx}
-\usepackage{subfigure}
+\usepackage{subfig}
 \usepackage{alltt}
 \usepackage{verbdef}
 \usepackage{color}
 \usepackage{epic}
 
-% Define subfloat environment
-\newbox\subfigbox % Create a box to hold the subfigure.
 \makeatletter
-\newenvironment{subfloat}% % Create the new environment.
-{\def\caption##1{\gdef\subcapsave{\relax##1}}%
-\let\subcapsave=\@empty % Save the subcaption text.
-\let\sf@oldlabel=\label
-\def\label##1{\xdef\sublabsave{\noexpand\label{##1}}}%
-\let\sublabsave\relax % Save the label key.
-\setbox\subfigbox\hbox
-\bgroup}% % Open the box...
-{\egroup % ... close the box and call \subfigure.
-\let\label=\sf@oldlabel
-\subfigure[\subcapsave]{\box\subfigbox}}%
+\newbox\sf@box
+\newenvironment{SubFloat}[2][]%
+  {\def\sf@one{#1}%
+   \def\sf@two{#2}%
+   \setbox\sf@box\hbox
+     \bgroup}%
+{ \egroup
+  \ifx\@empty\sf@two\@empty\relax
+    \def\sf@two{\@empty}
+  \fi
+  \ifx\@empty\sf@one\@empty\relax
+    \subfloat[\sf@two]{\box\sf@box}%
+  \else
+    \subfloat[\sf@one][\sf@two]{\box\sf@box}%
+  \fi}
 \makeatother
 
 \special{papersize=8.5in,11in}
@@ -31,7 +33,7 @@
 
 \begin{document}
 
-\title{Discovering inherent task-level parallelism by source-level dynamic dependence analysis}
+\title{Discovering Inherent Task-level Parallelism by Source-level Dynamic Dependence Analysis}
 
 %\authorinfo{Jonathan Mak}
 %           {Computer Laboratory\\
@@ -40,10 +42,6 @@
 %\authorinfo{Karl-Filip Fax\'en\and Sverker Janson}
 %           {Swedish Institute of Computer Science}
 %           {\{kff, sverker\}@sics.se}
-%\authorinfo{Alan Mycroft}
-%           {Computer Laboratory\\
-%            University of Cambridge}
-%           {Alan.Mycroft@cl.cam.ac.uk}
 \authorinfo{Authors omitted for review version}{}{}
           
 \maketitle 
@@ -54,7 +52,7 @@
 \terms
 Languages, Design, Measurement
 \keywords
-task-level parallelism, dynamic dependence analysis, potential parallelism
+Task-level parallelism, Dynamic Dependence Analysis, Potential parallelism, Parallelization aid
 
 \input{introduction}
 \input{methodology}
@@ -62,6 +60,10 @@ task-level parallelism, dynamic dependence analysis, potential parallelism
 \input{results}
 \input{related_work}
 \input{conclusions}
+
+%\acks
+%
+%We would like to thank Alan Mycroft for his valuable input into this paper.
 
 \bibliographystyle{plainnat}
 \bibliography{bib.bib}{}

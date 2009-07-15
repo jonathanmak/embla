@@ -9,8 +9,10 @@ spawned in the current procedure activation rather than being able to
 pick a specific task to join. While OpenMP~\cite{dagum98openmp} 
 originally focused almost exclusively on loops, version 3.0 adds 
 support for task parallelism.  Other notable examples
-include Java's concurrency library~\cite{lea00java} and X10~
-\cite{charles05x10}.
+offering similar functionality 
+include Java's concurrency library~\cite{lea00java}, Intel's
+Threading Building Blocks~\cite{reinders07intel} and Microsoft's
+Task Parallel Library~\cite{leijen07parallel}.
 
 % Other limits surveys
 Several studies have been made on instruction-level parallelism~
@@ -59,4 +61,4 @@ the selection of good candidate threads for speculation, as frequent
 rollbacks would offset any gains in parallelism~\cite{johnson04mincut,
 liu06posh}.  We believe that Embla can be used to identify good
 candidates, as it allows us to look at the frequencies at which
-potential dependences materialise.
+potential dependences materialize.
