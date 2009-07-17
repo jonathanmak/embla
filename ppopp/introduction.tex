@@ -1,7 +1,7 @@
 \section{Introduction}
 
 Parallel programming is no longer optional.  In order to enjoy continued
-performance gains with future generation multicore processors,
+performance gains with future generation multi-core processors,
 application developers must parallelize all software, old and
 new.
 % \cite{TEL95,ONHWC96,KAB03,VIAVAC05}
@@ -14,16 +14,17 @@ While automatic parallelization based on static analysis
 % \cite{KA02}
 is sometimes feasible, currently most software requires manual
 parallelization.
-Since this is a difficult task, there is urgent need for efficient tool support. 
-In particular, tools that assist the programmer in understanding the potential 
+Since this is a difficult task, there is urgent need for efficient tool support---in
+particular, tools that assist the programmer in understanding the potential 
 for parallelization in the code, finding promising parts of the code to parallelize, 
-and in validating that the resulting parallel code is correct.
+and validating that the resulting parallel code is correct.
 
-In this paper, we concentrate on the first issue; estimating the potential 
-for parallelism in a sequential program. The objective is to construct a tool
+In this paper, we address the first issue, and to an extent the second.
+The primary objective is to construct a tool
 which, when given a sequential program and an input, can estimate the 
 amount of parallelism that would be available if the program was parallelized
-using a language like OpenMP or Cilk. We validate our results against span 
+using language constructs such as those in OpenMP~\cite{dagum98openmp}
+or Cilk~\cite{blumofe96cilk}. We validate our results against timing 
 measurements of explicitly parallel Cilk programs.
 
 For explicitly parallel languages, 
@@ -35,98 +36,69 @@ an {\em estimated parallelization}. This requires two kinds of information:
 \item
 Information about the program, in particular about the dependences between 
 different parts, since these determine which parallelization is legal (this 
-information is also needed to find parallelization opportunities and validating 
+information is also needed to find parallelization opportunities and to validate
 correctness).
 \item
 Information about the parallel execution mechanisms and how these are going
 to be integrated into the program, that is, what parallelizing transformations 
-will be used.
+may be used.
 \end{itemize}
-We have implemented a parallelism measurement tool by extending the existing
-tool Embla [cite!] (which captures dependence information by an instrumented 
-execution of a program) with functionality for simulating the effects of various parallel 
-programming models, all based on independent fork-join task parallelism
+We have implemented a parallelism measurement tool by extending
+Embla \cite{embla:08}, a tool which captures dependence information by an instrumented 
+execution of a program, with functionality for simulating the effects of various parallel 
+programming models, all based on independent fork-join task parallelism,
 %\cite{Conway63}
-, a framework used in many parallel programming environments.
+a framework used in many parallel programming environments.
 %\cite{BJKLR96, Lea00, DM98, LF00}.
 
-In traditional studies of parallelism limits, the focus is typically
-on hardware support for some model of parallel execution, for instance 
-instruction level parallelism in the seminal study by Wall \cite{wall91limits} 
-or speculative module level parallelism \cite{warg01limits}. Parameters
-such as the amount of hardware resources (buffer space, function
-units, \ldots) are then varied. Our focus is rather on explicit
-parallelization of the program source code. This leads to a somewhat
+The focus of traditional studies of parallelism limits \cite{wall91limits,warg01limits}
+is typically on hardware support for some model of parallel
+execution. As such parameters
+such as the amount of hardware resources (buffer space, functional
+units, \ldots) are varied. Our focus is rather on explicit
+parallelization of the program source code, and we therefore use a
 different set of parameters to vary and different constraints for
-parallelization. For instance, in contrast to e.g. Wall, 
-we use control dependence information
-in our baseline model since that is typically available for source
-level transformations. On the other hand, our baseline model is
-static, in the sense that each code section is parallelized in one way
-only; this parallelization must be correct in all executions of that
-section. This is consistent with source level parallelization, and
-special measures have to be taken to lift the restriction (for
-instance function cloning, to allow code to be parallelized for some 
-call sites and not for others). To fully implement this model, speculative 
-execution (dependence speculation) has to be used. Section~\ref{smethod} 
+parallelization. The aim is to address the question,
+``Will techniques such as
+Thread-level speculation or parallel for-loops make much
+difference to the possible speed-up when parallelizing
+a program?'' Section~\ref{smethod} 
 discusses our parallelization models in depth.
 
 We have used our prototype tool to investigate the potential for 
 parallelization of three collections of programs; the SPEC CPU 2000 
-integer programs, miBench and the example programs distributed with
-the Cilk 5.4.6 distribution. While the two first collections contain
+integer programs, MiBench and the example programs distributed with
+the Cilk 5.4.6 distribution. While the first two collections contain
 sequential programs, the last one is made up of explicitly parallel 
 programs in the Cilk 5 language. These have the property that eliding
-the parallel construct leaves correct sequential code, and we have run 
+the parallel constructs leaves correct sequential code, and we have run 
 our tool on that code as validation of our approach. We can thus contrast 
 programs from these different sources as well as show the behaviour of 
 the different models, including the effects of control and dependence speculation.
 Section~\ref{sresults} reports the results of these experiments.
 
-
-
-
-\begin{figure}
-\small
-\hrulefill
-\[
-\begin{minipage}[t]{3cm}
-\begin{alltt}
-   p();
-   q();
-   r();
-\end{alltt}
-\end{minipage}
-\begin{minipage}[t]{3cm}
-\begin{alltt}
-   spawn p();
-   q();
-   sync;
-   r();
-\end{alltt}
-\end{minipage} 
-\]
-\hrulefill
-\caption{Example of fork-join parallelism.}
-\label{fforkjoin}
-\end{figure}
-
-Consider the program fragment in
-Figure~\ref{fforkjoin} (left):
-Suppose that the calls to {\tt p()} and {\tt q()} are independent,
-but that the call to {\tt r()} depends on the earlier calls. Then
-the call to {\tt p()} can be
-executed in parallel with
-the call to {\tt q()}, as shown to the right.
-Here we assume the availability of a construct {\tt spawn} to start
-the call in parallel and {\tt sync} to wait for all {\tt spawn}'d
-activities to terminate (cf. Cilk
-%\cite{BJKLR96}
-).
-% As long as {\tt p()} and {\tt q()} are
-% independent, the parallel program will produce identical results to
-% the sequential version.  Therefore it is sufficient to understand
-% (debug, verify, \ldots) the sequential program; everything except
-% performance carries over to the parallel version.
-
-
+The contributions can be summarised as follows:
+\begin{itemize}
+\item
+By using Embla to map dynamic dependences back to program source,
+our tool gives a realistic estimate of potential speed-up for
+parallelization using frameworks such as Cilk and OpenMP.
+Previous studies that we know of~\cite{Kreaseck00limitsof,warg01limits, oplinger99insearch}
+have only considered \emph{speculative}
+task-level parallelism---we give potential speed-ups for programs
+both with and without the use of thread-level speculation.
+Using this tool we present estimates of inherent parallelism in
+serial elisions of example Cilk programs (Section~\ref{sresults:cilk}).
+\item
+Dependences output by Embla assist the programmer in 
+parallelizing program source by identifying
+appropriate synchronization points. We show how synchronization
+points identified in serial elisions of example Cilk programs
+match those in the original programs (Section~\ref{sresults:cilk}).
+\item
+Critical paths output by our tool can
+be used to identify bottlenecks that restrict the level of
+inherent parallelism. We illustrate this using examples
+from the MiBench benchmark suite, and suggest refactorings
+or algorithmic changes to increase potential parallelism (Section~\ref{sresults:increasing}).
+\end{itemize}

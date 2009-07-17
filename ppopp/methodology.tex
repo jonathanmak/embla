@@ -5,17 +5,62 @@ Instruction-level parallelism is fine-grain, local and typically exploited in su
 It is however unsuitable for multi-core processors, as threading and communication overheads would dominate.
 Thus we would like to only consider parallelism at \emph{task}-level, where a task is a set of instructions that can run independently of other concurrent tasks, and is large enough to justify the costs of spawning a new thread to execute it.
 
-To mirror the task model of popular parallel programming environments such as Cilk~\cite{blumofe96cilk}, Java~\cite{lea00java}, TBB~\cite{reinders07intel} and TPL~\cite{leijen07parallel}, we define a task in Embla as a function call.
-The main reason for this is that functions are mainly used by programmers as an abstraction over a sequence of operations, and as such tend to be relatively self-contained and independent and would usually consist of a substantial amount of work.
-Also, the use of existing programming constructs such as functions as task boundaries means that the task-level parallelism that we discover can be extracted by both programmer and compiler easily.
+To mirror the task model of popular parallel programming environments such as Cilk~\cite{blumofe96cilk}, Java~\cite{lea00java}, TBB~\cite{reinders07intel} and TPL~\cite{leijen07parallel}, we use function calls and returns to delineate tasks.
+The main reason for this is that functions are mainly used by programmers as an abstraction over a sequence of operations, and as such tend to be relatively self-contained and independent and would typically consist of a substantial amount of work.
+Also, the use of existing programming constructs such as function calls and returns as task boundaries means that the task-level parallelism that we discover can be extracted by both programmer and compiler easily.
 
 In our model, each function call is spawned at its call site as a task.
 The calling thread can then continue to execute statements that follow the function call without waiting for the call to return, until control reaches a statement that has a dependence on the call.
 At this point the calling thread must \emph{synchronize} on the task, i.e.\ wait for the task to complete before going any further.
-In addition, each function call must synchronize on all tasks it has spawned that are still running before returning.
+
+\begin{figure}
+\small
+\hrulefill
+\[
+\begin{minipage}[t]{3cm}
+\begin{alltt}
+   p();
+   q();
+   r();
+\end{alltt}
+\end{minipage}
+\begin{minipage}[t]{3cm}
+\begin{alltt}
+   spawn p();
+   spawn q();
+   sync;
+   r();
+\end{alltt}
+\end{minipage}
+\]
+\hrulefill
+\caption{An example of function-call spawning and synchronization, using Cilk-like syntax}
+\label{fforkjoin}
+\end{figure}
+
+As an example of this, consider the program fragment in
+Figure~\ref{fforkjoin} (left):
+Suppose that the calls to {\tt p()} and {\tt q()} are independent,
+but that the call to {\tt r()} depends on the earlier calls. Then
+the call to {\tt p()} can be
+executed in parallel with
+the call to {\tt q()}, as shown on the right.
+Here we assume the availability of the constructs {\tt spawn} to start
+the call in parallel and {\tt sync} to synchronize on all previously {\tt spawn}'ed
+tasks (cf.\ Cilk).
+%\cite{BJKLR96}
+
+% As long as {\tt p()} and {\tt q()} are
+% independent, the parallel program will produce identical results to
+% the sequential version.  Therefore it is sufficient to understand
+% (debug, verify, \ldots) the sequential program; everything except
+% performance carries over to the parallel version.
+
+As in Cilk, each function call must synchronize on all tasks it has spawned that are still running before returning, meaning that all tasks must properly nest.
+While such a design choice may result in some potential parallelism being lost, it preserves program modularity by ensuring that each task is responsible for synchronizing on the tasks it has spawned.
 
 We calculate inherent parallelism by constructing a \emph{dynamic dependence graph} for each function call, an example of which is shown in Figure~\ref{example-depgraph}.
-A dynamic dependence graph is a directed acyclic graph $G=(V,E)$ where each node $v\in V$ corresponds to an \emph{instantiation}, or execution of a \emph{line} of the program\footnote{Ideally we would like to have a node corresponding to the each execution of a \emph{statement}, but the gcc debug information that we use contains only line not statement information.}, and each edge $e\in E$ corresponds to a dependence between two line instantiations.
+A dynamic dependence graph is a directed acyclic graph $G=(V,E)$ where each node $v\in V$ corresponds to an \emph{instantiation}, or execution, of a \emph{line}\footnote{Ideally we would like to have a node corresponding to each execution of a \emph{statement}, but the gcc debug information that Embla uses contains only line not statement information.} of the program, and each edge $e\in E$ corresponds to a dependence between two line instantiations.
 Such a dependence means that they cannot be executed in parallel---the source of the dependence must be completed before the target can begin.
 The \emph{cost} of a node $v$, $\mathit{cost}(v)$, is the minimum time required to execute the instantiation.
 In our model this is basically the number of instructions executed on that line, with the additional requirement that if one of the instructions is a function call, then the length of the critical path of that call is included in the cost of the node.
@@ -39,7 +84,12 @@ Data dependences arise when two lines of a program access the same memory locati
 They can be categorized into true (read-after-write), anti- (write-after-read) and output (write-after-write) dependences.
 In our tool data dependences can be \emph{exact} or \emph{aggregated}.
 With exact dependences, each instantiation of a line has its own set of dependences---different instantiations of the same line may therefore have different dependences, e.g.\ if they access different memory locations.
-When data dependences are aggregated, however, there is just one set of dependences for each line, namely the union of the dependences for each instantiation.
+When data dependences are aggregated, however, there is just one set of dependences for each line, namely the union of the dependences for each instantiation\footnote{
+This distinction parallels that between {\em context-sensitive} and
+{\em context-insensitive} static analyses.
+Exact dependences are maximally context-sensitive in that line instantiations
+essentially include both the full call-stack and, for loops, the iteration
+count.}.
 This means that the dynamic dependence graph will be built with each instantiation of a line having the same set of dependences.
 The difference between the two can be illustrated in the program in Figure~\ref{datadeps}, where there is a dependence between the calls to \texttt{g1} and \texttt{g2} in \texttt{f} only when \texttt{a} and \texttt{b} alias.
 A model using aggregated data dependences would ascribe that dependence to all calls to \texttt{f}, resulting in no parallelism, while one using exact dependences would only place it in the second call, resulting in some parallelism in the first call.
@@ -84,14 +134,14 @@ With TLS however, we can attempt to run \texttt{g1} and \texttt{g2} in parallel,
 \subsection{Control dependences}
 When whether a line is executed is not known until the execution of another (typically a branch), the former line is said to be control-dependent on the latter, and must not begin execution until the latter has completed.
 In our tool, control dependences are calculated by constructing Control Dependence Graphs~\cite{ferrante87program}.
-However, control dependences can also be turned off completely.
+However, our model also allows control dependences to be excluded.
 This in effect gives us the parallelism achievable with perfect (100\% accuracy) control speculation.
-Previous studies on branch prediction~\cite{smith98study} suggest that even simple and compile-time prediction algorithms can result in high accuracies for many programs, meaning that control speculation is probably viable.
+Previous studies on branch prediction and control speculation~\cite{smith98study,lam92limits} suggest that simple prediction algorithms can result in high accuracies for many programs, meaning that a model with control speculation is reasonable.
 
 \subsection{Granularity}
-In order to restrict parallelism to be task-level only, our default model only spawns lines with function calls.
-Lines with simple statements and not function calls must be executed in order as they are usually too fine-grain.
-Naturally this also excludes other forms of task-level parallelism where tasks are not delineated by functions.
+In order to restrict parallelism to be task-level only, our default model only spawns lines containing function calls.
+Lines with simple statements rather than function calls must be executed in order as they are usually too fine-grain.
+Naturally this also excludes other forms of task-level parallelism where tasks are not delineated by function calls and returns.
 As a result, our tool also contains an option to relax this constraint and spawn all lines, whether they contain function calls or not.
 While this allows us to see greater task-level parallelism, some of the parallelism discovered will be too fine-grain to be useful.
 Nonetheless, based on the line-level parallelism discovered, the programmer can then decide to refactor certain lines into their own spawnable function, once they have determined that the parallelism is sufficiently coarse-grain.
@@ -108,8 +158,9 @@ There is an option to parallelize loops in our tool, where an established algori
   \begin{SubFloat}{\label{spawn:orig}Original program extract}
     \begin{minipage}{0.7in}
       \begin{verbatim}
-int x, y, r=0;
+int x, y, r;
 
+r = 0;
 x = fib(n-1);
 r = r + x;
 y = fib(n-2);
@@ -124,8 +175,9 @@ return r;
   \begin{SubFloat}{\label{spawn:without}Best possible parallelization \emph{without} spawn hoisting}
     \begin{minipage}{1.0in}
       \begin{verbatim}
-int x, y, r=0;
+int x, y, r;
 
+r = 0;
 x = spawn fib(n-1);
 sync;
 r = r + x;
@@ -144,11 +196,12 @@ int x, y, r;
 
 x = spawn fib(n-1);
 y = spawn fib(n-2);
-r=0;
+r = 0;
 sync;
 r = r + x;
 r = r + y;
 return r;
+
       \end{verbatim}
     \end{minipage}%
   \end{SubFloat}%
@@ -159,8 +212,8 @@ return r;
 
 In our default model, a task is only spawned when control reaches its original site.
 It is possible, however, that some tasks can be started earlier, resulting in greater parallelism.
-This is illustrated in Figure~\ref{spawn}, where the line immediately following each call to \texttt{fib} is dependent on the result of the call in the original program (Figure~\ref{spawn:orig}).
+This is illustrated in Figure~\ref{spawn}, where in the original program the line immediately following each call to \texttt{fib} is dependent on the result of the call (Figure~\ref{spawn:orig}).
 As we need to synchronize on a spawned task before we reach any line that depends on it, we would need to insert a \texttt{sync} immediately after each call (Figure~\ref{spawn:without}).
-If we allow function spawns to be hoisted, however, more opportunities for parallelism exist, as shown in Figure~\ref{spawn:with}, where both calls to \texttt{fib} have been hoisted to the beginning of the program extract.
-provides To examine the extra parallelism this optimization allows, our tool provides an option to allow each spawn to be hoisted to as early a point as dependences allow.
+If we allow function spawns to be hoisted, however, more opportunities for parallelism exist, as shown in Figure~\ref{spawn:with}, where both calls to \texttt{fib} have been hoisted to the beginning of the program fragment.
+To examine the extra parallelism this optimization allows, our tool provides an option to allow each spawn to be hoisted to as early a point as dependences allow.
 

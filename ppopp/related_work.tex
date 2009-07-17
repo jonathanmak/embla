@@ -1,7 +1,7 @@
 \section{Related work}
 
 % Explicit task level parallelism
-A lot of languages and libraries have been created to allow easy
+Various languages and libraries have been created to allow easy
 expression of task-level parallelism.  Cilk's~\cite{blumofe96cilk}
 model of fork/join parallelism matches our function-spawning model
 most closely, although a Cilk {\tt sync} always joins with all tasks 
@@ -15,7 +15,7 @@ Threading Building Blocks~\cite{reinders07intel} and Microsoft's
 Task Parallel Library~\cite{leijen07parallel}.
 
 % Other limits surveys
-Several studies have been made on instruction-level parallelism~
+Several studies have been made on limits of instruction-level parallelism~
 \cite{wall91limits, postiff99limits, austin92dynamic, lam92limits,
 mak09limits}, but fewer have tried to separate out task-level
 parallelism from instruction-level parallelism.  Kreaseck et al.\
@@ -43,9 +43,9 @@ sequentially written program.
 % Automatic parallelization
 There has been much research into automatic parallelization~
 \cite{kennedy02optimizing, Blume94polaris, ottoni05automatic,
-ottoni07global}, most of which using only static analysis.  However,
+ottoni07global}, most of which use only static analysis.  However,
 the lack of precision when statically analysing dependences remains a
-barrier, something which dynamic analysis tools such as Embla can deal
+barrier, something which dynamic analysis tools such as Embla can assist
 with.  We believe that both static and dynamic analyses are necessary
 for automatic parallelization, as even though run-time information is
 much more precise about dependences, it does incur overheads, some of
