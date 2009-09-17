@@ -3601,7 +3601,9 @@ static void fakeCall( LoopInfo *l_info )
   //          currFrame - firstFrame, (unsigned) currFrame->currNode );
 
   LineInfo *fakeline = l_info->call->line;
+#if CRITPATH_ANALYSIS
   newInstr(fakeline, True);
+#endif
   checkIfNewLine(fakeline);
   recordOrFakeCall( current_stack_frame->sp, l_info->call, 0, 1 /* Yep, we're faking! */ );
 }
