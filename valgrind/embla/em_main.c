@@ -304,6 +304,7 @@ typedef
      UInt n_raw, n_war, n_waw;
 //     struct _TraceRec * h_tr;
 //     struct _TraceRec * t_tr;
+     struct _LineList *h_cause;
      struct _RTEntry *next;
    }
    RTEntry;
@@ -336,6 +337,8 @@ typedef struct _LineInfo {
    struct _LoopInfo *loop;
    struct _LineInfo *next;
 } LineInfo;
+
+static LineList * consLL( LineInfo *line, LineList *next );
 
 static struct _LoopInfo outOfTheLoop;
 
@@ -2472,6 +2475,7 @@ static void XXupdResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
    UInt        hash_value;
    UInt        t_line;
    RTEntry    *entry;
+   LineList   *ll;
 #endif
 
    IFDID( nnn++; );
@@ -2566,10 +2570,18 @@ static void XXupdResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
        entry->n_waw  = 0;
 //       entry->h_tr = new_tr;
 //       entry->t_tr = old_tr;
+       entry->h_cause = consLL(curr_info->line, entry->h_cause);
        entry->next = h_info->line->entries[hash_value];
        h_info->line->entries[hash_value] = entry;
 
+   } else {
+       // Record actual line that caused the dependence
+       for (ll=entry->h_cause ; ll != NULL && ll->line != curr_info->line ; ll = ll->next) {}
+       if (ll == NULL) {
+         entry->h_cause = consLL(curr_info->line, entry->h_cause);
+       }
    }
+
 #endif
 
 #if CRITPATH_ANALYSIS
@@ -5045,6 +5057,7 @@ static void printResultTable(const Char * traceFileName)
    SizeT num_results = 0;
    int fd = -1;
    LineInfo *line_info;
+   LineList *ll, *next;
 
 #if DUMP_TRACE_PILE
    dump_trace_pile( );
@@ -5099,6 +5112,11 @@ static void printResultTable(const Char * traceFileName)
 		   result_array[i].n_war, result_array[i].n_waw);//,
 //                   result_array[i].h_tr->i_info->i_addr, result_array[i].t_tr->i_info->i_addr );
 //                   result_array[i].h_tr - trace_pile, result_array[i].t_tr - trace_pile);
+     VG_(printf)("%s (", makeTitle(& result_array[i]));
+     for (ll=result_array[i].h_cause; ll != NULL; ll=ll->next) {
+       VG_(printf)(" %s:%d", ll->line->file, ll->line->line );
+     }
+     VG_(printf)( " )\n" );
      if (VG_(strcmp)(traceFileName, "-") != 0)
        VG_(write)( fd, buf, VG_(strlen)( buf ) );
      else
