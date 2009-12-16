@@ -87,6 +87,7 @@ unsigned interesting_address=0;
 #include "pub_tool_libcassert.h"
 
 #include "libvex_guest_offsets.h"
+#include "embla.h" // For client requests
 
 #define  RESULT_ENTRIES     1000003  // smallest prime >= a million
 #define  FILE_LEN               256
@@ -252,6 +253,7 @@ static int track_stack_name_deps = 0; // ...including/except WAR/WAW dependencie
 static int track_hidden =   0;     // Track HIDDEN dependencies
 static int para_non_calls = 0;     // Allows lines to be executed in parallel even if they don't contain function calls
 static int early_spawns = 0;  // Allows function calls to be spawned as early as dependencies allow
+static int no_reductions = 0; // Track dependencies even when the operations are marked as reduction operations
 
 #define  MASK_RAW        1
 #define  MASK_WAR        2
@@ -824,6 +826,20 @@ static void addNodeDependency(TraceRec *old_tr, TraceRec *new_tr) {
 }
 #endif
 
+unsigned long long updResultEntry_calls, updResultEntry_nca, updResultEntry_entry;
+
+Bool insideReductionOp = False;
+
+static void beginReductionOp(void) {
+  tl_assert (insideReductionOp == False);
+  insideReductionOp = True;
+}
+
+static void endReductionOp(void) {
+  tl_assert (insideReductionOp == True);
+  insideReductionOp = False;
+}
+
 typedef struct {
    Addr32    sp;
    TraceRec *tr;
@@ -907,7 +923,7 @@ static void bumpCounter(StatData *c, StatData n, StatData *min, StatData *max)
 static TaggedPtr newRegularEvent(StackFrame *frame, InstrInfo *i_info)
 {
    TraceRec  *tr   = newTraceRec( i_info, mkTaggedPtr2( frame->call_header, TPT_REG ) );
-   unsigned  hflag = ( frame->flags & SF_HIDDEN ) != 0 ? 1 : 0;
+   unsigned  hflag = (( frame->flags & SF_HIDDEN ) != 0 || insideReductionOp) ? 1 : 0;
 
    return mkTaggedPtr( tr, hflag, 0 );
 }
@@ -1397,6 +1413,8 @@ static Bool em_process_cmd_line_option(Char* arg)
   else
   VG_XACT_CLO(arg, "--early-spawns", early_spawns)
   else
+  VG_XACT_CLO(arg, "--no-reductions", no_reductions)
+  else
     return False;
 #if 0
   tl_assert(trace_file_name);
@@ -1430,6 +1448,7 @@ static void em_print_usage(void)
 "    --sample_threshold=<n>    output critical paths above this threshold. 0 means never output\n"
 "    --para-non-calls          consider parallelism even for lines without function calls\n"
 "    --early-spawns            consider parallelism where function calls can be executed as early as dependencies allow\n"
+"    --no-reductions           track dependencies even when the operations are marked as reduction operations\n"
    );
 }
 
@@ -2445,8 +2464,6 @@ static Int result_entry_compare(const RTEntry * e1, const RTEntry * e2)
  * Main updResultEntry routine  *
  ********************************/
 
-unsigned long long updResultEntry_calls, updResultEntry_nca, updResultEntry_entry;
-
 #if MOCK_RTENTRY
 
 static void updResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info, 
@@ -2504,7 +2521,7 @@ static void XXupdResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
      // The tail is indirect
      t_code = TP_GET_FLAG1( old_event ) ? DF_HIDDEN : DF_INDIRECT;
    } else {
-     t_code = DF_DIRECT;
+     t_code = TP_GET_FLAG1( old_event ) ? DF_HIDDEN : DF_DIRECT;
    }
    t_info = old_tr->i_info;
 
@@ -2517,6 +2534,15 @@ static void XXupdResultEntry(StackFrame *curr_ctx, InstrInfo *curr_info,
      h_info = curr_info;
      h_code = DF_DIRECT;
      new_tr = ToTrP( new_event );
+   }
+   // Special case for reduction operations
+   // Mark dep as hidden only if line numbers of head and tail are equal
+   if (insideReductionOp && // Inside a reduction operation
+       t_code == DF_HIDDEN &&
+       // Source is also reduction operation (Could also be a hidden function, but in practice this should not arise)
+       h_code != DF_HIDDEN && // This is not yet a hidden dependency
+       h_info->line == t_info->line) { // Source and target are on the same line
+     h_code = DF_HIDDEN;
    }
 
    if( ref_addr >= lowest_shadow_sp && ref_addr <= highest_shadow_sp ) {
@@ -4609,6 +4635,39 @@ static IRSB* em_instrument(VgCallbackClosure* closure,
    }
 }
 
+/*********************************************
+ * Client requests                           *
+ *********************************************/
+#define CLIREQ_COMPENSATION 24
+
+static Bool em_handle_client_request ( ThreadId tid, UWord* arg, UWord* ret )
+{
+  if (!VG_IS_TOOL_USERREQ('E','M',arg[0])
+      && VG_USERREQ__REDUCTION_BEGIN != arg[0]
+      && VG_USERREQ__REDUCTION_END   != arg[0])
+    return False;
+
+  switch(arg[0]) {
+    case VG_USERREQ__REDUCTION_BEGIN:
+      {
+        if (!no_reductions)
+          beginReductionOp();
+        break;
+      }
+    case VG_USERREQ__REDUCTION_END:
+      {
+        // Compensate for Valgrind client requests
+        currFrame->currNode->cost -= CLIREQ_COMPENSATION;
+        totalCost -= CLIREQ_COMPENSATION;
+        if (!no_reductions)
+          endReductionOp();
+        break;
+      }
+    default:
+      return False;
+  }
+  return True;
+}
 
 /*********************************************
  * Initialization routines                   *
@@ -5322,6 +5381,7 @@ static void em_pre_clo_init(void)
    VG_(needs_command_line_options)(em_process_cmd_line_option,
                                    em_print_usage,
                                    em_print_debug_usage);
+   VG_(needs_client_requests)   (em_handle_client_request);
 
    /* No needs, no core events to track */
 }
