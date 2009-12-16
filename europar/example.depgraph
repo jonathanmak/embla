@@ -1,0 +1,137 @@
+\verbdef\jkffxb$#include <stdlib.h> $
+\verbdef\jkffxc$#include <stdio.h> $
+\verbdef\jkffxd$ $
+\verbdef\jkffxe$static void inc(int *p) $
+\verbdef\jkffxf${ $
+\verbdef\jkffxg$   *p=*p+1; $
+\verbdef\jkffxh$} $
+\verbdef\jkffxi$ $
+\verbdef\jkffxj$int main(int argc, char **argv) $
+\verbdef\jkffxba${ $
+\verbdef\jkffxbb$   int *q=NULL,n=0; $
+\verbdef\jkffxbc$ $
+\verbdef\jkffxbd$   q = (int*) malloc( sizeof(int) ); $
+\verbdef\jkffxbe$   inc(q); $
+\verbdef\jkffxbf$   inc(&n); $
+\verbdef\jkffxbg$   inc(q); $
+\verbdef\jkffxbh$   printf( "%d\n", *q+n ); $
+\verbdef\jkffxbi$   q = (int*) malloc( sizeof(int) ); $
+\verbdef\jkffxbj$   return q==NULL; $
+\verbdef\jkffxca$} $
+\hrulefill
+\[
+\begin{picture}(240,200)(-65,-200)
+
+\put(-65,-10){\makebox(15,10)[r]{\it 1:}}%
+\put(0,-10){\makebox(100,10)[l]{\jkffxb}}
+\put(-65,-20){\makebox(15,10)[r]{\it 2:}}%
+\put(0,-20){\makebox(100,10)[l]{\jkffxc}}
+\put(-65,-30){\makebox(15,10)[r]{\it 3:}}%
+\put(0,-30){\makebox(100,10)[l]{\jkffxd}}
+\put(-65,-40){\makebox(15,10)[r]{\it 4:}}%
+\put(0,-40){\makebox(100,10)[l]{\jkffxe}}
+\put(-65,-50){\makebox(15,10)[r]{\it 5:}}%
+\put(0,-50){\makebox(100,10)[l]{\jkffxf}}
+%{\color{black} \dottedline{3}(-10,-45)(0,-45)}
+\put(-65,-60){\makebox(15,10)[r]{\it 6:}}%
+\put(0,-60){\makebox(100,10)[l]{\jkffxg}}
+\put(-65,-70){\makebox(15,10)[r]{\it 7:}}%
+\put(0,-70){\makebox(100,10)[l]{\jkffxh}}
+%{\color{black} \dottedline{3}(-10,-65)(0,-65)}
+\put(-65,-80){\makebox(15,10)[r]{\it 8:}}%
+\put(0,-80){\makebox(100,10)[l]{\jkffxi}}
+\put(-65,-90){\makebox(15,10)[r]{\it 9:}}%
+\put(0,-90){\makebox(100,10)[l]{\jkffxj}}
+\put(-65,-100){\makebox(15,10)[r]{\it 10:}}%
+\put(0,-100){\makebox(100,10)[l]{\jkffxba}}
+%{\color{black} \dottedline{3}(-10,-95)(0,-95)}
+\put(-65,-110){\makebox(15,10)[r]{\it 11:}}%
+\put(0,-110){\makebox(100,10)[l]{\jkffxbb}}
+{\color{black} \dottedline{3}(-10,-105)(0,-105)}
+\put(-65,-120){\makebox(15,10)[r]{\it 12:}}%
+\put(0,-120){\makebox(100,10)[l]{\jkffxbc}}
+\put(-65,-130){\makebox(15,10)[r]{\it 13:}}%
+\put(0,-130){\makebox(100,10)[l]{\jkffxbd}}
+{\color{black} \dottedline{3}(-10,-125)(0,-125)}
+\put(-65,-140){\makebox(15,10)[r]{\it 14:}}%
+\put(0,-140){\makebox(100,10)[l]{\jkffxbe}}
+{\color{black} \dottedline{3}(-10,-135)(0,-135)}
+\put(-65,-150){\makebox(15,10)[r]{\it 15:}}%
+\put(0,-150){\makebox(100,10)[l]{\jkffxbf}}
+{\color{black} \dottedline{3}(-10,-145)(0,-145)}
+\put(-65,-160){\makebox(15,10)[r]{\it 16:}}%
+\put(0,-160){\makebox(100,10)[l]{\jkffxbg}}
+{\color{black} \dottedline{3}(-10,-155)(0,-155)}
+\put(-65,-170){\makebox(15,10)[r]{\it 17:}}%
+\put(0,-170){\makebox(100,10)[l]{\jkffxbh}}
+{\color{black} \dottedline{3}(-10,-165)(0,-165)}
+\put(-65,-180){\makebox(15,10)[r]{\it 18:}}%
+\put(0,-180){\makebox(100,10)[l]{\jkffxbi}}
+{\color{black} \dottedline{3}(-10,-175)(0,-175)}
+\put(-65,-190){\makebox(15,10)[r]{\it 19:}}%
+\put(0,-190){\makebox(100,10)[l]{\jkffxbj}}
+{\color{black} \dottedline{3}(-10,-185)(0,-185)}
+\put(-65,-200){\makebox(15,10)[r]{\it 20:}}%
+\put(0,-200){\makebox(100,10)[l]{\jkffxca}}
+%{\color{black} \dottedline{3}(-10,-195)(0,-195)}
+
+\put(-40,-165){\color{black}\circle*{2}}
+%\put(-10,-45){\color{black}\circle*{2}}
+\put(-30,-175){\color{black}\circle*{2}}
+\put(-30,-185){\color{black}\circle*{2}}
+%\put(-10,-65){\color{black}\circle*{2}}
+%\put(-10,-95){\color{black}\circle*{2}}
+\put(-40,-105){\color{black}\circle*{2}}
+%\put(-10,-195){\color{black}\circle*{2}}
+\put(-30,-125){\color{black}\circle*{2}}
+\put(-20,-135){\color{black}\circle*{2}}
+\put(-40,-145){\color{black}\circle*{2}}
+\put(-20,-155){\color{black}\circle*{2}}
+%{\color{black}\dashline[200]{3}(-10.0,-48.0)(-10.0,-62.0)}%
+%{\color{black}\dashline[200]{3}(-10.0,-62.0)(-9.0,-59.0)}%
+%{\color{black}\dashline[200]{3}(-10.0,-62.0)(-11.0,-59.0)}%
+%{\color{black}\dashline[200]{3}(-10.0,-98.0)(-10.0,-192.0)}%
+%{\color{black}\dashline[200]{3}(-10.0,-192.0)(-9.0,-189.0)}%
+%{\color{black}\dashline[200]{3}(-10.0,-192.0)(-11.0,-189.0)}%
+{\color{black}\dashline[200]{3}(-38.7,-107.7)(-31.3,-122.3)}%
+{\color{black}\dashline[200]{3}(-31.3,-122.3)(-31.8,-119.2)}%
+{\color{black}\dashline[200]{3}(-31.3,-122.3)(-33.6,-120.1)}%
+{\color{black}\dashline[200]{3}(-40.0,-108.0)(-40.0,-142.0)}%
+{\color{black}\dashline[200]{3}(-40.0,-142.0)(-39.0,-139.0)}%
+{\color{black}\dashline[200]{3}(-40.0,-142.0)(-41.0,-139.0)}%
+{\color{black}\dashline[200]{3}(-27.9,-127.1)(-22.1,-132.9)}%
+{\color{black}\dashline[200]{3}(-22.1,-132.9)(-23.5,-130.1)}%
+{\color{black}\dashline[200]{3}(-22.1,-132.9)(-24.9,-131.5)}%
+{\color{black}\dashline[200]{3}(-29.1,-127.8)(-20.9,-152.2)}%
+{\color{black}\dashline[200]{3}(-20.9,-152.2)(-20.9,-149.0)}%
+{\color{black}\dashline[200]{3}(-20.9,-152.2)(-22.8,-149.6)}%
+{\color{black}\dashline[200]{3}(-30.7,-127.9)(-39.3,-162.1)}%
+{\color{black}\dashline[200]{3}(-39.3,-162.1)(-37.6,-159.4)}%
+{\color{black}\dashline[200]{3}(-39.3,-162.1)(-39.5,-158.9)}%
+{\color{black}\dottedline{2.5}(-30.0,-128.0)(-30.0,-172.0)}% Here
+{\color{black}\dashline[200]{3}(-30.0,-172.0)(-29.0,-169.0)}% Here
+{\color{black}\dashline[200]{3}(-30.0,-172.0)(-31.0,-169.0)}% Here
+{\color{black}\dashline[200]{3}(-20.0,-138.0)(-20.0,-152.0)}%
+{\color{black}\dashline[200]{3}(-20.0,-152.0)(-19.0,-149.0)}%
+{\color{black}\dashline[200]{3}(-20.0,-152.0)(-21.0,-149.0)}%
+{\color{black}\dashline[200]{3}(-20.7,-137.9)(-29.3,-172.1)}%
+{\color{black}\dashline[200]{3}(-29.3,-172.1)(-27.6,-169.4)}%
+{\color{black}\dashline[200]{3}(-29.3,-172.1)(-29.5,-168.9)}%
+{\color{black}\dashline[200]{3}(-40.0,-148.0)(-40.0,-162.0)}%
+{\color{black}\dashline[200]{3}(-40.0,-162.0)(-39.0,-159.0)}%
+{\color{black}\dashline[200]{3}(-40.0,-162.0)(-41.0,-159.0)}%
+{\color{black}\dashline[200]{3}(-22.7,-156.3)(-37.3,-163.7)}%
+{\color{black}\dashline[200]{3}(-37.3,-163.7)(-34.2,-163.2)}%
+{\color{black}\dashline[200]{3}(-37.3,-163.7)(-35.1,-161.4)}%
+{\color{black}\dashline[200]{3}(-21.3,-157.7)(-28.7,-172.3)}%
+{\color{black}\dashline[200]{3}(-28.7,-172.3)(-26.4,-170.1)}%
+{\color{black}\dashline[200]{3}(-28.7,-172.3)(-28.2,-169.2)}%
+{\color{black}\dashline[200]{3}(-37.9,-167.1)(-32.1,-172.9)}%
+{\color{black}\dashline[200]{3}(-32.1,-172.9)(-33.5,-170.1)}%
+{\color{black}\dashline[200]{3}(-32.1,-172.9)(-34.9,-171.5)}%
+{\color{black}\dashline[200]{3}(-30.0,-178.0)(-30.0,-182.0)}%
+{\color{black}\dashline[200]{3}(-30.0,-182.0)(-29.0,-179.0)}%
+{\color{black}\dashline[200]{3}(-30.0,-182.0)(-31.0,-179.0)}%
+\end{picture}
+\]
+\hrulefill

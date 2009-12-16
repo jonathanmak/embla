@@ -1,0 +1,72 @@
+\documentclass{llncs}
+
+\usepackage{makeidx}  % allows for indexgeneration
+\usepackage{graphicx}
+\usepackage{subfig}
+\usepackage{alltt}
+\usepackage{verbdef}
+\usepackage{color}
+\usepackage{epic}
+
+\makeatletter
+\newbox\sf@box
+\newenvironment{SubFloat}[2][]%
+  {\def\sf@one{#1}%
+   \def\sf@two{#2}%
+   \setbox\sf@box\hbox
+     \bgroup}%
+{ \egroup
+  \ifx\@empty\sf@two\@empty\relax
+    \def\sf@two{\@empty}
+  \fi
+  \ifx\@empty\sf@one\@empty\relax
+    \subfloat[\sf@two]{\box\sf@box}%
+  \else
+    \subfloat[\sf@one][\sf@two]{\box\sf@box}%
+  \fi}
+\makeatother
+
+\newcommand{\shortcite}[1]{\cite{#1}}
+
+\begin{document}
+
+\title{Discovering Inherent Task-level Parallelism by Source-level Dynamic Dependence Analysis}
+
+\author{Jonathan Mak\inst{1}
+   \and Karl-Filip Fax\'en\inst{2}
+   \and Sverker Janson\inst{2}
+   \and Alan Mycroft\inst{1}
+}
+
+\institute{Computer Laboratory, University of Cambridge\\
+  15 JJ Thomson Avenue, Cambridge CB3 0FD, United Kingdom
+\and
+        Swedish Institute of Computer Science\\
+  Box 1263, SE-164 29 Kista, Sweden
+}
+          
+\maketitle 
+
+\input{abstract}
+
+%\category{D.1.3}{Programming Techniques}{Concurrent Programming}[Parallel programming]
+%\terms
+%Languages, Design, Measurement
+%\keywords
+%Task-level Parallelism, Dynamic Dependence Analysis, Potential Parallelism, Parallelization Aid
+
+\input{introduction} % 1.5 pages
+\input{methodology} % 2 pages
+\input{results} % 5 pages
+\input{related_work} % 0.5 page
+\input{conclusions} % 0.5 page
+
+\section*{Acknowledgements}
+
+We are also grateful to St John's College, Cambridge for funding the studentship of the first author.
+
+\bibliographystyle{plain}
+\bibliography{bib.bib}{}
+
+\end{document}
+

@@ -1,0 +1,65 @@
+\section{Related work}
+
+% Explicit task level parallelism
+Various languages and libraries have been created to allow easy
+expression of task-level parallelism.  Cilk's~\cite{blumofe96cilk}
+model of fork/join parallelism matches our function-spawning model
+most closely, although a Cilk {\tt sync} always joins with all tasks 
+spawned in the current procedure activation rather than being able to 
+pick a specific task to join. While OpenMP~\cite{dagum98openmp} 
+originally focused almost exclusively on loops, version 3.0 adds 
+support for task parallelism.  Other notable examples
+offering similar functionality 
+include Java's concurrency library~\cite{lea00java}, Intel's
+Threading Building Blocks~\cite{reinders07intel} and Microsoft's
+Task Parallel Library~\cite{leijen07parallel}.
+
+% Other limits surveys
+Several studies have been made on limits of instruction-level parallelism~
+\cite{wall91limits,postiff99limits,austin92dynamic,lam92limits,mak09limits},
+but fewer have tried to separate out task-level
+parallelism from instruction-level parallelism.  Kreaseck et al.\
+\shortcite{Kreaseck00limitsof} explored limits of speculative task-level
+parallelism by executing function calls early, similar to the
+way we hoist spawns.  They have however imposed the restriction that
+spawned function calls must be joined at their original call sites,
+which is a restriction we have felt to be unnecessary, and thus have
+not imposed in our analysis.  In our model function calls can be
+joined as late as dependences allow (but always before the parent
+call returns).  Other studies~\cite{warg01limits,oplinger99insearch}
+have shown that data value prediction, especially in regard to return
+values, is effective at increasing task-level parallelism.  This is
+something we wish to consider further in the future.
+
+% Race detection
+There are parallels between Embla and on-the-fly data race detection~
+\cite{MellorCrummey91onthefly,ha02space,savage97eraser}.  Both use
+instrumentation to infer properties of the program through dynamic
+analysis.  The main difference is that while race detection seeks to
+find unsafe parallelism (i.e.\ bugs) in an explicitly multi-threaded
+program, Embla seeks to find potential safe parallelism in a
+sequentially written program.
+
+% Automatic parallelization
+There has been much research into automatic parallelization~
+\cite{kennedy02optimizing,Blume94polaris,ottoni05automatic,ottoni07global},
+most of which use only static analysis.  However,
+the lack of precision when statically analysing dependences remains a
+barrier, something which dynamic analysis tools such as Embla can assist
+with.  We believe that both static and dynamic analyses are necessary
+for automatic parallelization, as even though run-time information is
+much more precise about dependences, it does incur overheads, some of
+which may be eliminated by static means.
+
+% Thread-level speculation
+One way of achieving better automatic parallelization is to use
+thread-level speculation (TLS)~
+\cite{Rundberg01anall-software,gregory05stampede,welc05safe}.
+ Indeed, some of the speculative
+task-level parallelism uncovered in this study can be exploited in
+this way.  One important factor affecting the performance of TLS is
+the selection of good candidate threads for speculation, as frequent
+rollbacks would offset any gains in parallelism~\cite{johnson04mincut,liu06posh}.
+ We believe that Embla can be used to identify good
+candidates, as it allows us to look at the frequencies at which
+potential dependences materialize.

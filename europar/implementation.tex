@@ -1,0 +1,151 @@
+\section{Implementation}
+
+Our tool is based on the data dependence profiler Embla \cite{embla:08},
+which computes static data and control dependence information.  Both Embla
+and, because of its heritage, our tool are based on the Valgrind binary
+instrumentation framework \cite{valgrind:07}. Neither tool uses the 
+source code of the program under investigation, which makes them 
+relatively language independent, with one caveat: if used in a managed
+code environment such as .NET or a Java virtual machine, they profile the
+virtual machine rather than the program running on top of it.
+
+While the tools work entirely on machine code, they report results in terms 
+of the source code of the program, using debugging information to bridge
+the gap. However, since they do not know about the code generator, it is 
+necessary to separate dependences arising from the program from 
+dependences arising from artefacts in the code generator, such as 
+register spills and reloads, that should not affect the dependences 
+reported or the critical path measurements. 
+
+We use the following strategy to make clear the connection between the 
+instruction level (which the tools see) and the source level 
+(which the user cares about) without being confused by artefacts of 
+the code generator:
+Run the tools on code compiled with register allocation turned off and 
+record only dependences through memory, not through registers.
+This works well for languages 
+(or implementations) that adhere to the rule that the abstract program 
+state should be in memory at sequence points in the code. This is the 
+case for instance for C. 
+
+While this strategy only gives safe information about subprograms compiled 
+without optimization, it still allows parts of the program untouched by the 
+parallelizing transformations to be optimized, so for instance pre-compiled 
+libraries can be handled. Memory-based dependences between these and the 
+rest of the code are correctly tracked 
+and any register-based dependences (return values and possibly arguments)
+will be reflected in memory in the
+unoptimized code.
+
+
+\subsection{Computing dependences}   \label{snca}
+
+\begin{figure} \small
+\hrulefill
+\[
+\begin{picture}(160,60)(70,15)
+\put(120,65){\makebox(60,10)[c]{\it A:\ \tt f}}
+\put(150,65){\line(-2,-1){50}}
+% \put(150,65){\line( 0,-1){25}}
+\put(150,65){\line( 2,-1){50}}
+% \put(95,45){\makebox(20,10)[r]{\it 14}}
+% \put(150,45){\makebox(20,10)[l]{\it 15}}
+% \put(185,45){\makebox(20,10)[l]{\it 16}}
+% \put(70,50){\makebox(20,10)[r]{\ldots}}
+% \put(210,50){\makebox(20,10)[l]{\ldots}}
+\put(170,30){\makebox(60,10)[c]{\it C:\ \tt g2}}
+% \put(120,30){\makebox(60,10)[c]{\it C:\ \tt inc}}
+\put(70,30){\makebox(60,10)[c]{\it B:\ \tt g1}}
+\put(70,15){\makebox(60,10)[cb]{{\tt *a\ =}\ \ldots}}
+\put(170,15){\makebox(60,10)[cb]{\ldots\ {\tt =\ *b}}}
+\end{picture}
+\]
+\hrulefill
+\caption{Part of the execution tree of the program in Figure~\ref{datadeps}
+% edges are annotated with the line number of the corresponding call.
+} 
+\label{ffextree}
+\end{figure}
+
+Here we give a quick overview of how the Embla tool that we have extended
+implements the mapping from instruction level to source level dependences.
+Embla traces dependences between individual instructions in the binary
+code during program execution. It then maps these dependences to 
+dependences between pairs of source lines in the same function. The
+instructions causing the dependence need not be part of the function 
+within which the dependence is reported. For example, in 
+Figure~\ref{datadeps} the instructions causing the dependence (which we
+will from now on refer to as the {\em endpoints} of the dependence) 
+are part of the bodies of {\tt g1} and {\tt g2}, respectively, whereas the dependence 
+will be reported as a dependence between the {\em calls to} {\tt g1} and 
+{\tt g2} in {\tt f}.
+
+To find source-level dependences, Embla maintains an {\em execution tree},
+or call tree, that at each moment captures 
+the history of execution up to that moment. Every execution-tree node 
+corresponds to an
+individual function call, and the path from the node to the root of the
+tree corresponds to the call stack at the moment of the call. For
+example, Figure~\ref{ffextree} depicts a fragment of the execution tree
+for the program in Figure~\ref{datadeps}, capturing the calls to {\tt g1} 
+and {\tt g2} from {\tt f}.
+
+Embla maps instruction-level dependences to source lines
+ using the execution tree as follows. For
+every instruction-level dependence, Embla identifies the function calls
+where the endpoints occurred (nodes {\it B} and {\it C} for the example
+above), and computes the {\em nearest common ancestor} node (NCA) of
+those nodes in the execution tree. The NCA corresponds to a function
+call with two instructions that are dependent because of
+the instruction-level dependence (the calls to {\tt g1} and {\tt g2} in 
+{\tt f} in the example).
+
+\newcommand{\tracepile}{trace pile}
+
+To capture these dependences in this way
+Embla maintains two main data structures: the {\em \tracepile}, which represents
+the execution tree, and the {\em memory table}, which maps addresses to tree
+nodes corresponding to the last write and subsequent reads of that
+location. Each item in the trace pile corresponds to a function call
+or a memory access instruction inside a function call, and has a
+pointer to the parent node in the execution tree. There is also
+other information associated with a
+node, such as what source line corresponds to the node.
+
+For each instruction that accesses memory, Embla first looks up the
+memory table to find the set of instructions on which an instruction
+is data-dependent. For each dependence, the NCA is then
+computed by following the parent pointers, starting from the earlier
+of the instructions corresponding to the dependence, until a node
+corresponding to an activation record currently on the call stack is
+found. This is the NCA since the later instruction in the pair (i.e.\ 
+the current instruction), and hence all of its ancestors, are also
+on the current call stack.
+
+Once a function call has returned, we will not distinguish between 
+different events in the subtree corresponding to its (completed) 
+execution. The NCA computation simply skips them, following the 
+parent pointers until it finds a node on the stack (which will be
+the call instruction at the root of this subtree). Thus we can 
+periodically compact the \tracepile\ by replacing subtrees
+corresponding to completed calls by their root nodes, saving vast amounts
+of memory.
+After compaction, the \tracepile\ contains the items associated with the
+tree nodes corresponding to the current call stack, with call instruction items
+representing entire subtrees.
+
+Embla uses the Valgrind instrumentation infrastructure which emulates
+the user-mode instruction set architecture. An interesting alternative
+would be to sample dependences using hardware data breakpoints.
+Acumem Virtual Performance Expert \cite{hagersten2008improving}
+uses this approach for cache
+profiling, but since single dependences are much more important than
+single cache misses, it is not clear if sampling is suitable for
+dependence analysis.
+
+Our examples of profiling
+output use C, but
+the profiling is done at instruction level, and the result is
+mapped to source level using debugging information.
+
+
