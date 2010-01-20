@@ -1,27 +1,19 @@
-\section{Conclusions and Future work}
+\section{Conclusions}
 
 We have presented an extension to Embla, designed to aid manual parallelization by estimating and locating inherent parallelism in programs as well as pinpointing bottlenecks.
 It works by profiling dependences and mapping them back to program source.
 The underlying model of parallelism treats each function call as a spawnable task, which is synchronized on as late as dependences allow.
-It also has several parameters that can be altered to reflect various optimizations, such as thread-level data dependence and control speculation, loop parallelization and spawn hoisting.
+Variants of this model allow us to estimate the potential benefits of various optimizations, such as thread-level speculation.
 
-We have shown that our tool is able to discover all of the plentiful declared parallelism in most example Cilk programs, and even to find parallelism in places not explicitly parallelized.
-The only exception of interest is due to the tool's current inability to recognize associative reduction variables, and indeed the ability to discount dependences on such variables would be a useful enhancement to the tool.
-Our results also show that parallel for-loops are good sources of extra parallelism, especially when implemented with a divide-and-conquer strategy.
-
-Having run the same analyses over benchmark programs from the SPEC CPU 2000 and MiBench suites, we observed that most of them do not exhibit the level of task-level parallelism of the Cilk examples.
-This suggests that most general-purpose programs tend to have little inherent parallelism which is exploitable by spawning function calls and loops.
-Studying some of these benchmarks with the help of critical paths output by our tool, we discovered what program refactoring or algorithmic changes would be necessary to obtain greater levels of potential parallelism.
-
-The method of delineating tasks that underlies our task model may not be the only one.
-For instance, it is possible to relax the constraint that tasks must be properly nested, by allowing tasks to be synchronized anywhere within the program rather than only in the parent task.
-Loss of program modularity and clarity may result, but if much more parallelism can be discovered, it may still be desirable.
-
-One future enhancement to our tool is the addition of thread-spawning overheads to our cost model.
-This would give us an even more realistic estimate of potential speed-up.
-Related to this is an ability to turn off the spawning of threads that are too small, or to aggregate small threads into a bigger thread in order to save overheads.
-
-Another useful extension is to automate some of the parallelization process.
-Based on dependences from our tool, a compiler can automatically deduce the best points to spawn and synchronize on a task.
-Such parallelization may not result in a race-free program for all inputs, as the dependences were taken from only one set of inputs.
-Thus programmer effort is still required, but it would be spent on verifying the parallelization and correcting it where necessary rather than performing the parallelization themselves.
+Our tool can locate inherent parallelism in programs with lots of it,
+as shown by its reconstruction of parallel tasks in the Cilk test suite.
+For those without much readily available parallelism,
+such as many SPEC CPU 2000 and MiBench benchmarks,
+our tool outputs critical paths to assist the programmer in pinpointing bottlenecks and finding solutions.
+Some programmer effort is still required to realize task-level parallelism in this case,
+and we suggest two extensions to provide further assistance:
+one is an IDE that can simplify a critical path down to a regular expression that represents it more succinctly,
+and the other is a compiler that can perform code motion to move task-serializing operations,
+such as the induction variable update in \textsf{susan.smoothing}, outside task boundaries,
+thereby making the tasks independent and hence parallelizable.
+All in all, we believe our tool would be a useful aid for programmers parallelizing legacy sequential applications using parallel programming frameworks such as Cilk.

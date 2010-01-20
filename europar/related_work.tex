@@ -16,7 +16,7 @@ Task Parallel Library~\cite{leijen07parallel}.
 
 % Other limits surveys
 Several studies have been made on limits of instruction-level parallelism~
-\cite{wall91limits,postiff99limits,austin92dynamic,lam92limits,mak09limits},
+\cite{wall91limits,postiff99limits},
 but fewer have tried to separate out task-level
 parallelism from instruction-level parallelism.  Kreaseck et al.\
 \shortcite{Kreaseck00limitsof} explored limits of speculative task-level
@@ -27,13 +27,25 @@ which is a restriction we have felt to be unnecessary, and thus have
 not imposed in our analysis.  In our model function calls can be
 joined as late as dependences allow (but always before the parent
 call returns).  Other studies~\cite{warg01limits,oplinger99insearch}
-have shown that data value prediction, especially in regard to return
+have shown that data-value prediction, especially in regard to return
 values, is effective at increasing task-level parallelism.  This is
 something we wish to consider further in the future.
 
+% Use of Profiling to aid parallelization
+Embla's source-level profiling algorithm~\cite{embla:08} has been used 
+elsewhere to discover dependences and assist programmers with parallelization.
+Most~\cite{wu08compiler,tournavitis09towards,larus93loop}
+are concerned with the parallelization of loops only.
+The Alchemist tool~\cite{zhang09alchemist} uses it
+to select good task candidates for thread-level speculation.
+Nguyen et al.~\cite{nguyen02parallelizing} use it to detect function-level parallelism,
+but uses a more restrictive parallelization model that is based on Scheme.
+We believe our tool is the first that can assist in parallelizing function calls as well as loops,
+while providing a realistic estimate of potential speed-up.
+
 % Race detection
 There are parallels between Embla and on-the-fly data race detection~
-\cite{MellorCrummey91onthefly,ha02space,savage97eraser}.  Both use
+\cite{MellorCrummey91onthefly,savage97eraser}.  Both use
 instrumentation to infer properties of the program through dynamic
 analysis.  The main difference is that while race detection seeks to
 find unsafe parallelism (i.e.\ bugs) in an explicitly multi-threaded
@@ -41,25 +53,25 @@ program, Embla seeks to find potential safe parallelism in a
 sequentially written program.
 
 % Automatic parallelization
-There has been much research into automatic parallelization~
-\cite{kennedy02optimizing,Blume94polaris,ottoni05automatic,ottoni07global},
+There has been much research into automatic parallelization~\cite{kennedy02optimizing,Blume94polaris},
 most of which use only static analysis.  However,
 the lack of precision when statically analysing dependences remains a
-barrier, something which dynamic analysis tools such as Embla can assist
-with.  We believe that both static and dynamic analyses are necessary
-for automatic parallelization, as even though run-time information is
-much more precise about dependences, it does incur overheads, some of
-which may be eliminated by static means.
+barrier, something which dynamic analysis tools such as Embla can address.
+The downside is that the resulting parallelization may not be valid
+for runs not covered by the training set of input data.
+A hybrid approach would therefore be best.
 
 % Thread-level speculation
 One way of achieving better automatic parallelization is to use
 thread-level speculation (TLS)~
-\cite{Rundberg01anall-software,gregory05stampede,welc05safe}.
- Indeed, some of the speculative
-task-level parallelism uncovered in this study can be exploited in
-this way.  One important factor affecting the performance of TLS is
-the selection of good candidate threads for speculation, as frequent
+\cite{Rundberg01anall-software,gregory05stampede}.
+Indeed, some of the speculative
+task-level parallelism uncovered by Embla can be exploited in
+this way, 
+although we have observed this is not needed for the Cilk test suite programs.
+One important factor affecting the performance of TLS is
+selecting good candidate threads for speculation, as frequent
 rollbacks would offset any gains in parallelism~\cite{johnson04mincut,liu06posh}.
- We believe that Embla can be used to identify good
+We believe that Embla can be used to identify good
 candidates, as it allows us to look at the frequencies at which
 potential dependences materialize.
