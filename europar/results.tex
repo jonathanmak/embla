@@ -1,6 +1,6 @@
 \section{Evaluation and Test Suites} \label{sresults}
 
-We demonstrate the usefulness of our tool using example Cilk programs packaged with the 5.4.6 release of Cilk,
+We demonstrate the usefulness of Embla 2 using example Cilk programs packaged with the 5.4.6 release of Cilk,
 as described in Table~\ref{cilk-ex}\footnote{We
 have omitted programs that use the \texttt{inlet}, \texttt{abort} and \texttt{SYNCHED} keywords,
 as their translation into ordinary C is not straightforward.}.
@@ -8,9 +8,9 @@ As examples packaged with a parallel programming environment,
 these are programs known to have lots of task-level parallelism.
 Furthermore, the nature of Cilk means that these programs can be translated into semantically equivalent programs in ordinary C (known as \emph{serial elisions}) simply by stripping the Cilk keywords\footnote{Namely,
 \texttt{cilk}, \texttt{spawn} and \texttt{sync}.}.
-We thus have a set of C programs and their manually-parallelized counterparts to compare with the parallelism discovered by our tool.
+We thus have a set of C programs and their manually-parallelized counterparts to compare with the parallelism discovered by Embla 2.
 
-\begin{table}
+\begin{table}[t]
 \centering
 \scriptsize
 \begin{tabular}{ | l | l | l | }
@@ -44,32 +44,34 @@ Program & Description & Parameters \\
   \label{cilksort-depgraph}
 \end{figure}
 
-Programmers can use aggregated dependences discovered by our tool to realize the parallelism discovered using a language like Cilk,
+Programmers can use aggregated dependences discovered by Embla 2 to realize the parallelism discovered using a language like Cilk,
 where function calls are spawned as tasks and later joined (or \emph{synchonized}),
 by synchronizing on previously spawned tasks just before the first line dependent on them.
 As an example, Figure~\ref{cilksort-depgraph} shows an extract from the \textsf{cilksort} program,
-along with aggregated dependences discovered by our tool on the program's serial elision.
+along with aggregated dependences discovered by Embla 2 on the program's serial elision.
 By spawning function calls and synchronizing before the first line that depends on previously spawned tasks,
 we arrive at the Cilk program with optimal parallelism, which in this case is the same as the original program.
-However, the programmer should be aware that as with all dynamic analyses, these dependences are based on running the program on sample inputs only and so the parallelization may not be safe for all possible inputs.
+However, the programmer should be aware that as with all dynamic analyses,
+these dependences are based on running the program on sample inputs only and so the parallelization may not be safe for all possible inputs.
+Nevertheless, previous work~\cite{embla:08} has shown a correlation between dependence coverage and code coverage.
 
 \subsection{Amount of parallelism discovered} \label{sresults:cilk-limits}
-\begin{figure}
+\begin{figure}[t]
  \centering
  \includegraphics[width=2.0in]{cilk-run}
- \caption{Parallelism of Cilk programs as calculated by Cilk and Embla}
+ \caption{Parallelism of Cilk programs as calculated by Cilk and Embla (note logarithmic scale)}
  \label{cilk-run}
 \end{figure}
 
-Figure~\ref{cilk-run} compares the amount of parallelism found by Cilk's timing infrastructure (averaged over 60 runs) to that found by our extension of Embla on their serial elisions.
+Figure~\ref{cilk-run} compares (on a logarithmic scale) the amount of parallelism found by Cilk's timing infrastructure (averaged over 60 runs) to that found by Embla 2 on their serial elisions.
 Our baseline model for this comparison uses aggregated data dependences, and considers only function-call-level parallelism without loop parallelization or spawn hoisting---the closest model we have to Cilk's.
-The graph shows that our tool is able to find all of the task-level parallelism in most of the original Cilk programs.
+The graph shows that Embla 2 is able to find all of the task-level parallelism in most of the original Cilk programs.
 The only exceptions are \textsf{fib} and \textsf{magic}, the Cilk-reported parallelism for which appears to vary greatly.
-The reason our tool does not find much parallelism in \textsf{magic} compared to the Cilk run is because the Cilk program uses an implicit \emph{inlet} at the statement \texttt{count += spawn execute(...);},
+The reason Embla 2 does not find much parallelism in \textsf{magic} compared to the Cilk run is because the Cilk program uses an implicit \emph{inlet} at the statement \texttt{count += spawn execute(...);},
 which is not a feature of our model.
-Later we show how, by extending our model, our tool also discovers the parallelism here.
+Later we show how, by extending our model, Embla 2 also discovers the parallelism here.
 
-For a few examples our tool can discover more parallelism than explicitly specified in the original Cilk program.
+For a few examples Embla 2 can discover more parallelism than explicitly specified in the original Cilk program.
 We found functions called synchronously in \textsf{cholesky}, \textsf{heat} and \textsf{strassen} that could have been spawned.
 In addition, we also identified C library function calls in \textsf{heat},
 \textsf{lu} and \textsf{plu} that cannot be spawned directly in Cilk (as library functions are not defined as spawnable) but can be spawned with the addition of simple wrappers.
@@ -79,7 +81,7 @@ In addition, we also identified C library function calls in \textsf{heat},
 We now look more closely at the variant optimization models to see whether they affect potential parallelism in these programs.
 
 \paragraph{Exact data dependences}
-In most programs in the Cilk test suite the difference between the two models is negligible.
+In most programs in the Cilk test suite the difference between this model and the baseline is negligible.
 This suggests that for such programs most of the potential parallelism is statically achievable---runtime techniques such as thread-level speculation (TLS) would give few performance benefits.
 One exception is \textsf{lu}, which gives an almost-fourfold speed-up over the baseline.
 The reason for this is that dependences for a certain task in a nested loop apply only between iterations of the outer loop but not of the inner loop.
@@ -87,7 +89,7 @@ While TLS would address this issue, a cheaper method is to parallelize the inner
 
 \paragraph{Line-level parallelism}
 
-\begin{figure}
+\begin{figure}[t]
  \begin{center}
   \begin{SubFloat}{\label{cilk-gran}Comparing levels of granularity}
    \includegraphics[width=2.0in]{cilk-gran}
@@ -102,9 +104,9 @@ While TLS would address this issue, a cheaper method is to parallelize the inner
  \caption{Parallelism of Cilk programs using variant models}
 \end{figure}
 
-The amount of line-level parallelism in these programs is compared to the amount of task-level parallelism in Figure~\ref{cilk-gran}.
+The amount of line-level parallelism in these programs is compared to the amount of function-call-level parallelism in Figure~\ref{cilk-gran}.
 We can see that for most of these programs the amount of line-level parallelism is around twice or more that of function-call-level parallelism.
-This is mostly due to simple statements that perform arithmetic operations inside a function call or loop that can run in parallel.
+This is mostly due to simple statements performing arithmetic operations inside a function call or loop that can run in parallel.
 Each of these operations takes a small number of cycles, which means that it is not viable for each of these to be spawned.
 As mentioned, some of this fine-grain (mostly instruction-level) parallelism is realized already in existing superscalar processors.
 Nevertheless, operations may be grouped and extracted into tasks that are sufficiently large to see performance gains.
@@ -114,25 +116,25 @@ Nevertheless, operations may be grouped and extracted into tasks that are suffic
 Looking at Figure~\ref{cilk-loop}, which compares the potential parallelism of Cilk programs with and without spawning loop iterations, we can see that the use of parallel for-loops benefits most of the programs considered here.
 This is most remarkable in \textsf{matmul}, where there is a 64-fold gain in parallelism when for-loops are parallelized.
 We deduce from this that the use of parallel for-loops is an excellent way to express task-level parallelism, in addition to function calls.
-Our extension of Embla not only finds the amount of loop-level parallelism in a program, but can be used to easily identify candidate loops for parallelization.
-This can simply be done by searching through the dependences output by our tool for dependences between iterations of the loop concerned.
+Embla 2 not only finds the amount of loop-level parallelism in a program, but can be used to easily identify candidate loops for parallelization.
+This can simply be done by searching through the dependences output by Embla 2 for dependences between iterations of the loop concerned.
 If there are no such dependences, then the loop can be parallelized.
 
 \paragraph{Reduction operations}
 
 When dependences between reduction operations are discounted,
 the parallelism of \textsf{magic} vastly increases from under 2 to 376.
-This means that a parallel reduction mechanism, such as Cilk's implicit inlets\footnote{In Cilk an inlet is a block of code that is executed atomically after a task completes, and can therefore be used to ensure updates to a reduction variable are atomic.},
+This means that a parallel reduction mechanism, such as Cilk's implicit inlets\footnote{In Cilk an inlet is a block of code that is executed atomically after a task completes, and can therefore be used to ensure updates to a reduction variable are atomic.}, Cilk++'s \emph{hyperobjects} and similar operations in OpenMP,
 is essential for the program's parallelism potential to be realized.
 
 \paragraph{Spawn hoisting}
 
-With these programs, we find that spawn hoisting has a negligible effect on the amount of potential parallelism, as parallelism measurements with spawn hoisting is almost the same as those for the baseline in Figure~\ref{cilk-run}.
-This suggests that most function calls in these benchmarks are already spawned at the earliest possible point, and there is little further hoisting possible.
+With these Cilk programs, we find that spawn hoisting has a negligible effect on the amount of potential parallelism, as parallelism measurements with spawn hoisting is almost the same as those for the baseline in Figure~\ref{cilk-run}.
+This suggests that, perhaps unsurprisingly, most function calls in these programs are already spawned at the earliest possible point, and little further hoisting is possible.
 
-\subsection{Parallelism in various benchmarks} \label{sresults:benchmarks}
+\subsection{Parallelism in other benchmarks} \label{sresults:benchmarks}
 
-\begin{figure*}
+\begin{figure*}[t]
  \centering
 % \subfloat[SPEC CPU 2000 integer benchmarks]{
 %   \includegraphics[width=4in]{spec}
@@ -148,7 +150,7 @@ This suggests that most function calls in these benchmarks are already spawned a
 \label{benchmarks}
 \end{figure*}
 
-We also ran the same analysis using our tool on some of the benchmark programs in the SPEC CPU 2000~\cite{henning00spec} (with the MinneSPEC reduced data input set~\cite{KleinOsowski02minnespec}) and MiBench~\cite{guthaus01mibench} suites, the results of which are displayed in Figure~\ref{benchmarks}.
+We also ran the same analysis using Embla 2 on some of the benchmark programs in the SPEC CPU 2000~\cite{henning00spec} (with the MinneSPEC reduced data input set~\cite{KleinOsowski02minnespec}) and MiBench~\cite{guthaus01mibench} suites, the results of which are displayed in Figure~\ref{benchmarks}.
 As before, the baseline model uses aggregated data dependences, and considers only function-call-level parallelism without loop parallelization or spawn hoisting.
 The second model includes loop-level parallelism, while the third, \textsf{Optimized} model considers line-level parallelism and exact data dependences, hoisting spawns and ignoring control dependences.
 In general, we see that few benchmarks exhibit the level of parallelism seen in the Cilk examples.
@@ -159,29 +161,29 @@ Some of them are the \textsf{susan} benchmarks from MiBench, which perform image
 This is reflected in our results, which show that using the small inputs, both \textsf{susan.corners} and \textsf{susan.edges} have potential parallelism of over 12 when loop iterations are spawned.
 This is not the case for \textsf{susan.smoothing}, however, as we will explain later.
 
-\subsection{Increasing inherent parallelism by Critical path analysis} \label{sresults:increasing}
+\subsection{Increasing inherent parallelism by critical path analysis} \label{sresults:increasing}
 
-Even though our tool finds lots of inherent task-level parallelism in example programs from the Cilk test suite, little is found in most general-purpose programs, meaning they cannot be transformed into highly concurrent programs simply by spawning existing function calls and loops.
-However, here our tool can output the critical path of each function call, allowing us to examine the bottlenecks that prevent greater parallelism from being realized.
+Even though Embla 2 finds lots of inherent task-level parallelism in example programs from the Cilk test suite, little is found in most general-purpose programs, meaning they cannot be transformed into highly concurrent programs simply by spawning existing function calls and loops.
+However, here Embla 2 can output the critical path of each function call, allowing us to examine the bottlenecks that prevent greater parallelism from being realized.
 We now demonstrate this in some of the simpler examples and suggest refactorings or algorithmic changes that would increase inherent parallelism.
 
 \paragraph{\textsf{susan.smoothing}}
 
 As mentioned, \textsf{susan.smoothing} is a data-parallel image smoothing application.
 Unlike \textsf{susan.corners} and \textsf{susan.edges}, little inherent parallelism is found here even when loop iterations are spawned.
-Under the `Spawning loop iterations' model of parallelism, our tool has reported a critical path length of 37,168,389 instructions out of a total of 44,240,209 instructions, resulting in a parallelism of 1.19.
+Under the `Spawning loop iterations' model of parallelism, Embla 2 has reported a critical path length of 37M instructions out of a total of 44M instructions, resulting in a parallelism of 1.19.
 Most of the critical path is attributed to the call to function \texttt{susan\_smoothing}.
 From its critical path we deduce that the main dependence is one between instantiations of a certain loop within this function.
 Further examination of the loop reveals that the dependence is due to a variable that is incremented exactly once per iteration, and is therefore an induction variable.
 However, as the increment is in the loop body rather than the loop header, each execution of the loop body is dependent on the last, and as a result iterations of the loops are serialized.
-A simple solution is to move the increment operation to the loop header, which causes inherent parallelism to be vastly increased to around 1,090.
+A simple solution is to move the increment operation to the loop header (manual code motion), which causes inherent parallelism to be vastly increased to around 1,090.
 
 \paragraph{\textsf{sha}}
 
 The Secure Hash Algorithm program computes a 160-bit hash value from the contents of an input file.
-Under the `Line-level parallelism' variant model, our tool reports a critical path of length 16,150,120 instructions out of the total work of 21,968,394 instructions, resulting in a parallelism of 1.36.
-Most of the critical path (16,139,892 instructions) can be attributed to the call to function \texttt{sha\_stream}.
-Inside this function, the critical path consists mainly of dependences between calls to \texttt{sha\_update}, most of which have a cost of 423,934 instructions.
+Under the `Line-level parallelism' variant model, Embla 2 reports a critical path of length 16M instructions out of the total work of 22M instructions, resulting in a parallelism of 1.36.
+Most of the critical path (16M instructions) can be attributed to the call to function \texttt{sha\_stream}.
+Inside this function, the critical path consists mainly of dependences between calls to \texttt{sha\_update}, most of which have a cost of 0.4M instructions.
 Further examination of \texttt{sha\_update} reveals that the function takes the existing hash value (the \emph{digest}) and derives a new hash value which replaces it.
 Consequently, each call to this function must depend on the last as it requires the digest computed by the last call.
 This suggests that in order to increase the amount of inherent parallelism, the underlying algorithm must be modified, e.g.\ by dividing the file into blocks and computing independent digests for each block, which are then combined into one final digest.

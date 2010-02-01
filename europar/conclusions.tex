@@ -1,19 +1,19 @@
 \section{Conclusions}
 
-We have presented an extension to Embla, designed to aid manual parallelization by estimating and locating inherent parallelism in programs as well as pinpointing bottlenecks.
+We have presented Embla 2, a tool designed to aid manual parallelization by estimating and locating inherent parallelism in programs as well as pinpointing bottlenecks.
 It works by profiling dependences and mapping them back to program source.
 The underlying model of parallelism treats each function call as a spawnable task, which is synchronized on as late as dependences allow.
 Variants of this model allow us to estimate the potential benefits of various optimizations, such as thread-level speculation.
 
-Our tool can locate inherent parallelism in programs with lots of it,
+Embla 2 can locate inherent parallelism in programs with lots of it,
 as shown by its reconstruction of parallel tasks in the Cilk test suite.
 For those without much readily available parallelism,
 such as many SPEC CPU 2000 and MiBench benchmarks,
-our tool outputs critical paths to assist the programmer in pinpointing bottlenecks and finding solutions.
+Embla 2 outputs critical paths to assist the programmer in pinpointing bottlenecks and finding solutions.
 Some programmer effort is still required to realize task-level parallelism in this case,
 and we suggest two extensions to provide further assistance:
 one is an IDE that can simplify a critical path down to a regular expression that represents it more succinctly,
 and the other is a compiler that can perform code motion to move task-serializing operations,
 such as the induction variable update in \textsf{susan.smoothing}, outside task boundaries,
 thereby making the tasks independent and hence parallelizable.
-All in all, we believe our tool would be a useful aid for programmers parallelizing legacy sequential applications using parallel programming frameworks such as Cilk.
+All in all, we believe Embla 2 would be a useful aid for programmers parallelizing legacy sequential applications using parallel programming frameworks such as Cilk.

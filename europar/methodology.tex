@@ -2,31 +2,33 @@
 
 Reflecting the task models of popular parallel programming environments such as Cilk~\cite{blumofe96cilk},
 Java~\cite{lea00java}, TBB~\cite{reinders07intel} and TPL~\cite{leijen07parallel},
-we use function calls and returns to delineate tasks.
-The main reason for this is that functions are mainly used as an abstraction over a sequence of operations, and as such tend to be relatively self-contained, independent and consisting of a substantial amount of work
-(finer-grain parallelism is largely exploited by superscalar processors).
-Also, the use of existing programming constructs makes parallelization of sequential programs more straightforward.
-Loops, another potential source of task-level parallelism, are also considered as tasks in one of our variant models below.
+we use function calls/returns and (optionally) loop bodies to delineate tasks.
+The reasons for using function calls/returns are that functions represent a reasonable amount of usually self-contained work (finer-grain parallelism is largely exploited by superscalar processors), require minimal syntactic restructuring to exploit and have single entry/single exit control flow.
+Loops are considered as tasks in one of our variant models below.
 Naturally other legitimate coarse-grain parallelism will be left out,
 the extent of which we estimate with another variant model.
 
-In all our models each function call is spawned at its call site as a task.
+In all our models each function call is spawned as a task at its call site.
 The calling thread can then continue to execute statements that follow the function call without waiting for the call to return,
 until control reaches a statement that has a dependence on the call.
 At this point the calling thread must \emph{synchronize} on the task,
 i.e.\ wait for the task to complete before going any further.
 
-Under these models, inherent parallelism is calculated by constructing a \emph{dynamic dependence graph}.
+Under these models, inherent parallelism is calculated by constructing a \emph{dynamic dependence graph} for each function.
 This is a directed acyclic graph $G=(V,E)$ where each node $v\in V$ corresponds to an \emph{instantiation},
-or execution, of a \emph{line}\footnote{We would like to have a node corresponding to each execution of a \emph{statement}, but the gcc debug tables that Embla uses are per-line not per-statement.} of the program,
+or execution, of a \emph{line}\footnote{We would like to have a node corresponding to each execution of a \emph{statement}, but the gcc debug tables that Embla uses are per-line not per-statement.} of the function,
 and an edge $(u,v)\in E$ means that $u$ must be completed before $v$ can begin.
-Edges are inserted for two reasons.
-The first is a dependence between two line instantiations.
-Dependences are observed as instruction-level dependences during execution and mapped back to source lines from the Nearest Common Ancestor (NCA) function by Embla---further
-details can be found in~\cite{embla:08}.
-Secondly, to enforce the requirement that only function calls can be spawned as tasks,
-there is also an incoming edge to each node from the last executed node that does not contain a function call.
+Edges $u \rightarrow v$ are inserted for:
+\begin{itemize}
+\item
+Data dependences between an instruction in the dynamic call tree of $u$ to one in that of $v$ (computed using the Nearest Common Ancestor algorithm~\cite{embla:08}).
+\item
+Control dependences between $u$ and $v$.
+\item
+Dependences related to the parallelization model, that is, the restructuring of the code that we allow.
+E.g.\ to enforce the requirement that only function calls can be spawned as tasks, there is an incoming edge to each node from the last executed node that does not contain a function call.
 This effectively linearizes the graph except at function call spawns, the only points where forks are allowed.
+\end{itemize} 
 The \emph{cost} of a node $v$, $\mathit{cost}(v)$,
 is the minimum time required to execute the instantiation.
 In our model this is essentially the number of instructions executed on that line,
@@ -49,18 +51,19 @@ modelling the effects of dynamic techniques such as thread-level speculation~\ci
 (Cf.\ the difference between context-sensitive and context-insensitive static analysis.)
 
 \paragraph*{Loop iterations as tasks}
-As mentioned, there is an option to parallelize loops in our tool,
+As mentioned, there is an option to parallelize loops in Embla 2,
 where an established algorithm \cite{aho86compilers} is used to identify natural loops,
 iterations of which are spawned as tasks just like function calls.
 
 \paragraph*{Reduction operations}
 Reductions are accumulation operations on variables such as \texttt{acc += f(i);},
-where the order in which instances of this operation are executed makes no difference to the final value of the accumulator.
+where the order in which instances of the associative reduction operation ({\tt+})
+are executed makes no difference to the final value of the accumulator.
 We have implemented an algorithm to statically recognise reduction operations,
 dependences between which can be safely ignored by Embla to enable greater parallelism.
 
 \paragraph*{Spawn hoisting}
-Another way of enabling further parallelism is by spawning tasks earlier.
+Another way of enabling further parallelism is by spawning tasks earlier (a form of code motion optimization).
 In this variant, function calls are spawned as early as dependences allow,
 rather than only when control in the calling thread reaches the call site.
 

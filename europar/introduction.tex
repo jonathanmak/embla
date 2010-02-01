@@ -12,7 +12,7 @@ particular, tools that assist the programmer in understanding the potential
 for parallelization in the code, parallelizing code with high potential, 
 and validating that the resulting parallel code is correct.
 
-In this paper we address the first two issues, by presenting a tool
+In this paper we address the first two issues, by presenting Embla 2, a tool
 which, when given a sequential program and an input, can estimate the 
 amount of parallelism that would be available if the program was parallelized
 using language constructs such as those in OpenMP~\cite{dagum98openmp}
@@ -21,7 +21,8 @@ This parallelism measurement tool has been built by extending
 Embla \cite{embla:08}, a Valgrind-based~\cite{valgrind:07} profiler which captures dependence information,
 with functionality for simulating the effects of various parallel 
 programming models based on independent fork-join task parallelism,
-a framework used in many parallel programming environments.
+a framework used in many parallel programming
+environments~\cite{blumofe96cilk,lea00java,reinders07intel,leijen07parallel}.
 We validate our results against timing 
 measurements of explicitly parallel Cilk programs.
 
@@ -35,7 +36,7 @@ difference to the possible speed-up when parallelizing
 a program?'' Section~\ref{smethod} 
 discusses our parallelization models in depth.
 
-We have used our prototype tool to investigate the potential for 
+We have used Embla 2 to investigate the potential for 
 parallelization of three collections of programs: the SPEC CPU 2000 
 programs~\cite{henning00spec}, MiBench~\cite{guthaus01mibench} and the example programs in
 the Cilk 5.4.6 distribution.
@@ -46,23 +47,23 @@ Section~\ref{sresults} reports the results of these experiments.
 The contributions can be summarised as follows:
 \begin{itemize}
 \item
-Dependences output by Embla assist the programmer in 
+Dependences output by Embla 2 assist the programmer in 
 parallelization by identifying
 appropriate source-level synchronization points. We show how synchronization
 points identified in serial elisions of example Cilk programs
 match those in the original hand-parallelized programs (Section~\ref{sresults:cilk-spawns}).
 \item
-By using Embla to map dynamic dependences back to program source,
-our tool gives a realistic estimate of potential speed-up for
+By mapping dynamic dependences back to program source,
+Embla 2 gives a realistic estimate of potential speed-up for
 parallelization using frameworks such as Cilk and OpenMP.
 Previous studies that we know of~\cite{Kreaseck00limitsof,warg01limits,oplinger99insearch}
 have only considered \emph{speculative}
 task-level parallelism---we give potential speed-ups for programs
 both with and without the use of thread-level speculation.
-Using this tool we present estimates of inherent parallelism in
+Using Embla 2 we present estimates of inherent parallelism in
 various example programs (Sections~\ref{sresults:cilk-limits} and~\ref{sresults:benchmarks}).
 \item
-Critical paths output by our tool can
+Critical paths output by Embla 2 can
 be used to identify at source-level bottlenecks that restrict the level of
 inherent parallelism. We illustrate this using examples
 from the MiBench benchmark suite, and suggest refactorings
