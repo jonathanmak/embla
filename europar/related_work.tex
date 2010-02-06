@@ -2,7 +2,7 @@
 
 % Explicit task level parallelism
 Various languages and libraries have been created to allow easy
-expression of task-level parallelism.  Cilk's~\cite{blumofe96cilk}
+expression of task-level parallelism.  Cilk(++)'s~\cite{blumofe96cilk,leiserson09cilk}
 model of fork/join parallelism matches our function-spawning model
 most closely, although a Cilk {\tt sync} always joins with all tasks 
 spawned in the current procedure activation rather than being able to 
@@ -44,19 +44,19 @@ We believe our tool is the first that can assist in parallelizing function calls
 while providing a realistic estimate of potential speed-up.
 
 % Race detection
-There are parallels between Embla 2 and on-the-fly data race detection~
+There are parallels between Embla~2 and on-the-fly data race detection~
 \cite{MellorCrummey91onthefly,savage97eraser}.  Both use
 instrumentation to infer properties of the program through dynamic
 analysis.  The main difference is that while race detection seeks to
 find unsafe parallelism (i.e.\ bugs) in an explicitly multi-threaded
-program, Embla 2 seeks to find potential safe parallelism in a
+program, Embla~2 seeks to find potential safe parallelism in a
 sequentially written program.
 
 % Automatic parallelization
 There has been much research into automatic parallelization~\cite{kennedy02optimizing,Blume94polaris},
 most of which use only static analysis.  However,
 the lack of precision when statically analysing dependences remains a
-barrier, something which dynamic analysis tools such as Embla 2 can address.
+barrier, something which dynamic analysis tools such as Embla~2 can address.
 The downside is that the resulting parallelization may not be valid
 for runs not covered by the training set of input data.
 A hybrid approach would therefore be best.
@@ -66,12 +66,12 @@ One way of achieving better automatic parallelization is to use
 thread-level speculation (TLS)~
 \cite{Rundberg01anall-software,gregory05stampede}.
 Indeed, some of the speculative
-task-level parallelism uncovered by Embla 2 can be exploited in
+task-level parallelism uncovered by Embla~2 can be exploited in
 this way, 
 although we have observed this is not needed for the Cilk test suite programs.
 One important factor affecting the performance of TLS is
 selecting good candidate threads for speculation, as frequent
 rollbacks would offset any gains in parallelism~\cite{johnson04mincut,liu06posh}.
-We believe that Embla 2 can be used to identify good
+We believe that Embla~2 can be used to identify good
 candidates, as it allows us to look at the frequencies at which
 potential dependences materialize.

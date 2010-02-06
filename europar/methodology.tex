@@ -4,7 +4,7 @@ Reflecting the task models of popular parallel programming environments such as 
 Java~\cite{lea00java}, TBB~\cite{reinders07intel} and TPL~\cite{leijen07parallel},
 we use function calls/returns and (optionally) loop bodies to delineate tasks.
 The reasons for using function calls/returns are that functions represent a reasonable amount of usually self-contained work (finer-grain parallelism is largely exploited by superscalar processors), require minimal syntactic restructuring to exploit and have single entry/single exit control flow.
-Loops are considered as tasks in one of our variant models below.
+Loop bodies are considered as tasks in one of our variant models below.
 Naturally other legitimate coarse-grain parallelism will be left out,
 the extent of which we estimate with another variant model.
 
@@ -22,6 +22,9 @@ Edges $u \rightarrow v$ are inserted for:
 \begin{itemize}
 \item
 Data dependences between an instruction in the dynamic call tree of $u$ to one in that of $v$ (computed using the Nearest Common Ancestor algorithm~\cite{embla:08}).
+These arise whenever two instructions access the same memory location and at least one of them is a write operation,
+except that write-after-read and write-after-write dependences on the stack are ignored (these tend to be on easily privatizable variables),
+as well as all dependences between known commutative library functions, e.g.\ \texttt{malloc}.
 \item
 Control dependences between $u$ and $v$.
 \item
@@ -41,7 +44,7 @@ The inherent parallelism of a program is simply that of its \texttt{main} functi
 
 Potential optimizations are explored under variants of the baseline model:
 
-\paragraph*{Exact data dependences}
+\paragraph{Exact data dependences}
 By default, data dependences are \emph{aggregated} per source line over a program's execution
 and then applied to all instantiations of the line.
 This models the parallelism that is possible by inserting synchronization points in source code,
@@ -50,24 +53,25 @@ A variant is to use \emph{exact} dependences by allowing each instantiation of t
 modelling the effects of dynamic techniques such as thread-level speculation~\cite{Rundberg01anall-software,gregory05stampede}.
 (Cf.\ the difference between context-sensitive and context-insensitive static analysis.)
 
-\paragraph*{Loop iterations as tasks}
-As mentioned, there is an option to parallelize loops in Embla 2,
+\paragraph{Loop iterations as tasks}
+As mentioned, there is an option to parallelize loops in Embla~2,
 where an established algorithm \cite{aho86compilers} is used to identify natural loops,
 iterations of which are spawned as tasks just like function calls.
+Updates to the loop index, which are outside the task boundaries, are still serialized.
 
-\paragraph*{Reduction operations}
+\paragraph{Reduction operations}
 Reductions are accumulation operations on variables such as \texttt{acc += f(i);},
 where the order in which instances of the associative reduction operation ({\tt+})
 are executed makes no difference to the final value of the accumulator.
 We have implemented an algorithm to statically recognise reduction operations,
 dependences between which can be safely ignored by Embla to enable greater parallelism.
 
-\paragraph*{Spawn hoisting}
+\paragraph{Spawn hoisting}
 Another way of enabling further parallelism is by spawning tasks earlier (a form of code motion optimization).
 In this variant, function calls are spawned as early as dependences allow,
 rather than only when control in the calling thread reaches the call site.
 
-\paragraph*{Line-level parallelism}
+\paragraph{Line-level parallelism}
 By only considering function calls and potentially loop iterations as tasks, other forms of task-level parallelism are naturally excluded.
 To see how much more parallelism there is, we introduce a variant model where all lines can be spawned, regardless of whether they contain function calls.
 Note however that while this allows us to see more parallelism, some of the extra parallelism discovered will be too fine-grain to be exploitable.
