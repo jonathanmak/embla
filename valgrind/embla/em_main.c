@@ -289,6 +289,7 @@ static ICount instructions = 0;
 
 const char * trace_file_name = "embla.trace";
 const char * edge_file_name = "embla.edges";
+const char * critpath_file_name = "embla.critpath";
 const char * dep_file_name = "embla.deps";
 const char * hidden_func_file_name = "embla.hidden-funcs";
 const char * loop_file_name = "embla.loops";
@@ -640,18 +641,36 @@ static void newNodeFrame(INode *callerNode) {
   currFrame->cpLength = -999999;
 }
 
-#define PRINT_CP(currNode, currCp, countdown) \
-        for ((currNode) = (currCp); (currNode) != NULL; (currNode) = (currNode)->cp) { \
-          VG_(printf)("%d(%lld), ", (currNode)->line->line, (currNode)->cost); \
+#define PRINT_CP \
+        for ((currNode) = (currFrame->cp); (currNode) != NULL; (currNode) = (currNode)->cp) { \
+          VG_(sprintf)(buffer, "%d(%lld), ", (currNode)->line->line, (currNode)->cost); \
+          VG_(write)( cpfd, buffer, VG_(strlen)( buffer ) ); \
           if (--countdown == 0) { \
-            VG_(printf)("\n"); \
+            VG_(sprintf)(buffer, "\n"); \
+            VG_(write)( cpfd, buffer, VG_(strlen)( buffer ) ); \
             countdown = 10; \
           } \
         } \
-        VG_(printf)("\n");
+        VG_(sprintf)(buffer, "\n"); \
+        VG_(write)( cpfd, buffer, VG_(strlen)( buffer ) );
 
+static int cpfd = -1;
 static void printCritPathNodes(void) {
   INode *currNode;
+  char *buffer[8096];
+
+  if (cpfd == -1) {
+    SysRes sres;
+    sres = VG_(open)((Char *) critpath_file_name, 
+        VKI_O_CREAT | VKI_O_TRUNC | VKI_O_WRONLY,
+        VKI_S_IRUSR | VKI_S_IWUSR | VKI_S_IRGRP);
+    if( sres.isError ) {
+      VG_(message)(Vg_UserMsg, "Edge file could not be opened");
+      return;
+    }
+    cpfd = sres.res;
+    tl_assert(cpfd != -1);
+  }
 
   // Prints out the critical path
   if (currFrame->callerNode != NULL) {
@@ -659,15 +678,17 @@ static void printCritPathNodes(void) {
       sample_count--;
       if (sample_count == 0) {
         int countdown = 10;
-        VG_(printf)("%s:%d(%s)=%lld: ", currFrame->callerNode->line->file, currFrame->callerNode->line->line, currFrame->cp->line->file, currFrame->cpLength);
-        PRINT_CP(currNode, currFrame->cp, countdown);
+        VG_(sprintf)(buffer, "%s:%d(%s)=%lld: ", currFrame->callerNode->line->file, currFrame->callerNode->line->line, currFrame->cp->line->file, currFrame->cpLength);
+        VG_(write)( cpfd, buffer, VG_(strlen)( buffer ) );
+        PRINT_CP;
         sample_count = sample_freq;
       }
     }
     if (sample_threshold > 0 && currFrame->cpLength >= sample_threshold) {
         int countdown = 10;
-        VG_(printf)("!%s:%d(%s)=%lld: ", currFrame->callerNode->line->file, currFrame->callerNode->line->line, currFrame->cp->line->file, currFrame->cpLength);
-        PRINT_CP(currNode, currFrame->cp, countdown);
+        VG_(sprintf)(buffer, "!%s:%d(%s)=%lld: ", currFrame->callerNode->line->file, currFrame->callerNode->line->line, currFrame->cp->line->file, currFrame->cpLength);
+        VG_(write)( cpfd, buffer, VG_(strlen)( buffer ) );
+        PRINT_CP;
     }
   }
 }
@@ -1373,6 +1394,8 @@ static Bool em_process_cmd_line_option(Char* arg)
   else
   VG_STR_CLO(arg, "--edge-file", edge_file_name)
   else
+  VG_STR_CLO(arg, "--critpath-file", critpath_file_name)
+  else
   VG_STR_CLO(arg, "--dep-file", dep_file_name)
   else
   VG_STR_CLO(arg, "--hidden-func-file", hidden_func_file_name)
@@ -1428,6 +1451,7 @@ static void em_print_usage(void)
    VG_(printf)(
 "    --trace-file=<name>       store trace data in <name> [embla.trace]\n"
 "    --edge-file=<name>        store control flow data in <name> [embla.edges]\n"
+"    --critpath-file=<name>    store critical paths in <name> [embla.critpath]\n"
 "    --dep-file=<name>         read dependencies for span calculation from <name> [embla.deps]\n"
 "    --hidden-func-file=<name> read names of hidden functions <name> [embla.hidden-funcs]\n"
 "    --loop-file=<name>        read loop structure from <name> [embla.loops]\n"
@@ -5097,6 +5121,9 @@ static void finaliseCritPath(void) {
   }
   finaliseOldNode();
   printCritPathNodes();//->cpLength;
+  if( cpfd != -1 ) {
+    VG_(close)( cpfd );
+  }
   cpLength = currFrame->cpLength;
   // To take account of the first 2 manually created TraceRecs
   VG_(message)(Vg_UserMsg, "No. of instructions is %lld", totalCost);
