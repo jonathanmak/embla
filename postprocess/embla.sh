@@ -19,6 +19,7 @@ DEPS_FILE_LOOP=$BASENAME.ldeps
 
 # Dynamic data deps, ILP, dynamic control deps, early spawns, no loops
 # Used for generating static deps file
+echo "$EMBLA_BIN/bin/valgrind --tool=embla --hidden-func-file=$HIDDEN_FUNC_FILE --n_trace_recs=$N_TRACE_RECS --loop-file=/dev/null --trace-file=$TRACE_FILE --edge-file=$EDGES_FILE $CLIENT_PROG 1>&2"
 eval "$EMBLA_BIN/bin/valgrind --tool=embla --hidden-func-file=$HIDDEN_FUNC_FILE --n_trace_recs=$N_TRACE_RECS --loop-file=/dev/null --trace-file=$TRACE_FILE --edge-file=$EDGES_FILE $CLIENT_PROG 1>&2"
 
 # Create no-loop depfile
@@ -27,6 +28,7 @@ $CREATE_DATADEPS $TRACE_FILE >>$DEPS_FILE
 # Create loop file
 $CREATE_LOOPS $EDGES_FILE >$LOOP_FILE
 
+echo "$EMBLA_BIN/bin/valgrind --tool=embla --hidden-func-file=$HIDDEN_FUNC_FILE --n_trace_recs=$N_TRACE_RECS --loop-file=$LOOP_FILE --trace-file=$TRACE_FILE_LOOP --edge-file=$EDGES_FILE_LOOP $CLIENT_PROG 1>&2"
 eval "$EMBLA_BIN/bin/valgrind --tool=embla --hidden-func-file=$HIDDEN_FUNC_FILE --n_trace_recs=$N_TRACE_RECS --loop-file=$LOOP_FILE --trace-file=$TRACE_FILE_LOOP --edge-file=$EDGES_FILE_LOOP $CLIENT_PROG 1>&2"
 
 # Create no-loop depfile
