@@ -95,8 +95,8 @@ typedef
         0, 0, 0, 0, 0);                                          \
    })
 
-#define __REDUCTION_BINARY(type, var, op, arg) __extension__     \
-  ({register type __red_temp = (arg);                            \
+#define __REDUCTION_BINARY(var, op, arg) __extension__     \
+  ({register typeof(var) __red_temp = (arg);                            \
     unsigned int _qzz_res;                                       \
     VALGRIND_DO_CLIENT_REQUEST(_qzz_res, 0 /* default return */, \
         VG_USERREQ__REDUCTION_BEGIN,                             \
@@ -109,14 +109,14 @@ typedef
 
 #define __RED_PLUSPLUS(var) __REDUCTION_UNARY((var)++)
 #define __RED_MINUSMINUS(var) __REDUCTION_UNARY((var)--)
-#define __RED_PLUS(type, var, arg) __REDUCTION_BINARY(type, var, +=, arg)
-#define __RED_TIMES(type, var, arg) __REDUCTION_BINARY(type, var, *=, arg)
-#define __RED_MINUS(type, var, arg) __REDUCTION_BINARY(type, var, -=, arg)
-#define __RED_AND(type, var, arg) __REDUCTION_BINARY(type, var, =(var)&&, arg)
-#define __RED_OR(type, var, arg) __REDUCTION_BINARY(type, var, =(var)||, arg)
-#define __RED_BAND(type, var, arg) __REDUCTION_BINARY(type, var, &=, arg)
-#define __RED_BXOR(type, var, arg) __REDUCTION_BINARY(type, var, ^=, arg)
-#define __RED_BOR(type, var, arg) __REDUCTION_BINARY(type, var, |=, arg)
+#define __RED_PLUS(var, arg) __REDUCTION_BINARY(var, +=, arg)
+#define __RED_TIMES(var, arg) __REDUCTION_BINARY(var, *=, arg)
+#define __RED_MINUS(var, arg) __REDUCTION_BINARY(var, -=, arg)
+#define __RED_AND(var, arg) __REDUCTION_BINARY(var, =(var)&&, arg)
+#define __RED_OR(var, arg) __REDUCTION_BINARY(var, =(var)||, arg)
+#define __RED_BAND(var, arg) __REDUCTION_BINARY(var, &=, arg)
+#define __RED_BXOR(var, arg) __REDUCTION_BINARY(var, ^=, arg)
+#define __RED_BOR(var, arg) __REDUCTION_BINARY(var, |=, arg)
 
 #endif /* __EMBLA_H */
 
