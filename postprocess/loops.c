@@ -380,12 +380,14 @@ int main(int argc, char **argv)
 
     acc = filterUsingExits( a, acc );
 
-    acc->leader = acc;
-    for( tt = acc; tt->next != NULL; tt = tt->next ) {
-      tt->next->leader = tt;
-    }
+    if (acc != NULL) {
+      acc->leader = acc;
+      for( tt = acc; tt->next != NULL; tt = tt->next ) {
+        tt->next->leader = tt;
+      }
 
-    inserted = insertLL( inserted, acc );
+      inserted = insertLL( inserted, acc );
+    }
   }
     
   while( inserted != NULL ) {
