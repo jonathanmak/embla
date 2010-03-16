@@ -21,6 +21,7 @@ while (defined($line = <FH>)) {
     $calleefile = $3;
     $length = $4;
     $line = $5;
+    $lastline = "";
     $cpinfo{$callerfile}{$callerline}{calleefile} = $calleefile;
     $cpinfo{$callerfile}{$callerline}{leng}{instances} += 1;
     $cpinfo{$callerfile}{$callerline}{leng}{acccost} += $length;
@@ -50,23 +51,24 @@ while (defined($line = <FH>)) {
 
 for $callerfile (keys %cp) {
   for $callerline (keys %{ $cp{$callerfile}}) {
+    open DOT, ">$callerfile.$callerline.dot" or die $!;
     $calleefile = $cpinfo{$callerfile}{$callerline}{calleefile};
     my $acclength = $cpinfo{$callerfile}{$callerline}{leng}{acccost};
     my $instlength = $cpinfo{$callerfile}{$callerline}{leng}{instances};
     my $avglength = $acclength / $instlength;
-    printf "// %s:%d - Callee file = %s, Length = %d \n", $callerfile, $callerline, $calleefile, $length;
-    printf "digraph \"%s:%d\" {\n", $callerfile, $callerline;
+    printf DOT "// %s:%d - Callee file = %s, Length = %d \n", $callerfile, $callerline, $calleefile, $avglength;
+    printf DOT "digraph \"%s:%d\" {\n", $callerfile, $callerline;
     for $lineno (keys %{ $cp{$callerfile}{$callerline}}) {
       my $instances = $cp{$callerfile}{$callerline}{$lineno}{instances};
       my $acccost = $cp{$callerfile}{$callerline}{$lineno}{acccost};
       my $avgcost = $acccost / $instances;
-      printf "  %d [label = \"%d:%d\"];\n", $lineno, $lineno, $avgcost;
+      printf DOT "  %d [label = \"%d:%d\"];\n", $lineno, $lineno, $avgcost;
       for $succline (keys %{ $cp{$callerfile}{$callerline}{$lineno}{succs}}) {
         my $depinsts = $cp{$callerfile}{$callerline}{$lineno}{succs}{$succline};
-        printf "  %d -> %d [label = \"%d\"];\n", $lineno, $succline, $depinsts;
+        printf DOT "  %d -> %d [label = \"%d\"];\n", $lineno, $succline, $depinsts;
       }
     }
-    printf "}\n";
+    printf DOT "}\n";
   }
 }
 
