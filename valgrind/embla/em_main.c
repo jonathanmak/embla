@@ -240,7 +240,9 @@ static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
 //
 #define  N_FRAMES         64000  // Nesting level
 static int static_deps =  0;    // We're tracking some static dependencies (for efficiency)
-static int no_dyn_deps =  0;    // We're not tracking any dynamic dependencies (for efficiency)
+static int dyn_deps =  0;    // We're tracking some dynamic dependencies (for efficiency)
+static int no_critpath =  0;    // We're not priting critical paths
+static int no_trace =  0;    // We're not priting trace file
 static int dctl =      0;     // Track control dependencies dynamically (ignore joins)
 static int draw =      0;     // Track RAW dependencies dynamically
 static int dwar =      0;     // Track WAR dependencies dynamically...
@@ -287,12 +289,12 @@ static StatData
 static unsigned int translations = 0;
 static ICount instructions = 0;
 
-const char * trace_file_name = "embla.trace";
-const char * edge_file_name = "embla.edges";
-const char * critpath_file_name = "embla.critpath";
+const char * trace_file_name = "";
+const char * edge_file_name = "";
+const char * critpath_file_name = "";
 const char * dep_file_name = "embla.deps";
 const char * hidden_func_file_name = "embla.hidden-funcs";
-const char * loop_file_name = "embla.loops";
+const char * loop_file_name = "";
 
 typedef
    struct _RTEntry {
@@ -724,7 +726,7 @@ static void retNode(void) {
   INodeList *nodeIter, *tail;
   finaliseOldNode();
   currFrame->callerNode->cost += currFrame->cpLength;
-  printCritPathNodes();
+  if (!no_critpath) printCritPathNodes();
 
   // Free up memory
   for (nodeIter = currFrame->allNodes; nodeIter != NULL; nodeIter = tail) {
@@ -1420,8 +1422,6 @@ static Bool em_process_cmd_line_option(Char* arg)
   else
   VG_XACT_CLO(arg, "--swaw", swaw)
   else
-  VG_XACT_CLO(arg, "--no-dyn-deps", no_dyn_deps)
-  else
   VG_XACT_CLO(arg, "--track-stack-name-deps", track_stack_name_deps)
   else
   VG_XACT_CLO(arg, "--track-hidden", track_hidden)
@@ -1449,12 +1449,12 @@ static Bool em_process_cmd_line_option(Char* arg)
 static void em_print_usage(void)
 {  
    VG_(printf)(
-"    --trace-file=<name>       store trace data in <name> [embla.trace]\n"
-"    --edge-file=<name>        store control flow data in <name> [embla.edges]\n"
-"    --critpath-file=<name>    store critical paths in <name> [embla.critpath]\n"
+"    --trace-file=<name>       store trace data in <name>\n"
+"    --edge-file=<name>        store control flow data in <name>\n"
+"    --critpath-file=<name>    store critical paths in <name>\n"
 "    --dep-file=<name>         read dependencies for span calculation from <name> [embla.deps]\n"
 "    --hidden-func-file=<name> read names of hidden functions <name> [embla.hidden-funcs]\n"
-"    --loop-file=<name>        read loop structure from <name> [embla.loops]\n"
+"    --loop-file=<name>        read loop structure from <name>\n"
 "    --span                    measure critical path instead of collecting deps\n"
 "    --dctl                    track dynamic control dependencies (ignore joins)\n"
 "    --draw                    track dynamic RAW dependencies\n"
@@ -1464,7 +1464,6 @@ static void em_print_usage(void)
 "    --sraw                    track static RAW dependencies\n"
 "    --swar                    track static WAR dependencies\n"
 "    --swaw                    track static WAW dependencies\n"
-"    --no-dyn-deps             do not track any dynamic data dependencies (for efficiency)\n"
 "    --track-stack-name-deps   track WAR/WAW dependencies on stack\n"
 "    --track-hidden            track hidden dependencies\n"
 "    --n_trace_recs=<n>        maximum number of trace records allowed\n"
@@ -4547,7 +4546,7 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
              tmpExpr = stIn->Ist.WrTmp.data;
              switch( tmpExpr->tag ) {
                case Iex_Load:
-                 if (!no_dyn_deps) {
+                 if (dyn_deps || !no_trace) {
                    currII = mk_i_info( currII, guestIAddr, guestILen );
                    ref_size = sizeofIRType( tmpExpr->Iex.Load.ty );
 #if TRACE_REG_DEPS
@@ -4605,7 +4604,7 @@ static IRSB* em_instrument_deps(VgCallbackClosure* closure,
              break;
          case Ist_Store:
              // This is a store instruction, so it should be instrumented
-             if (!no_dyn_deps) {
+             if (dyn_deps || !no_trace) {
 #if TRACE_REG_DEPS
                flags = sr_index==bbIn_idx ? SI_SAVE_REST : 0;
 #endif
@@ -4995,7 +4994,9 @@ static void em_post_clo_init_span( void )
    stack_base->call_header = NULL;
 
    readDeps( );
-   read_loops();
+   if (VG_(strcmp)(loop_file_name, "") != 0) {
+     read_loops();
+   }
 
 }
 
@@ -5030,6 +5031,9 @@ static void em_post_clo_init_deps(void)
    VG_(clo_vex_control).iropt_level = 0;
    VG_(clo_vex_control).iropt_unroll_thresh = 0;
    VG_(clo_vex_control).guest_chase_thresh = 0;
+
+   no_trace = (VG_(strcmp)(trace_file_name, "") == 0);
+   no_critpath = (VG_(strcmp)(critpath_file_name, "") == 0);
 
    VG_(message)(Vg_UserMsg, "Initalising dependency profiling");
 
@@ -5088,11 +5092,14 @@ static void em_post_clo_init_deps(void)
 
    // For efficiency purposes
    static_deps = sctl || sraw || swar || swaw;
+   dyn_deps = dctl || draw || dwar || dwaw;
 
    if (static_deps) {
      readDeps();
    }
-   read_loops();
+   if (VG_(strcmp)(loop_file_name, "") != 0) {
+     read_loops();
+   }
 }
 
 static void em_post_clo_init(void)
@@ -5120,7 +5127,7 @@ static void finaliseCritPath(void) {
     retNode();
   }
   finaliseOldNode();
-  printCritPathNodes();//->cpLength;
+  if (!no_critpath) printCritPathNodes();//->cpLength;
   if( cpfd != -1 ) {
     VG_(close)( cpfd );
   }
@@ -5336,15 +5343,19 @@ static void em_fini_span(Int exitcode)
 static void em_fini_deps(Int exitcode)
 {
 #if PRINT_RESULTS_TABLE
-   VG_(message)(Vg_UserMsg, "Dependency trace has finished, storing in %s",
+  if (!no_trace) {
+    VG_(message)(Vg_UserMsg, "Dependency trace has finished, storing in %s",
 		trace_file_name);
-   printResultTable( trace_file_name );
+    printResultTable( trace_file_name );
+  }
 #endif
 
 #if RECORD_CF_EDGES
-   VG_(message)(Vg_UserMsg, "Control flow graph stored in %s",
+  if (VG_(strcmp)(edge_file_name, "") != 0) {
+    VG_(message)(Vg_UserMsg, "Control flow graph stored in %s",
 		edge_file_name);
-   printCFG( edge_file_name );
+    printCFG( edge_file_name );
+  }
 #endif
 
 #if CRITPATH_ANALYSIS
