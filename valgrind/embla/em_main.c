@@ -4905,6 +4905,8 @@ static InstrInfo *mk_fake_call( Char *file, Char *func, int ctr )
    return i_info;
 }
 
+#define MAX_LOOPS 10000
+
 static void read_loops( void )
 {
    ReadHandle *rh;
@@ -4921,9 +4923,9 @@ static void read_loops( void )
    rh = openRH( loop_file_name );
 
    while( !eofRH( rh ) ) {
-     int n, id, p_id, depth, l_exit;
+     int n, wholeLoop_id, loopBody_id, p_id, depth, l_exit;
      Char *file, *func;
-     LoopInfo *loop, *parent;
+     LoopInfo *loopBody, *wholeLoop, *parent;
 
      fake_call_ctr++;
 
@@ -4934,43 +4936,65 @@ static void read_loops( void )
      func = intern_string( buf );
 
      n  = readWord( rh, buf, bufsize );
-     id = VG_(atoll)( buf );
+     loopBody_id = VG_(atoll)( buf );
+     wholeLoop_id = MAX_LOOPS + loopBody_id;
 
      n  = readWord( rh, buf, bufsize );
      p_id = VG_(atoll)( buf );
 
-     parent = p_id == id ? &outOfTheLoop : findLoop( table, file, func, p_id );
+     parent = p_id == loopBody_id ? &outOfTheLoop : findLoop( table, file, func, p_id );
      depth = parent->depth+1;
 
-     loop = (LoopInfo *) VG_(calloc)( "", 1, sizeof(LoopInfo) + depth*sizeof(LoopInfo*) );
+     wholeLoop = (LoopInfo *) VG_(calloc)( "", 1, sizeof(LoopInfo) + depth*sizeof(LoopInfo*) );
 
-     loop->file = file;
-     loop->func = func;
-     loop->id   = id;
-     loop->no   = fake_call_ctr;
-     loop->call = mk_fake_call( file, func, fake_call_ctr );
-     loop->next = table[ id & LOOP_HASH_MASK ];
-     loop->depth = depth;
+     wholeLoop->file = file;
+     wholeLoop->func = func;
+     wholeLoop->id   = wholeLoop_id;
+     wholeLoop->no   = MAX_LOOPS + fake_call_ctr;
+     wholeLoop->call = mk_fake_call( file, func, MAX_LOOPS + fake_call_ctr );
+     wholeLoop->next = table[ wholeLoop_id & LOOP_HASH_MASK ];
+     wholeLoop->depth = depth;
+
+     table[ wholeLoop_id & LOOP_HASH_MASK ] = wholeLoop;
 
      for( i = 0; i < depth-1; i++ ) {
-       loop->nest[i] = parent->nest[i];
+       wholeLoop->nest[i] = parent->nest[i];
      }
-     loop->nest[depth-1] = loop;
+     wholeLoop->nest[depth-1] = wholeLoop;
+     
+     depth++;
+     loopBody = (LoopInfo *) VG_(calloc)( "", 1, sizeof(LoopInfo) + depth*sizeof(LoopInfo*) );
 
-     table[ id & LOOP_HASH_MASK ] = loop;
+     loopBody->file = file;
+     loopBody->func = func;
+     loopBody->id   = loopBody_id;
+     loopBody->no   = fake_call_ctr;
+     loopBody->call = mk_fake_call( file, func, fake_call_ctr );
+     loopBody->next = table[ loopBody_id & LOOP_HASH_MASK ];
+     loopBody->depth = depth;
+
+     table[ loopBody_id & LOOP_HASH_MASK ] = loopBody;
+
+     for( i = 0; i < depth-1; i++ ) {
+       loopBody->nest[i] = wholeLoop->nest[i];
+     }
+     loopBody->nest[depth-1] = loopBody;
      
      n  = readWord( rh, buf, bufsize );
      l_exit = VG_(atoll)( buf ); // Reading the exit
 
      while( !eolRH( rh ) ) {
+        LineInfo *l;
         n = readWord( rh, buf, bufsize );
         i = VG_(atoll)( buf );
 
-        if( i != l_exit ) {
-          // ensure that line i in file/func has its loop field set to loop
-          LineInfo *l = mk_line_info_l( file, i, func );
+        l = mk_line_info_l( file, i, func );
 
-          l->loop = loop;
+        // ensure that line i in file/func has its loop field set to loop
+        if( i == l_exit ) {
+          l->loop = wholeLoop;
+        } else {
+          l->loop = loopBody;
         }
      }
 

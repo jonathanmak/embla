@@ -14,7 +14,7 @@ WORKDIR=`pwd`
 GENID=`date -u +%s%N`
 CONDOR_SCRIPT="universe        = vanilla
 executable      = /home/jchm2/Work/embla/postprocess/embla-condor-exec-loop.sh
-nice_user       = True
+#nice_user       = True
 requirements    = Memory > 3000
 log             = condor.log
 output          = condor.$GENID.out

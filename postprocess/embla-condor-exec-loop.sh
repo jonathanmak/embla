@@ -11,6 +11,7 @@ SCRIPT_DIR=/home/jchm2/Work/embla/postprocess
 CREATE_CTLDEPS=$SCRIPT_DIR/cfa.sh
 CREATE_DATADEPS="awk -f $SCRIPT_DIR/datadeps.awk"
 CREATE_LOOPS=$SCRIPT_DIR/loops.sh
+FILTER_LOOPS=$SCRIPT_DIR/filter-loops.pl
 SPREADSHEET=/home/jchm2/public_html/private/embla-$SUITE.txt
 DATE=`date -u`
 HIDDEN_FUNC_FILE=$EMBLA_BIN/embla.hidden-funcs
@@ -25,6 +26,10 @@ DEP_FILE_LOOP=embla.$GENID.ldeps
 LOOP_FILE=embla.$GENID.loops
 TRACE_FILE_JUNK=embla.$GENID.trace.junk
 EDGES_FILE_JUNK=embla.$GENID.edges.junk
+TRACE_FILE_PLOOP=embla.$GENID.pltrace
+EDGES_FILE_PLOOP=embla.$GENID.pledges
+DEP_FILE_PLOOP=embla.$GENID.pldeps
+PLOOP_FILE=embla.$GENID.ploops
 
 embla () {
   cd $WORKDIR
@@ -40,6 +45,9 @@ FIRST_OPTS="--loop-file=/dev/null --trace-file=$TRACE_FILE_NOLOOP --edge-file=$E
 
 # Dynamic data deps, ILP, no control deps, early spawns, with loops
 SECOND_OPTS="--loop-file=$LOOP_FILE --trace-file=$TRACE_FILE_LOOP --edge-file=$EDGES_FILE_LOOP --draw --dwar --dwaw --para-non-calls --early-spawns $CLIENT_PROG"
+
+# Dynamic data deps, ILP, no control deps, early spawns, with loops
+THIRD_OPTS="--loop-file=$PLOOP_FILE --trace-file=$TRACE_FILE_PLOOP --edge-file=$EDGES_FILE_PLOOP --draw --dwar --dwaw --para-non-calls --early-spawns $CLIENT_PROG"
 
 # Static data deps, TLP, static control deps, no early spawns, no loops. Base Case
 # OPTS[0]="--loop-file=/dev/null --trace-file=$TRACE_FILE_JUNK --edge-file=$EDGES_FILE_JUNK --dep-file=$DEP_FILE_NOLOOP --sraw --swar --swaw --sctl $CLIENT_PROG" 
@@ -57,7 +65,7 @@ SECOND_OPTS="--loop-file=$LOOP_FILE --trace-file=$TRACE_FILE_LOOP --edge-file=$E
 # OPTS[4]="--loop-file=/dev/null --trace-file=$TRACE_FILE_JUNK --edge-file=$EDGES_FILE_JUNK --dep-file=$DEP_FILE_NOLOOP --sraw --swar --swaw --sctl --early-spawns $CLIENT_PROG" 
 
 # Static data deps, TLP, static control deps, no early spawns, with loops.
-OPTS[0]="--loop-file=$LOOP_FILE --trace-file=$TRACE_FILE_JUNK --edge-file=$EDGES_FILE_JUNK --dep-file=$DEP_FILE_LOOP --sraw --swar --swaw --sctl $CLIENT_PROG" 
+OPTS[0]="--loop-file=$PLOOP_FILE --trace-file=$TRACE_FILE_JUNK --edge-file=$EDGES_FILE_JUNK --dep-file=$DEP_FILE_PLOOP --sraw --swar --swaw --sctl $CLIENT_PROG" 
 
 # Go to working dir
 cd $WORKDIR
@@ -75,6 +83,16 @@ embla $SECOND_OPTS
 # Create loop depfile
 $CREATE_CTLDEPS $EDGES_FILE_LOOP >$DEP_FILE_LOOP
 $CREATE_DATADEPS $TRACE_FILE_LOOP >>$DEP_FILE_LOOP
+
+# Filter loops based on depfile
+$FILTER_LOOPS --sraw --swar --swaw --sctl $DEP_FILE_LOOP <$LOOP_FILE >$PLOOP_FILE
+
+# Run third run, to gather data and generate static deps file (with parallel
+# loops only)
+embla $THIRD_OPTS
+# Create parallel loop depfile
+$CREATE_CTLDEPS $EDGES_FILE_PLOOP >$DEP_FILE_PLOOP
+$CREATE_DATADEPS $TRACE_FILE_PLOOP >>$DEP_FILE_PLOOP
 
 # Run the other ones
 for i in ${!OPTS[*]}
