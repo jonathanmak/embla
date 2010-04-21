@@ -88,6 +88,7 @@ unsigned interesting_address=0;
 
 #include "libvex_guest_offsets.h"
 #include "embla.h" // For client requests
+// #include <math.h>
 
 #define  RESULT_ENTRIES     1000003  // smallest prime >= a million
 #define  FILE_LEN               256
@@ -242,6 +243,7 @@ static Char h_cont[CONT_LEN], t_cont[CONT_LEN];
 static int static_deps =  0;    // We're tracking some static dependencies (for efficiency)
 static int dyn_deps =  0;    // We're tracking some dynamic dependencies (for efficiency)
 static int no_critpath =  0;    // We're not priting critical paths
+static int no_lengths =  0;    // We're not priting line lengths
 static int no_trace =  0;    // We're not priting trace file
 static int dctl =      0;     // Track control dependencies dynamically (ignore joins)
 static int draw =      0;     // Track RAW dependencies dynamically
@@ -267,6 +269,7 @@ static int no_reductions = 0; // Track dependencies even when the operations are
 static int sample_freq =    0;
 static int sample_count =   0;
 static int sample_threshold = 0;
+static int spawn_threshold = 0;
 
 typedef enum { SR_NONE, SR_SAVE, SR_RESTORE, SR_MOV_SP } SRCode;
 
@@ -292,9 +295,11 @@ static ICount instructions = 0;
 const char * trace_file_name = "";
 const char * edge_file_name = "";
 const char * critpath_file_name = "";
+const char * lengths_file_name = "";
 const char * dep_file_name = "embla.deps";
-const char * hidden_func_file_name = "embla.hidden-funcs";
+const char * hidden_func_file_name = "";
 const char * loop_file_name = "";
+const char * task_size_file_name = "";
 
 typedef
    struct _RTEntry {
@@ -328,36 +333,64 @@ typedef struct _LineList {
 } LineList;
 #endif
 
+typedef struct _LoggedLineList {
+   struct _LineInfo *line;
+   struct _LoggedLineList *next;
+   long long int count;
+} LoggedLineList;
+
+typedef struct _Stats {
+  long long int n;
+  float mean;
+  float m2; // Sum of squares from current mean
+} Stats;
+
+#define INIT_STATS { 0, 0, 0 }
+static const Stats init_stats = INIT_STATS;
+
+// Algorithm From Knuth
+static void updateStats( Stats* stats, float new_data ) {
+  float delta;
+  stats->n++;
+  delta = new_data - stats->mean;
+  stats->mean += delta / stats->n;
+  stats->m2 += delta * (new_data - stats->mean);
+}
+
 typedef struct _LineInfo {
 #if PRINT_RESULTS_TABLE
    RTEntry  *entries[RT_ENTRIES_PER_LINE];
 #endif
 #if RECORD_CF_EDGES
    LineList *deps;
-   LineList *pred[PRED_ENTRIES_PER_LINE];
+   LoggedLineList *pred[PRED_ENTRIES_PER_LINE];
 #endif
    int      line;
    char    *file;
    char    *func;
    struct _LoopInfo *loop;
    struct _LineInfo *next;
+   Stats    seqLengthStatsContainsCall;
+   Stats    seqLengthStatsNotContainsCall;
+   Bool     shouldSpawn;
 } LineInfo;
 
 static LineList * consLL( LineInfo *line, LineList *next );
+static LoggedLineList * consLoggedLL( LineInfo *line, LoggedLineList *next );
 
 static struct _LoopInfo outOfTheLoop;
 
 #if RECORD_CF_EDGES
 #if PRINT_RESULTS_TABLE
-static LineInfo dummy_line_info = { { }, NULL, { }, 0, "", "", &outOfTheLoop, NULL };
+static LineInfo dummy_line_info = { { }, NULL, { }, 0, "", "", &outOfTheLoop, NULL, INIT_STATS };
 #else
-static LineInfo dummy_line_info = { NULL, { }, 0, "", "", &outOfTheLoop, NULL };
+static LineInfo dummy_line_info = { NULL, { }, 0, "", "", &outOfTheLoop, NULL, INIT_STATS };
 #endif
 #else
 #if PRINT_RESULTS_TABLE
-static LineInfo dummy_line_info = { { }, 0, "", "", &outOfTheLoop, NULL };
+static LineInfo dummy_line_info = { { }, 0, "", "", &outOfTheLoop, NULL, INIT_STATS };
 #else
-static LineInfo dummy_line_info = { 0, "", "", &outOfTheLoop, NULL };
+static LineInfo dummy_line_info = { 0, "", "", &outOfTheLoop, NULL, INIT_STATS };
 #endif
 #endif
 
@@ -454,6 +487,7 @@ typedef struct _INode {
   Bool callNode;
   long long int cost;
   long long int cpLength; // Excludes its own cost before node finalisation, includes its own cost after
+  long long int seqLength;
   struct _INode *cp;
 } INode;
 
@@ -479,6 +513,7 @@ typedef struct _FrameGraph {
   INode *lastBranchNode; // for adding dynamic control dependencies
   INode *callerNode;
   long long int cpLength;
+  long long int seqLength;
   INode *cp;
   LatestNodeTable latestNodesTbl;
 } FrameGraph;
@@ -611,6 +646,7 @@ static INode *new_INode(LineInfo *line) {
    inode->callNode = False; // Set to true later if we encounter a call on this line
    inode->cost = 0;
    inode->cpLength = 0;
+   inode->seqLength = 0;
    inode->cp = NULL;
    currFrame->currNode = inode;
 
@@ -641,6 +677,7 @@ static void newNodeFrame(INode *callerNode) {
   currFrame->latestNodesTbl = initial_LatestNodeTable;
   currFrame->cp = NULL;
   currFrame->cpLength = -999999;
+  currFrame->seqLength = 0;
 }
 
 #define PRINT_CP \
@@ -667,7 +704,7 @@ static void printCritPathNodes(void) {
         VKI_O_CREAT | VKI_O_TRUNC | VKI_O_WRONLY,
         VKI_S_IRUSR | VKI_S_IWUSR | VKI_S_IRGRP);
     if( sres.isError ) {
-      VG_(message)(Vg_UserMsg, "Edge file could not be opened");
+      VG_(message)(Vg_UserMsg, "Critical paths file could not be opened");
       return;
     }
     cpfd = sres.res;
@@ -695,17 +732,19 @@ static void printCritPathNodes(void) {
   }
 }
 
+#define UNSPAWNABLE(node) (!(node->callNode) || ((spawn_threshold > 0) && !(node->line->shouldSpawn)))
+
 static void finaliseOldNode(void) {
   INode *node = currFrame->currNode;
 
   if (!para_non_calls && // We're focusing only on function-call level parallelism
       currFrame->lastNonCallNode != NULL && // There is something to depend on
       // If we're allowing early function spawns, then check the node is not a callnode
-      (!early_spawns || !(node->callNode))) { 
+      (!early_spawns || UNSPAWNABLE(node))) { 
     addDep(currFrame->lastNonCallNode, node);
   }
 
-  if (!(node->callNode)) {
+  if (UNSPAWNABLE(node)) {
     currFrame->lastNonCallNode = node;
   }
 
@@ -714,6 +753,12 @@ static void finaliseOldNode(void) {
   if (currFrame->cp == NULL || node->cpLength > currFrame->cpLength) {
     currFrame->cp = node;
     currFrame->cpLength = node->cpLength;
+  }
+  if (!no_lengths) {
+    currFrame->seqLength += node->seqLength;
+    updateStats(
+       (node->callNode ? &(node->line->seqLengthStatsContainsCall) : &(node->line->seqLengthStatsNotContainsCall)),
+       node->seqLength);
   }
 
   if (static_deps) {
@@ -726,6 +771,7 @@ static void retNode(void) {
   INodeList *nodeIter, *tail;
   finaliseOldNode();
   currFrame->callerNode->cost += currFrame->cpLength;
+  if (!no_lengths) currFrame->callerNode->seqLength += currFrame->seqLength;
   if (!no_critpath) printCritPathNodes();
 
   // Free up memory
@@ -768,6 +814,7 @@ static void newInstr(LineInfo *line, Bool fake) {
     // Incrememt cost
     node->cost++;
     totalCost++;
+    if (!no_lengths) node->seqLength++;
   }
 }
 
@@ -1331,6 +1378,9 @@ static LineInfo *mk_line_info_l( char *file, int line, char *func )
       info->func = intern_string( func == NULL ? "???" : func );
       info->loop = &outOfTheLoop;  // Should be updated for lines in loops
       info->next = *info_p;
+      info->seqLengthStatsContainsCall = init_stats;
+      info->seqLengthStatsNotContainsCall = init_stats;
+      info->shouldSpawn = False;
       *info_p = info;
    }
    return info;
@@ -1398,11 +1448,15 @@ static Bool em_process_cmd_line_option(Char* arg)
   else
   VG_STR_CLO(arg, "--critpath-file", critpath_file_name)
   else
+  VG_STR_CLO(arg, "--lengths-file", lengths_file_name)
+  else
   VG_STR_CLO(arg, "--dep-file", dep_file_name)
   else
   VG_STR_CLO(arg, "--hidden-func-file", hidden_func_file_name)
   else
   VG_STR_CLO(arg, "--loop-file", loop_file_name)
+  else
+  VG_STR_CLO(arg, "--task-size-file", task_size_file_name)
   else
   VG_XACT_CLO(arg, "--span", measure_span)
   else
@@ -1426,11 +1480,13 @@ static Bool em_process_cmd_line_option(Char* arg)
   else
   VG_XACT_CLO(arg, "--track-hidden", track_hidden)
   else
-  VG_NUM_CLO(arg, "--n_trace_recs", n_trace_recs)
+  VG_NUM_CLO(arg, "--n-trace-recs", n_trace_recs)
   else
-  VG_NUM_CLO(arg, "--sample_freq", sample_freq)
+  VG_NUM_CLO(arg, "--sample-freq", sample_freq)
   else
-  VG_NUM_CLO(arg, "--sample_threshold", sample_threshold)
+  VG_NUM_CLO(arg, "--sample-threshold", sample_threshold)
+  else
+  VG_NUM_CLO(arg, "--spawn-threshold", spawn_threshold)
   else
   VG_XACT_CLO(arg, "--para-non-calls", para_non_calls)
   else
@@ -1452,9 +1508,11 @@ static void em_print_usage(void)
 "    --trace-file=<name>       store trace data in <name>\n"
 "    --edge-file=<name>        store control flow data in <name>\n"
 "    --critpath-file=<name>    store critical paths in <name>\n"
+"    --lengths-file=<name>     store line lengths in <name>\n"
 "    --dep-file=<name>         read dependencies for span calculation from <name> [embla.deps]\n"
-"    --hidden-func-file=<name> read names of hidden functions <name> [embla.hidden-funcs]\n"
+"    --hidden-func-file=<name> read names of hidden functions <name>\n"
 "    --loop-file=<name>        read loop structure from <name>\n"
+"    --task-size-file=<name>   read average task/continuation sizes in <name>\n"
 "    --span                    measure critical path instead of collecting deps\n"
 "    --dctl                    track dynamic control dependencies (ignore joins)\n"
 "    --draw                    track dynamic RAW dependencies\n"
@@ -1466,9 +1524,10 @@ static void em_print_usage(void)
 "    --swaw                    track static WAW dependencies\n"
 "    --track-stack-name-deps   track WAR/WAW dependencies on stack\n"
 "    --track-hidden            track hidden dependencies\n"
-"    --n_trace_recs=<n>        maximum number of trace records allowed\n"
-"    --sample_freq=<n>         frequency for outputting critical paths. 0 means never output\n"
-"    --sample_threshold=<n>    output critical paths above this threshold. 0 means never output\n"
+"    --n-trace-recs=<n>        maximum number of trace records allowed\n"
+"    --sample-freq=<n>         frequency for outputting critical paths. 0 means never output\n"
+"    --sample-threshold=<n>    output critical paths above this threshold. 0 means never output\n"
+"    --spawn-threshold=<n>     only spawn a function call if its average length is n or above (default 0)\n"
 "    --para-non-calls          consider parallelism even for lines without function calls\n"
 "    --early-spawns            consider parallelism where function calls can be executed as early as dependencies allow\n"
 "    --no-reductions           track dependencies even when the operations are marked as reduction operations\n"
@@ -3630,9 +3689,33 @@ static LineList * consLL( LineInfo *line, LineList *next )
     return ll;
 }
 
+static LoggedLineList * consLoggedLL( LineInfo *line, LoggedLineList *next )
+{
+    static LoggedLineList *free_edge = NULL;
+    static int       n_free_edges = 0;
+    const int        block_size = 100000;
+
+    LoggedLineList *ll;
+
+    if( n_free_edges == 0 ) {
+        free_edge = (LoggedLineList *) VG_(calloc)( "", block_size, sizeof(LineList) );
+        check( free_edge != NULL, "Out of memory for CF edges!\n" );
+        n_free_edges = block_size;
+    }
+    ll = free_edge;
+    free_edge++;
+    n_free_edges--;
+
+    ll->next = next;
+    ll->line = line;
+    ll->count = 0;
+
+    return ll;
+}
+
 static void checkIfNewLine( LineInfo *line )
 {
-    LineList *ll, **llp;
+    LoggedLineList *ll, **llp;
     LineInfo *prev_line = current_stack_frame->current_line;
 
     if (line != prev_line) {
@@ -3644,7 +3727,10 @@ static void checkIfNewLine( LineInfo *line )
         for( ll = *llp; ll != NULL && ll->line != prev_line; ll = ll->next ) ;
 
         if( ll == NULL ) {
-            *llp = consLL( prev_line, *llp );
+            *llp = consLoggedLL( prev_line, *llp );
+            (*llp)->count++;
+        } else {
+            ll->count++;
         }
       }
     }
@@ -4682,6 +4768,9 @@ static Bool em_handle_client_request ( ThreadId tid, UWord* arg, UWord* ret )
         // Compensate for Valgrind client requests
         currFrame->currNode->cost -= CLIREQ_COMPENSATION;
         totalCost -= CLIREQ_COMPENSATION;
+        if (!no_lengths) {
+          currFrame->currNode->seqLength -= CLIREQ_COMPENSATION;
+        }
         if (!no_reductions)
           endReductionOp();
         break;
@@ -5032,22 +5121,65 @@ static void readHiddenFuncs( void)
 
    numHiddenFuncs = 0;
    hiddenFuncs = VG_(malloc)("", guess_size * sizeof(Char *));
-   rh = openRH( hidden_func_file_name );
+   if (VG_(strcmp)(hidden_func_file_name, "") != 0) {
+     rh = openRH( hidden_func_file_name );
    
+     while( 1 ) {
+        int n = readWord( rh, fn, FN_LEN );
+
+        if( !n ) break;
+
+        hiddenFuncs[numHiddenFuncs] = VG_(malloc)("", FN_LEN * sizeof(Char));
+        VG_(strcpy)(hiddenFuncs[numHiddenFuncs], fn);
+        numHiddenFuncs++;
+
+     }
+
+     closeRH( rh );
+   }
+
+   VG_(realloc)("", hiddenFuncs, numHiddenFuncs);
+}
+
+static void readTaskSizes ( void )
+{
+   const int bs = 1000;
+   Char filename[bs];
+   Char fnname[bs];
+   Char s_line[bs];
+   Char s_task_size[bs];
+   Char s_cont_size[bs];
+   ReadHandle *rh;
+
+   rh = openRH( task_size_file_name );
+   
+   // Format: "<file-name> <line> <expected task size> <expected continuation size>"
    while( 1 ) {
-      int n = readWord( rh, fn, FN_LEN );
+      int n1 = readWord( rh, filename, bs );
+      int n2 = readWord( rh, fnname, bs );
+      int n3 = readWord( rh, s_line, bs );
+      int n4 = readWord( rh, s_task_size, bs );
+      int n5 = readWord( rh, s_cont_size, bs );
+      LineInfo *lineInfo;
+      long line;
+      double task_size, cont_size;
 
-      if( !n ) break;
+      if( !n1 || !n2 || !n3 || !n4 || !n5 ) break;
 
-      hiddenFuncs[numHiddenFuncs] = VG_(malloc)("", FN_LEN * sizeof(Char));
-      VG_(strcpy)(hiddenFuncs[numHiddenFuncs], fn);
-      numHiddenFuncs++;
+      line = VG_(atoll)(s_line);
+      task_size = VG_(strtod)(s_task_size, NULL);
+      cont_size = VG_(strtod)(s_cont_size, NULL);
 
+      lineInfo = mk_line_info_l( filename, line, fnname );
+
+      if (spawn_threshold > 0 &&
+          task_size >= spawn_threshold &&
+          cont_size >= spawn_threshold) {
+        lineInfo->shouldSpawn = True;
+      }
    }
 
    closeRH( rh );
-
-   VG_(realloc)("", hiddenFuncs, numHiddenFuncs);
 }
 
 static void em_post_clo_init_deps(void)
@@ -5058,6 +5190,7 @@ static void em_post_clo_init_deps(void)
 
    no_trace = (VG_(strcmp)(trace_file_name, "") == 0);
    no_critpath = (VG_(strcmp)(critpath_file_name, "") == 0);
+   no_lengths = (VG_(strcmp)(lengths_file_name, "") == 0);
 
    VG_(message)(Vg_UserMsg, "Initalising dependency profiling");
 
@@ -5124,6 +5257,9 @@ static void em_post_clo_init_deps(void)
    if (VG_(strcmp)(loop_file_name, "") != 0) {
      read_loops();
    }
+   if (VG_(strcmp)(task_size_file_name, "") != 0) {
+     readTaskSizes();
+   }
 }
 
 static void em_post_clo_init(void)
@@ -5140,6 +5276,8 @@ static void em_post_clo_init(void)
 /*****************************************************
  * Finalization routines                             *
  *****************************************************/
+
+static void printLengths(void);
 
 #if CRITPATH_ANALYSIS
 
@@ -5160,6 +5298,11 @@ static void finaliseCritPath(void) {
   VG_(message)(Vg_UserMsg, "No. of instructions is %lld", totalCost);
   VG_(message)(Vg_UserMsg, "Length of Critical path is %lld", cpLength);
   VG_(message)(Vg_UserMsg, "Average parallelism is %lld", totalCost / cpLength);
+  
+  if (!no_lengths) {
+    printLengths( );
+  }
+
 }
 
 #endif
@@ -5247,6 +5390,7 @@ static void printResultTable(const Char * traceFileName)
 
 typedef struct {
    LineInfo *from,*to;
+   long long int count;
 } CFEdge;
 
 static Int cf_edge_compare( CFEdge *a, CFEdge *b )
@@ -5262,6 +5406,45 @@ static Int cf_edge_compare( CFEdge *a, CFEdge *b )
    return a->to->line - b->to->line;
 }
 
+#define PRINT_SEQ_LENGTHS(containsCall) \
+   if (seqLengthStats.n > 0) { \
+      float variance = /*sqrt*/(seqLengthStats.m2 / seqLengthStats.n); \
+      VG_(sprintf)( buf, "%s\t%s\t%d\t%s\t%llu\t%llu\t%llu\n", line_info->file, line_info->func, line_info->line, containsCall, seqLengthStats.n, (long long int) (seqLengthStats.mean), (long long int) variance ); \
+      VG_(write)( fd, buf, VG_(strlen)( buf ) ); \
+   }
+
+static void printLengths(void) {
+   int      i;
+   int fd = -1;
+   LineInfo *line_info;
+
+   SysRes sres;
+   sres = VG_(open)((Char *) lengths_file_name, 
+	       VKI_O_CREAT | VKI_O_TRUNC | VKI_O_WRONLY,
+	       VKI_S_IRUSR | VKI_S_IWUSR | VKI_S_IRGRP);
+   if( sres.isError ) {
+      VG_(message)(Vg_UserMsg, "Lengths file could not be opened");
+      return;
+   }
+   fd = sres.res;
+
+   for( i=0; i<RESULT_ENTRIES; i++ ) {
+     for( line_info = line_table[i]; line_info != NULL; line_info = line_info->next ) {
+       if (
+          (VG_(strcmp)(line_info->file, "???") != 0) &&
+          (VG_(strcmp)(line_info->func, "???") != 0)) {
+         Stats seqLengthStats = line_info->seqLengthStatsContainsCall;
+         PRINT_SEQ_LENGTHS("T");
+         seqLengthStats = line_info->seqLengthStatsNotContainsCall;
+         PRINT_SEQ_LENGTHS("F");
+       }
+     }
+   }
+
+   if( fd != -1 )
+     VG_(close)( fd );
+} 
+
 static void printCFG(const Char * cfgFileName)
 {
    int      i,j;
@@ -5270,7 +5453,7 @@ static void printCFG(const Char * cfgFileName)
    SizeT num_results = 0;
    int fd = -1;
    LineInfo *line_info;
-   LineList *ll;
+   LoggedLineList *ll;
 
    // BONK( "printCFG\n" );
 
@@ -5295,6 +5478,7 @@ static void printCFG(const Char * cfgFileName)
              }
              result_array[num_results - 1].from = pred_line;
              result_array[num_results - 1].to   = line_info;
+             result_array[num_results - 1].count= ll->count;
            }
          }
        }
@@ -5319,7 +5503,7 @@ static void printCFG(const Char * cfgFileName)
    for (i = 0; i < num_results; ++i)
    {
      CFEdge *e = result_array + i;
-     VG_(sprintf)( buf, "%s\t%s\t%d\t%d\n", e->from->file, e->from->func, e->from->line, e->to->line );
+     VG_(sprintf)( buf, "%s\t%s\t%d\t%d\t%lld\n", e->from->file, e->from->func, e->from->line, e->to->line, e->count );
      if( fd != -1 )
        VG_(write)( fd, buf, VG_(strlen)( buf ) );
      else

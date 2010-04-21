@@ -31,7 +31,7 @@ embla () {
   echo "======================================================" >&2
   echo "Date: $DATE" >&2
   echo "Arguments: $*" >&2
-  eval "$EMBLA_BIN/bin/valgrind --tool=embla --hidden-func-file=$HIDDEN_FUNC_FILE --n_trace_recs=$N_TRACE_RECS $*"
+  eval "$EMBLA_BIN/bin/valgrind --tool=embla --hidden-func-file=$HIDDEN_FUNC_FILE --n-trace-recs=$N_TRACE_RECS $*"
 }
 
 # Dynamic data deps, ILP, dynamic control deps, early spawns, no loops
