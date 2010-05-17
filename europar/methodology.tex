@@ -14,44 +14,61 @@ until control reaches a statement that has a dependence on the call.
 At this point the calling thread must \emph{synchronize} on the task,
 i.e.\ wait for the task to complete before going any further.
 
-Under these models, inherent parallelism is calculated by constructing a \emph{dynamic dependence graph} for each function.
+Our tool extends Embla~\cite{embla:08}, a Valgrind-based profiler that is based
+on these models and outputs data dependences between source lines in the same
+function. Embla works by observing instruction-level dependences that arise
+whenever two instructions access the same memory location and at least one of
+them is a write operation, The source and target instructions of each
+dependence are mapped to source lines within their {\em Nearest Common
+Ancestor} function.
+
+In Embla 2, we calculate inherent parallelism by constructing a \emph{dynamic dependence graph} for each function.
 This is a directed acyclic graph $G=(V,E)$ where each node $v\in V$ corresponds to an \emph{instantiation},
 or execution, of a \emph{line}\footnote{We would like to have a node corresponding to each execution of a \emph{statement}, but the gcc debug tables that Embla uses are per-line not per-statement.} of the function,
 and an edge $(u,v)\in E$ means that $u$ must be completed before $v$ can begin.
 Edges $u \rightarrow v$ are inserted for:
-\begin{itemize}
+\begin{enumerate}
 \item
-Data dependences between an instruction in the dynamic call tree of $u$ to one in that of $v$ (computed using the Nearest Common Ancestor algorithm~\cite{embla:08}).
-These arise whenever two instructions access the same memory location and at least one of them is a write operation,
-except that write-after-read and write-after-write dependences on the stack are ignored (these tend to be on easily privatizable variables),
-as well as all dependences between known commutative library functions, e.g.\ \texttt{malloc}.
+Data dependences between an instruction in the dynamic call tree of $u$ to one
+in that of $v$ (as observed by the original Embla infrastructure described
+above). Write-after-read and write-after-write dependences on the stack are
+ignored (these tend to be on easily privatizable variables), as well as all
+dependences between known commutative library functions, e.g.\ \texttt{malloc}.
 \item
 Control dependences between $u$ and $v$.
-\item
+\item \label{dep-enum-model}
 Dependences related to the parallelization model, that is, the restructuring of the code that we allow.
 E.g.\ to enforce the requirement that only function calls can be spawned as tasks, there is an incoming edge to each node from the last executed node that does not contain a function call.
 This effectively linearizes the graph except at function call spawns, the only points where forks are allowed.
-\end{itemize} 
+\end{enumerate} 
 The \emph{cost} of a node $v$, $\mathit{cost}(v)$,
 is the minimum time required to execute the instantiation.
 In our model this is essentially the number of instructions executed on that line,
 with the additional requirement that if one of the instructions is a function call,
-then the length of the critical path of that call is included in the cost of the node.
+then the length of the \emph{critical path} of that call is included in the
+\emph{cost} of the node.
 The \emph{critical path} $\mathit{CP}$ is the path in $G$ with the largest total cost.
 The amount of inherent parallelism for a function call is then the cost of serial execution divided by the length of the critical path,
 i.e. $\sum_{v\in V} \mathit{cost}(v)/\sum_{v\in \mathit{CP}} \mathit{cost}(v)$.
 The inherent parallelism of a program is simply that of its \texttt{main} function.
+This figure is the speed-up of the parallelized program given unlimited
+processors and zero task creation overheads.
 
 Potential optimizations are explored under variants of the baseline model:
 
 \paragraph{Exact data dependences}
-By default, data dependences are \emph{aggregated} per source line over a program's execution
-and then applied to all instantiations of the line.
-This models the parallelism that is possible by inserting synchronization points in source code,
-necessitating the same synchronization point for all instantiations.
-A variant is to use \emph{exact} dependences by allowing each instantiation of the same line to have its own set of dependences as observed during execution,
-modelling the effects of dynamic techniques such as thread-level speculation~\cite{Rundberg01anall-software,gregory05stampede}.
-(Cf.\ the difference between context-sensitive and context-insensitive static analysis.)
+By default, data dependences are \emph{aggregated} per source line over a
+program's execution and then applied to all instantiations of the line.  This
+models the parallelism that is possible by inserting synchronization points in
+source code, necessitating the same synchronization point for all
+instantiations.  A variant is to use \emph{exact} dependences by allowing each
+instantiation of the same line to have its own set of dependences as observed
+during execution\footnote{Cf.\ the difference between context-sensitive and
+context-insensitive static analysis}, modelling the effects of dynamic
+techniques such as thread-level
+speculation~\cite{Rundberg01anall-software,gregory05stampede}, in the ideal
+case where the continuation of each task instance runs in parallel with the
+task right up until the point where a conflict would have been detected.
 
 \paragraph{Loop iterations as tasks}
 As mentioned, there is an option to parallelize loops in Embla~2,
@@ -63,17 +80,22 @@ Updates to the loop index, which are outside the task boundaries, are still seri
 Reductions are accumulation operations on variables such as \texttt{acc += f(i);},
 where the order in which instances of the associative reduction operation ({\tt+})
 are executed makes no difference to the final value of the accumulator.
-We have implemented an algorithm to statically recognise reduction operations,
+Embla 2 includes a helper program that statically identifies and annotates reduction
+operations in loops,
 dependences between which can be safely ignored by Embla to enable greater parallelism.
 
 \paragraph{Spawn hoisting}
 Another way of enabling further parallelism is by spawning tasks earlier (a form of code motion optimization).
 In this variant, function calls are spawned as early as dependences allow,
 rather than only when control in the calling thread reaches the call site.
+This is modelled by relaxing constraint~\ref{dep-enum-model} above
+so that the incoming edge is only inserted to each node that does not contain a
+function call.
 
 \paragraph{Line-level parallelism}
 By only considering function calls and potentially loop iterations as tasks, other forms of task-level parallelism are naturally excluded.
 To see how much more parallelism there is, we introduce a variant model where all lines can be spawned, regardless of whether they contain function calls.
+This is modelled by not applying constraint~\ref{dep-enum-model} at all.
 Note however that while this allows us to see more parallelism, some of the extra parallelism discovered will be too fine-grain to be exploitable.
 
 

@@ -1,5 +1,13 @@
 \section{Evaluation and Test Suites} \label{sresults}
 
+For models using aggregated data dependences, Embla~2 must be run twice---first
+to collect all observed dependences, and then to calculate a parallelism figure
+given those dependences. When run on an x86 desktop, the first run causes an
+average of 1500x slowdown of the profiled program, while the second run causes
+an average of 700x slowdown.  Most of the slowdown is attributed to garbage
+collection.  Valgrind itself, on which Embla~2 is based, causes a slowdown of
+8x on average.
+
 We demonstrate the usefulness of Embla~2 using example Cilk programs packaged with the 5.4.6 release of Cilk,
 as described in Table~\ref{cilk-ex}\footnote{We
 have omitted programs that use the \texttt{inlet}, \texttt{abort} and \texttt{SYNCHED} keywords,
@@ -45,7 +53,7 @@ Program & Description & Parameters \\
 \end{figure}
 
 Programmers can use aggregated dependences discovered by Embla~2 to realize the parallelism discovered using a language like Cilk,
-where function calls are spawned as tasks and later joined (or \emph{synchonized}),
+where function calls are spawned as tasks and later joined (or \emph{synchronized}),
 by synchronizing on previously spawned tasks just before the first line dependent on them.
 As an example, Figure~\ref{cilksort-depgraph} shows an extract from the \textsf{cilksort} program,
 along with aggregated dependences discovered by Embla~2 on the program's serial elision.
@@ -66,9 +74,9 @@ which is not a feature of our model.
 Later we show how, by extending our model, Embla~2 also discovers the parallelism here.
 
 For a few examples Embla~2 can discover more parallelism than explicitly specified in the original Cilk program.
-We found functions called synchronously in \textsf{cholesky}, \textsf{heat} and \textsf{strassen} that could have been spawned.
-In addition, we also identified C library function calls in \textsf{heat},
-\textsf{lu} and \textsf{plu} that cannot be spawned directly in Cilk (as library functions are not defined as spawnable) but can be spawned with the addition of simple wrappers.
+We found several functions called synchronously that could have been spawned,
+as well as C library function calls
+that can be spawned with the addition of simple wrappers.
 
 \begin{figure}[t]
  \begin{center}
@@ -108,7 +116,8 @@ Nevertheless, operations may be grouped and extracted into tasks that are suffic
 
 \paragraph{Loops}
 
-Looking at the first and third columns of Figure~\ref{cilk-gran-loop}, which compares the potential parallelism of Cilk programs with and without spawning loop iterations, we can see that the use of parallel for-loops benefits most of the programs considered here.
+Looking at the first and third columns of Figure~\ref{cilk-gran-loop}, which
+compares the potential parallelism of Cilk programs without and with spawning loop iterations, we can see that the use of parallel for-loops benefits most of the programs considered here.
 This is most remarkable in \textsf{matmul}, where there is a 64-fold gain in parallelism when for-loops are parallelized.
 This confirms the view that the use of parallel for-loops is an excellent way to express task-level parallelism, in addition to function calls.
 Furthermore, some parallel programming environments (e.g.\ Cilk++~\cite{leiserson09cilk}) optimize parallel for-loops by deriving loop induction variables by divide-and-conquer instead of linearly,
@@ -165,7 +174,16 @@ This is because the baseline allows for partial overlap between loop iterations 
 
 Even though Embla~2 finds lots of inherent task-level parallelism in example programs from the Cilk test suite, little is found in most general-purpose programs, meaning they cannot be transformed into highly concurrent programs simply by spawning existing function calls and loops.
 However, here Embla~2 can output the critical path of each function call, allowing us to examine the bottlenecks that prevent greater parallelism from being realized.
+This critical path can then be collapsed into a graph with one node per line,
+as shown in Figure~\ref{sha-critpath}.
 We now demonstrate this in some of the simpler examples and suggest refactorings or algorithmic changes that would increase inherent parallelism.
+
+\begin{figure*}[t]
+ \centering
+ \includegraphics[width=4in]{sha_driver-c-24}
+ \caption{Critical path of {\tt sha\_stream} function in \textsf{sha}}
+ \label{sha-critpath}
+\end{figure*}
 
 \paragraph{\textsf{susan.smoothing}}
 
@@ -180,7 +198,8 @@ A simple solution is to move the increment operation to the loop header (manual 
 
 The Secure Hash Algorithm program computes a 160-bit hash value from the contents of an input file.
 Under the \textsf{Line-level parallelism} variant model, Embla~2 reports a parallelism of 1.36.
-Most of the critical path can be attributed to dependences between calls to \texttt{sha\_update}.
+Most of the critical path can be attributed to dependences between calls to
+\texttt{sha\_update} (line 198 in Figure~\ref{sha-critpath}).
 This function takes the existing hash value (the \emph{digest}) and derives a new hash value which replaces it.
 Consequently, each call to this function must depend on the last as it requires the digest computed by the last call.
 This suggests that in order to increase the amount of inherent parallelism, the underlying algorithm must be modified, e.g.\ by dividing the file into blocks and computing independent digests for each block, which are then combined into one final digest.

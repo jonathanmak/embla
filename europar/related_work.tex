@@ -13,6 +13,8 @@ offering similar functionality
 include Java's concurrency library~\cite{lea00java}, Intel's
 Threading Building Blocks~\cite{reinders07intel} and Microsoft's
 Task Parallel Library~\cite{leijen07parallel}.
+SMPSs~\cite{perez08dependency} uses a related model where the programmer
+specifies dependences rather than synchronisation points.
 
 % Other limits surveys
 Several studies have been made on limits of instruction-level parallelism~
@@ -55,7 +57,7 @@ sequentially written program.
 % Automatic parallelization
 There has been much research into automatic parallelization~\cite{kennedy02optimizing,Blume94polaris},
 most of which use only static analysis.  However,
-the lack of precision when statically analysing dependences remains a
+the lack of precision when statically analyzing dependences remains a
 barrier, something which dynamic analysis tools such as Embla~2 can address.
 The downside is that the resulting parallelization may not be valid
 for runs not covered by the training set of input data.
