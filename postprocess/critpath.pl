@@ -15,7 +15,7 @@ my (%cp);
 my ($cpinfo);
 
 while (defined($line = <FH>)) {
-  if ($line =~ /^!?([-A-Za-z\.]+):(-?[0-9]+)\(([-A-Za-z\.]+)\)=([0-9]+): (.*)/) {
+  if ($line =~ /^!?([-_A-Za-z\.]+):(-?[0-9]+)\(([-_A-Za-z\.]+)\)=([0-9]+): (.*)/) {
     $callerfile = $1;
     $callerline = $2;
     $calleefile = $3;

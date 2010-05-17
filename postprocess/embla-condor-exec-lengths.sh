@@ -40,7 +40,8 @@ $CREATE_CTLDEPS $EDGE_FILE >$DEP_FILE
 $CREATE_DATADEPS $TRACE_FILE >>$DEP_FILE
 $GRAN_ANALYSIS --sraw --swar --swaw --sctl --dep-file $DEP_FILE --edge-file $EDGE_FILE --lengths-file $LENGTHS_FILE >$TASK_SIZE_FILE
 
-for s in 0 10 20 40 80 160 320 ; do
+#for s in 0 10 20 40 80 160 320 ; do
+for s in 640 1280 2560 5120 10240 ; do
   embla "--dep-file=$DEP_FILE --task-size-file=$TASK_SIZE_FILE --spawn-threshold=$s --sraw --swar --swaw --sctl --no-reductions $CLIENT_PROG"
 done
 
