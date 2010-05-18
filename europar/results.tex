@@ -3,44 +3,41 @@
 For models using aggregated data dependences, Embla~2 must be run twice---first
 to collect all observed dependences, and then to calculate a parallelism figure
 given those dependences. When run on an x86 desktop, the first run causes an
-average of 1500x slowdown of the profiled program, while the second run causes
-an average of 700x slowdown.  Most of the slowdown is attributed to garbage
-collection.  Valgrind itself, on which Embla~2 is based, causes a slowdown of
-8x on average.
+average of 1500x slowdown of the profiled program, while the second causes
+around 700x. 
+Valgrind itself, on which Embla~2 is based, causes an average slowdown of
+8x.
 
-We demonstrate the usefulness of Embla~2 using example Cilk programs packaged with the 5.4.6 release of Cilk,
-as described in Table~\ref{cilk-ex}\footnote{We
+We demonstrate the usefulness of Embla~2 using example Cilk programs packaged with the 5.4.6 release of Cilk\footnote{We
 have omitted programs that use the \texttt{inlet}, \texttt{abort} and \texttt{SYNCHED} keywords,
-as their translation into ordinary C is not straightforward.}.
-As examples packaged with a parallel programming environment,
-these are programs known to have lots of task-level parallelism.
+as their translation into ordinary C is not straightforward.}---programs known to have lots of task-level parallelism.
 Furthermore, the nature of Cilk means that these programs can be translated into semantically equivalent programs in ordinary C (known as \emph{serial elisions}) simply by stripping the Cilk keywords\footnote{Namely,
 \texttt{cilk}, \texttt{spawn} and \texttt{sync}.}.
 We thus have a set of C programs and their manually-parallelized counterparts to compare with the parallelism discovered by Embla~2.
 
-\begin{table}[t]
-\centering
-\scriptsize
-\begin{tabular}{ | l | l | l | }
-\hline
-Program & Description & Parameters \\
-\hline
-\textsf{cholesky} & Matrix decomposition & \texttt{size=256}, \texttt{nonzeros=1000} \\
-\textsf{cilksort} & Merge sort & \texttt{size=100000} \\
-\textsf{fft} & Fourier transform & \texttt{size=512*512} \\
-\textsf{fib} & Na\"ive Fibonacci calculation & \texttt{n=30} \\
-\textsf{heat} & Differential equation solver & \texttt{nx=ny=512}, \texttt{nt=1} \\ 
-\textsf{lu} & Matrix decomposition & \texttt{n=256} \\
-\textsf{magic} & Magic squares search & \texttt{n=4} \\
-\textsf{matmul} & Matrix multiplication & \texttt{n=128} \\
-\textsf{plu} & Matrix decomposition & \texttt{n=128} \\
-\textsf{strassen} & Matrix multiplication & \texttt{n=512} \\
-\hline
-\end{tabular}
-\small
-\label{cilk-ex}
-\caption{Description and parameters for Cilk 5.4.6 examples used}
-\end{table}
+%\begin{table}[t]
+%\centering
+%\scriptsize
+%\begin{tabular}{ | l | l | l | }
+%\hline
+%Program & Description & Parameters \\
+%\hline
+%\textsf{cholesky} & Matrix decomposition & \texttt{size=256}, \texttt{nonzeros=1000} \\
+%\textsf{cilksort} & Merge sort & \texttt{size=100000} \\
+%\textsf{fft} & Fourier transform & \texttt{size=512*512} \\
+%\textsf{fib} & Na\"ive Fibonacci calculation & \texttt{n=30} \\
+%\textsf{heat} & Differential equation solver & \texttt{nx=ny=512}, \texttt{nt=1} \\ 
+%\textsf{lu} & Matrix decomposition & \texttt{n=256} \\
+%\textsf{magic} & Magic squares search & \texttt{n=4} \\
+%\textsf{matmul} & Matrix multiplication & \texttt{n=128} \\
+%\textsf{plu} & Matrix decomposition & \texttt{n=128} \\
+%\textsf{strassen} & Matrix multiplication & \texttt{n=512} \\
+%\hline
+%\end{tabular}
+%\small
+%\label{cilk-ex}
+%\caption{Description and parameters for Cilk 5.4.6 examples used}
+%\end{table}
 
 \subsection{Finding optimal task synchronization points} \label{sresults:cilk-spawns}
 \begin{figure}[t]
@@ -80,13 +77,13 @@ that can be spawned with the addition of simple wrappers.
 
 \begin{figure}[t]
  \begin{center}
-  \begin{SubFloat}{\label{cilk-run}Parallelism of Cilk programs as calculated by Cilk and Embla}
+  \begin{SubFloat}{\label{cilk-run}As calculated by Cilk and Embla~2}
    \includegraphics[width=2.0in]{cilk-run}
   \end{SubFloat}
 % \end{center}
  \qquad
 % \begin{center}
-  \begin{SubFloat}{\label{cilk-gran-loop}Parallelism of Cilk programs using variant models}
+  \begin{SubFloat}{\label{cilk-gran-loop}Using variant models}
    \includegraphics[width=2.0in]{cilk-gran-loop}
   \end{SubFloat}
  \end{center}
@@ -117,8 +114,9 @@ Nevertheless, operations may be grouped and extracted into tasks that are suffic
 \paragraph{Loops}
 
 Looking at the first and third columns of Figure~\ref{cilk-gran-loop}, which
-compares the potential parallelism of Cilk programs without and with spawning loop iterations, we can see that the use of parallel for-loops benefits most of the programs considered here.
-This is most remarkable in \textsf{matmul}, where there is a 64-fold gain in parallelism when for-loops are parallelized.
+compares the potential parallelism of Cilk programs without and with spawning
+loop iterations, we can see that the use of parallel for-loops benefits most of
+the programs considered here, especially \textsf{matmul}.
 This confirms the view that the use of parallel for-loops is an excellent way to express task-level parallelism, in addition to function calls.
 Furthermore, some parallel programming environments (e.g.\ Cilk++~\cite{leiserson09cilk}) optimize parallel for-loops by deriving loop induction variables by divide-and-conquer instead of linearly,
 meaning that actual parallelism may be even higher than these figures.
@@ -135,7 +133,7 @@ is essential for the program's parallelism potential to be realized.
 
 \paragraph{Spawn hoisting}
 
-With these Cilk programs, we find that spawn hoisting has a negligible effect on the amount of potential parallelism, as parallelism measurements with spawn hoisting is almost the same as those for the baseline in Figure~\ref{cilk-run}.
+With these Cilk programs, we find that spawn hoisting has a negligible effect on potential parallelism, as parallelism measurements with spawn hoisting is almost the same as those for the baseline in Figure~\ref{cilk-run}.
 This suggests that, perhaps unsurprisingly, most function calls in these programs are already spawned at the earliest possible point, and little further hoisting is possible.
 
 \subsection{Parallelism in other benchmarks} \label{sresults:benchmarks}
@@ -151,7 +149,7 @@ This suggests that, perhaps unsurprisingly, most function calls in these program
 % \subfloat[MiBench]{
 %   \includegraphics[width=4in]{mb}
 % }
-\includegraphics[width=5in]{benches}
+\includegraphics[width=4.5in]{benches}
 \caption{Parallelism of benchmark programs}
 \label{benchmarks}
 \end{figure*}
@@ -207,10 +205,10 @@ This suggests that in order to increase the amount of inherent parallelism, the 
 \paragraph{Other examples}
 
 Applying the same analysis to other examples, we find that input/output forms a large part of several benchmarks.
-In \textsf{dijkstra}, for example, a tenth of the program's sequential execution time is taken up by calls to \texttt{scanf}.
-In \textsf{FFT} (MiBench), printing the results takes up around 80\% of processing time.
-As input/output is unparallelizable without significant re-implementation, Amdahl's law would mean that the maximum speed-up, even if we were able to parallelize the rest of the program perfectly, would still be low.
-This suggests that for some of the benchmarks examined, a parallel implementation of input/output would be very useful.
+Calls to \texttt{scanf}/\texttt{printf} take up a tenth of the sequential
+execution time of \textsf{dijkstra} and 80\% of that of \textsf{FFT} (MiBench).
+As input/output is unparallelizable without significant re-implementation, Amdahl's law means that the maximum speed-up, even if we were able to parallelize the rest of the program perfectly, would still be low.
+This suggests that a parallel implementation of input/output would be very useful.
 
 
 

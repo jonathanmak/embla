@@ -10,6 +10,7 @@
 \verbdef\jkffxdjd$$
 \verbdef\jkffxdje$spawn cilkmerge(tmpA,tmpC-1,tmpC,tmpA+size-1,A);$
 \hrulefill
+\setlength{\unitlength}{0.75pt}
 \[
 \begin{picture}(420,110)(-55,-110)
 
