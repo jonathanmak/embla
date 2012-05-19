@@ -117,6 +117,7 @@ typedef
 #define __RED_BAND(var, arg) __REDUCTION_BINARY(var, &=, arg)
 #define __RED_BXOR(var, arg) __REDUCTION_BINARY(var, ^=, arg)
 #define __RED_BOR(var, arg) __REDUCTION_BINARY(var, |=, arg)
+#define __RED_ASSIGN(var, arg) __REDUCTION_BINARY(var, =, arg)
 
 #endif /* __EMBLA_H */
 

@@ -245,6 +245,7 @@ static int dyn_deps =  0;    // We're tracking some dynamic dependencies (for ef
 static int no_critpath =  0;    // We're not priting critical paths
 static int no_lengths =  0;    // We're not priting line lengths
 static int no_trace =  0;    // We're not priting trace file
+static int no_task_size_out = 0;  // We're not printing task size out file
 static int dctl =      0;     // Track control dependencies dynamically (ignore joins)
 static int draw =      0;     // Track RAW dependencies dynamically
 static int dwar =      0;     // Track WAR dependencies dynamically...
@@ -300,6 +301,7 @@ const char * dep_file_name = "embla.deps";
 const char * hidden_func_file_name = "";
 const char * loop_file_name = "";
 const char * task_size_file_name = "";
+const char * task_size_out_file_name = "";
 
 typedef
    struct _RTEntry {
@@ -373,6 +375,7 @@ typedef struct _LineInfo {
    Stats    seqLengthStatsContainsCall;
    Stats    seqLengthStatsNotContainsCall;
    Bool     shouldSpawn;
+   Stats    continuationLengthStats;
 } LineInfo;
 
 static LineList * consLL( LineInfo *line, LineList *next );
@@ -382,15 +385,15 @@ static struct _LoopInfo outOfTheLoop;
 
 #if RECORD_CF_EDGES
 #if PRINT_RESULTS_TABLE
-static LineInfo dummy_line_info = { { }, NULL, { }, 0, "", "", &outOfTheLoop, NULL, INIT_STATS };
+static LineInfo dummy_line_info = { { }, NULL, { }, 0, "", "", &outOfTheLoop, NULL, INIT_STATS, INIT_STATS, False, INIT_STATS };
 #else
-static LineInfo dummy_line_info = { NULL, { }, 0, "", "", &outOfTheLoop, NULL, INIT_STATS };
+static LineInfo dummy_line_info = { NULL, { }, 0, "", "", &outOfTheLoop, NULL, INIT_STATS, INIT_STATS, False, INIT_STATS  };
 #endif
 #else
 #if PRINT_RESULTS_TABLE
-static LineInfo dummy_line_info = { { }, 0, "", "", &outOfTheLoop, NULL, INIT_STATS };
+static LineInfo dummy_line_info = { { }, 0, "", "", &outOfTheLoop, NULL, INIT_STATS, INIT_STATS, False, INIT_STATS  };
 #else
-static LineInfo dummy_line_info = { 0, "", "", &outOfTheLoop, NULL, INIT_STATS };
+static LineInfo dummy_line_info = { 0, "", "", &outOfTheLoop, NULL, INIT_STATS, INIT_STATS, False, INIT_STATS  };
 #endif
 #endif
 
@@ -488,6 +491,7 @@ typedef struct _INode {
   long long int cost;
   long long int cpLength; // Excludes its own cost before node finalisation, includes its own cost after
   long long int seqLength;
+  long long int beginTime;
   struct _INode *cp;
 } INode;
 
@@ -516,11 +520,12 @@ typedef struct _FrameGraph {
   long long int seqLength;
   INode *cp;
   LatestNodeTable latestNodesTbl;
+  INodeList *callsNotYetSynced;
 } FrameGraph;
 
 static FrameGraph *firstFrame;
 static FrameGraph *currFrame;
-static long long int totalCost;
+static long long int globalClock;
 
 static INodeList *consINode(INodeList *tail, INode *head) {
   INodeList *newList = VG_(malloc)("", sizeof(INodeList));
@@ -532,10 +537,27 @@ static INodeList *consINode(INodeList *tail, INode *head) {
   return newList;
 }
 
+#define UPD_CONT_LENGTH_STATS(fromNode, endTime) \
+  if (!no_task_size_out && fromNode->callNode && fromNode->beginTime > 0) { \
+    /* Only care about the first dependence encountered */ \
+    long long int contLength = endTime - (fromNode->beginTime + fromNode->seqLength); \
+    updateStats(&(fromNode->line->continuationLengthStats), contLength); \
+    fromNode->beginTime = 0; \
+  }
+
 static void addDep(INode *fromNode, INode *toNode) {
   if (fromNode == toNode) {
     return;
   }
+
+//  if (!no_task_size_out && fromNode->callNode && fromNode->beginTime > 0) {
+//    LineInfo* lineInfo = fromNode->line;
+//    if (VG_(strcmp(lineInfo->func, "read_min")) == 0) {
+//      VG_(printf)("%d\t%lld\t%lld\t%d\t%lld\n", lineInfo->line, fromNode->beginTime, fromNode->seqLength, toNode->line->line, toNode->beginTime);
+//    }
+//  }
+
+  UPD_CONT_LENGTH_STATS(fromNode, toNode->beginTime);
 
   if (toNode->cp == NULL || fromNode->cpLength > toNode->cpLength) {
     toNode->cp = fromNode;
@@ -551,6 +573,7 @@ static void addStaticDeps(INode *node) {
      LineInfo *line = ll->line;
      int idx = ( line->line ) & ( ( 1 << idx_bits ) - 1 );
      INodeList *p = table[ idx ];
+     INodeList *callList, *next, *prev = NULL;
 
      while( p != NULL && p->node->line != line ) {
         p = p->next;
@@ -558,6 +581,23 @@ static void addStaticDeps(INode *node) {
 
      if (p != NULL) {
        addDep(p->node, node);
+     }
+     
+     if (!no_task_size_out) {
+       for (callList = currFrame->callsNotYetSynced; callList != NULL; callList = next) {
+         next = callList->next;
+         if (callList->node->line == line) {
+           addDep(callList->node, node);
+           if (prev == NULL) {
+             currFrame->callsNotYetSynced = next;
+           } else {
+             prev->next = next;
+           }
+           VG_(free)(callList);
+         } else {
+           prev = callList;
+         }
+       }
      }
   }
 }
@@ -647,6 +687,7 @@ static INode *new_INode(LineInfo *line) {
    inode->cost = 0;
    inode->cpLength = 0;
    inode->seqLength = 0;
+   inode->beginTime = globalClock;
    inode->cp = NULL;
    currFrame->currNode = inode;
 
@@ -665,6 +706,9 @@ static INode *new_INode(LineInfo *line) {
 
 static void newNodeFrame(INode *callerNode) {
   callerNode->callNode = True;
+  if (!no_task_size_out) {
+    currFrame->callsNotYetSynced = consINode(currFrame->callsNotYetSynced, callerNode);
+  }
   currFrame++;
   if (currFrame - N_FRAMES >= firstFrame) {
     VG_(tool_panic)( "Frame allNodes stack overflow." );
@@ -678,6 +722,7 @@ static void newNodeFrame(INode *callerNode) {
   currFrame->cp = NULL;
   currFrame->cpLength = -999999;
   currFrame->seqLength = 0;
+  currFrame->callsNotYetSynced = NULL;
 }
 
 #define PRINT_CP \
@@ -775,6 +820,14 @@ static void retNode(void) {
   if (!no_critpath) printCritPathNodes();
 
   // Free up memory
+  if (!no_task_size_out) {
+    for (nodeIter = currFrame->callsNotYetSynced; nodeIter != NULL; nodeIter = tail) {
+      INode *inode = nodeIter->node;
+      tail = nodeIter->next;
+      UPD_CONT_LENGTH_STATS(inode, globalClock);
+      VG_(free)(nodeIter);
+    }
+  }
   for (nodeIter = currFrame->allNodes; nodeIter != NULL; nodeIter = tail) {
     tail = nodeIter->next;
     VG_(free)(nodeIter->node);
@@ -813,7 +866,7 @@ static void newInstr(LineInfo *line, Bool fake) {
   if (!fake) {
     // Incrememt cost
     node->cost++;
-    totalCost++;
+    globalClock++;
     if (!no_lengths) node->seqLength++;
   }
 }
@@ -877,7 +930,7 @@ static TraceRec * newTraceRec(InstrInfo *i_info, TaggedPtr link)
    n_calls_to_newTR++;
    if( last_trace_rec >= trace_pile + n_trace_recs ) {
      // DPRINT1( "Bailing out after %u calls\n", n_calls_to_newTR );
-       VG_(tool_panic)( "Trace pile overflow" );
+     VG_(tool_panic)( "Trace pile overflow" );
    }
    last_trace_rec++;
    last_trace_rec->i_info = i_info;
@@ -1381,6 +1434,7 @@ static LineInfo *mk_line_info_l( char *file, int line, char *func )
       info->seqLengthStatsContainsCall = init_stats;
       info->seqLengthStatsNotContainsCall = init_stats;
       info->shouldSpawn = False;
+      info->continuationLengthStats = init_stats;
       *info_p = info;
    }
    return info;
@@ -1458,6 +1512,8 @@ static Bool em_process_cmd_line_option(Char* arg)
   else
   VG_STR_CLO(arg, "--task-size-file", task_size_file_name)
   else
+  VG_STR_CLO(arg, "--task-size-out-file", task_size_out_file_name)
+  else
   VG_XACT_CLO(arg, "--span", measure_span)
   else
   VG_XACT_CLO(arg, "--dctl", dctl)
@@ -1509,6 +1565,7 @@ static void em_print_usage(void)
 "    --edge-file=<name>        store control flow data in <name>\n"
 "    --critpath-file=<name>    store critical paths in <name>\n"
 "    --lengths-file=<name>     store line lengths in <name>\n"
+"    --task-size-out-file=<name>   store average task/continuation sizes in <name>\n"
 "    --dep-file=<name>         read dependencies for span calculation from <name> [embla.deps]\n"
 "    --hidden-func-file=<name> read names of hidden functions <name>\n"
 "    --loop-file=<name>        read loop structure from <name>\n"
@@ -3544,6 +3601,7 @@ static void checkIfMallocRet(Addr32 addr, Addr32 target, void *guest_state)
           !VG_(strcmp)("memalign", fn)) {
         Addr32 retValue = ptr[OFFSET_x86_EAX];
         setMallocSize( retValue, malloc_request_size );
+        clearMap(retValue, malloc_request_size); // Need to clear map when mallocing as well as freeing
       } else if (!VG_(strcmp)("realloc", fn)) {
         Addr32 retValue = ptr[OFFSET_x86_EAX];
         int mallocSize = getMallocSize(addr_arg);
@@ -3556,9 +3614,12 @@ static void checkIfMallocRet(Addr32 addr, Addr32 target, void *guest_state)
             // Shrinking memory (i.e. free)
             Addr32 freedRegion = addr_arg + malloc_request_size;       
             clearMap(freedRegion, -delta);
-          } else {
+          } else if (delta > 0) {
             // Growing memory (i.e. malloc)
-            // Nothing more needs to be done
+            Addr32 mallocedRegion = addr_arg + mallocSize;
+            clearMap(mallocedRegion, delta); // Need to clear map when mallocing as well as freeing
+          } else {
+            // Remaining the same. Nothing needs to be done.
           }
         } else {
           // Copying (i.e. free old region, malloc new region)
@@ -4747,7 +4808,7 @@ static IRSB* em_instrument(VgCallbackClosure* closure,
 /*********************************************
  * Client requests                           *
  *********************************************/
-#define CLIREQ_COMPENSATION 24
+#define CLIREQ_COMPENSATION 12
 
 static Bool em_handle_client_request ( ThreadId tid, UWord* arg, UWord* ret )
 {
@@ -4759,6 +4820,12 @@ static Bool em_handle_client_request ( ThreadId tid, UWord* arg, UWord* ret )
   switch(arg[0]) {
     case VG_USERREQ__REDUCTION_BEGIN:
       {
+        // Compensate for Valgrind client requests
+        currFrame->currNode->cost -= CLIREQ_COMPENSATION;
+        globalClock -= CLIREQ_COMPENSATION;
+        if (!no_lengths) {
+          currFrame->currNode->seqLength -= CLIREQ_COMPENSATION;
+        }
         if (!no_reductions)
           beginReductionOp();
         break;
@@ -4767,7 +4834,7 @@ static Bool em_handle_client_request ( ThreadId tid, UWord* arg, UWord* ret )
       {
         // Compensate for Valgrind client requests
         currFrame->currNode->cost -= CLIREQ_COMPENSATION;
-        totalCost -= CLIREQ_COMPENSATION;
+        globalClock -= CLIREQ_COMPENSATION;
         if (!no_lengths) {
           currFrame->currNode->seqLength -= CLIREQ_COMPENSATION;
         }
@@ -5003,7 +5070,7 @@ static void read_loops( void )
    Char buf[bufsize];
    LoopInfo  *table[LOOP_HASH_ENTRIES];
    int i;
-   int fake_call_ctr = 0;
+   int fake_call_ctr;
 
    for( i = 0; i < LOOP_HASH_ENTRIES; i++ ) {
      table[i] = NULL;
@@ -5016,7 +5083,8 @@ static void read_loops( void )
      Char *file, *func;
      LoopInfo *loopBody, *wholeLoop, *parent;
 
-     fake_call_ctr++;
+     n  = readWord( rh, buf, bufsize );
+     fake_call_ctr = VG_(atoll)( buf );
 
      n  = readWord( rh, buf, bufsize );
      file = intern_string( buf );
@@ -5061,6 +5129,14 @@ static void read_loops( void )
      loopBody->call = mk_fake_call( file, func, fake_call_ctr );
      loopBody->next = table[ loopBody_id & LOOP_HASH_MASK ];
      loopBody->depth = depth;
+
+     // Loop bodies can always be spawned,
+     // as Cilk++ and Wool use divide-and-conquer that can
+     // coalesce loop iterations into a single task to ensure
+     // granularity is large enough.
+     // Having said that, coalescing loop iterations reduces
+     // parallelism, which we don't reflect here
+     loopBody->call->line->shouldSpawn = True;
 
      table[ loopBody_id & LOOP_HASH_MASK ] = loopBody;
 
@@ -5190,7 +5266,8 @@ static void em_post_clo_init_deps(void)
 
    no_trace = (VG_(strcmp)(trace_file_name, "") == 0);
    no_critpath = (VG_(strcmp)(critpath_file_name, "") == 0);
-   no_lengths = (VG_(strcmp)(lengths_file_name, "") == 0);
+   no_task_size_out = (VG_(strcmp)(task_size_out_file_name, "") == 0);
+   no_lengths = (VG_(strcmp)(lengths_file_name, "") == 0) && no_task_size_out;
 
    VG_(message)(Vg_UserMsg, "Initalising dependency profiling");
 
@@ -5278,6 +5355,7 @@ static void em_post_clo_init(void)
  *****************************************************/
 
 static void printLengths(void);
+static void printTaskSizeOut(void);
 
 #if CRITPATH_ANALYSIS
 
@@ -5295,12 +5373,16 @@ static void finaliseCritPath(void) {
   }
   cpLength = currFrame->cpLength;
   // To take account of the first 2 manually created TraceRecs
-  VG_(message)(Vg_UserMsg, "No. of instructions is %lld", totalCost);
+  VG_(message)(Vg_UserMsg, "No. of instructions is %lld", globalClock);
   VG_(message)(Vg_UserMsg, "Length of Critical path is %lld", cpLength);
-  VG_(message)(Vg_UserMsg, "Average parallelism is %lld", totalCost / cpLength);
+  VG_(message)(Vg_UserMsg, "Average parallelism is %lld", globalClock / cpLength);
   
-  if (!no_lengths) {
+  if ((VG_(strcmp)(lengths_file_name, "") != 0)) {
     printLengths( );
+  }
+
+  if (!no_task_size_out) {
+    printTaskSizeOut();
   }
 
 }
@@ -5444,6 +5526,42 @@ static void printLengths(void) {
    if( fd != -1 )
      VG_(close)( fd );
 } 
+
+static void printTaskSizeOut(void) {
+   int      i;
+   int fd = -1;
+   LineInfo *line_info;
+
+   SysRes sres;
+   sres = VG_(open)((Char *) task_size_out_file_name, 
+	       VKI_O_CREAT | VKI_O_TRUNC | VKI_O_WRONLY,
+	       VKI_S_IRUSR | VKI_S_IWUSR | VKI_S_IRGRP);
+   if( sres.isError ) {
+      VG_(message)(Vg_UserMsg, "Lengths file could not be opened");
+      return;
+   }
+   fd = sres.res;
+
+   for( i=0; i<RESULT_ENTRIES; i++ ) {
+     for( line_info = line_table[i]; line_info != NULL; line_info = line_info->next ) {
+       if (
+          (VG_(strcmp)(line_info->file, "???") != 0) &&
+          (VG_(strcmp)(line_info->func, "???") != 0)) {
+         Stats seqLengthStats = line_info->seqLengthStatsContainsCall;
+         Stats contLengthStats = line_info->continuationLengthStats;
+         tl_assert(seqLengthStats.n == contLengthStats.n);
+         if (seqLengthStats.n > 0) {
+//           VG_(sprintf)( buf, "%s\t%s\t%d\t%llu\t%llu\t%llu\t%lld\n", line_info->file, line_info->func, line_info->line, (long long int) (seqLengthStats.mean), (long long int) (contLengthStats.mean), contLengthStats.n, (long long int) (contLengthStats.m2 / contLengthStats.n) );
+           VG_(sprintf)( buf, "%s\t%s\t%d\t%llu\t%llu\n", line_info->file, line_info->func, line_info->line, (long long int) (seqLengthStats.mean), (long long int) (contLengthStats.mean) );
+           VG_(write)( fd, buf, VG_(strlen)( buf ) );
+         }
+       }
+     }
+   }
+
+   if( fd != -1 )
+     VG_(close)( fd );
+}
 
 static void printCFG(const Char * cfgFileName)
 {

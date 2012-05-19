@@ -1,5 +1,7 @@
 #!/usr/bin/perl
 
+my ($MAX_LOOPS) = 10000;
+
 use Getopt::Long;
 
 my $filefilter, $linefilter;
@@ -51,21 +53,38 @@ while (defined($line = <FH>)) {
 
 for $callerfile (keys %cp) {
   for $callerline (keys %{ $cp{$callerfile}}) {
-    open DOT, ">$callerfile.$callerline.dot" or die $!;
+    my($callerlinetext);
+    if ($callerline > 0) {
+      $callerlinetext = $callerline;
+    } elsif ($callerline > -$MAX_LOOPS) {
+      my $loopno = -$callerline;
+      $callerlinetext = "LoopBody$loopno";
+    } else {
+      my $loopno = -( $callerline + $MAX_LOOPS );
+      $callerlinetext = "Loop$loopno";
+    }
+    open DOT, ">$callerfile.$callerlinetext.dot" or die $!;
     $calleefile = $cpinfo{$callerfile}{$callerline}{calleefile};
     my $acclength = $cpinfo{$callerfile}{$callerline}{leng}{acccost};
     my $instlength = $cpinfo{$callerfile}{$callerline}{leng}{instances};
     my $avglength = $acclength / $instlength;
-    printf DOT "// %s:%d - Callee file = %s, Length = %d \n", $callerfile, $callerline, $calleefile, $avglength;
     printf DOT "digraph \"%s:%d\" {\n", $callerfile, $callerline;
+    printf DOT "  label = \"%s:%s - Callee file = %s, Length = %d\";\n", $callerfile, $callerlinetext, $calleefile, $avglength;
+    printf DOT "  labelloc=t;\n";
     for $lineno (keys %{ $cp{$callerfile}{$callerline}}) {
       my $instances = $cp{$callerfile}{$callerline}{$lineno}{instances};
       my $acccost = $cp{$callerfile}{$callerline}{$lineno}{acccost};
       my $avgcost = $acccost / $instances;
-      printf DOT "  %d [label = \"%d:%d\"];\n", $lineno, $lineno, $avgcost;
+      if ($lineno > 0) {
+        printf DOT "  %d [label = \"Line %d\\nCost:%d\"];\n", $lineno, $lineno, $avgcost;
+      } elsif ($lineno > -$MAX_LOOPS) { # Loop body
+        printf DOT "  %d [label = \"Body of Loop %d\\nCost:%d\"];\n", $lineno, -$lineno, $avgcost;
+      } else {
+        printf DOT "  %d [label = \"Loop %d\\nCost:%d\"];\n", $lineno, -($lineno+$MAX_LOOPS), $avgcost;
+      }
       for $succline (keys %{ $cp{$callerfile}{$callerline}{$lineno}{succs}}) {
         my $depinsts = $cp{$callerfile}{$callerline}{$lineno}{succs}{$succline};
-        printf DOT "  %d -> %d [label = \"%d\"];\n", $lineno, $succline, $depinsts;
+        printf DOT "  %d -> %d [label = \"%dx\"];\n", $lineno, $succline, $depinsts;
       }
     }
     printf DOT "}\n";

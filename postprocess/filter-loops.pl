@@ -33,14 +33,13 @@ while (defined($line = <FH>)) {
   }
 }
 
-my ($loopnum) = 0;
+my ($loopnum);
 my ($id, $pid, $header, $restOfLine);
 my (%loops);
 
 while (defined($line = <STDIN>)) {
   chomp($line);
-  ($file, $fn, $id, $pid, $header, $restOfLine) = split(/\t/, $line, 6);
-  $loopnum++;
+  ($loopnum, $file, $fn, $id, $pid, $header, $restOfLine) = split(/\t/, $line, 7);
   if ($deps{$file}{-$loopnum}{$header} != 1 &&
       $deps{$file}{-$loopnum}{-$loopnum} != 1) {
     # Loop is parallel
@@ -54,7 +53,7 @@ while (defined($line = <STDIN>)) {
       # No enclosing loop
       $pid = $id;
     } 
-    printf "%s\t%s\t%d\t%d\t%d\t%s\n", $file, $fn, $id, $pid, $header, $restOfLine;
+    printf "%d\t%s\t%s\t%d\t%d\t%d\t%s\n", $loopnum, $file, $fn, $id, $pid, $header, $restOfLine;
   } else {
     $loops{$file}{$id}{para} = 0;
   }

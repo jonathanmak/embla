@@ -81,13 +81,11 @@ void readLengths(void) {
     getline(ifs, temp, '\n');
     variance = atof(temp.c_str());
     
-    if (lineNo > 0) { // Ignore loops
-      Stats& stats = containsCall == "T" ?
-        getLineInfo(file, fn, lineNo).containsCall :
-        getLineInfo(file, fn, lineNo).notContainsCall;
-      stats.n = n;
-      stats.mean = mean;
-    }
+    Stats& stats = containsCall == "T" ?
+      getLineInfo(file, fn, lineNo).containsCall :
+      getLineInfo(file, fn, lineNo).notContainsCall;
+    stats.n = n;
+    stats.mean = mean;
   }
 }
 
@@ -247,6 +245,10 @@ double calculateContinuationLength(LineInfo& lineInfo) {
   gsl_matrix_free(solveM);
   gsl_vector_free(lengthsV);
 
+  if (length != length) { // NAN
+    cerr << "Continuation length of " << lineInfo.file << ":" << lineInfo.line << " is NaN!" << endl;
+    exit(1);
+  }
   return length;
 }
 
@@ -257,7 +259,7 @@ void printMeanLengths(void) {
     for (map<int, LineInfo>::iterator li = lines.begin(); li != lines.end(); li++) {
       int line = li->first;
       LineInfo& lineInfo = li->second;
-      if (lineInfo.containsCall.n > 0) {
+      if (line > 0 && lineInfo.containsCall.n > 0) {
         double taskLength = lineInfo.containsCall.mean;
         double continuationLength = calculateContinuationLength(lineInfo);
 

@@ -26,7 +26,8 @@ for sfile in `awk -F"\t" '{print $1}' $cfgfile | sort -u`; do
      | awk -v fil=$sfile -v fn=$sfname '{print fil "\t" fn "\t" $0}' \
      | cat 
   done
-done
+done \
+| awk '{print ++ctr "\t" $0}'
 rm $cfgfile.TEMP
 
 IFS=$O
